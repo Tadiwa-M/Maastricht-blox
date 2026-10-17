@@ -1,0 +1,24 @@
+# data & build outputs
+/data/
+/build/
+*.laz
+*.gpkg
+*.osm.pbf
+# python
+__pycache__/
+.venv/
+*.egg-info/
+.pytest_cache/
+# dotnet
+bin/
+obj/
+# unity
+unity/[Ll]ibrary/
+unity/[Tt]emp/
+unity/[Oo]bj/
+unity/[Bb]uild/
+unity/[Bb]uilds/
+unity/[Ll]ogs/
+unity/[Uu]ser[Ss]ettings/
+unity/*.csproj
+unity/*.sln
