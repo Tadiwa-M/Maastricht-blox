@@ -1,0 +1,1 @@
+{"ts":1792241400,"vehicles":[{"id":"ARR:1234","mode":"bus","operator":"ARR","routeShort":"4","routeId":"r4","tripId":"t4","headsign":"Station","shapeId":"sh4","lat":50.850197,"lon":5.68975,"world":[607.51,1361.97],"bearingDeg":40.0,"speedMps":null,"distAlongShapeM":189.8,"delaySec":45,"observedTs":1792241390}]}

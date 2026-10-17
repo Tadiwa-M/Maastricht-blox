@@ -1,0 +1,19 @@
+{
+    "name": "Blox.Rendering",
+    "rootNamespace": "Blox.Rendering",
+    "references": [
+        "Blox.Data",
+        "Blox.Meshing",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
