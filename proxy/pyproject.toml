@@ -1,0 +1,22 @@
+[project]
+name = "blox-proxy"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+  "httpx>=0.27",
+  "gtfs-realtime-bindings>=1.0",
+  "protobuf>=5.0",
+  "pyproj>=3.6",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.24"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/blox_proxy"]
