@@ -1,0 +1,27 @@
+{
+    "name": "Blox.Look.EditorTests",
+    "rootNamespace": "Blox.Editor.Tests",
+    "references": [
+        "Blox.Data",
+        "Blox.Meshing",
+        "Blox.Rendering",
+        "Blox.Gameplay",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

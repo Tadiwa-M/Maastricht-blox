@@ -12,6 +12,11 @@ See `CONTRACT.md` for the data formats and APIs shared by all components.
 
 ## Credits
 Data © OpenStreetMap contributors (ODbL) · 3D BAG by TU Delft 3D geoinformation (CC BY 4.0) ·
-AHN via PDOK · OVapi · Buienradar · Rijkswaterstaat.
+AHN (AHN.nl; AHN4 via PDOK CC0, AHN5/AHN6 CC BY 4.0) · aerial photo: Beeldmateriaal Nederland
+via PDOK (CC BY 4.0, only if used for ground colours) · OVapi (GTFS / GTFS-RT) ·
+weather: [Buienradar.nl](https://www.buienradar.nl) (non-commercial use) · water levels: Rijkswaterstaat ·
+train positions: NS (only if an NS API key is configured).
+
+Status, what is verified and the next steps on a PC: `docs/STATUS.md`.
 
 Not affiliated with, endorsed or sponsored by the LEGO Group.
