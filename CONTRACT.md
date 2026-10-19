@@ -1,4 +1,4 @@
-# Maastricht Blox: Interface Contract (v2)
+# Maastricht Blox: Interface Contract (v3)
 
 This file is the single source of truth shared by every component. Parallel work streams
 (pipeline, proxy, Unity data/meshing, Unity rendering) code against **this** file, not
@@ -151,7 +151,7 @@ Rules:
 
 ```json
 {
-  "contractVersion": 2,
+  "contractVersion": 3,
   "crs": "EPSG:28992",
   "originRD": [175700, 316500],
   "baseNapM": 30.0,
@@ -165,12 +165,56 @@ Rules:
   "generated": "2026-10-17T12:00:00Z",
   "sources": [{"name": "3D BAG", "version": "...", "licence": "CC BY 4.0"}],
   "chunks": [{"cx": 12, "cy": 40, "file": "chunks/c_12_40.bxc", "bricks": 18234,
-              "minK": 60, "maxK": 410, "sha1": "..."}]
+              "minK": 60, "maxK": 410, "sha1": "..."}],
+  "islands": [{"id": 7, "file": "islands/i_000007.bxi", "cx": 12, "cy": 40, "bricks": 3120,
+               "sha1": "..."}]
 }
 ```
 
 The output directory (`build/world/`) contains `manifest.json`, `palette.json`,
 `brick_catalogue.json` (copies), `features.json`, `chunks/`, `preview.png`.
+
+## 5.1 Islands (v3): buildings on their own rotated grid
+
+Most Maastricht streets are not aligned with the world grid. A wall at 20° rasterises into a
+staircase, which can't carry facade detail. So a building (or a terrace of touching buildings
+with the same orientation) whose main wall is more than **3°** off-axis is built on its **own
+grid, rotated to that wall**, and stored as an **island** rather than in the chunks.
+
+**Pose.** An island has `origin = [x, z]` (Unity metres: the world position of its local cell
+(0, 0) min corner, at k = 0) and `yawDeg`, clockwise from north, the same convention as brick
+model poses (7.1). Local axes in world (east, north) components:
+local +j → `(sin yaw, cos yaw)`, local +i → `(cos yaw, −sin yaw)`. A local point `(u, v)` in
+metres (u along +i, v along +j) lands at world
+`x = origin.x + u·cos(yaw) + v·sin(yaw)`, `z = origin.z − u·sin(yaw) + v·cos(yaw)`;
+height `y = K · 0.2` exactly as in chunks (islands use **global k**). |yawDeg| ≤ 45.
+Shared vectors: `contract/test_vectors/islands.json`.
+
+**File: `islands/i_{id:06d}.bxi`.** Little-endian.
+```
+Header (40 bytes)
+  char[4]  magic       = "BXI1"
+  uint16   version     = 1
+  uint16   flags       bit0 = body is raw-DEFLATE compressed
+  uint32   islandId
+  int32    cx, cy      owning chunk (for streaming/LOD: the chunk holding the island's centre)
+  float32  originX     Unity metres
+  float32  originZ     Unity metres
+  float32  yawDeg      clockwise from north, (−45, 45]
+  uint32   brickCount
+  uint32   bodyBytes
+Body: brickCount × BrickRecord (section 4 layout: i, j are LOCAL 0..255, k global, facing rule
+in the local frame, featureId global).
+```
+An island is at most 256 × 256 studs; larger terraces are split into several islands with
+the same yaw and adjacent origins.
+
+**Rules.** Island bricks never appear in chunks. Under an island's footprint the chunk
+grid holds ground only (paving), so nothing shows through gaps. The island footprint is grown
+by half a stud so rotated edges overlap their neighbours instead of leaving slits. Plinth bricks
+go two plates below ground to hide the seam on slopes. Stud exposure and hidden-face culling
+are computed **within the island** (the chunk grid doesn't cover island studs). Renderers
+transform each island as one rigid object (local → world by the pose above).
 
 ## 6. Features: `features.json`
 
