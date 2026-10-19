@@ -27,6 +27,7 @@ if (-not (Test-Path 'C:\Program Files\Unity\Hub\Editor')) {
     Write-Warning 'Unity Hub not found: install Unity Hub, then Unity 6 LTS (6000.x) with Windows Build Support.'
 }
 Write-Host "`nNext:"
-Write-Host '  bash scripts/check.sh            (Git Bash) all tests'
+Write-Host '  .\scripts\check.ps1               all tests'
+Write-Host '  .\scripts\preview.ps1             open the look test in the browser viewer'
 Write-Host '  cd pipeline; uv run blox fetch   download AHN / 3D BAG / OSM (network needed)'
 Write-Host '  .\scripts\unity.ps1 all          compile, test, build and screenshot the Unity look test'
