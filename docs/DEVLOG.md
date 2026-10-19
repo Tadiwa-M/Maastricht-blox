@@ -207,3 +207,131 @@ LookTests `Passed: 67`, viewer `# pass 24  # fail 0`.
   is in progress.
 - Workstation (RTX 5070, no admin rights): the setup script now installs uv/.NET/Node per user.
   Unity needs IT or an existing install.
+
+## 2026-10-19: Unity reads and renders islands (contract v3, track U)
+
+**What changed**
+- `Blox.Data`: `.bxi` reader/writer (`IslandHeader`, `IslandReader`, `IslandWriter`), `IslandPose`
+  (local <-> world, plus `UnityEulerY`, Unity's own Y rotation written out), `IslandIndex`
+  (occupancy within the island). `ChunkOccupancy` now wraps a shared `ColumnOccupancy` (any grid
+  size, unsorted records). `Manifest.Islands`; `WorldSpec.ContractVersion` = 3 (manifests 1..3 read).
+  `WorldIndex` lists islands by owning chunk and loads/unloads them; `WorldFiles` loads `.bxi`
+  (sha1 and brick count checked). `WorldRaycast` also walks loaded islands (ray turned into the
+  island frame, same DDA); `BrickHit.IslandId` marks island hits.
+- `Blox.Meshing`: `IslandMesherCore` (the chunk mesher on the island grid, local space, no
+  neighbours; `StudsToWorld`), `CellGrid.ComputeDims` and `LodMesherCore.ComputeDims` take a grid
+  size, `IslandMeshJob`, `LodMeshJob.SizeI/SizeJ`, `ChunkMeshBuilder.ScheduleIsland` and
+  `IslandTransform`. `PendingChunkMesh` carries an island id and returns world-space studs.
+- `Blox.Rendering`: `WorldLoader` meshes a chunk's islands at the chunk's level, one GameObject per
+  island at (originX, 0, originZ) with `Quaternion.Euler(0, yawDeg, 0)`; `StudRenderer` takes
+  island batches; island materials are copies with fake studs off.
+- Shaders: horizontal-face bevel axes follow the object's yaw (`objectXWS`, TEXCOORD7). Also fixes
+  top-face bevels of rotated brick models.
+
+**Why**
+- Islands are "a chunk on its own turned grid", so reusing the chunk mesher, occupancy and record
+  reader keeps one code path and one set of culling rules. Islands follow their owning chunk for
+  streaming/LOD (the contract's "owning chunk"), so there is no second planner to tune.
+- Sign check: Unity is left-handed, Y up, +Z north; positive Y rotation turns +Z toward +X =
+  clockwise from above = the contract's yaw. No flip; pinned by tests against
+  `contract/test_vectors/islands.json`.
+- Studs are baked to world space on the CPU (instead of a per-batch matrix) so `StudCull.compute`
+  and `Stud.shader` stay unchanged.
+
+**Numbers**
+- dotnet: `Blox.Tests` 360 passed (was 319), `Blox.LookTests` 67 passed. The pipeline golden
+  island (`i_000001.bxi`, yaw -33.5, a brick at local i = 252) reads byte-exact; the uncompressed
+  one re-writes byte for byte; record `world` positions match the pose.
+- `build/fixture_world` (synthetic town): island 1 yaw -30, 998 bricks, 28 x 32 studs, 292 studs;
+  island 2 yaw 20, 2722 bricks, 46 x 29 studs, 657 studs; both mesh on their own grid.
+
+**Open decisions / not done**
+- Nothing ran in Unity (not installed here): island GameObjects, Burst `IslandMeshJob`, the shader
+  change. Check on the GPU workstation with `scripts/unity.ps1 all`.
+- Islands get no far fake studs (beyond 130 m roofs look smooth). Fix would be a per-island
+  stud-top lookup or object-space fake studs.
+- Gameplay ground queries (`WorldIndex.IsSolid`/`ColumnTop`, `CharacterWalker`) ignore islands:
+  walkers pass through rotated buildings. Needs an "is solid at world point" that also asks islands.
+- Colour variation of island bricks hashes island-local (i, j, k); the contract doesn't say.
+  The viewer should do the same, or the contract should pick a rule.
+
+## 2026-10-19: rotated building islands in the pipeline (contract v3, track P)
+
+**What changed**
+- New package `pipeline/src/blox_pipeline/islands/`: `orient.py` (dominant wall direction mod
+  90°: length-weighted histogram peak, then circular mean of the edges near it), `group.py`
+  (|yaw| > 3° → island; touching houses with yaws within 3° → one terrace group, merged
+  strongest contact first while the group stays within 3°), `frame.py` (local frame: origin
+  snapped so the main walls sit on cell centres, footprint grown by 0.25 m, DTM sampled at
+  world positions, street probes evaluated back in world space), `build.py` (voxelise + facade
+  + layout per 64-stud local sub-tile, terrain stripped, plinth 2 plates below ground,
+  split into 256-stud islands), `pose.py` (`island_local_to_world`, passes
+  `contract/test_vectors/islands.json`).
+- World side: island buildings leave `world.buildings`; their footprint is paved
+  (`island_paving`, priority above roads); `Layers.island_k` marks them occupied, so
+  neighbours get no facade/glass on a party wall against an island and no trees inside.
+- IO: `.bxi` writer/reader (`io/island_*.py`, 40-byte header), manifest `"islands"` list,
+  `contractVersion` 3. Golden fixture `pipeline/tests/fixtures/golden/i_000001.bxi`
+  (+ `_uncompressed`) and `golden_island.json` (every field, plus world positions) for C#.
+- `blox build` builds islands, logs facade detail for world grid / islands / total;
+  `--no-islands` keeps v2 behaviour. Top-down preview draws islands turned into place.
+- Town fixture: + a terrace of three touching houses turned −20° (one island, yaw +20) with
+  a pedestrian street along its front, + a house turned 2° (stays on the grid).
+- `tools/island_share.py`: estimates the share of turned buildings in an existing world from
+  its bricks (outline from brick columns, simplified, same estimator and grouping).
+
+**Why this way**: the voxeliser, facade planner and layout already work; islands reuse them
+unchanged by mapping local metres to "fake RD" `(X0 + u, Y0 + v)`. Laying islands out in
+64-stud sub-tiles keeps the chunk rules, so cutting at 256 never splits a brick and the
+facade code's chunk-border handling still holds.
+
+**Numbers**
+- Town fixture facade detail: **42 % → 93 %** of exterior wall (v2 `--no-islands`: 12/182
+  runs, 264 studs `short`; v3: 24/26 runs; islands alone 12/12 runs, 212 studs, 100 %;
+  the turned terrace's fronts are shop fronts via the world-space street check).
+- `samples/markt` (estimate, raster-based, ±2°): 108 of 132 whole buildings (82 %) would be
+  islands, in 56 groups; 17 of them are at 3-5°, inside the estimator's error, so 69-82 %.
+  Validated on the fixture rebuilt with `--no-islands`: finds exactly its 4 island
+  buildings in 2 groups, yaws within 2.3°.
+- Cost ~60-70 ms per island building (≈ 6-7 extra minutes for the full slice if ~80 % of
+  8725 buildings are islands; parallelising groups is easy if needed).
+- Tests: pipeline 453 passed (was 391).
+
+**Open decisions**
+- Renderers (viewer, Unity) don't draw islands yet (other tracks). Until then a v3 world
+  shows paved empty footprints where turned buildings stand.
+- Buildings turned 1-3° stay on the grid and can still have `skew` walls (fixture: the 2°
+  house's 8 m walls). Threshold is `VoxelConfig.island_min_yaw_deg`.
+- No water/bridges inside an island's local world: a canal-side island wall is not checked
+  for the `street` (water in front) fallback.
+- Two detailed walls meeting at a corner can put two corner windows back to back; more
+  visible now that free-standing island houses get four detailed walls.
+
+## 2026-10-19: islands cross-check (pipeline <-> C#)
+
+**What changed**
+- Bug fix (pipeline, `islands/frame.py`): an island's local world only contained the group's own
+  members, so a party wall shared with an on-grid neighbour (or another island) was planned as
+  a street front and got windows and a door. Nearby non-member buildings are now copied into the
+  local world as occupancy only (`local_neighbours`, same mechanism the world grid uses for
+  islands). Regression test: `test_party_wall_against_an_on_grid_neighbour_gets_no_facade`.
+  The town fixture's output is unchanged (its islands touch no on-grid building).
+- `write_world` warns when an island's owning chunk has no file (it would never stream in).
+- `pipeline/tests/fixtures/town_world/`: the town fixture built with `blox build`, committed so
+  CI's dotnet job (which doesn't run the pipeline) reads real pipeline-built islands. Kept
+  current by `test_committed_town_world_is_current` (`BLOX_REGEN_FIXTURES=1` regenerates).
+- C# `IslandTests`: the old fixture test skipped unless `build/fixture_world` existed (never in
+  CI); it now reads the committed world (or `BLOX_ISLAND_WORLD_DIR`) and is a plain `[Fact]`.
+  New `PipelineBuiltIslandsSitOnTheirPavedHole`: islands placed by C#'s `IslandPose` land on the
+  pipeline's paving (91 %/93 % of interior columns; 1 %/12 % with the yaw flipped) and their
+  plinth reaches the chunk ground: yaw sign and origin agree end to end.
+
+**Reviewed, no change needed**: yaw sign on both sides (pipeline affine matrices, Unity
+`Quaternion.Euler(0, yaw, 0)`), origin = local (0, 0) min corner with global k, cell-centre
+snapping of the main walls, half-stud growth, owning chunk = brick-extent centre, 256-stud split
+(sub-tiles never let a brick cross a 64-line, origins offset along local axes).
+
+**Open**: island ids depend on build bbox (contract has no stability rule); a group's facade
+props (sills, awnings, street props up to 3 cells out) can overlap world features outside the
+paved footprint; the shared party wall itself is still drawn twice (neighbour's straight wall
+and the island's turned wall cross), which is inherent to mixing grids.

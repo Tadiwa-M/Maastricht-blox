@@ -33,7 +33,7 @@ ROAD_RANK = {  # paint order: higher ranks drawn later (on top)
 }
 WATERWAY_WIDTH_M = {"river": 12.0, "canal": 10.0, "stream": 2.5, "ditch": 1.5, "drain": 1.5}
 BRIDGE_VALUES = frozenset({"yes", "viaduct", "movable", "aqueduct", "cantilever", "covered", "trestle"})
-P_LANDUSE, P_ROAD_AREA, P_ROAD, P_RAIL = 10, 20, 30, 50
+P_LANDUSE, P_ROAD_AREA, P_ROAD, P_RAIL, P_ISLAND = 10, 20, 30, 50, 60
 RAIL_BED_M, RAIL_GAUGE_M = 3.0, 1.435
 
 
@@ -155,6 +155,14 @@ def prepare_landuse(osm: OsmData, reg: FeatureRegistry) -> list[SurfacePatch]:
     return out
 
 
+def island_paving(groups: list) -> list[SurfacePatch]:
+    """Pave the (unrotated) footprint of every island building at ground level. The island
+    covers it, but its grown, turned outline never matches the world cells exactly: paving
+    keeps grass and roads from showing through the gaps (CONTRACT 5.1)."""
+    pave = palette.idx("pavement")
+    return [SurfacePatch(b.footprint, pave, TILE, P_ISLAND) for g in groups for b in g.members]
+
+
 def prepare_trees(osm: OsmData, dtm: HeightGrid, dsm: HeightGrid | None) -> list[TreeSpec]:
     points: list[tuple[str, Point]] = []
     for f in osm.trees:
@@ -205,5 +213,5 @@ def register_pois(osm: OsmData, reg: FeatureRegistry) -> None:
         reg.add(kind, f.geom, name=f.name, osm_id=f.osm_id, address=addr, tags=keep)
 
 
-__all__ = ["prepare_water", "prepare_roads", "prepare_landuse", "prepare_trees", "register_pois",
+__all__ = ["island_paving", "prepare_water", "prepare_roads", "prepare_landuse", "prepare_trees", "register_pois",
            "parse_width"]

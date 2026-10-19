@@ -5,6 +5,10 @@ chunk border along i, the back wall on a chunk border along j), a fifth building
 30 degrees, a residential street in front, a pedestrian street along the west end and a
 café POI inside the third house. Ground slopes gently east (1 %).
 
+Islands (CONTRACT 5.1): behind the block, a terrace of three touching houses turned
+-20 degrees (one island, yaw +20) with a pedestrian street along their north front, and a
+house turned only 2 degrees, which must stay on the world grid.
+
 Written as a cached data dir exactly like ``blox fetch`` leaves it (AHN blocks, a 3D BAG
 CityJSON tile, the OSM clip), so tests and ``blox build --data-dir`` read it the real way::
 
@@ -41,9 +45,32 @@ TERRACE = [  # bag id suffix, x0, x1, eave z, ridge z, ridge along x?, year
 # the wall plane behind them is in cy=31, so its sills straddle a chunk border
 Y0, Y1 = 317510.0, 317524.5
 ROTATED = ("5", (176290.0, 317530.0), 10.0, 12.0, 30.0, 58.0, 62.0, 1962)  # id, centre, w, d, deg, eave, ridge, year
+# rotated terrace: (id, x0, x1 along the street from the centre, eave, ridge, year); all share
+# TURNED_CENTRE, TURNED_DEG and a depth of TURNED_DEPTH, front (north side) faces the street
+TURNED_CENTRE, TURNED_DEG, TURNED_DEPTH = (176250.0, 317540.0), -20.0, 10.0
+TURNED_TERRACE = [
+    ("6", -9.5, -3.5, 60.0, 64.0, 1700),
+    ("7", -3.5, 3.5, 62.5, 67.0, 1850),
+    ("8", 3.5, 9.5, 59.5, 63.5, 1910),
+]
+NEAR_GRID = ("9", (176274.0, 317538.0), 8.0, 10.0, 2.0, 59.0, 63.0, 1935)  # like ROTATED, 2 degrees
 CAFE = (176247.0, 317511.0)
 STREET = ((176200.0, 317505.0), (176320.0, 317505.0))      # residential, 7 m
 PEDESTRIAN = ((176225.0, 317480.0), (176225.0, 317545.0))  # pedestrian, 6 m
+
+
+def turned_axes() -> tuple[np.ndarray, np.ndarray]:
+    """Unit vectors along the turned terrace's street (u) and towards its front (v)."""
+    a = math.radians(TURNED_DEG)
+    return np.array([math.cos(a), math.sin(a)]), np.array([-math.sin(a), math.cos(a)])
+
+
+def turned_street() -> tuple[tuple[float, float], tuple[float, float]]:
+    """Pedestrian street along the turned terrace's front, 6 m wide, 0.5 m from the wall."""
+    u, v = turned_axes()
+    c = np.array(TURNED_CENTRE) + (TURNED_DEPTH / 2 + 3.5) * v
+    a, b = c - 12.0 * u, c + 12.0 * u
+    return (float(a[0]), float(a[1])), (float(b[0]), float(b[1]))
 
 
 def ground_z(x: float | np.ndarray, y: float | np.ndarray = 0.0) -> float | np.ndarray:
@@ -86,12 +113,18 @@ def city_json() -> dict:
         else:  # ridge runs back from the street: start the ring on the east side
             corners = [(x1, Y0), (x1, Y1), (x0, Y1), (x0, Y0)]
         parts.append(gabled(bag_id(sfx), corners, eave, ridge, year))
-    sfx, (cx, cy), w, d, deg, eave, ridge, year = ROTATED
-    a = math.radians(deg)
-    ux, uy, vx, vy = math.cos(a), math.sin(a), -math.sin(a), math.cos(a)
-    corners = [(cx + sx * w / 2 * ux + sy * d / 2 * vx, cy + sx * w / 2 * uy + sy * d / 2 * vy)
-               for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
-    parts.append(gabled(bag_id(sfx), corners, eave, ridge, year))
+    for sfx, (cx, cy), w, d, deg, eave, ridge, year in (ROTATED, NEAR_GRID):
+        a = math.radians(deg)
+        ux, uy, vx, vy = math.cos(a), math.sin(a), -math.sin(a), math.cos(a)
+        corners = [(cx + sx * w / 2 * ux + sy * d / 2 * vx, cy + sx * w / 2 * uy + sy * d / 2 * vy)
+                   for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+        parts.append(gabled(bag_id(sfx), corners, eave, ridge, year))
+    u, v = turned_axes()
+    c0 = np.array(TURNED_CENTRE)
+    for sfx, a0, a1, eave, ridge, year in TURNED_TERRACE:  # CCW, ridge along the street
+        h = TURNED_DEPTH / 2
+        corners = [tuple(float(t) for t in c0 + a * u + b * v) for a, b in ((a0, -h), (a1, -h), (a1, h), (a0, h))]
+        parts.append(gabled(bag_id(sfx), corners, eave, ridge, year))
     for objs, vs in parts:
         base = len(verts)
         for o in objs.values():
@@ -114,7 +147,8 @@ def _ll(x: float, y: float) -> tuple[float, float]:
 
 
 def write_osm(path: Path) -> None:
-    pts = {1: STREET[0], 2: STREET[1], 3: PEDESTRIAN[0], 4: PEDESTRIAN[1], 10: CAFE}
+    ts = turned_street()
+    pts = {1: STREET[0], 2: STREET[1], 3: PEDESTRIAN[0], 4: PEDESTRIAN[1], 5: ts[0], 6: ts[1], 10: CAFE}
     tags = {10: {"amenity": "cafe", "name": "Café De Hoek", "addr:street": "Teststraat", "addr:housenumber": "3"}}
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -124,6 +158,7 @@ def write_osm(path: Path) -> None:
             w.add_node(Node(id=nid, location=_ll(x, y), tags=tags.get(nid, {})))
         w.add_way(Way(id=100, nodes=[1, 2], tags={"highway": "residential", "name": "Teststraat", "width": "7"}))
         w.add_way(Way(id=101, nodes=[3, 4], tags={"highway": "pedestrian", "name": "Kleine Staat", "width": "6"}))
+        w.add_way(Way(id=102, nodes=[5, 6], tags={"highway": "pedestrian", "name": "Schuine Steeg", "width": "6"}))
 
 
 def write_data_dir(root: Path) -> Path:

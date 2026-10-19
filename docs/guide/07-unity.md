@@ -9,7 +9,7 @@ installed in the build container. The engine-free parts are compiled and tested 
 
 | Assembly | Folder | What | Engine-free? |
 |---|---|---|---|
-| `Blox.Data` | `Runtime/Data/` | contract formats, `WorldIndex`, `WorldRaycast`, `Rotation`, `Pose`, `PathMover`, `BrickModel`, `BrickVariation`, JSON parser | yes, all |
+| `Blox.Data` | `Runtime/Data/` | contract formats (chunks, v3 islands), `WorldIndex`, `IslandIndex`, `IslandPose`, `WorldRaycast`, `Rotation`, `Pose`, `PathMover`, `BrickModel`, `BrickVariation`, JSON parser | yes, all |
 | `Blox.Meshing` | `Runtime/Meshing/Core/` + `Unity/` | chunk mesher, HLOD, studs, detail pieces, model meshes; Burst job wrappers | `Core/` yes |
 | `Blox.Rendering` | `Runtime/Rendering/` | `WorldLoader` streaming, `ChunkRenderer`, `StudRenderer`, time of day, shadow range | `Core/` maths yes |
 | `Blox.Live` | `Runtime/Live/` | proxy DTOs, JSON, `VehicleTrack`, `VehicleRegistry`; `Unity/LiveClient.cs` does HTTP | all but `Unity/` |
@@ -35,10 +35,60 @@ WorldLoader (Rendering, MonoBehaviour, implements IWorldSource)
   ChunkMeshResult -> ChunkRenderer (2 submeshes: 0 opaque, 1 trans/glass)
                   -> StudRenderer (GPU cull, 2 indirect draws: near 16-seg < 45 m, mid 8-seg < 130 m)
                   -> StudTopsBuffer (far: BrickBody fakes studs where a real one sits)
+  for each island owned by that chunk (v3), at the chunk's level:
+  WorldIndex.LoadIsland(id)           -> IslandReader -> IslandIndex (pose, occupancy within the island)
+  ChunkMeshBuilder.ScheduleIsland     -> Burst job: IslandMesherCore (chunk mesher on the island grid)
+  -> GameObject "island_000123" at (originX, 0, originZ), rotation Euler(0, yawDeg, 0)
+  -> StudRenderer.SetIsland (studs already turned into world space)
 ```
 
 Mesh positions are chunk-local in x/z and absolute in y. Place the chunk object at
 `(spec.ChunkOriginX(c), 0, spec.ChunkOriginZ(c))`.
+
+### Islands: rotated buildings (CONTRACT 5.1, v3)
+
+Most Maastricht streets are not on the world grid, and a wall at 20 degrees rasterised onto it
+is a staircase that can't hold windows. The pipeline therefore builds such buildings (or a
+terrace of touching buildings sharing an angle) on their **own grid turned to the main wall**
+and writes them as islands (`islands/i_{id:06d}.bxi`). Unity's side:
+
+- **Reading.** `IslandReader` (40-byte header + the normal record body, i/j local 0..255, k
+  global). `Manifest.Islands` lists them (manifest `contractVersion` 1..3 accepted).
+  `WorldIndex.IslandsOwnedBy(chunk)` / `LoadIsland(id)` give an `IslandIndex`: pose plus a
+  per-island occupancy, because stud exposure and face culling are computed within the island.
+- **Pose.** `IslandPose.LocalToWorld(u, v)`: `x = ox + u cos + v sin`, `z = oz - u sin + v cos`.
+  Unity is left-handed, Y up, +Z north, +X east, and a positive Y rotation turns +Z toward +X,
+  i.e. clockwise seen from above, the same sense as the contract's yaw. So the GameObject gets
+  `Quaternion.Euler(0, yawDeg, 0)` with **no sign flip** (`ChunkMeshBuilder.IslandTransform`).
+  `IslandPose.UnityEulerY` spells out Unity's rotation and the tests check it against
+  `contract/test_vectors/islands.json`.
+- **Tested against the pipeline.** `IslandTests` reads the committed pipeline-built town world
+  (`pipeline/tests/fixtures/town_world`, or any world via `BLOX_ISLAND_WORLD_DIR`): every island
+  loads, meshes, has an existing owning chunk, and, placed by `IslandPose`, sits on the paving
+  the pipeline left in the chunks (>90 % of interior columns; with the yaw sign flipped it is
+  1-12 %), with its plinth reaching the chunk ground. That pins yaw sign and origin end to end.
+- **Meshing.** `IslandMesherCore` runs the unchanged chunk mesher with the island grid as its
+  world (origin 0, no neighbours): one mesh per island in local metres.
+- **Streaming/LOD.** An island follows its owning chunk: when `WorldLoader` meshes a chunk at
+  some level it meshes that chunk's islands at the same level (full detail, or HLOD with the
+  same factor via `LodMesherCore` on the island extent). The chunk stays "busy" until all its
+  jobs finish. Island data is unloaded when the owner is neither busy nor at full detail.
+- **Studs.** Local studs are turned into world space on the CPU when the job completes (position
+  through the pose, yaw added to the stud's spin), so `StudRenderer` and `StudCull.compute`
+  treat them like chunk studs (one batch per island). Far fake studs are **off** on islands:
+  `_BloxStudTops` is indexed by world-grid columns, which don't line up with a rotated grid, so
+  island faces use material copies with `_FakeStudStrength = 0`. Beyond the mid stud distance
+  (130 m) island roofs therefore show no studs.
+- **Bevels on turned objects.** The brick shader rebuilt top-face axes as world +X/+Z. That is
+  wrong for anything turned (islands, and brick models too), so the vertex shader now passes the
+  object's +X axis (`objectXWS`) and `BloxFaceAxes` uses it for horizontal faces. Side faces were
+  already right (cross(up, n) turns with the object).
+- **Picking.** `WorldRaycast.Cast` turns the ray into each loaded island's frame and runs the same
+  DDA there; the nearest hit of chunks and islands wins (`BrickHit.IslandId`, island-local I/J).
+  `MapCameraRig` doesn't use `WorldRaycast` for picking yet.
+- **Not covered:** gameplay ground queries (`WorldIndex.IsSolid`/`ColumnTop`, used by
+  `CharacterWalker`) only see chunks, so a walker passes through island buildings. Colour
+  variation of island bricks hashes the island-local (i, j, k).
 
 ### Mesh format and analytic bevels
 
@@ -88,7 +138,7 @@ log a `Blox setup:` warning if a name isn't found.
 ## Tests without Unity
 
 ```bash
-dotnet test dotnet/Blox.sln                                                    # 319 (Blox.Tests)
+dotnet test dotnet/Blox.sln                                                    # 360 (Blox.Tests)
 dotnet test unity/Assets/Blox/Editor/PureTests~/Blox.LookTests.csproj          # 67 (Blox.LookTests)
 ```
 
@@ -99,11 +149,13 @@ dotnet test unity/Assets/Blox/Editor/PureTests~/Blox.LookTests.csproj          #
 - `Editor/PureTests~/` (the `~` hides it from Unity) tests the rendering and gameplay maths:
   sun position, daylight, shadow cascades, LOD policy, stud geometry, camera maths, walk cycle,
   ground probe, character motion.
-- `Editor/Tests/LookConventionTests.cs` are EditMode tests for inside Unity (not run yet).
+- `Editor/Tests/LookConventionTests.cs` are EditMode tests for inside Unity (not run yet), incl.
+  `IslandTransformMatchesContractPose` (the island GameObject transform vs `IslandPose`).
 
 ## Not verified (needs Unity)
 
-Editor menus, Burst jobs, `Mesh.MeshDataArray`, GPU stud culling, shader compile (138 of 158
+Editor menus, Burst jobs (incl. `IslandMeshJob`), `Mesh.MeshDataArray`, GPU stud culling,
+island GameObject placement and the `objectXWS` shader change in a real editor, shader compile (138 of 158
 variants compiled with DXC outside Unity; the 20 failures are instancing variants that fail the
 same way for Unity's own Lit.shader), the look, frame time, input, and the movement scripts.
-`WorldRaycast` exists, but `MapCameraRig` doesn't use it for picking yet.
+`WorldRaycast` exists (chunks and islands), but `MapCameraRig` doesn't use it for picking yet.

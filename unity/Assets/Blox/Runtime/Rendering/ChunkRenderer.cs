@@ -9,7 +9,8 @@ namespace Blox.Rendering
     /// One chunk's MeshFilter + MeshRenderer. Kept GPU-Resident-Drawer friendly: plain
     /// MeshRenderer, shared materials (submesh 0 = Blox/BrickBody, 1 = Blox/BrickTransparent),
     /// no MaterialPropertyBlocks, no light probes. The mesh is reused when the chunk switches
-    /// between full detail and HLOD boxes.
+    /// between full detail and HLOD boxes. Islands (CONTRACT 5.1) use the same component on a
+    /// GameObject placed and rotated by the island pose; <see cref="Coord"/> is then the owning chunk.
     /// </summary>
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     [DisallowMultipleComponent]
@@ -23,10 +24,11 @@ namespace Blox.Rendering
         public int Level { get; private set; } = -1;
         public int VertexCount { get; private set; }
 
-        public void Init(ChunkCoord coord, Material opaque, Material transparent)
+        /// <param name="meshName">Defaults to "Blox c_XX_YY"; islands pass "Blox island N".</param>
+        public void Init(ChunkCoord coord, Material opaque, Material transparent, string meshName = null)
         {
             Coord = coord;
-            _mesh = new Mesh { name = $"Blox {coord}" };
+            _mesh = new Mesh { name = meshName ?? $"Blox {coord}" };
             GetComponent<MeshFilter>().sharedMesh = _mesh;
             _renderer = GetComponent<MeshRenderer>();
             _renderer.sharedMaterials = new[] { opaque, transparent };

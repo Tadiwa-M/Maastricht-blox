@@ -30,7 +30,8 @@ def features_document(features: Any) -> dict[str, Any]:
 
 
 def manifest_document(contract_version: int, generated: str, sources: Iterable[Mapping[str, Any]],
-                      chunk_entries: list[dict[str, Any]]) -> dict[str, Any]:
+                      chunk_entries: list[dict[str, Any]],
+                      island_entries: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     src = []
     for s in sources:
         missing = {"name", "version", "licence"} - set(s)
@@ -53,4 +54,5 @@ def manifest_document(contract_version: int, generated: str, sources: Iterable[M
         "generated": generated,
         "sources": src,
         "chunks": chunk_entries,
+        "islands": list(island_entries or []),
     }

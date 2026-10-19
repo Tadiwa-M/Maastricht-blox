@@ -29,6 +29,29 @@ namespace Blox.Editor.Tests
             Assert.That(Vector3.Distance(lookedAt, target), Is.LessThan(1e-3f));
         }
 
+        /// <summary>
+        /// Islands (CONTRACT 5.1): the GameObject transform from ChunkMeshBuilder.IslandTransform
+        /// must map a local mesh point (u, y, v) to exactly IslandPose.LocalToWorld(u, v).
+        /// </summary>
+        [TestCase(0.0, 0.0, 0.0)]
+        [TestCase(485.0, 1217.0, 20.0)]
+        [TestCase(612.25, 1344.75, -33.5)]
+        [TestCase(10.0, 20.0, 45.0)]
+        public void IslandTransformMatchesContractPose(double ox, double oz, double yaw)
+        {
+            var pose = new IslandPose(ox, oz, yaw);
+            Blox.Meshing.ChunkMeshBuilder.IslandTransform(pose, out var position, out var rotation);
+            var m = Matrix4x4.TRS(position, rotation, Vector3.one);
+            foreach (var (u, v) in new[] { (0.5, 0.0), (0.0, 0.5), (10.0, 4.0), (127.5, 127.5) })
+            {
+                Vector3 world = m.MultiplyPoint3x4(new Vector3((float)u, 24f, (float)v));
+                pose.LocalToWorld(u, v, out double x, out double z);
+                Assert.That(world.x, Is.EqualTo((float)x).Within(1e-3f));
+                Assert.That(world.y, Is.EqualTo(24f).Within(1e-5f));
+                Assert.That(world.z, Is.EqualTo((float)z).Within(1e-3f));
+            }
+        }
+
         [TestCase(30.0, 135.0)]
         [TestCase(5.0, 270.0)]
         [TestCase(62.0, 180.0)]

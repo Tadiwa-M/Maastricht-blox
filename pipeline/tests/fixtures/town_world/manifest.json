@@ -1,0 +1,112 @@
+{
+ "contractVersion": 3,
+ "crs": "EPSG:28992",
+ "originRD": [
+  175700,
+  316500
+ ],
+ "baseNapM": 30.0,
+ "studM": 0.5,
+ "plateM": 0.2,
+ "chunkStuds": 64,
+ "chunksX": 64,
+ "chunksY": 64,
+ "palette": "palette.json",
+ "catalogue": "brick_catalogue.json",
+ "features": "features.json",
+ "generated": "2026-10-19T18:44:37Z",
+ "sources": [
+  {
+   "name": "AHN",
+   "version": "AHN 0.5 m DTM/DSM",
+   "licence": "CC0 (AHN4 via PDOK) / CC BY 4.0 (AHN5, AHN6)",
+   "attribution": "AHN.nl"
+  },
+  {
+   "name": "3D BAG",
+   "version": "api.3dbag.nl",
+   "licence": "CC BY 4.0",
+   "attribution": "3D BAG by TU Delft 3D geoinformation"
+  },
+  {
+   "name": "OpenStreetMap",
+   "version": "Geofabrik limburg-latest",
+   "licence": "ODbL",
+   "attribution": "OpenStreetMap contributors"
+  }
+ ],
+ "chunks": [
+  {
+   "cx": 16,
+   "cy": 31,
+   "file": "chunks/c_16_31.bxc",
+   "bricks": 2861,
+   "minK": 98,
+   "maxK": 197,
+   "sha1": "43d83fedc366107e489fb7076f32d4d877fb92b9"
+  },
+  {
+   "cx": 16,
+   "cy": 32,
+   "file": "chunks/c_16_32.bxc",
+   "bricks": 860,
+   "minK": 98,
+   "maxK": 173,
+   "sha1": "39c2deab818ba6025175a8d046b31c0d7bc31acd"
+  },
+  {
+   "cx": 17,
+   "cy": 31,
+   "file": "chunks/c_17_31.bxc",
+   "bricks": 2187,
+   "minK": 100,
+   "maxK": 197,
+   "sha1": "6ba7d31eb7b8e123031dc97abfbee68a9c686df8"
+  },
+  {
+   "cx": 17,
+   "cy": 32,
+   "file": "chunks/c_17_32.bxc",
+   "bricks": 1370,
+   "minK": 100,
+   "maxK": 173,
+   "sha1": "906458586194fa275ee7694587950b6f8a913d17"
+  },
+  {
+   "cx": 18,
+   "cy": 31,
+   "file": "chunks/c_18_31.bxc",
+   "bricks": 560,
+   "minK": 101,
+   "maxK": 106,
+   "sha1": "18078200be59850f9c079c8a2bc5a4c6994cc44a"
+  },
+  {
+   "cx": 18,
+   "cy": 32,
+   "file": "chunks/c_18_32.bxc",
+   "bricks": 992,
+   "minK": 101,
+   "maxK": 164,
+   "sha1": "9fa745d959224c1f598901156549cdae955fff0e"
+  }
+ ],
+ "islands": [
+  {
+   "id": 1,
+   "file": "islands/i_000001.bxi",
+   "cx": 18,
+   "cy": 32,
+   "bricks": 998,
+   "sha1": "0db1dd6185fd804691ac9d11610de5228213f272"
+  },
+  {
+   "id": 2,
+   "file": "islands/i_000002.bxi",
+   "cx": 17,
+   "cy": 32,
+   "bricks": 2722,
+   "sha1": "035bc3ce106cffc74d0c3eaed9e52e267e153162"
+  }
+ ]
+}

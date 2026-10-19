@@ -69,7 +69,7 @@ def test_build_end_to_end_with_fake_stages(tmp_path, monkeypatch):
         rec["I"], rec["J"], rec["K"] = ii + tile.I0, jj + tile.J0, kk + tile.k0
         return rec
 
-    def fake_write(out_dir, chunks, features, sources):
+    def fake_write(out_dir, chunks, features, sources, islands=()):
         seen.update(out=out_dir, chunks=chunks, features=features, sources=sources)
 
     monkeypatch.setattr(cli, "_import_stages", lambda: (fake_layout, fake_write, None))

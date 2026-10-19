@@ -1,7 +1,7 @@
 # Blox.Data
 
 Pure C# (`noEngineReferences: true`, netstandard2.1, C# 9). Reads everything the pipeline
-writes (CONTRACT.md sections 1-6) and answers world queries. Compiled and tested outside
+writes (CONTRACT.md sections 1-6, including the v3 islands of 5.1) and answers world queries. Compiled and tested outside
 Unity by `dotnet/` (`dotnet test dotnet/Blox.sln`).
 
 ## Loading a world
@@ -13,6 +13,14 @@ WorldIndex world = WorldFiles.Open(worldDir, verifySha1: false); // manifest, pa
 foreach (ManifestChunk c in world.AvailableChunks) { /* only non-empty chunks exist */ }
 ChunkData? chunk = world.Load(new ChunkCoord(22, 47));             // reads + validates chunks/c_22_47.bxc
 world.Unload(new ChunkCoord(22, 47));
+
+// v3 islands: rotated buildings on their own grid, owned by the chunk holding their centre.
+foreach (uint id in world.IslandsOwnedBy(new ChunkCoord(22, 47)))
+{
+    IslandIndex island = world.LoadIsland(id)!;                    // reads + validates islands/i_000123.bxi
+    island.Pose.LocalToWorld(u, v, out double x, out double z);    // local metres -> Unity metres
+    bool solid = island.IsSolid(i, j, k);                          // island-local cells, global k
+}
 ```
 
 `WorldIndex` is not thread-safe for load/unload; read-only queries may run concurrently.
@@ -23,18 +31,21 @@ where you would build a `WorldIndex` with your own loader delegate and `ChunkRea
 
 | Type | What |
 |---|---|
-| `WorldSpec` | Contract constants + conversions: `RdToCell`, `RdToUnity`, `CellToUnityX/Y/Z`, `UnityXToI/YToK/ZToJ`, `ChunkOf(I, J)`, `ChunkOriginX/Z`. `ContractVersion` = 2 (`MinContractVersion` = 1); `FromManifest` checks the grid values. |
+| `WorldSpec` | Contract constants + conversions: `RdToCell`, `RdToUnity`, `CellToUnityX/Y/Z`, `UnityXToI/YToK/ZToJ`, `ChunkOf(I, J)`, `ChunkOriginX/Z`. `ContractVersion` = 3 (`MinContractVersion` = 1); `FromManifest` checks the grid values. |
 | `GridCell`, `ChunkCoord` | Integer cell (I, J, K) and chunk (cx, cy). `ChunkCoord.FileName` = `chunks/c_XX_YY.bxc`. |
-| `Manifest` | `manifest.json` model; accepts `contractVersion` 1 and 2 (v2 only added things). |
+| `Manifest` | `manifest.json` model; accepts `contractVersion` 1..3 (v2 and v3 only added things); `Islands` (v3, empty before). |
 | `Palette`, `PaletteEntry`, `MaterialClass` | `palette.json`. `ToTable()` -> `PaletteColor[256]` (linear RGB + class) for jobs. |
 | `Catalogue`, `BrickType`, `BrickKind`, `StudPattern` | `brick_catalogue.json` incl. the v2 detail kinds (`arch`, `window`, `door`, `fence`, `round_tile`, `jumper`, `tile_grille`) and `studs: center`. `ToTable()` -> `BrickTypeInfo[256]` (blittable) for jobs; `IsDetail`, `IsRound`. |
 | `FeatureSet`, `Feature` | `features.json`; `Get(id)`, `Search(text)` (name prefix > name substring > address). Unknown kinds load as `FeatureKind.Unknown`. |
 | `BrickRecord` | 12-byte blittable record exactly as in the file: `i, j, k, type, color, rotFlags, featureId`; `.Rot`, `.Facing`, `.NoVariation`, `.HideStuds` (v2 bit 3). Create with `BrickRecord.Place(..., Facing.E)`. |
 | `ChunkReader` / `ChunkWriter` | `.bxc` I/O (raw DEFLATE via `DeflateStream`). Reader validates header, sizes, reserved bits, sort order; with a type table also unknown ids, chunk-border crossing and minK/maxK. Errors throw `ChunkFormatException`. |
 | `ChunkData` | Header + `Records` (file order, sorted by k, j, i). `GlobalI(n)`, `GlobalJ(n)`. |
-| `ChunkOccupancy` | Per-chunk sparse column spans: `BrickAt(i, j, k)`, `ColumnTop(i, j)`. |
-| `WorldIndex` | `TryGetBrick(I, J, K, out BrickHit)`, `IsSolid`, `ColumnTop`, `FeatureAt`, plus `TypeTable` / `ColorTable`. |
-| `WorldRaycast.Cast` | DDA ray cast in Unity metres through loaded chunks (bricks as boxes) for picking. |
+| `ColumnOccupancy`, `ChunkOccupancy` | Sparse column spans over a square grid (64 for chunks, 256 for islands): `BrickAt(i, j, k)`, `ColumnTop(i, j)`. Records may be unsorted. |
+| `IslandHeader`, `IslandReader`, `IslandWriter`, `IslandData` | `.bxi` I/O (CONTRACT 5.1): 40-byte header (id, owning chunk, origin, yaw), then the chunk record body with LOCAL i/j (0..255). Reader checks magic, version, flags, id, yaw in (-45, 45], sizes, reserved bits; with a type table also ids and the 256-stud edge. |
+| `IslandPose` | origin + yaw (clockwise from north): `LocalToWorld`, `WorldToLocal`, `LocalDirToWorld`, `CellToWorld`, and `UnityEulerY` (what `Quaternion.Euler(0, yaw, 0)` does) to prove the Unity transform equals the contract map. |
+| `IslandIndex` | a loaded island: data, pose, occupancy (`BrickAt`, `IsSolid`, `ColumnTop` in island cells), extent, `WorldToCell`, `WorldBounds`. |
+| `WorldIndex` | `TryGetBrick(I, J, K, out BrickHit)`, `IsSolid`, `ColumnTop`, `FeatureAt` (chunks only), islands: `AvailableIslands`, `IslandsOwnedBy`, `LoadIsland`, `UnloadIsland`, `GetIsland`, `LoadedIslands`; plus `TypeTable` / `ColorTable`. |
+| `WorldRaycast.Cast` | DDA ray cast in Unity metres through loaded chunks **and islands** (the ray is turned into each island's frame; nearest hit wins; `BrickHit.IslandId` != 0 for island bricks, I/J then island-local). |
 | `Rotation`, `Facing` | **the** rotation rules of CONTRACT section 2 (see below); nothing else does rot maths. |
 | `Footprint` | which footprint cells carry studs (`HasStud`, `HasCenterStud`). |
 | `Pose`, `PathMover` | CONTRACT 7.1 motion: a pose is position + yaw (clockwise from north); `PathMover` turns path + distance into a pose (shared by live buses and gameplay). |
@@ -78,6 +89,7 @@ stud angle = ((s >> 16) & 0xFFFF) / 65536 * 360 deg
 seed01 = (s >> 8) / 16777216
 ```
 Bricks hash their record min corner (I, J, K); studs hash their own cell (I, J, Ktop).
+Island bricks hash their island-local (i, j, k) (a rotated brick has no global cell).
 `no_variation` bricks skip v and w. Test vectors (from `VariationTests`): `Pcg(0) = 129708002`,
 `Seed(1,2,3) = 438766412`, `Seed(970,2434,100) = 3704521945`, `Seed(-1,0,0) = 4197473905`.
 The mesher already bakes v and w into vertex colours; the shader only needs the hash for extras.

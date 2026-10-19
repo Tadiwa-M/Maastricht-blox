@@ -18,6 +18,22 @@ namespace Blox.Data
         public ChunkCoord Coord => new ChunkCoord(Cx, Cy);
     }
 
+    /// <summary>
+    /// One <c>islands[]</c> entry of manifest.json (CONTRACT 5.1, v3): a building or terrace on
+    /// its own rotated grid. <see cref="Cx"/>/<see cref="Cy"/> is the owning chunk (the one holding
+    /// the island's centre); streaming and LOD follow that chunk.
+    /// </summary>
+    public sealed class ManifestIsland
+    {
+        public uint Id { get; set; }
+        public string File { get; set; } = "";
+        public int Cx { get; set; }
+        public int Cy { get; set; }
+        public int Bricks { get; set; }
+        public string? Sha1 { get; set; }
+        public ChunkCoord Owner => new ChunkCoord(Cx, Cy);
+    }
+
     public sealed class ManifestSource
     {
         public string Name { get; set; } = "";
@@ -44,6 +60,8 @@ namespace Blox.Data
         public string? Generated { get; set; }
         public List<ManifestSource> Sources { get; } = new List<ManifestSource>();
         public List<ManifestChunk> Chunks { get; } = new List<ManifestChunk>();
+        /// <summary>v3 islands; empty for v1/v2 manifests (the key is optional).</summary>
+        public List<ManifestIsland> Islands { get; } = new List<ManifestIsland>();
 
         public static Manifest Parse(string json) => FromJson(JsonParser.Parse(json));
 
@@ -87,6 +105,22 @@ namespace Blox.Data
                     Sha1 = c.OptString("sha1"),
                 });
             }
+            var islands = n.Get("islands");
+            if (!islands.IsNull)
+                foreach (var c in islands.Items)
+                {
+                    long id = c["id"].AsLong;
+                    if (id < 1 || id > uint.MaxValue) throw new FormatException($"island id {id} out of range");
+                    m.Islands.Add(new ManifestIsland
+                    {
+                        Id = (uint)id,
+                        File = c["file"].AsString,
+                        Cx = c["cx"].AsInt,
+                        Cy = c["cy"].AsInt,
+                        Bricks = c["bricks"].AsInt,
+                        Sha1 = c.OptString("sha1"),
+                    });
+                }
             return m;
         }
     }

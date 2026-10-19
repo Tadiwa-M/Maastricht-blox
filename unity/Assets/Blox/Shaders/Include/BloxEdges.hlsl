@@ -7,14 +7,18 @@
 //   UV0 = position on the face in metres from the face's min corner (along u, v)
 //   UV1 = face size in metres along (u, v); 0 = that axis has no brick edge (round bricks, HLOD)
 // The face axes are rebuilt from the flat face normal exactly as FaceEmitter.FaceAxes does.
+// FaceEmitter works in object space; objects may be turned about +Y (islands, CONTRACT 5.1, and
+// brick models), so horizontal faces take u from the object's +X axis in world space
+// (objectXWS = its xz, from the vertex shader). Side faces need nothing: cross(up, n) turns
+// with the object because the turn is about up. Unrotated chunks get objectXWS = (1, 0).
 // ---------------------------------------------------------------------------------------
 
-void BloxFaceAxes(float3 n, out float3 u, out float3 v)
+void BloxFaceAxes(float3 n, float2 objectXWS, out float3 u, out float3 v)
 {
     if (abs(n.y) > 0.999)
     {
-        u = float3(1.0, 0.0, 0.0);
-        v = float3(0.0, 0.0, 1.0);
+        u = float3(objectXWS.x, 0.0, objectXWS.y);   // object +X (local +i)
+        v = float3(-objectXWS.y, 0.0, objectXWS.x);  // cross(u, up) = object +Z (local +j)
         return;
     }
     u = normalize(cross(float3(0.0, 1.0, 0.0), n));
@@ -78,10 +82,10 @@ void BloxEdgeAxis(float coord, float size, float3 axis, float pixelM, BloxEdgePa
     crevice = max(crevice, c * c * saturate(prm.creviceM / pixelM));
 }
 
-BloxEdgeResult BloxEvaluateEdges(float3 faceNormalWS, float2 uv0, float2 uv1, float pixelM, BloxEdgeParams prm)
+BloxEdgeResult BloxEvaluateEdges(float3 faceNormalWS, float2 objectXWS, float2 uv0, float2 uv1, float pixelM, BloxEdgeParams prm)
 {
     float3 u, v;
-    BloxFaceAxes(faceNormalWS, u, v);
+    BloxFaceAxes(faceNormalWS, objectXWS, u, v);
     float3 tilt = 0.0;
     float seam = 0.0, crevice = 0.0;
     BloxEdgeAxis(uv0.x, uv1.x, u, pixelM, prm, tilt, seam, crevice);
@@ -98,10 +102,10 @@ BloxEdgeResult BloxEvaluateEdges(float3 faceNormalWS, float2 uv0, float2 uv1, fl
 // Per-brick micro variation: a tiny normal tilt offset from the brick seed, so neighbouring
 // bricks catch the light slightly differently (real moulded parts do). Add it to the
 // bent normal and renormalise. Axes come from the flat face normal.
-float3 BloxBrickTiltOffset(float3 faceNormalWS, float seed01, float amount)
+float3 BloxBrickTiltOffset(float3 faceNormalWS, float2 objectXWS, float seed01, float amount)
 {
     float3 u, v;
-    BloxFaceAxes(faceNormalWS, u, v);
+    BloxFaceAxes(faceNormalWS, objectXWS, u, v);
     float2 h = BloxSeedHash2(seed01) - 0.5;
     return (u * h.x + v * h.y) * (2.0 * amount);
 }

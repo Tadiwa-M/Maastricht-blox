@@ -28,6 +28,8 @@ class VoxelConfig:
     bridge_clearance_m: float = 1.5  # deck at least this far above the water it spans
     use_ortho_ground: bool = True
     facade_detail: bool = True  # facade grammar on axis-aligned walls (False: glass cells only)
+    islands: bool = True  # rotated buildings on their own grid (CONTRACT 5.1); False: staircases
+    island_min_yaw_deg: float = 3.0  # buildings turned more than this become islands
 
 
 @dataclass
@@ -131,6 +133,7 @@ class PreparedWorld:
     ground_rgb: object | None = None  # RGBGrid (optional ortho)
     streets: object | None = None  # streets.StreetContext
     facades: list = field(default_factory=list)  # facade_runs.RunPlan, sorted
+    islands: list = field(default_factory=list)  # islands.IslandGroup: built apart, not in chunks
     _btree: STRtree | None = None
     _ptree: STRtree | None = None
     _wtree: STRtree | None = None

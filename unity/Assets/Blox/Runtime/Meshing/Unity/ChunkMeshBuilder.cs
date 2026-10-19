@@ -79,6 +79,50 @@ namespace Blox.Meshing
             return new PendingChunkMesh(c, job.Schedule(dependsOn), sink, bricks, range);
         }
 
+        /// <summary>
+        /// Schedules the mesh of a loaded island (CONTRACT 5.1): <paramref name="factor"/> 0 = full
+        /// detail with studs, 2/4/8 = HLOD boxes. The mesh is in island-local space: place the
+        /// GameObject with <see cref="IslandTransform"/>. Studs come back in world space (the pose
+        /// is applied in <see cref="PendingChunkMesh.Complete"/>).
+        /// </summary>
+        public PendingChunkMesh ScheduleIsland(IslandIndex island, int factor, JobHandle dependsOn = default)
+        {
+            var records = island.Data.Records;
+            var bricks = new NativeArray<PlacedBrick>(records.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            for (int n = 0; n < records.Length; n++) bricks[n] = PlacedBrick.From(records[n], 0, 0);
+            int ei = island.ExtentI, ej = island.ExtentJ;
+            var size = new Vector2(ei * Units.StudM, ej * Units.StudM);
+            var range = new Vector2Int(island.MinK, island.MaxK);
+            if (factor == 0)
+            {
+                var sink = new NativeMeshSink(Allocator.TempJob, Math.Max(64, records.Length * 12));
+                var job = new IslandMeshJob { Bricks = bricks, Types = _types, Colors = _colors, ExtentI = ei, ExtentJ = ej, Sink = sink };
+                return new PendingChunkMesh(island.Owner, job.Schedule(dependsOn), sink, bricks, range, island.Id, size, island.Pose);
+            }
+            var lodSink = new NativeMeshSink(Allocator.TempJob, 1024);
+            var lod = new LodMeshJob
+            {
+                Bricks = bricks, Types = _types, Colors = _colors, Factor = factor,
+                ChunkI0 = 0, ChunkJ0 = 0, SizeI = ei, SizeJ = ej, OriginX = 0f, OriginZ = 0f, Sink = lodSink,
+            };
+            int fk = factor * 5 / 2;
+            range = new Vector2Int(WorldSpec.FloorDiv(range.x, fk) * fk, (WorldSpec.FloorDiv(range.y - 1, fk) + 1) * fk);
+            size = new Vector2((ei + factor - 1) / factor * factor * Units.StudM, (ej + factor - 1) / factor * factor * Units.StudM);
+            return new PendingChunkMesh(island.Owner, lod.Schedule(dependsOn), lodSink, bricks, range, island.Id, size, island.Pose);
+        }
+
+        /// <summary>
+        /// Unity transform of an island (CONTRACT 5.1): position (originX, 0, originZ), rotation
+        /// Euler(0, yawDeg, 0). Unity's positive Y rotation turns +Z (north) toward +X (east), i.e.
+        /// clockwise from above, the contract's yaw sense, so the yaw is used as is. Checked in the
+        /// dotnet tests through <see cref="IslandPose.UnityEulerY"/>.
+        /// </summary>
+        public static void IslandTransform(in IslandPose pose, out Vector3 position, out Quaternion rotation)
+        {
+            position = new Vector3((float)pose.OriginX, 0f, (float)pose.OriginZ);
+            rotation = Quaternion.Euler(0f, (float)pose.YawDeg, 0f);
+        }
+
         private Vector2Int KRange(ChunkData data)
         {
             int lo = int.MaxValue, hi = int.MinValue;
@@ -126,7 +170,7 @@ namespace Blox.Meshing
     public readonly struct ChunkMeshResult
     {
         public readonly int VertexCount, OpaqueTriangles, TransparentTriangles;
-        /// <summary>Exposed studs in absolute Unity world metres (empty for LOD meshes).</summary>
+        /// <summary>Exposed studs in absolute Unity world metres (empty for LOD meshes; islands already posed).</summary>
         public readonly StudInstance[] Studs;
 
         public ChunkMeshResult(int v, int o, int t, StudInstance[] studs)
@@ -141,15 +185,23 @@ namespace Blox.Meshing
         private NativeMeshSink _sink;
         private readonly NativeArray<PlacedBrick> _bricks;
         private readonly Vector2Int _kRange;
+        private readonly Vector2 _sizeXZ;
+        private readonly IslandPose _pose;
         private bool _done;
 
+        /// <summary>The chunk, or for an island its owning chunk.</summary>
         public ChunkCoord Coord { get; }
+        /// <summary>0 for a chunk mesh; the island id for an island mesh.</summary>
+        public uint IslandId { get; }
+        public bool IsIsland => IslandId != 0;
         public JobHandle Handle { get; }
         public bool IsCompleted => Handle.IsCompleted;
 
-        internal PendingChunkMesh(ChunkCoord coord, JobHandle handle, NativeMeshSink sink, NativeArray<PlacedBrick> bricks, Vector2Int kRange)
+        internal PendingChunkMesh(ChunkCoord coord, JobHandle handle, NativeMeshSink sink, NativeArray<PlacedBrick> bricks, Vector2Int kRange,
+                                  uint islandId = 0, Vector2 sizeXZ = default, IslandPose pose = default)
         {
             Coord = coord; Handle = handle; _sink = sink; _bricks = bricks; _kRange = kRange;
+            IslandId = islandId; _sizeXZ = sizeXZ; _pose = pose;
         }
 
         /// <summary>
@@ -181,6 +233,7 @@ namespace Blox.Meshing
                 Mesh.ApplyAndDisposeWritableMeshData(arr, target, flags);
                 target.bounds = bounds;
                 var studs = _sink.Studs.Length > 0 ? _sink.Studs.AsArray().ToArray() : Array.Empty<StudInstance>();
+                if (IsIsland) IslandMesherCore.StudsToWorld(studs, _pose); // local -> world, same as the GameObject transform
                 return new ChunkMeshResult(vCount, n0 / 3, n1 / 3, studs);
             }
             finally
@@ -192,10 +245,12 @@ namespace Blox.Meshing
 
         private Bounds Bounds()
         {
-            float size = Units.ChunkStuds * Units.StudM;
+            // Local space: chunk box (32 m square) or the island's local extent.
+            float sx = Units.ChunkStuds * Units.StudM, sz = sx;
+            if (IsIsland) { sx = Mathf.Max(_sizeXZ.x, 0.01f); sz = Mathf.Max(_sizeXZ.y, 0.01f); }
             float y0 = _kRange.x * Units.PlateM, y1 = _kRange.y * Units.PlateM;
             var b = new Bounds();
-            b.SetMinMax(new Vector3(0, y0, 0), new Vector3(size, Mathf.Max(y1, y0 + 0.01f), size));
+            b.SetMinMax(new Vector3(0, y0, 0), new Vector3(sx, Mathf.Max(y1, y0 + 0.01f), sz));
             return b;
         }
     }

@@ -44,6 +44,7 @@ class Layers:
     roof_shape: NDArray[np.uint8]
     win_period: NDArray[np.uint8]
     win_offset: NDArray[np.uint8]
+    island_k: NDArray[np.int32]  # top K of an island building over this column (occupancy only)
 
     @classmethod
     def empty(cls, box: CellBox) -> "Layers":
@@ -77,6 +78,7 @@ def build_layers(world: PreparedWorld, box: CellBox) -> Layers:
         _patch(p, L)
     for b in world.buildings_in(area):
         _building(world, b, L)
+    _islands(world, L, area)
     _ridges(L)
     return L
 
@@ -139,6 +141,21 @@ def _water(world: PreparedWorld, L: Layers, area) -> None:
         sub(L.ground_color, L.box, win)[mask] = soil
         sub(L.ground_shape, L.box, win)[mask] = FULL
         sub(L.ground_feat, L.box, win)[mask] = 0
+
+
+def _islands(world: PreparedWorld, L: Layers, area) -> None:
+    """Island buildings are not voxelised here, but neighbours must know the space is taken:
+    no facade or glass windows on a party wall against an island, no trees inside it."""
+    for g in world.islands:
+        for b in g.members:
+            if not b.footprint.intersects(area):
+                continue
+            hit = cover(b.footprint, L.box)
+            if hit is None:
+                continue
+            win, mask = hit
+            cur = sub(L.island_k, L.box, win)
+            cur[mask] = np.maximum(cur[mask], g.top_k(b))
 
 
 def slope_shape(nx: float, ny: float) -> int:

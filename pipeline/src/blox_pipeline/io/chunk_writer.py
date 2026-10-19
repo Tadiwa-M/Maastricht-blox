@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import shutil
 import zlib
 from collections.abc import Iterable, Mapping
@@ -19,9 +20,12 @@ from ..layout.records import CHUNK, KNOWN_FLAGS, RECORD_DTYPE, Records, chunk_ke
 from ..palette import palette_path
 from .chunk_reader import read_chunk
 from .format import FILE_RECORD_DTYPE, FLAG_DEFLATE, ChunkHeader, chunk_filename
+from .island_writer import write_island
 from .world_meta import features_document, manifest_document
 
-CONTRACT_VERSION = 2  # manifest contractVersion; chunk binary itself is still BXC1 v1
+log = logging.getLogger("blox")
+
+CONTRACT_VERSION = 3  # manifest contractVersion (v3: islands); chunk binary itself is still BXC1 v1
 
 
 @dataclass(frozen=True)
@@ -114,6 +118,7 @@ def _iter_parts(chunks: ChunkSource) -> Iterable[Records]:
 def write_world(
     out_dir: Path | str, chunks: ChunkSource, features: Any = (), sources: Iterable[Mapping[str, Any]] = (),
     *, compress: bool = True, generated: str | None = None, catalogue: Catalogue | None = None,
+    islands: Iterable[Any] = (),
 ) -> Path:
     """Write a complete world directory and return the manifest path.
 
@@ -121,12 +126,15 @@ def write_world(
     one tile at a time) or a mapping of anything -> record array. Records are grouped by
     owning chunk; a chunk seen again in a later part is merged with what was written.
     ``features``: list of feature dicts or ``{"features": [...]}``. ``sources``: list of
-    ``{"name", "version", "licence"}``. Stale ``chunks/*.bxc`` files are removed first.
+    ``{"name", "version", "licence"}``. ``islands``: objects with ``id, cx, cy, records``
+    (local I, J) and ``pose.origin`` / ``pose.yaw_deg`` (``islands.Island``), written to
+    ``islands/*.bxi`` and listed in the manifest. Stale ``chunks/*.bxc`` and
+    ``islands/*.bxi`` files are removed first.
     """
     cat = catalogue or load_catalogue()
     out = Path(out_dir)
     (out / "chunks").mkdir(parents=True, exist_ok=True)
-    for stale in (out / "chunks").glob("*.bxc"):
+    for stale in [*(out / "chunks").glob("*.bxc"), *(out / "islands").glob("*.bxi")]:
         stale.unlink()
     infos: dict[tuple[int, int], ChunkInfo] = {}
     for part in _iter_parts(chunks):
@@ -148,7 +156,17 @@ def write_world(
     _write_json(out / "features.json", features_document(features))
     stamp = generated or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     entries = [infos[k].manifest_entry() for k in sorted(infos)]
-    manifest = manifest_document(CONTRACT_VERSION, stamp, sources, entries)
+    island_entries = [
+        write_island(out, isl.records, isl.id, isl.cx, isl.cy, isl.pose.origin, isl.pose.yaw_deg,
+                     compress=compress, catalogue=cat).manifest_entry()
+        for isl in sorted(islands, key=lambda i: i.id) if len(isl.records)
+    ]
+    # An island is streamed with its owning chunk; if that chunk has no file the island is
+    # never loaded by a renderer. Ground normally guarantees it, so this only warns.
+    orphans = [e["id"] for e in island_entries if (e["cx"], e["cy"]) not in infos]
+    if orphans:
+        log.warning("islands %s: owning chunk not in the manifest, renderers will never load them", orphans)
+    manifest = manifest_document(CONTRACT_VERSION, stamp, sources, entries, island_entries)
     _write_json(out / "manifest.json", manifest)
     return out / "manifest.json"
 

@@ -14,6 +14,10 @@ namespace Blox.Rendering
     /// visible studs to a near list (16-segment bevelled stud) or a mid list (8 segments), and
     /// counts them into one indirect-args buffer per LOD; two indirect draws render them all.
     /// Beyond <see cref="MidDistance"/> no studs are drawn: Blox/BrickBody fakes them.
+    /// <para>Islands (CONTRACT 5.1) are uploaded as their own batches (<see cref="SetIsland"/>).
+    /// Their stud positions are baked into world space on the CPU (and the island yaw added to
+    /// each stud's spin) when the mesh completes, so the cull shader and the stud shader need no
+    /// per-batch matrix and treat island studs exactly like chunk studs.</para>
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class StudRenderer : MonoBehaviour
@@ -61,7 +65,8 @@ namespace Blox.Rendering
             public Bounds Bounds;
         }
 
-        private readonly Dictionary<ChunkCoord, ChunkStuds> _chunks = new Dictionary<ChunkCoord, ChunkStuds>();
+        // One batch per full-detail chunk or island; see ChunkKey / IslandKey.
+        private readonly Dictionary<long, ChunkStuds> _chunks = new Dictionary<long, ChunkStuds>();
         private readonly Plane[] _planes = new Plane[6];
         private readonly Vector4[] _planeVectors = new Vector4[6];
         private readonly GraphicsBuffer.IndirectDrawIndexedArgs[] _args = new GraphicsBuffer.IndirectDrawIndexedArgs[1];
@@ -128,12 +133,24 @@ namespace Blox.Rendering
 
         private void PublishFade() => BloxShaderGlobals.SetFakeStudFade(midDistance * fakeFadeStart, midDistance);
 
+        private static long ChunkKey(ChunkCoord c) => ((long)(uint)c.X << 32) | (uint)c.Y;
+        private static long IslandKey(uint id) => (1L << 62) | id;
+
         /// <summary>Replaces a chunk's studs (absolute world positions, from the chunk mesher).</summary>
-        public void SetChunk(ChunkCoord coord, StudInstance[] studs)
+        public void SetChunk(ChunkCoord coord, StudInstance[] studs) => SetBatch(ChunkKey(coord), coord.ToString(), studs);
+
+        public void RemoveChunk(ChunkCoord coord) => RemoveBatch(ChunkKey(coord));
+
+        /// <summary>Replaces an island's studs (already in world space: PendingChunkMesh applies the pose).</summary>
+        public void SetIsland(uint islandId, StudInstance[] studs) => SetBatch(IslandKey(islandId), $"island {islandId}", studs);
+
+        public void RemoveIsland(uint islandId) => RemoveBatch(IslandKey(islandId));
+
+        private void SetBatch(long key, string label, StudInstance[] studs)
         {
-            RemoveChunk(coord);
+            RemoveBatch(key);
             if (!_ready || studs.Length == 0) return;
-            var buffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, studs.Length, StudStride) { name = $"Blox Studs {coord}" };
+            var buffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, studs.Length, StudStride) { name = $"Blox Studs {label}" };
             buffer.SetData(studs);
             var min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
             var max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
@@ -145,16 +162,16 @@ namespace Blox.Rendering
             }
             var bounds = new Bounds();
             bounds.SetMinMax(min - new Vector3(0.2f, 0f, 0.2f), max + new Vector3(0.2f, 0.15f, 0.2f));
-            _chunks[coord] = new ChunkStuds { Buffer = buffer, Count = studs.Length, Bounds = bounds };
+            _chunks[key] = new ChunkStuds { Buffer = buffer, Count = studs.Length, Bounds = bounds };
             TotalStuds += studs.Length;
         }
 
-        public void RemoveChunk(ChunkCoord coord)
+        private void RemoveBatch(long key)
         {
-            if (!_chunks.TryGetValue(coord, out var c)) return;
+            if (!_chunks.TryGetValue(key, out var c)) return;
             c.Buffer.Release();
             TotalStuds -= c.Count;
-            _chunks.Remove(coord);
+            _chunks.Remove(key);
         }
 
         private void LateUpdate()

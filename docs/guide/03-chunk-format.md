@@ -1,4 +1,4 @@
-# 03: Chunk format (`.bxc`)
+# 03: Chunk format (`.bxc`) and island format (`.bxi`)
 
 Spec: CONTRACT 4. One file per non-empty 64 × 64-stud column chunk:
 `chunks/c_{cx:02d}_{cy:02d}.bxc`. Everything is little-endian.
@@ -102,15 +102,83 @@ sides, so it was hollow-culled, and nobody can see this brick's stud.
 | JS | `viewer/src/bxc.js` (`DecompressionStream('deflate-raw')`) | none |
 
 Cross-checks:
-- **Golden files:** `pipeline/tests/fixtures/golden/` is written by `io/make_golden.py`.
+- **Golden files:** `pipeline/tests/fixtures/golden/` is written by `io/make_golden.py`
+  (chunk: `c_01_02*.bxc` + `golden.json`; island: `i_000001*.bxi` + `golden_island.json`).
   Python checks it regenerates byte for byte, and C# (`dotnet/Blox.Tests/ChunkIoTests.cs`)
   reads it and re-encodes the body byte for byte.
 - **The test scene in C#:** `dotnet test dotnet/Blox.sln --filter TestsceneChunksLoadAndMesh`
   (folder from `BLOX_WORLD_DIR`, default `build/testscene`).
 - **Viewer:** `viewer/test/bxc.test.mjs`.
 
+## Islands: `islands/i_{id:06d}.bxi` (contract v3)
+
+Spec: CONTRACT 5.1. A building (or terrace) turned more than 3° off the world grid is built
+on its own grid, turned to its main wall, and stored as an island instead of in the chunks
+(why and how: [guide 04](04-facades-and-pieces.md#rotated-buildings-islands-contract-51-pipelinesrcblox_pipelineislands)).
+The body is the same 12-byte record as a chunk, but `i, j` are **local island cells**
+(0..255, an island is at most 256 × 256 studs) and `k` is global. The 40-byte header holds
+the pose instead of chunk bounds:
+
+```
+offset size  field
+0x00   4     magic        "BXI1"
+0x04   2     version      1
+0x06   2     flags        bit0 = body is raw DEFLATE
+0x08   4     islandId     uint32 (manifest "islands"[].id)
+0x0C   4     cx           int32  owning chunk: the chunk holding the island's centre (streaming/LOD)
+0x10   4     cy           int32
+0x14   4     originX      float32 Unity metres: world position of local cell (0, 0)'s min corner
+0x18   4     originZ      float32
+0x1C   4     yawDeg       float32 clockwise from north, (-45, 45]
+0x20   4     brickCount   uint32
+0x24   4     bodyBytes    uint32
+0x28   ...   body         brickCount x 12-byte records (section 4 layout)
+```
+
+**Placing a local point.** `(u, v)` metres (u along local +i, v along +j) land at
+`x = originX + u·cos(yaw) + v·sin(yaw)`, `z = originZ − u·sin(yaw) + v·cos(yaw)`, and
+`y = k · 0.2`. So local +j points along the yaw (yaw 0: north) like a brick model's forward.
+Python: `islands/pose.py: island_local_to_world`, checked against
+`contract/test_vectors/islands.json` like every other language. Facing (N/E/S/W) inside an
+island means the **local** axes; renderers move the whole island as one rigid object.
+
+Walkthrough of the golden `pipeline/tests/fixtures/golden/i_000001_uncompressed.bxi`:
+
+```
+000000 42 58 49 31 01 00 00 00 01 00 00 00 13 00 00 00  >BXI1............<
+000010 2c 00 00 00 00 10 19 44 00 18 a8 44 00 00 06 c2  >,......D...D....<
+000020 07 00 00 00 54 00 00 00 00 00 78 00 09 01 00 00  >....T.....x.....<
+```
+
+| Bytes | Field | Raw | Value |
+|---|---|---|---|
+| 00-03 | magic | `42 58 49 31` | `"BXI1"` |
+| 04-05 | version | `01 00` | 1 |
+| 06-07 | flags | `00 00` | not compressed (`i_000001.bxi` has `01 00`) |
+| 08-0B | islandId | `01 00 00 00` | 1 |
+| 0C-13 | cx, cy | `13 ..`, `2c ..` | chunk (19, 44) |
+| 14-17 | originX | `00 10 19 44` | 612.25 |
+| 18-1B | originZ | `00 18 a8 44` | 1344.75 |
+| 1C-1F | yawDeg | `00 00 06 c2` | −33.5 |
+| 20-23 | brickCount | `07 00 00 00` | 7 |
+| 24-27 | bodyBytes | `54 00 00 00` | 84 = 7 × 12 |
+| 28- | first record | `00 00 78 00 09 01 00 00 07 00 00 00` | local (0, 0), k 120, `brick_2x4`, colour 1, rot 0, feature 7: world min corner (612.25, 24.0, 1344.75) |
+
+`golden_island.json` lists every field of every record plus its world position.
+
+| Language | Read | Write |
+|---|---|---|
+| Python | `pipeline/src/blox_pipeline/io/island_reader.py` (`read_island`, `read_world_islands`) | `io/island_writer.py` (`write_world(..., islands=...)`; layout in `io/island_format.py`) |
+
+Rules the writer checks: every brick inside 256 × 256, `k + h ≤ 65535`, |yaw| ≤ 45 with
+−45 excluded, known flags. Records are sorted `(k, j, i)` as in chunks. Bricks also never
+cross a 64-stud line inside an island (the pipeline lays islands out in 64 × 64 sub-tiles,
+reusing the chunk code); that is a pipeline property, not a format rule.
+
 ## The manifest
 
 `manifest.json` (CONTRACT 5) lists each chunk with `bricks`, `minK`, `maxK` and the file's
-`sha1`, so a loader can plan LOD from the bounds before opening any chunk. `contractVersion`
-is 2. `WorldFiles.Open(dir, verifySha1: true)` in C# checks the hashes.
+`sha1`, so a loader can plan LOD from the bounds before opening any chunk. Since v3 it also
+has `"islands": [{"id", "file", "cx", "cy", "bricks", "sha1"}]` (always present, maybe
+empty). `contractVersion` is 3 (the Python reader still accepts 1 and 2: same chunk bytes,
+no islands). `WorldFiles.Open(dir, verifySha1: true)` in C# checks the hashes.
