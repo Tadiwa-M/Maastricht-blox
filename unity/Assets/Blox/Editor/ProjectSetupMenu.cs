@@ -27,14 +27,24 @@ namespace Blox.Editor
         [MenuItem("Blox/Setup Project", priority = 0)]
         private static void SetupProject()
         {
-            var assets = EnsureAssets();
-            ApplyProjectSettings(assets.Pipeline);
-            bool restart = EnsureInputSystemBackend();
-            AssetDatabase.SaveAssets();
+            bool restart = Apply();
             string msg = "URP asset, renderer (Forward+, SSAO), post-processing profile and materials are in "
                          + BloxEditorPaths.Generated + " and assigned to Graphics and Quality settings.";
             if (restart) msg += "\n\nThe Input System backend was enabled: restart the editor before pressing Play.";
             EditorUtility.DisplayDialog("Blox", msg, "OK");
+        }
+
+        /// <summary>
+        /// The whole setup without dialogs (menu and batch mode share it). Returns true when the
+        /// Input System backend was just enabled and the editor needs a restart.
+        /// </summary>
+        internal static bool Apply()
+        {
+            var assets = EnsureAssets();
+            ApplyProjectSettings(assets.Pipeline);
+            bool restart = EnsureInputSystemBackend();
+            AssetDatabase.SaveAssets();
+            return restart;
         }
 
         /// <summary>Creates or refreshes every generated asset (used by the scene builder too).</summary>

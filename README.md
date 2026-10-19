@@ -9,7 +9,9 @@ See `CONTRACT.md` for the data formats and APIs shared by all components.
 ```bash
 scripts/check.sh            # all tests: pipeline, proxy, C# (dotnet), viewer
 scripts/shots.sh            # rebuild the look-test scene and take viewer screenshots (build/shots/)
+scripts/unity.sh all        # GPU workstation: Unity compile, tests, build, screenshot (Windows: scripts\unity.ps1)
 ```
+New machine: `scripts/setup-workstation.ps1` (or `.sh`), then see `docs/guide/00-workstation-setup.md`.
 Plan and phases: `PLAN.md` · how it works: [`docs/README.md`](docs/README.md) (architecture, guides, dev log) · interface formats: `CONTRACT.md`.
 
 ## Components

@@ -28,6 +28,8 @@ A brick-built, game-quality miniature of Maastricht for PC.
 | Engine-free C# tests | .NET 8 SDK, xUnit | in use |
 | Hero assets (later) | Blender, MagicaVoxel → pipeline importer | phase 3 |
 | Quality gate | `scripts/check.sh`, GitHub Actions CI | in use |
+| Unity automation | `scripts/unity.ps1` / `unity.sh` (headless compile, EditMode tests, player build, screenshot) | ready, first run on workstation |
+| GPU workstation | Unity 6 LTS + GPU; setup via `scripts/setup-workstation.ps1` | being set up |
 | Capture | `scripts/shots.sh` (viewer screenshots), OBS for the demo video | shots in use |
 | Keys/accounts | NS API key (trains), PDOK/3D BAG/OVapi need none | NS key pending |
 
