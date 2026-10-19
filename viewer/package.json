@@ -6,7 +6,8 @@
   "description": "Browser viewer for Maastricht Blox world dirs (look development, no Unity needed).",
   "scripts": {
     "build": "node build.mjs",
-    "shots": "node screenshot.mjs"
+    "shots": "node screenshot.mjs",
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "three": "0.170.0"

@@ -71,7 +71,7 @@ export class Stage {
     const c = box.getCenter(new THREE.Vector3());
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(4000, 4000),
-      new THREE.MeshStandardMaterial({ color: 0x8f9a7d, roughness: 0.95 }),
+      new THREE.MeshStandardMaterial({ color: 0xa8a393, roughness: 0.95 }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(c.x, box.min.y - 0.02, c.z);
@@ -160,7 +160,7 @@ export class Stage {
     this.resize(width, height);
   }
 
-  setTiltShift(on, amount = 2.2) {
+  setTiltShift(on, amount = 1.5) {
     this.tiltShift = on;
     for (const p of this.tilt) p.enabled = on;
     this.tiltAmount = amount;
@@ -174,7 +174,7 @@ export class Stage {
     this.camera.updateProjectionMatrix();
     if (!this.composer) return;
     this.composer.setSize(width, height);
-    const a = this.tiltAmount ?? 2.2;
+    const a = this.tiltAmount ?? 1.5;
     this.tilt[0].uniforms.h.value = a / width;
     this.tilt[1].uniforms.v.value = a / height;
     for (const p of this.tilt) p.uniforms.r.value = 0.5;
