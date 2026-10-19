@@ -105,6 +105,7 @@ async function main() {
 
   const r = stage.renderer;
   r.info.autoReset = false;
+  const still = /[?&]shot=1/.test(location.search);
   let frames = 0, last = performance.now(), fps = 0, acc = 0;
   function frame() {
     controls.update();
@@ -115,9 +116,18 @@ async function main() {
     if (now - last > 500) { fps = Math.round((acc * 1000) / (now - last)); acc = 0; last = now; }
     ui.stats({ bricks: built.bricks, studs: built.studs, calls: r.info.render.calls, fps });
     if (++frames === 4) window.__bloxReady = true;
+    if (still && frames >= 4) return; // screenshot mode: freeze so capture is cheap
     requestAnimationFrame(frame);
   }
   window.__blox = { world, stage, controls, presets, built };
+  // screenshot hook: render synchronously and read the canvas back (cheaper than a
+  // compositor capture under software GL)
+  window.__bloxCapture = () => {
+    const t0 = performance.now();
+    stage.render();
+    const url = canvas.toDataURL('image/png');
+    return { url, ms: performance.now() - t0 };
+  };
   requestAnimationFrame(frame);
 }
 
