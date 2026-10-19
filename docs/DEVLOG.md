@@ -122,3 +122,13 @@ LookTests `Passed: 67`, viewer `# pass 24  # fail 0`.
 - In-game credits screen (CONTRACT 9).
 - Small Unity gap: changing the bus corner smoothing in the Inspector during Play only affects
   routes loaded afterwards.
+
+## 2026-10-19 (later): workstation automation
+
+- The owner's PC is slow; a GPU workstation will run Unity. Added `scripts/setup-workstation.{ps1,sh}`
+  and `scripts/unity.{ps1,sh}` (headless setup → EditMode tests → player build → screenshot) so
+  Claude on the workstation can iterate on compile errors and the look without manual clicks.
+- Unity side: `Blox.Editor.BatchMode` (exit codes for scripts), `ProjectSetupMenu.Apply()` and
+  `LookTestSceneMenu.Build()` split out of the menu handlers, `Blox.Gameplay.ShotRunner`
+  (`-bloxShot`), and `WorldLoader` honours `-bloxWorld` (players have no project folder).
+- Guide: `docs/guide/00-workstation-setup.md`. Still uncompiled until the first workstation run.

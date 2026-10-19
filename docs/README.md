@@ -8,6 +8,7 @@ explain it and show where it is implemented.
 
 | # | Page | Read it to learn |
 |---|---|---|
+| 0 | [guide/00-workstation-setup.md](guide/00-workstation-setup.md) | set up the GPU workstation: Unity headless compile/test/build/screenshot, real data |
 | 1 | [ARCHITECTURE.md](ARCHITECTURE.md) | the big picture: components, data flow and why each design decision was taken |
 | 2 | [guide/01-coordinates-and-rotation.md](guide/01-coordinates-and-rotation.md) | RD → grid → Unity/three.js, the **facing rule**, `footprint_cell`, shared test vectors |
 | 3 | [guide/02-pipeline.md](guide/02-pipeline.md) | Python pipeline stages, and how voxels become bricks |
@@ -30,6 +31,7 @@ explain it and show where it is implemented.
 ```bash
 scripts/check.sh      # all suites: pipeline, proxy, dotnet (core + look), viewer
 scripts/shots.sh      # rebuild models + look-test scene, take viewer screenshots into build/shots/
+scripts/unity.sh all  # (workstation) Unity compile + tests + player build + screenshot; Windows: scripts\unity.ps1
 ```
 
 ## Keeping the docs current

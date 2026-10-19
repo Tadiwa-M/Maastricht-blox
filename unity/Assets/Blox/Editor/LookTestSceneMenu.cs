@@ -28,6 +28,12 @@ namespace Blox.Editor
         private static void CreateLookTestScene()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            Build();
+        }
+
+        /// <summary>Builds and saves the scene without prompts (menu and batch mode share it).</summary>
+        internal static void Build()
+        {
             var assets = ProjectSetupMenu.EnsureAssets();
             var frame = WorldFrame.Read(WorldLoader.ResolveDirectory(WorldDirectory));
 
@@ -38,6 +44,7 @@ namespace Blox.Editor
             var camera = CreateCamera(volume, frame);
             var loader = CreateWorld(assets, camera);
             LookTestActors.Spawn(WorldLoader.ResolveDirectory(WorldDirectory), assets, camera, loader);
+            new GameObject("ShotRunner").AddComponent<ShotRunner>();  // idle unless -bloxShot is passed
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, BloxEditorPaths.LookTestScene);

@@ -59,8 +59,16 @@ namespace Blox.Rendering
         public int ChunksShown => _renderers.Count;
         public int JobsInFlight => _inFlight.Count;
 
+        /// <summary>
+        /// A player started with <c>-bloxWorld &lt;dir&gt;</c> loads that world (standalone builds have
+        /// no project folder to resolve against); otherwise relative paths are taken from the
+        /// Unity project folder.
+        /// </summary>
         public static string ResolveDirectory(string dir)
         {
+            var args = System.Environment.GetCommandLineArgs();
+            int a = System.Array.IndexOf(args, "-bloxWorld");
+            if (a >= 0 && a + 1 < args.Length) return Path.GetFullPath(args[a + 1]);
             if (Path.IsPathRooted(dir)) return dir;
             string project = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
             return Path.GetFullPath(Path.Combine(project, dir));

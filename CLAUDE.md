@@ -8,7 +8,8 @@
 3. **Systematize and automate**: if a step is repeated, script it (`scripts/`), and wire
    checks into CI (`.github/workflows/ci.yml`).
 4. **Ensure quality**: `scripts/check.sh` must pass before every push; for look changes run
-   `scripts/shots.sh`, review the screenshots and show them to the owner.
+   `scripts/shots.sh`, review the screenshots and show them to the owner. On the GPU workstation
+   also run `scripts/unity.ps1 all` (or `unity.sh`) for Unity compile/tests/screenshot.
 5. Communication: concise, high-signal, direct pushback over validation.
 
 ## Rules
