@@ -2,15 +2,17 @@
 
 South -> north: the Maas with a stone quay, a road with pavements and lamp posts, the
 cobbled square with a cafe terrace, planters and trees, a row of four detailed
-townhouses (``facade`` grammar: stepped gables, dormers, shop fronts) and a tall tower
-with a stepped spire. Everything is painted into a voxel tile following
-CONTRACT section 7 (slopes as 3-cell stacks, tiles for paving, shape 8 for water).
+townhouses (``facade`` grammar: stepped gables, dormers, shop fronts, an arcade with a
+balcony) and a tall tower with a stepped spire. Everything is painted into a voxel tile
+following CONTRACT section 7 (slopes as 3-cell stacks, tiles for paving, shape 8 for
+water); windows, doors, arches, fences and small round details are placed pieces
+(``Canvas.place``), which ``build`` passes to the layout next to the voxels.
 """
 
 from __future__ import annotations
 
 from ..facade import GroundFloor, HouseSpec, RoofKind, paint_house
-from ..facade.props import bench, bollard, cafe_table, planter
+from ..facade.props import bench, bollard, cafe_table, planter, street_lamp
 from ..layout.records import CHUNK
 from .canvas import Canvas
 
@@ -27,10 +29,10 @@ HOUSES = [
     HouseSpec(1, 45, 12, 16, 3, 10, "mergel", trim="cream", accent="dark_green", roof="slate",
               roof_kind=RoofKind.STEPPED_GABLE, ground=GroundFloor.SHOP, awning=("white", "dark_green"),
               quoins=True, plinth="mergel_dark", corner_west=True),
-    HouseSpec(13, 45, 10, 16, 2, 11, "brick_red", trim="white", accent="dark_green",
-              roof="roof_tile_dark", roof_kind=RoofKind.EAVE_DORMERS, shutters=True,
-              flowers="flower_pink"),
-    HouseSpec(23, 45, 12, 16, 3, 12, "ochre", trim="white", accent="medium_blue",
+    HouseSpec(13, 45, 12, 16, 2, 11, "brick_red", trim="white", accent="dark_green",
+              roof="roof_tile_dark", roof_kind=RoofKind.EAVE_DORMERS, ground=GroundFloor.ARCHED,
+              shutters=True, flowers="flower_pink", balcony=True),
+    HouseSpec(25, 45, 10, 16, 3, 12, "ochre", trim="white", accent="medium_blue",
               roof_kind=RoofKind.FLAT_CORNICE, ground=GroundFloor.SHOP, awning=("white", "medium_blue"),
               plinth="mergel_dark"),
     HouseSpec(35, 45, 10, 16, 3, 13, "sand_green", trim="white", accent="brick_dark_red",
@@ -120,13 +122,6 @@ def _tree(cv: Canvas, x: int, y: int) -> None:
                     cv.cell(i, j, k, leaf)
 
 
-def _lamp(cv: Canvas, x: int, y: int) -> None:
-    g = GROUND_K
-    cv.fill(x, x + 1, y, y + 1, g, g + 14, "black")
-    cv.fill(x, x + 1, y, y + 1, g + 14, g + 16, "lamp_warm")
-    cv.fill(x, x + 1, y, y + 1, g + 16, g + 17, "black")
-
-
 def make_scene() -> Canvas:
     cv = Canvas(CX, CY, K0, NZ)
     _ground(cv)
@@ -143,8 +138,8 @@ def make_scene() -> Canvas:
     for i in range(4, CHUNK, 10):
         bollard(cv, i, 24, GROUND_K)
     for x in LAMPS_I:
-        _lamp(cv, x, 12)
-        _lamp(cv, x + 8, 21)
+        street_lamp(cv, x, 12, GROUND_K)
+        street_lamp(cv, x + 8, 21, GROUND_K)
     return cv
 
 

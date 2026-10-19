@@ -7,6 +7,7 @@ with a full stack of the same colour directly behind it (the studded back row).
 from __future__ import annotations
 
 from .painter import RIDGE_I, RIDGE_J, SLOPE_E, SLOPE_N, SLOPE_S, SLOPE_W, TILE, Painter
+from .pieces import fence_run, piece_h
 from .spec import HouseSpec, RoofKind
 
 BRICK = 3
@@ -73,6 +74,7 @@ def _stepped_gable(cv: Painter, h: HouseSpec, top: int) -> None:
             cv.fill(a, b, j0, j1, kb + 2 * BRICK, kb + 2 * BRICK + 1, h.trim, h.fid)
             mid = (a + b) // 2
             cv.fill(mid - 1, mid + 1, j0, j1, kb + 2 * BRICK + 1, kb + 3 * BRICK, h.trim, h.fid)  # finial
+            cv.place("jumper_1x2", mid - 1, j0, kb + 3 * BRICK, "S", h.trim, h.fid)  # centred top stud
             break
         cv.fill(a, b, j0, j1, kb, kb + 3 * BRICK, h.wall, h.fid)
         for x in (a, b - 2):                                               # step caps
@@ -82,9 +84,10 @@ def _stepped_gable(cv: Painter, h: HouseSpec, top: int) -> None:
         s += 1
     mid = (h.x0 + h.x1) // 2
     if h.width >= 10:                                                      # attic window
-        cv.clear(mid - 1, mid + 1, j0, j0 + 1, top + 3, top + 10)
-        cv.fill(mid - 1, mid + 1, j0 + 1, j1, top + 3, top + 10, "glass", h.fid)
-        cv.fill(mid - 1, mid + 1, j0, j0 + 1, top + 2, top + 3, h.trim, h.fid)
+        k = top + 3
+        cv.clear(mid - 1, mid + 1, j0, j0 + 1, k, k + piece_h("window_1x2x2"))
+        cv.place("window_1x2x2", mid - 1, j0, k, "S", h.trim, h.fid)       # gable wall behind
+        cv.fill(mid - 1, mid + 1, j0, j0 + 1, k - 1, k, h.trim, h.fid)
     cv.clear(mid - 1, mid + 1, j0, j0 + 1, top + 14, top + 17)               # hoist window
     cv.fill(mid - 1, mid + 1, j0 + 1, j1, top + 14, top + 17, "glass", h.fid)
 
@@ -95,8 +98,9 @@ def _dormer(cv: Painter, h: HouseSpec, x: int, eave: int) -> None:
     k0 = eave + BRICK
     k1 = k0 + 9
     cv.fill(x, x + 4, jf, jf + 5, k0, k1, h.wall, h.fid)
-    cv.fill(x + 1, x + 3, jf, jf + 1, k0 + 1, k1 - 1, "glass", h.fid)
     cv.fill(x, x + 4, jf, jf + 1, k0, k0 + 1, h.trim, h.fid)
+    cv.clear(x + 1, x + 3, jf, jf + 1, k0 + 1, k0 + 1 + piece_h("window_1x2x2"))
+    cv.place("window_1x2x2", x + 1, jf, k0 + 1, "S", h.trim, h.fid)
     cv.fill(x, x + 1, jf - 1, jf + 5, k1, k1 + BRICK, h.roof, h.fid, SLOPE_W)
     cv.fill(x + 3, x + 4, jf - 1, jf + 5, k1, k1 + BRICK, h.roof, h.fid, SLOPE_E)
     cv.fill(x + 1, x + 3, jf - 1, jf + 5, k1, k1 + BRICK, h.roof, h.fid)
@@ -109,10 +113,8 @@ def _flat_roof(cv: Painter, h: HouseSpec, eave: int) -> None:
     cv.fill(h.x0, h.x1, j0, j0 + 1, eave, eave + 6, h.wall, h.fid)            # attic band
     cv.fill(h.x0, h.x1, h.y0, j0, eave + 3, eave + 5, h.trim, h.fid)            # cornice
     cv.fill(h.x0, h.x1, h.y0 - 1, h.y0, eave + 4, eave + 5, h.trim, h.fid)
-    for i in range(h.x0, h.x1):                                                 # balustrade
-        if (i - h.x0) % 2 == 0 or i in (h.x0, h.x1 - 1):
-            cv.fill(i, i + 1, j0, j0 + 1, eave + 6, eave + 9, h.trim, h.fid)
-    cv.fill(h.x0, h.x1, j0, j0 + 1, eave + 9, eave + 10, h.trim, h.fid)
+    fence_run(cv, h.x0, h.x1, j0, eave + 6, h.trim, h.fid)                    # balustrade
+    cv.fill(h.x0, h.x1, j0, j0 + 1, eave + 9, eave + 10, h.trim, h.fid)          # top rail
     cv.fill(h.x0 + 3, h.x0 + 6, h.y1 - 6, h.y1 - 3, eave + 1, eave + 7, "light_grey", h.fid)  # roof hatch
 
 

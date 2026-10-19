@@ -47,7 +47,7 @@ namespace Blox.Tests
         public void CatalogueLoadsFromContract()
         {
             var c = Repo.Catalogue;
-            Assert.Equal(37, c.Types.Count);
+            Assert.Equal(47, c.Types.Count);
             var s = c.ByName("slope33_2x3");
             Assert.Equal(BrickKind.Slope, s.Kind);
             Assert.Equal((2, 3, 3), (s.W, s.D, s.H));
@@ -58,6 +58,24 @@ namespace Blox.Tests
             Assert.Null(c[0]);
             Assert.Equal(0, Repo.Types[0].Defined);
             Assert.Equal(1, Repo.Types[37].Defined);
+        }
+
+        [Fact]
+        public void CatalogueV2DetailPiecesLoad()
+        {
+            var c = Repo.Catalogue;
+            Assert.Equal(BrickKind.Arch, c.ByName("arch_1x6").Kind);
+            Assert.Equal(BrickKind.Window, c.ByName("window_1x2x3").Kind);
+            Assert.Equal(BrickKind.Door, c.ByName("door_1x2x4").Kind);
+            Assert.Equal(BrickKind.Fence, c.ByName("fence_1x4").Kind);
+            Assert.Equal(BrickKind.RoundTile, c.ByName("round_tile_1x1").Kind);
+            Assert.Equal(StudPattern.Center, c.ByName("jumper_1x2").Studs);
+            Assert.Equal(BrickKind.TileGrille, c.ByName("grille_1x2").Kind);
+            var s30 = c.ByName("slope30_1x2");
+            Assert.Equal((StudPattern.BackRows, 0, 2), (s30.Studs, s30.StudRows, s30.H));
+            Assert.True(Repo.Types[c.ByName("window_1x2x2").Id].IsDetail);
+            Assert.True(Repo.Types[c.ByName("round_tile_1x1").Id].IsRound);
+            Assert.False(Repo.Types[c.ByName("jumper_1x2").Id].IsDetail);
         }
 
         [Fact]
@@ -94,9 +112,13 @@ namespace Blox.Tests
         }
 
         [Fact]
-        public void ManifestRejectsOtherContractVersion()
+        public void ManifestAcceptsV1AndV2AndRejectsOthers()
         {
-            Assert.Throws<FormatException>(() => Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 2")));
+            Assert.Equal(2, WorldSpec.ContractVersion);
+            Assert.Equal(1, Manifest.Parse(ManifestJson).ContractVersion);
+            Assert.Equal(2, Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 2")).ContractVersion);
+            Assert.Throws<FormatException>(() => Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 3")));
+            Assert.Throws<FormatException>(() => Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 0")));
         }
 
         [Fact]

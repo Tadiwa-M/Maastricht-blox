@@ -5,9 +5,18 @@ using Blox.Data.Json;
 
 namespace Blox.Data
 {
-    public enum BrickKind : byte { Brick = 0, Plate = 1, Tile = 2, Slope = 3, SlopeDouble = 4, Round = 5 }
+    /// <summary>
+    /// Shape family of a brick type (catalogue <c>kind</c>). Kinds up to Round are extrusions of a
+    /// simple profile; Arch and later (v2, CONTRACT 2.1) are detail pieces with their own geometry.
+    /// </summary>
+    public enum BrickKind : byte
+    {
+        Brick = 0, Plate = 1, Tile = 2, Slope = 3, SlopeDouble = 4, Round = 5,
+        Arch = 6, Window = 7, Door = 8, Fence = 9, RoundTile = 10, Jumper = 11, TileGrille = 12,
+    }
 
-    public enum StudPattern : byte { None = 0, All = 1, BackRows = 2 }
+    /// <summary>Catalogue <c>studs</c>: which footprint cells carry a top stud. Center = one stud on the footprint centre (jumper).</summary>
+    public enum StudPattern : byte { None = 0, All = 1, BackRows = 2, Center = 3 }
 
     /// <summary>Blittable brick type description (indexed by typeId in a 256 table) for jobs.</summary>
     public struct BrickTypeInfo
@@ -21,6 +30,13 @@ namespace Blox.Data
         public byte StudRows;  // slopes: number of studded back rows
 
         public bool IsSlope => Kind == BrickKind.Slope || Kind == BrickKind.SlopeDouble;
+
+        /// <summary>Round prisms (round brick/plate and the round tile).</summary>
+        public bool IsRound => Kind == BrickKind.Round || Kind == BrickKind.RoundTile;
+
+        /// <summary>v2 detail pieces with hand-built geometry (arch, window, door, fence, grille).</summary>
+        public bool IsDetail => Kind == BrickKind.Arch || Kind == BrickKind.Window || Kind == BrickKind.Door
+                                || Kind == BrickKind.Fence || Kind == BrickKind.TileGrille;
     }
 
     public sealed class BrickType
@@ -40,7 +56,7 @@ namespace Blox.Data
         };
     }
 
-    /// <summary>contract/brick_catalogue.json model (CONTRACT section 2).</summary>
+    /// <summary>contract/brick_catalogue.json model (CONTRACT sections 2 and 2.1).</summary>
     public sealed class Catalogue
     {
         private readonly BrickType?[] _byId = new BrickType?[256];
@@ -86,8 +102,9 @@ namespace Blox.Data
         {
             if (t.W < 1 || t.D < 1 || t.H < 1 || t.W > 64 || t.D > 64 || t.H > 255)
                 throw new FormatException($"brick '{t.Name}' has invalid size {t.W}x{t.D}x{t.H}");
-            if (t.Studs == StudPattern.BackRows && (t.StudRows < 1 || t.StudRows >= t.D))
-                throw new FormatException($"brick '{t.Name}' studRows {t.StudRows} must be in 1..d-1");
+            // studRows 0 is allowed (v2 slope30: a slope without studs).
+            if (t.Studs == StudPattern.BackRows && (t.StudRows < 0 || t.StudRows >= t.D))
+                throw new FormatException($"brick '{t.Name}' studRows {t.StudRows} must be in 0..d-1");
             if (t.Kind == BrickKind.Slope && t.D < 2)
                 throw new FormatException($"slope '{t.Name}' needs d >= 2");
         }
@@ -100,6 +117,13 @@ namespace Blox.Data
             "slope" => BrickKind.Slope,
             "slope_double" => BrickKind.SlopeDouble,
             "round" => BrickKind.Round,
+            "arch" => BrickKind.Arch,
+            "window" => BrickKind.Window,
+            "door" => BrickKind.Door,
+            "fence" => BrickKind.Fence,
+            "round_tile" => BrickKind.RoundTile,
+            "jumper" => BrickKind.Jumper,
+            "tile_grille" => BrickKind.TileGrille,
             _ => throw new FormatException($"unknown brick kind '{s}'"),
         };
 
@@ -108,6 +132,7 @@ namespace Blox.Data
             "all" => StudPattern.All,
             "none" => StudPattern.None,
             "backRows" => StudPattern.BackRows,
+            "center" => StudPattern.Center,
             _ => throw new FormatException($"unknown stud pattern '{s}'"),
         };
 

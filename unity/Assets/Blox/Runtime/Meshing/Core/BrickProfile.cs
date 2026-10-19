@@ -11,11 +11,15 @@ namespace Blox.Meshing.Core
     /// <list type="bullet">
     /// <item>brick / plate / tile: flat at h.</item>
     /// <item>slope: flat at h over the studded back rows z in [0, studRows], then straight down
-    ///       to a front lip of <see cref="LipPlates"/> at z = d (low edge faces +z = +j).</item>
+    ///       to a front lip of <see cref="LipPlates"/> (0.05 m, CONTRACT v2) at z = d (low edge
+    ///       faces +z = +j). studRows 0 (slope30) slopes all the way from the back edge.</item>
     /// <item>slope_double: lip at z = 0 and z = d, ridge at z = d / 2 with height h.</item>
     /// </list>
-    /// Round bricks are a <see cref="RoundSegments"/>-sided prism of radius <see cref="RoundRadius"/>
-    /// studs centred in their cell; they never fully cover a neighbouring cell face.
+    /// Round bricks and round tiles are a <see cref="RoundSegments"/>-sided prism of radius
+    /// <see cref="RoundRadius"/> studs centred in their cell; they never fully cover a
+    /// neighbouring cell face. Jumpers use the plain plate profile. Detail pieces (arch,
+    /// window, door, fence, grille) have their own geometry (<see cref="DetailMesher"/>) and
+    /// cover rules (<see cref="DetailShapes.CoversLocal"/>).
     ///
     /// <b>Cover</b>: <see cref="CoversLocal"/> says whether the brick's surface on side
     /// <c>dir</c> fully closes the boundary face of its local cell (a, b, p). A face of a
@@ -23,8 +27,8 @@ namespace Blox.Meshing.Core
     /// </summary>
     public static class BrickProfile
     {
-        /// <summary>Height of the vertical front lip of slopes, in plates.</summary>
-        public const float LipPlates = 1f;
+        /// <summary>Height of the vertical front lip of slopes, in plates (CONTRACT v2: 0.25 plate = 0.05 m).</summary>
+        public const float LipPlates = 0.25f;
         public const int RoundSegments = 12;
         public const float RoundRadius = 0.48f;
 
@@ -80,7 +84,8 @@ namespace Blox.Meshing.Core
         /// </summary>
         public static bool CoversLocal(in BrickTypeInfo t, int dir, int a, int b, int p)
         {
-            if (t.Kind == BrickKind.Round) return false;
+            if (t.IsRound) return false;
+            if (t.IsDetail) return DetailShapes.CoversLocal(t, dir, a, b, p);
             switch (dir)
             {
                 case Dir.NegY: return true;

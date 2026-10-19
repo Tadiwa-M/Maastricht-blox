@@ -19,7 +19,7 @@ FACE_SHADE = {"top": 1.0, "west": 0.78, "south": 0.62}
 
 def _voxels(rec: Records, cat: Catalogue):
     """Dense ``[i, j, k]`` colour / slope / stud-top grids over the records' bounding box."""
-    c = footprint_cells(rec, cat)
+    c = footprint_cells(rec, cat, pane_colour=load_palette().idx("glass"))
     i0, j0, k0 = int(c.I.min()), int(c.J.min()), int(c.K.min())
     dims = (int(c.I.max()) - i0 + 1, int(c.J.max()) - j0 + 1, int(c.top.max()) - k0)
     col = np.zeros(dims, np.uint8)

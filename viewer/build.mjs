@@ -1,5 +1,5 @@
 // Build the viewer: bundle src/ (three included) to dist/viewer.js, embed a world dir as
-// dist/world.js and copy dist/index.html.  Usage: node build.mjs [worldDir]
+// dist/world.js (plus contract/models/*.json brick models) and copy dist/index.html.  Usage: node build.mjs [worldDir]
 import { build } from 'esbuild';
 import { mkdir, readFile, readdir, writeFile, copyFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -10,6 +10,17 @@ const worldDir = resolve(process.argv[2] || join(here, '..', 'build', 'testscene
 const dist = join(here, 'dist');
 
 async function readJson(p) { return JSON.parse(await readFile(p, 'utf8')); }
+
+/** Brick models (CONTRACT 7.1) from contract/models/*.json, keyed by file name. */
+async function readModels() {
+  const dir = join(here, '..', 'contract', 'models');
+  const models = {};
+  let files = [];
+  try { files = (await readdir(dir)).filter((f) => f.endsWith('.json')); } catch { /* none yet */ }
+  for (const f of files) models[f.replace(/\.json$/, '')] = await readJson(join(dir, f));
+  console.log(`models: ${files.length ? Object.keys(models).join(', ') : 'none (viewer uses placeholders)'}`);
+  return models;
+}
 
 async function embedWorld() {
   const manifest = await readJson(join(worldDir, 'manifest.json'));
@@ -27,7 +38,13 @@ async function embedWorld() {
     bytes += buf.length;
     chunks[f.split('/').pop()] = buf.toString('base64');
   }
-  const js = `window.BLOX_WORLD = ${JSON.stringify({ manifest, palette, catalogue, features, chunks })};\n`;
+  const models = await readModels();
+  // the gallery shows the contract's catalogue, which may be newer than the world's copy
+  const contract = {
+    catalogue: await readJson(join(here, '..', 'contract', 'brick_catalogue.json')),
+    palette: await readJson(join(here, '..', 'contract', 'palette.json')),
+  };
+  const js = `window.BLOX_WORLD = ${JSON.stringify({ manifest, palette, catalogue, features, chunks, models, contract })};\n`;
   await writeFile(join(dist, 'world.js'), js);
   console.log(`world.js: ${files.length} chunks (${(bytes / 1024).toFixed(1)} KiB) from ${worldDir}`);
 }

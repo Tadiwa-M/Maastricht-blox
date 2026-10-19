@@ -11,21 +11,34 @@ namespace Blox.Meshing.Core
         public CellGridDims Dims;
         public ReadOnlySpan<BrickTypeInfo> Types;
         public ReadOnlySpan<PaletteColor> Colors;
-        public float OriginX, OriginZ;
+        /// <summary>Subtracted from output positions: chunk SW corner (x, z; y = 0), or a model part pivot.</summary>
+        public float OriginX, OriginY, OriginZ;
+        /// <summary>Colour used for window/door panes (the palette's first glass entry).</summary>
+        public PaletteColor Glass;
+
+        /// <summary>First palette entry of class glass; a dark blue-grey fallback when the palette has none.</summary>
+        public static PaletteColor FindGlass(ReadOnlySpan<PaletteColor> colors)
+        {
+            for (int n = 1; n < colors.Length; n++)
+                if (colors[n].Defined != 0 && colors[n].Material == MaterialClass.Glass) return colors[n];
+            return new PaletteColor { R = 0.03f, G = 0.05f, B = 0.07f, Material = MaterialClass.Glass, Defined = 1 };
+        }
     }
 
     /// <summary>
     /// Emits the body faces of one brick: one polygon per face (bottom, flat top, sloped
     /// surfaces, front/back, two side profiles), skipping axis-aligned faces that are fully
     /// hidden by neighbouring bricks (<see cref="CellGrid.FaceHidden"/>). Sloped faces are always emitted.
+    /// Round kinds go to <see cref="RoundMesher"/>, detail pieces to <see cref="DetailMesher"/>.
     /// </summary>
     public static class BrickBodyMesher
     {
         public static void Emit<TSink>(ref TSink sink, in PlacedBrick br, in BrickTypeInfo t, in MeshContext ctx, in FaceStyle style)
             where TSink : struct, IChunkMeshSink
         {
-            var xf = new BrickXform { I = br.I, J = br.J, K = br.K, W = t.W, D = t.D, Rot = br.Rot, OriginX = ctx.OriginX, OriginZ = ctx.OriginZ };
-            if (t.Kind == BrickKind.Round) { RoundMesher.Emit(ref sink, xf, t, ctx, style); return; }
+            var xf = new BrickXform { I = br.I, J = br.J, K = br.K, W = t.W, D = t.D, Rot = br.Rot, OriginX = ctx.OriginX, OriginY = ctx.OriginY, OriginZ = ctx.OriginZ };
+            if (t.IsRound) { RoundMesher.Emit(ref sink, xf, t, ctx, style); return; }
+            if (t.IsDetail) { DetailMesher.Emit(ref sink, br, t, xf, ctx, style); return; }
 
             float w = t.W, d = t.D, h = t.H;
             Poly p;
@@ -108,7 +121,7 @@ namespace Blox.Meshing.Core
                     for (int a = aLo; a <= aHi; a++)
                     {
                         if (!BrickProfile.TouchesLocal(t, localDir, a, b, p)) continue;
-                        Footprint.RotateCell(a, b, t.W, t.D, rot, out int ci, out int cj);
+                        Rotation.FootprintCell(a, b, t.W, t.D, rot, out int ci, out int cj);
                         if (!CellGrid.FaceHidden(ctx.Cells, ctx.Dims, br.I + ci, br.J + cj, br.K + p, worldDir, self)) return true;
                     }
             return false;

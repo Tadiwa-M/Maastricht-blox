@@ -18,7 +18,7 @@ namespace Blox.Tests
             foreach (var (a, b, c, _) in s.Triangles())
             {
                 var n = Float3.Cross(b.Position - a.Position, c.Position - a.Position);
-                Assert.True(n.Length > 1e-9f, "degenerate triangle");
+                Assert.True(n.Length > 1e-9f, $"degenerate triangle {a.Position} {b.Position} {c.Position} (normal {a.Normal}, uv1 {a.U1},{a.V1})");
                 var avg = a.Normal + b.Normal + c.Normal;
                 Assert.True(Float3.Dot(n, avg) > 0, $"triangle {a.Position} {b.Position} {c.Position} is wound against its normal {avg}");
             }

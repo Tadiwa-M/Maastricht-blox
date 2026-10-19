@@ -1,21 +1,33 @@
 #nullable enable
 using System;
+using Blox.Data;
 
 namespace Blox.Live
 {
     /// <summary>
-    /// A route shape in Unity world metres with cumulative distances (CONTRACT section 8,
-    /// <c>/v1/shapes</c>). Evaluates position and heading at a distance along the shape.
+    /// A route shape in Unity world metres with the proxy's cumulative distances (CONTRACT
+    /// section 8, <c>/v1/shapes</c>). It is a thin wrapper over <see cref="PathMover"/>, the same
+    /// mover characters and scripted vehicles use, so live buses turn corners the same way.
     /// Distances outside [Start, End] clamp to the ends.
     /// </summary>
     public sealed class ShapePolyline
     {
-        private readonly float[] _x, _z, _d;
+        private readonly PathMover _path;
 
         public string ShapeId { get; }
-        public int Count => _x.Length;
-        public float StartM => _d[0];
-        public float EndM => _d[_d.Length - 1];
+        public int Count => _path.PointCount;
+        public float StartM => (float)_path.StartM;
+        public float EndM => (float)_path.EndM;
+
+        /// <summary>
+        /// Corner smoothing in metres (see <see cref="PathMover"/>). 0 (default) = heading of the
+        /// segment under the point, exactly as the proxy draws it.
+        /// </summary>
+        public float TurnRadiusM
+        {
+            get => _path.TurnRadiusM;
+            set => _path.TurnRadiusM = Math.Max(0f, value);
+        }
 
         public ShapePolyline(string shapeId, float[] x, float[] z, float[] cumDistM)
         {
@@ -23,58 +35,23 @@ namespace Blox.Live
             if (x.Length < 1) throw new ArgumentException("shape needs at least one point");
             for (int i = 1; i < cumDistM.Length; i++)
                 if (cumDistM[i] < cumDistM[i - 1]) throw new ArgumentException($"shape {shapeId}: cumDistM decreases at point {i}");
-            ShapeId = shapeId; _x = x; _z = z; _d = cumDistM;
+            ShapeId = shapeId;
+            _path = new PathMover(x, null, z, loop: false, turnRadiusM: 0f, cumDistM: cumDistM);
         }
 
         public static ShapePolyline From(ShapeDto dto) => new ShapePolyline(dto.ShapeId, dto.X, dto.Z, dto.CumDistM);
 
+        /// <summary>Pose (y = 0) at distance <paramref name="distM"/> along the shape.</summary>
+        public Pose PoseAt(double distM) => _path.Evaluate(distM);
+
         /// <summary>Position at distance <paramref name="distM"/>, and heading in degrees (0 = +z north, 90 = +x east).</summary>
         public void Evaluate(double distM, out float x, out float z, out float headingDeg)
         {
-            int n = _d.Length;
-            if (n == 1) { x = _x[0]; z = _z[0]; headingDeg = 0; return; }
-            int seg = Segment(distM);
-            float d0 = _d[seg], d1 = _d[seg + 1];
-            float t = d1 > d0 ? (float)((Math.Max(d0, Math.Min(d1, distM)) - d0) / (d1 - d0)) : 0f;
-            x = _x[seg] + (_x[seg + 1] - _x[seg]) * t;
-            z = _z[seg] + (_z[seg + 1] - _z[seg]) * t;
-            headingDeg = Heading(_x[seg + 1] - _x[seg], _z[seg + 1] - _z[seg]);
-        }
-
-        /// <summary>Index s of the segment [s, s+1] containing distM (clamped), skipping zero-length segments when possible.</summary>
-        private int Segment(double distM)
-        {
-            int lo = 0, hi = _d.Length - 2;
-            if (distM <= _d[0]) return FirstNonDegenerate(0);
-            if (distM >= _d[_d.Length - 1]) return LastNonDegenerate(hi);
-            while (lo < hi) // last s with d[s] <= distM
-            {
-                int mid = (lo + hi + 1) >> 1;
-                if (_d[mid] <= distM) lo = mid; else hi = mid - 1;
-            }
-            return FirstNonDegenerate(lo);
-        }
-
-        private int FirstNonDegenerate(int s)
-        {
-            int k = s;
-            while (k < _d.Length - 2 && _d[k + 1] <= _d[k]) k++;
-            return k;
-        }
-
-        private int LastNonDegenerate(int s)
-        {
-            int k = s;
-            while (k > 0 && _d[k + 1] <= _d[k]) k--;
-            return k;
+            var p = _path.Evaluate(distM);
+            x = p.X; z = p.Z; headingDeg = p.YawDeg;
         }
 
         /// <summary>Compass heading of a world-space direction: 0 = +z (north), 90 = +x (east).</summary>
-        public static float Heading(float dx, float dz)
-        {
-            if (dx == 0 && dz == 0) return 0;
-            double deg = Math.Atan2(dx, dz) * 180.0 / Math.PI;
-            return (float)(deg < 0 ? deg + 360.0 : deg);
-        }
+        public static float Heading(float dx, float dz) => Pose.YawOf(dx, dz);
     }
 }

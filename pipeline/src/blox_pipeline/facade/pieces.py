@@ -81,19 +81,21 @@ def flower_box(cv: Painter, h: HouseSpec, x: int, k_window: int, flowers: str) -
 
 
 def fence_run(cv: Painter, i0: int, i1: int, j: int, k: int, colour: str, fid: int) -> None:
-    """Balustrade from ``i0`` to ``i1`` along +i: posts at the ends, ``fence_1x4`` between,
-    a post between neighbouring fences, leftover studs filled with posts."""
+    """Balustrade from ``i0`` to ``i1`` along +i: a post at each end, as many ``fence_1x4``
+    as fit in between, and left-over studs as extra posts between the fences."""
     h = piece_h("fence_1x4")
-    cv.fill(i0, i0 + 1, j, j + 1, k, k + h, colour, fid)
-    cv.fill(i1 - 1, i1, j, j + 1, k, k + h, colour, fid)
-    i = i0 + 1
-    while i < i1 - 1:
-        if i + 4 <= i1 - 1:
+    inner = i1 - i0 - 2
+    n = max(0, inner // 4)
+    spare = inner - 4 * n
+    between = [0] * max(0, n - 1)
+    for g in range(min(spare, len(between))):
+        between[g] += 1
+    spare -= sum(between)
+    i = i0
+    posts = [1 + spare // 2] + between + [1 + spare - spare // 2]  # widths of the post runs
+    for m, width in enumerate(posts):
+        cv.fill(i, i + width, j, j + 1, k, k + h, colour, fid)
+        i += width
+        if m < n:
             cv.place("fence_1x4", i, j, k, "S", colour, fid)
             i += 4
-        else:
-            cv.fill(i, i + 1, j, j + 1, k, k + h, colour, fid)
-            i += 1
-        if i < i1 - 1:
-            cv.fill(i, i + 1, j, j + 1, k, k + h, colour, fid)
-            i += 1

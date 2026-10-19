@@ -10,7 +10,7 @@ See `CONTRACT.md` for the data formats and APIs shared by all components.
 scripts/check.sh            # all tests: pipeline, proxy, C# (dotnet), viewer
 scripts/shots.sh            # rebuild the look-test scene and take viewer screenshots (build/shots/)
 ```
-Plan and phases: `PLAN.md` · how it works: `docs/` · interface formats: `CONTRACT.md`.
+Plan and phases: `PLAN.md` · how it works: [`docs/README.md`](docs/README.md) (architecture, guides, dev log) · interface formats: `CONTRACT.md`.
 
 ## Components
 - `pipeline/`: AHN + 3D BAG + OSM → voxelised brick chunks (`build/world/`)

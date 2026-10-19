@@ -78,7 +78,12 @@ namespace Blox.Tests
             return sink;
         }
 
-        public static PlacedBrick Brick(string type, int i, int j, int k, int rot = 0, byte color = 4, bool noVariation = false) =>
-            new PlacedBrick(i, j, k, Repo.TypeId(type), color, (byte)((rot & 3) | (noVariation ? BrickRecord.FlagNoVariation : 0)));
+        public static PlacedBrick Brick(string type, int i, int j, int k, int rot = 0, byte color = 4, bool noVariation = false, bool hideStuds = false) =>
+            new PlacedBrick(i, j, k, Repo.TypeId(type), color, (byte)((rot & 3) | (noVariation ? BrickRecord.FlagNoVariation : 0)
+                                                                     | (hideStuds ? BrickRecord.FlagHideStuds : 0)));
+
+        /// <summary>A brick placed by facing (how gameplay/pipeline code should place things).</summary>
+        public static PlacedBrick Placed(string type, int i, int j, int k, Blox.Data.Facing facing, byte color = 4) =>
+            PlacedBrick.Place(i, j, k, Repo.TypeId(type), color, facing);
     }
 }

@@ -1,4 +1,5 @@
 // Camera presets derived from the world bounds and building features (not hard-coded).
+// Azimuths are compass degrees (0 = north, 90 = east); three.js north is -z.
 import * as THREE from 'three';
 
 function buildingsBox(world) {
@@ -65,6 +66,13 @@ export function makePresets(world, box, aspect = 1.6) {
       return { target: t, cam: t.clone().add(offset(180, 70, fitDist(r3, 28, aspect) * 0.8)), fov: 28 };
     })(),
   };
+  // river: low over the water looking north at the facades (shows water reflections)
+  {
+    const t = new THREE.Vector3(c.x, groundY + 2, c.z + size.z * 0.15);
+    presets.river = { target: t, cam: t.clone().add(offset(192, 9, size.z * 0.75)), fov: 40 };
+  }
+  // gallery / generic overview: from the south, steep enough to see every slot
+  presets.gallery = { target: c.clone(), cam: c.clone().add(offset(192, 55, fitDist(Math.hypot(size.x, size.z) / 2, 30, aspect) * 0.72)), fov: 30 };
   if (pick) {
     const [I0, J0, I1] = pick.bboxIJ;
     const t = new THREE.Vector3((I0 + I1 + 1) / 2 * S, groundY + 3.2, -J0 * S + 0.5);

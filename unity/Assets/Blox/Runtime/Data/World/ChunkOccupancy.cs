@@ -61,7 +61,7 @@ namespace Blox.Data
         {
             var t = cat[r.type];
             if (t.Defined == 0) throw new ArgumentException($"unknown typeId {r.type}");
-            Footprint.Extent(t, r.Rot, out ei, out ej);
+            Rotation.RotatedExtent(t, r.Rot, out ei, out ej);
             if (r.i + ei > Size || r.j + ej > Size) throw new ArgumentException($"brick {r} crosses the chunk border");
             h = t.H;
         }

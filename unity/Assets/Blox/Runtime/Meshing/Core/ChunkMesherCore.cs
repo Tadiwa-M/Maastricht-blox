@@ -20,7 +20,11 @@ namespace Blox.Meshing.Core
                                         ReadOnlySpan<BrickTypeInfo> types, ReadOnlySpan<PaletteColor> colors, float originX, float originZ)
             where TSink : struct, IChunkMeshSink
         {
-            var ctx = new MeshContext { Cells = cells, Dims = dims, Types = types, Colors = colors, OriginX = originX, OriginZ = originZ };
+            var ctx = new MeshContext
+            {
+                Cells = cells, Dims = dims, Types = types, Colors = colors, OriginX = originX, OriginZ = originZ,
+                Glass = MeshContext.FindGlass(colors),
+            };
             for (int n = 0; n < own.Length; n++)
             {
                 var br = own[n];
@@ -40,35 +44,6 @@ namespace Blox.Meshing.Core
             float r = c.R, g = c.G, b = c.B;
             BrickVariation.Apply(seed, br.NoVariation, ref r, ref g, ref b);
             return new FaceStyle { R = r, G = g, B = b, Material = c.Material, Seed01 = BrickVariation.Seed01(seed) };
-        }
-    }
-
-    /// <summary>Exposed-stud extraction: a stud is exposed when the cell directly above it is empty.</summary>
-    public static class StudExtractor
-    {
-        public static void Emit<TSink>(ref TSink sink, in PlacedBrick br, in BrickTypeInfo t, ReadOnlySpan<ushort> cells, in CellGridDims dims, in FaceStyle style)
-            where TSink : struct, IChunkMeshSink
-        {
-            if (t.Studs == StudPattern.None) return;
-            int rot = br.Rot, top = br.K + t.H;
-            for (int b = 0; b < t.D; b++)
-                for (int a = 0; a < t.W; a++)
-                {
-                    if (!Footprint.HasStud(t, a, b)) continue;
-                    Footprint.RotateCell(a, b, t.W, t.D, rot, out int ci, out int cj);
-                    int si = br.I + ci, sj = br.J + cj;
-                    if (CellGrid.Occupied(CellGrid.Get(cells, dims, si, sj, top))) continue;
-                    uint seed = BrickVariation.Seed(si, sj, top);
-                    sink.AddStud(new StudInstance
-                    {
-                        X = (si + 0.5f) * Units.StudM,
-                        Y = top * Units.PlateM,
-                        Z = (sj + 0.5f) * Units.StudM,
-                        R = style.R, G = style.G, B = style.B,
-                        AngleDeg = BrickVariation.StudAngleDeg(seed),
-                        Material = (float)style.Material,
-                    });
-                }
         }
     }
 }

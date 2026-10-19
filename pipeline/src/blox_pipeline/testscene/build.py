@@ -30,12 +30,13 @@ class SceneStats:
 
 def lay_out_scene() -> tuple[Records, float, float]:
     cv = make_scene()
+    placed = cv.placed_records()
     t0 = time.perf_counter()
-    rec = layout_tile(cv.color, cv.feature, cv.shape, cv.k0, cv.I0, cv.J0)
+    rec = layout_tile(cv.color, cv.feature, cv.shape, cv.k0, cv.I0, cv.J0, placed=placed)
     t1 = time.perf_counter()
-    rec = layout_tile(cv.color, cv.feature, cv.shape, cv.k0, cv.I0, cv.J0)
+    rec = layout_tile(cv.color, cv.feature, cv.shape, cv.k0, cv.I0, cv.J0, placed=placed)
     t2 = time.perf_counter()
-    errs = verify_layout(cv.color, cv.feature, cv.shape, rec, cv.k0, cv.I0, cv.J0)
+    errs = verify_layout(cv.color, cv.feature, cv.shape, rec, cv.k0, cv.I0, cv.J0, placed=placed)
     if errs:
         raise RuntimeError("look-test layout failed verification: " + "; ".join(errs))
     return rec, t1 - t0, t2 - t1

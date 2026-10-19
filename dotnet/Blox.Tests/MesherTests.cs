@@ -11,25 +11,27 @@ namespace Blox.Tests
     {
         private const byte Red = 4, Water = 32, Glass = 34;
 
-        public static TheoryData<string, int> AllTypesAllRotations()
+        /// <summary>Every profile-based type (not the v2 detail pieces, see DetailMesherTests) in every rotation.</summary>
+        public static TheoryData<string, int> ProfileTypesAllRotations()
         {
             var d = new TheoryData<string, int>();
             foreach (var t in Repo.Catalogue.Types)
-                for (int rot = 0; rot < 4; rot++) d.Add(t.Name, rot);
+                if (!t.Info.IsDetail)
+                    for (int rot = 0; rot < 4; rot++) d.Add(t.Name, rot);
             return d;
         }
 
         [Theory]
-        [MemberData(nameof(AllTypesAllRotations))]
+        [MemberData(nameof(ProfileTypesAllRotations))]
         public void IsolatedBrickIsClosedOutwardAndHasExpectedVolume(string type, int rot)
         {
             var s = Run(2, 3, new[] { Brick(type, 2 * 64 + 10, 3 * 64 + 10, 100, rot) });
             MeshAssert.WindingMatchesNormals(s);
             MeshAssert.IsClosedManifold(s);
-            Assert.Equal(ExpectedVolume(Repo.Catalogue.ByName(type).Info), MeshAssert.Volume(s), 4);
+            Assert.InRange(Math.Abs(ExpectedVolume(Repo.Catalogue.ByName(type).Info) - MeshAssert.Volume(s)), 0, 1e-5);
             // Every vertex lies inside the brick's rotated box (chunk-local metres).
             var t = Repo.Catalogue.ByName(type).Info;
-            Footprint.Extent(t, rot, out int ei, out int ej);
+            Rotation.RotatedExtent(t, rot, out int ei, out int ej);
             foreach (var v in s.Vertices)
             {
                 Assert.InRange(v.Position.X, 10 * 0.5f - 1e-4f, (10 + ei) * 0.5f + 1e-4f);
@@ -52,6 +54,7 @@ namespace Blox.Tests
                 case BrickKind.SlopeDouble:
                     return t.W * t.D * (t.H + BrickProfile.LipPlates) / 2.0 * cell;
                 case BrickKind.Round:
+                case BrickKind.RoundTile:
                 {
                     int n = BrickProfile.RoundSegments;
                     double r = BrickProfile.RoundRadius * 0.5;
@@ -116,15 +119,16 @@ namespace Blox.Tests
             for (int rot = 0; rot < 4; rot++)
             {
                 var s = Run(0, 0, new[] { Brick("slope45_2x2", 10, 10, 10, rot) });
-                Footprint.SlopeLowEdge(rot, out int di, out int dj);
+                Rotation.FrontDir(rot, out int di, out int dj); // a slope's front is its low edge
                 var sloped = s.Triangles().Where(t => t.a.Normal.Y > 0.01f && t.a.Normal.Y < 0.99f).ToList();
                 Assert.Equal(2, sloped.Count); // one quad
                 var n = sloped[0].a.Normal;
-                // rise 2 plates (0.4 m) over 1 stud (0.5 m): normal ~ (0.4 horizontal, 0.5 up) normalised.
-                float len = (float)Math.Sqrt(0.4 * 0.4 + 0.5 * 0.5);
+                // rise 3 plates minus the 0.25-plate lip (0.55 m) over 1 stud (0.5 m).
+                float rise = (3f - BrickProfile.LipPlates) * 0.2f;
+                float len = (float)Math.Sqrt(rise * rise + 0.5 * 0.5);
                 Assert.Equal(0.5f / len, n.Y, 4);
-                Assert.Equal(di * 0.4f / len, n.X, 4);
-                Assert.Equal(dj * 0.4f / len, n.Z, 4);
+                Assert.Equal(di * rise / len, n.X, 4);
+                Assert.Equal(dj * rise / len, n.Z, 4);
                 // Flat top only over the studded back row, two studs on that row.
                 Assert.Equal(2, s.Studs.Count);
                 float backCentre = rot switch { 0 => 10.5f, 1 => 10.5f, 2 => 11.5f, _ => 11.5f } * 0.5f;
@@ -160,7 +164,7 @@ namespace Blox.Tests
             // Slope rot 0 (low edge +j) at j=10..11, a 1x1 brick in front at j=12, one behind at j=9.
             var bricks = new[] { Brick("brick_1x1", 10, 9, 10), Brick("slope45_1x2", 10, 10, 10), Brick("brick_1x1", 10, 12, 10) };
             var s = Run(0, 0, bricks);
-            // Front brick's -j face stays (slope covers only 1 of 3 plates there).
+            // Front brick's -j face stays (the slope's 0.05 m lip covers none of it).
             Assert.Contains(s.Triangles(), t => t.a.Normal.Z < -0.99f && Math.Abs(t.a.Position.Z - 6.0f) < 1e-5);
             // Slope's lip (+j at z = 6.0 m) is hidden by the front brick.
             Assert.DoesNotContain(s.Triangles(), t => t.a.Normal.Z > 0.99f && Math.Abs(t.a.Position.Z - 6.0f) < 1e-5);
@@ -266,9 +270,11 @@ namespace Blox.Tests
             // rot 1: low edge faces +i. Back row cell (a=0,b=0) covers +j/-j sides fully at every plate.
             Assert.Equal(1 << Dir.PosY, BrickProfile.CoverMaskWorld(t, 1, 0, 0, 2) & (1 << Dir.PosY));
             int frontTop = BrickProfile.CoverMaskWorld(t, 1, 0, 1, 2);
-            Assert.Equal(0, frontTop & (1 << Dir.PosX));   // front face only covers the lip plate
+            Assert.Equal(0, frontTop & (1 << Dir.PosX));   // the front is the sloped surface
             Assert.Equal(0, frontTop & (1 << Dir.PosY));
-            Assert.NotEqual(0, BrickProfile.CoverMaskWorld(t, 1, 0, 1, 0) & (1 << Dir.PosX));
+            // v2: the lip is only 0.05 m, so even the bottom plate's front face is not closed.
+            Assert.Equal(0, BrickProfile.CoverMaskWorld(t, 1, 0, 1, 0) & (1 << Dir.PosX));
+            Assert.NotEqual(0, BrickProfile.CoverMaskWorld(t, 1, 0, 0, 0) & (1 << Dir.NegX)); // back stays closed
         }
     }
 }

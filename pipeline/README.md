@@ -91,6 +91,81 @@ Rules worth knowing:
   (BAG id, year, height, OSM name/address), landmarks, streets (one per name), water,
   named parks, POIs, stations, bus stops. `bboxIJ` is inclusive, `centroid` lies inside.
 
+## Rotation and facing (`src/blox_pipeline/rotation.py`)
+
+One rule: **a piece's front faces +j (north) at rot 0**. Code never picks `rot` itself; it
+says where the front should face and `facing_to_rot` turns that into `rot`:
+
+| facing | front faces | rot |
+|---|---|---|
+| `N` | +j | 0 |
+| `E` | +i | 1 |
+| `S` | -j | 2 (our house fronts) |
+| `W` | -i | 3 (west side walls) |
+
+`rotated_extent(w, d, rot)` gives the turned footprint size, `footprint_cell(w, d, rot, a, b)`
+says where unrotated cell `(a, b)` lands relative to the record position (the min corner of
+the turned box), `front_dir(rot)` is the unit step the front points along. Catalogue,
+layout (slopes, verification), previews and models all use these helpers; the tests run
+them against the shared `contract/test_vectors/rotation.json` that C# and JS also pass.
+
+## Placed pieces and hide_studs (`src/blox_pipeline/layout/`)
+
+Detail pieces (windows, doors, arches, fences, round tiles, jumpers, grilles, 30 deg
+slopes; CONTRACT 2.1) can't come out of a voxel grid, so they are *placed*:
+
+```python
+cv.place("window_1x2x3", i, j, k, "S", "white", feature_id)   # testscene.Canvas
+rec = layout_tile(cv.color, cv.feature, cv.shape, cv.k0, cv.I0, cv.J0, placed=cv.placed_records())
+```
+
+`(i, j, k)` is the min corner of the box the turned piece fills. Its cells must be air in
+the voxel grid (checked by `Canvas.place`, and again by `layout_tile`, which also rejects
+pieces outside the chunk or overlapping each other). Because those cells are air, hollow
+culling keeps the wall behind a window frame. `verify_layout(..., placed=...)` checks the
+pieces came through unchanged.
+
+`layout/studs.py` sets rotFlags bit3 `hide_studs` on any brick whose every stud cell lies
+under a solid input cell that was hollow-culled (not stored), so renderers skip studs no
+camera can see.
+
+## Facade grammar (`src/blox_pipeline/facade/`)
+
+`HouseSpec` describes a house (width, storeys, colours, roof kind, ground floor kind,
+shutters, flower boxes, balcony, corner windows); `paint_house` builds it in this order:
+shell -> pilasters -> upper storeys (`windows.py`) -> ground floor (`ground.py`) -> west
+side windows -> cornice -> roof (`roofs.py`). `pieces.py` has the tiny "clear, place,
+backdrop" helpers. What each part uses:
+
+- every window is a `window_1x2x3` frame (trim colour) with a sloped `slope30_1x2` sill
+  or a flower box with `round_tile_1x1` flowers; a dark "room" backdrop sits behind it,
+  varying per window;
+- doors are `door_1x2x4` (accent colour); shops get an `arch_1x4` over the door, a sign
+  band with `grille_1x2` lettering and a striped awning; `GroundFloor.ARCHED` puts every
+  ground-floor opening under an arch with a glass fanlight;
+- flat roofs get a `fence_1x4` balustrade, stepped gables a `jumper_1x2` on top, attic
+  and dormer windows are `window_1x2x2`; `balcony=True` adds a fenced balcony.
+
+## Brick models (`src/blox_pipeline/models/`, CONTRACT 7.1)
+
+```
+uv run python -m blox_pipeline.models                      # writes ../contract/models/{bus,boat,character}.json
+uv run python -m blox_pipeline.models --preview ../build/models   # plus iso PNGs
+```
+
+Each model is a short generator using `ModelBuilder`: `place(piece, i, j, k, facing, colour,
+part=...)` for special pieces, then `box(...)` to pour the body into the cells that are
+still empty. Models face +j. The bus (5 x 24 x 16) has wheel parts; the boat (7 x 30 x 27)
+has its pivot on the waterline; the character (4 x 1 x 10, arms included) is an original
+blocky figure with `leg_l/leg_r` (hip pivots) and `arm_l/arm_r` (shoulder pivots) for a
+walk cycle. `check_model` validates any model file independently.
+
+## Look-test scene
+
+`uv run python -m blox_pipeline.testscene --out ../build/testscene` lays out one
+hand-authored chunk (Markt corner: river, quay, road, square, four townhouses, tower),
+verifies it and writes the world plus `preview.png` / `preview_iso.png`.
+
 ## Status
 
 Tested offline with hand-built fixtures in the real formats (CityJSON, GeoTIFF, OSM PBF,

@@ -21,6 +21,8 @@ namespace Blox.Live
         [SerializeField] private float staticIntervalSec = 1800f;
         [SerializeField] private float healthIntervalSec = 30f;
         [SerializeField] private int timeoutSec = 10;
+        [Tooltip("Corner smoothing for buses on their route shapes (m); same rule as path followers (Blox.Data.PathMover).")]
+        [SerializeField, Min(0f)] private float busTurnRadiusM = 6f;
 
         public VehicleRegistry Registry { get; } = new VehicleRegistry();
         public LiveClock Clock { get; } = new LiveClock();
@@ -41,7 +43,11 @@ namespace Blox.Live
         /// <summary>Current proxy-clock time in Unix seconds.</summary>
         public double Now => Clock.Now(LiveClock.LocalUnixNow());
 
-        /// <summary>Poses for this frame (render time = Now - 60 s). The dictionary is reused.</summary>
+        /// <summary>
+        /// Poses for this frame (render time = Now - 60 s). The dictionary is reused. Turn one into
+        /// the shared <see cref="Blox.Data.Pose"/> with <see cref="VehiclePose.ToPose"/> and place the
+        /// bus model with it, exactly like a path follower.
+        /// </summary>
         public IReadOnlyDictionary<string, VehiclePose> SamplePoses()
         {
             Registry.SampleAll(Now, _poses);
@@ -52,6 +58,7 @@ namespace Blox.Live
 
         private void OnEnable()
         {
+            Registry.TurnRadiusM = busTurnRadiusM;
             StartCoroutine(Loop(staticIntervalSec, PollStatic));
             StartCoroutine(Loop(vehiclesIntervalSec, PollVehicles));
             StartCoroutine(Loop(environmentIntervalSec, PollEnvironment));

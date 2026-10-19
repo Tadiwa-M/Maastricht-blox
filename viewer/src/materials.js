@@ -39,8 +39,8 @@ export class MaterialSet {
     this.trans = plastic({ roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.05, transparent: true,
       opacity: 0.75, envMapIntensity: 1.6, depthWrite: false });
     this.water = plastic({ roughness: 0.06, clearcoat: 0, specularIntensity: 1, ior: 1.33,
-      transparent: true, opacity: 0.88, envMapIntensity: 1.3 });
-    this.waterUniforms = addRipples(this.water, rippleNormalTexture());
+      transparent: true, opacity: 0.9, envMapIntensity: 2.0 });
+    this.waterUniforms = addRipples(this.water, rippleNormalTexture(), 0.6);
     this.metal = plastic({ metalness: 0.8, roughness: 0.28, clearcoat: 0.2, envMapIntensity: 1.4 });
     this.emissive = new Map();
     this.clippingPlanes = clippingPlanes;
@@ -75,7 +75,7 @@ export class MaterialSet {
   /** night in [0, 1]: lamps and windows glow. */
   setNight(night) {
     this.night = night;
-    for (const m of this.emissive.values()) m.emissiveIntensity = 0.8 + night * 5;
+    for (const m of this.emissive.values()) m.emissiveIntensity = 0.8 + night * 3;
     this.glass.emissiveIntensity = night * 1.6;
     this.glass.envMapIntensity = 1.6 * (1 - 0.6 * night);
   }

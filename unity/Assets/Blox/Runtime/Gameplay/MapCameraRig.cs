@@ -69,6 +69,12 @@ namespace Blox.Gameplay
         private bool _panning;
         private Vector3 _panGrab;
 
+        /// <summary>When set, the orbit target follows this transform (third-person view of a walking figure).</summary>
+        public Transform FollowTarget { get; set; }
+
+        /// <summary>WASD panning; switched off while a CharacterWalker uses those keys.</summary>
+        public bool KeyboardPanEnabled { get; set; } = true;
+
         public Vector3 Target => target;
         public float Distance => distance;
         public float Yaw => yaw;
@@ -110,6 +116,14 @@ namespace Blox.Gameplay
             float dt = Time.unscaledDeltaTime;
             HandleMouse();
             HandleKeyboard(dt);
+
+            if (FollowTarget != null)
+            {
+                var f = FollowTarget.position;
+                _desiredTarget.x = f.x;
+                _desiredTarget.z = f.z;
+                groundHeight = f.y;
+            }
 
             _desiredDistance = Mathf.Clamp(_desiredDistance, minDistance, maxDistance);
             _desiredTarget.x = Mathf.Clamp(_desiredTarget.x, boundsMin.x, boundsMax.x);
@@ -188,7 +202,7 @@ namespace Blox.Gameplay
             if (kb == null) return;
             float h = (kb.dKey.isPressed ? 1f : 0f) - (kb.aKey.isPressed ? 1f : 0f);
             float v = (kb.wKey.isPressed ? 1f : 0f) - (kb.sKey.isPressed ? 1f : 0f);
-            if (h != 0f || v != 0f)
+            if (KeyboardPanEnabled && (h != 0f || v != 0f))
             {
                 var rot = Quaternion.Euler(0f, yaw, 0f);
                 var move = (rot * Vector3.right * h + rot * Vector3.forward * v) * (keyPanSpeed * distance * dt);

@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using Blox.Data;
 
 namespace Blox.Live
 {
@@ -31,6 +32,13 @@ namespace Blox.Live
         public bool Extrapolated;     // render time is past the newest observation
         public bool Discontinuity;    // the pose jumped (first sample, new trip, backward snap)
         public double DistM;          // distance along the shape when OnShape
+
+        /// <summary>
+        /// The shared <see cref="Data.Pose"/> (CONTRACT 7.1) for this sample, standing on height
+        /// <paramref name="groundY"/> (the proxy only knows x/z; the renderer supplies the road height).
+        /// Buses, path followers and characters are all placed from this one type.
+        /// </summary>
+        public Pose ToPose(float groundY = 0f) => new Pose(X, groundY, Z, HeadingDeg);
     }
 
     /// <summary>

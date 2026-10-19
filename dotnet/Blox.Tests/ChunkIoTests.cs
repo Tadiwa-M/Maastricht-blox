@@ -116,7 +116,7 @@ namespace Blox.Tests
         {
             var plain = HandBuilt(false, out _);
             Assert.Throws<ChunkFormatException>(() => ChunkReader.Read(Mutate(plain, 32 + 0, 64)));    // i out of range
-            Assert.Throws<ChunkFormatException>(() => ChunkReader.Read(Mutate(plain, 32 + 6, 0x09)));  // reserved rotFlags bit
+            Assert.Throws<ChunkFormatException>(() => ChunkReader.Read(Mutate(plain, 32 + 6, 0x11)));  // reserved rotFlags bit (bit 4; bit 3 is hide_studs since v2)
             Assert.Throws<ChunkFormatException>(() => ChunkReader.Read(Mutate(plain, 32 + 7, 1)));     // reserved byte
             Assert.Throws<ChunkFormatException>(() => ChunkReader.Read(Mutate(plain, 32 + 4, 0)));     // type 0
             Assert.Throws<ChunkFormatException>(() => ChunkReader.Read(Mutate(plain, 32 + 5, 0)));     // colour 0

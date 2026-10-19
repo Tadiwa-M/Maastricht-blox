@@ -5,7 +5,7 @@ using Blox.Data;
 namespace Blox.Meshing.Core
 {
     /// <summary>
-    /// Round 1x1 bricks/plates: a <see cref="BrickProfile.RoundSegments"/>-sided prism with
+    /// Round 1x1 bricks/plates and round tiles: a <see cref="BrickProfile.RoundSegments"/>-sided prism with
     /// smooth side normals, centred in its cell. UV1 is 0 on the axes that have no brick edge
     /// (around the circumference, and on the top/bottom caps) so the bevel shader skips them.
     /// </summary>
@@ -25,7 +25,7 @@ namespace Blox.Meshing.Core
 
             float cx = (xf.I + 0.5f) * Units.StudM - xf.OriginX;
             float cz = (xf.J + 0.5f) * Units.StudM - xf.OriginZ;
-            float y0 = xf.K * Units.PlateM, y1 = (xf.K + t.H) * Units.PlateM;
+            float y0 = xf.K * Units.PlateM - xf.OriginY, y1 = (xf.K + t.H) * Units.PlateM - xf.OriginY;
             float r = BrickProfile.RoundRadius * Units.StudM;
             float height = y1 - y0;
             float circumference = 2f * (float)Math.PI * r;
