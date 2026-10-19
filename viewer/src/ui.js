@@ -1,4 +1,5 @@
-// Overlay UI wiring: sun-time slider, toggles (tilt-shift, AO, animation), stats, info panel.
+// Overlay UI wiring: sun-time slider, toggles (tilt-shift, AO, animation), quality selector,
+// stats (with the measured frame rate), info panel.
 const $ = (id) => document.getElementById(id);
 
 export function fmtHours(h) {
@@ -6,7 +7,7 @@ export function fmtHours(h) {
   return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
-export function bindUI({ time, tilt, ao, anim, onTime, onTilt, onAO, onAnim }) {
+export function bindUI({ time, tilt, ao, anim, quality, onTime, onTilt, onAO, onAnim, onQuality }) {
   const slider = $('time'), label = $('timeLabel');
   slider.value = time;
   label.textContent = fmtHours(time);
@@ -20,14 +21,20 @@ export function bindUI({ time, tilt, ao, anim, onTime, onTilt, onAO, onAnim }) {
     $(id).checked = init[id];
     $(id).addEventListener('change', (e) => fn(e.target.checked));
   }
+  $('quality').value = quality;
+  $('quality').addEventListener('change', (e) => onQuality(e.target.value));
   return {
     set(o) {
       slider.value = o.time; label.textContent = fmtHours(o.time);
       for (const id of Object.keys(toggles)) $(id).checked = o[id];
+      $('quality').value = o.quality;
     },
+    /** Tier actually in use (auto shows what it picked). */
+    tier(mode, name) { $('tierLabel').textContent = mode === 'auto' ? `→ ${name}` : ''; },
     stats(s) {
-      $('stats').textContent = `${s.bricks.toLocaleString()} bricks · ${s.studs.toLocaleString()} studs · `
-        + `${s.calls} draws · ${s.actors} movers · ${s.fps} fps`;
+      $('stats').textContent = `${s.bricks.toLocaleString()} bricks · ${s.near}/${s.chunks} chunks near · `
+        + `${s.studs.toLocaleString()} studs · ${s.calls} draws · ${(s.triangles / 1e6).toFixed(2)} M tris · `
+        + `${s.actors} movers · ${s.fps}`;
     },
     info(html) {
       const el = $('info');

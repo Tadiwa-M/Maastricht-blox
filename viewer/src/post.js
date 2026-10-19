@@ -4,6 +4,9 @@
 // under studs; `thickness` stops occluders far in front of a surface from casting dark
 // halos around silhouettes. Tilt-shift: the blur grows with camera distance (off for
 // close-ups, stronger for the overview) and the sharp band follows the orbit target.
+//
+// Quality tiers (src/quality.js) may run AO at half resolution (its result is upsampled when
+// blended) or switch it off, and keep bloom for the night only, when lamps and windows glow.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -25,6 +28,9 @@ export class Post {
     c.setSize(width, height);
     c.addPass(new RenderPass(scene, camera));
     const gtao = new GTAOPass(scene, camera, width, height);
+    this.aoScale = 1;
+    const setAoSize = gtao.setSize.bind(gtao);
+    gtao.setSize = (w, h) => setAoSize(Math.max(1, Math.round(w * this.aoScale)), Math.max(1, Math.round(h * this.aoScale)));
     gtao.output = GTAOPass.OUTPUT.Default;
     gtao.blendIntensity = 1.0;
     gtao.updateGtaoMaterial(AO);
@@ -39,7 +45,36 @@ export class Post {
     c.addPass(new OutputPass());
     this.composer = c;
     this.tiltOn = true;
+    this.aoWanted = true; // the HUD toggle
+    this.quality = { ao: 'full', bloom: 'always' };
+    this.night = 0;
     this.resize(width, height);
+  }
+
+  /** Tier settings: ao 'full' | 'half' | 'off', bloom 'always' | 'night'. */
+  setQuality({ ao, bloom }) {
+    this.quality = { ao, bloom };
+    const scale = ao === 'half' ? 0.5 : 1;
+    if (scale !== this.aoScale) { this.aoScale = scale; this.resize(this.width, this.height); }
+    this.setAO(this.aoWanted);
+    this.setNight(this.night);
+  }
+
+  setAO(on) {
+    this.aoWanted = on;
+    this.gtao.enabled = on && this.quality.ao !== 'off';
+  }
+
+  /** Night factor 0..1: bloom strength, and whether bloom runs at all on lower tiers. */
+  setNight(n) {
+    this.night = n;
+    this.bloom.strength = THREE.MathUtils.lerp(0.18, 0.7, n);
+    this.bloom.enabled = this.quality.bloom === 'always' || n > 0.05;
+  }
+
+  setPixelRatio(pr) {
+    this.composer.setPixelRatio(pr);
+    this.resize(this.width, this.height);
   }
 
   setTiltShift(on) {

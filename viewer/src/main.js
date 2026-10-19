@@ -1,12 +1,14 @@
 // Entry point: pick the world (embedded data or the piece gallery), build the brick
 // meshes, stage, camera presets, locomotion demo, picking and the render loop.
 //
-// URL hash: #view=hero|map|facade|gallery&t=16.5&tilt=0&ao=0&anim=0&ids=38-47
+// URL hash: #view=hero|map|facade|gallery&t=16.5&tilt=0&ao=0&anim=0&ids=38-47&quality=auto
 import * as THREE from 'three';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { loadWorld } from './world.js';
 import { MaterialSet } from './materials.js';
-import { buildWorldMeshes } from './bricks.js';
+import { worldContext } from './bricks.js';
+import { ChunkLOD } from './lod.js';
+import { TIERS, MODES, initialTier, useLod, FrameGovernor, FpsMeter } from './quality.js';
 import { Stage } from './scene.js';
 import { makePresets } from './presets.js';
 import { galleryWorld, parseIds } from './gallery.js';
@@ -24,6 +26,7 @@ function parseHash() {
     ao: p.get('ao') !== '0',
     anim: p.get('anim') !== '0',
     ids: p.get('ids'),
+    quality: MODES.includes(p.get('quality')) ? p.get('quality') : 'auto',
   };
 }
 
@@ -72,12 +75,29 @@ async function main() {
   const W = () => window.innerWidth, H = () => window.innerHeight;
   const stage = new Stage(canvas, W(), H());
   const mats = new MaterialSet();
-  const built = buildWorldMeshes(world, mats);
-  stage.scene.add(built.group);
+  const lod = new ChunkLOD(world, mats, worldContext(world, mats));
+  stage.scene.add(lod.group);
+  // the gallery is one small scene: always the full look
+  const size = isGallery ? { chunks: 1, bricks: 0 } : { chunks: lod.chunks.length, bricks: world.count };
+  let mode = opts.quality, tierName = initialTier(mode, size), governor = new FrameGovernor(tierName);
   if (labels) stage.overlay.add(labels);
   const box = worldBox(world);
   stage.setBounds(box, world.studM);
   stage.initPost();
+  function applyTier(name) {
+    tierName = name;
+    const tier = TIERS[name];
+    stage.setQuality(tier);
+    lod.setTier({ ...tier, lod: useLod(name, size) });
+    ui?.tier(mode, name);
+  }
+  function setMode(m) {
+    mode = m;
+    governor = new FrameGovernor(initialTier(m, size));
+    applyTier(initialTier(m, size));
+  }
+  let ui = null;
+  applyTier(tierName);
   const demo = isGallery ? null : setupDemo(world, box, data.models);
   if (demo) stage.scene.add(demo.group);
 
@@ -101,22 +121,25 @@ async function main() {
   }
   function applyTime(h) { const n = stage.setTime(h); mats.setNight(n); demo?.mats.setNight(n); }
 
-  const ui = bindUI({
-    time: opts.time, tilt: opts.tilt, ao: opts.ao, anim: animate,
+  ui = bindUI({
+    time: opts.time, tilt: opts.tilt, ao: opts.ao, anim: animate, quality: mode,
     onTime: applyTime,
     onTilt: (on) => stage.post.setTiltShift(on),
-    onAO: (on) => { stage.post.gtao.enabled = on; },
+    onAO: (on) => stage.post.setAO(on),
     onAnim: (on) => { animate = on; },
+    onQuality: setMode,
   });
+  ui.tier(mode, tierName);
   applyView(opts.view);
   applyTime(opts.time);
   stage.post.setTiltShift(opts.tilt);
-  stage.post.gtao.enabled = opts.ao;
+  stage.post.setAO(opts.ao);
   window.addEventListener('hashchange', () => {
     const o = parseHash();
     if ((o.view === 'gallery') !== isGallery || o.ids !== opts.ids) { location.reload(); return; }
     applyView(o.view); applyTime(o.time); ui.set(o);
-    stage.post.setTiltShift(o.tilt); stage.post.gtao.enabled = o.ao; animate = o.anim;
+    stage.post.setTiltShift(o.tilt); stage.post.setAO(o.ao); animate = o.anim;
+    if (o.quality !== mode) setMode(o.quality);
   });
   window.addEventListener('resize', () => stage.resize(W(), H()));
   bindPicking(canvas, stage, world, ui);
@@ -125,10 +148,16 @@ async function main() {
   r.info.autoReset = false;
   const still = /[?&]shot=1/.test(location.search);
   const clock = new THREE.Clock();
-  let frames = 0, last = performance.now(), fps = 0, acc = 0, t = 0;
-  function frame() {
+  // fps = real intervals between animation frames (the old readout rounded to whole fps,
+  // so anything slower than 2 s per frame showed "0 fps")
+  const meter = new FpsMeter(1000);
+  let frames = 0, t = 0, lastStats = 0;
+  if (still) lod.settle(stage.camera); else lod.update(stage.camera, { all: true });
+  function frame(now) {
     const dt = Math.min(clock.getDelta(), 0.1);
+    const ms = meter.tick(now);
     controls.update();
+    lod.update(stage.camera);
     if (animate && !still) {
       t += dt;
       demo?.update(dt);
@@ -136,16 +165,23 @@ async function main() {
     }
     r.info.reset();
     stage.render(controls.target);
-    const now = performance.now();
-    acc++;
-    if (now - last > 500) { fps = Math.round((acc * 1000) / (now - last)); acc = 0; last = now; }
-    ui.stats({ bricks: built.bricks, studs: built.studs, calls: r.info.render.calls, fps,
-      actors: demo?.actors.length || 0 });
+    if (mode === 'auto' && !still && ms > 0) {
+      const next = governor.sample(ms);
+      if (next) applyTier(next);
+    }
+    if (now - lastStats > 250 || still) {
+      lastStats = now;
+      const ls = lod.stats();
+      ui.stats({ bricks: world.count, studs: ls.studs, near: ls.near, chunks: ls.chunks, calls: r.info.render.calls,
+        triangles: r.info.render.triangles, fps: meter.label(), actors: demo?.actors.length || 0 });
+    }
     if (++frames === 4) window.__bloxReady = true;
     if (still && frames >= 4) return; // screenshot mode: freeze so capture is cheap
     requestAnimationFrame(frame);
   }
-  window.__blox = { world, stage, controls, presets, built, demo };
+  const built = { bricks: world.count, get studs() { return lod.studsShown; } };
+  window.__blox = { world, stage, controls, presets, built, demo, lod,
+    quality: { describe: () => `${mode}:${tierName}` } };
   // screenshot hook: render synchronously and read the canvas back (cheaper than a
   // compositor capture under software GL)
   window.__bloxCapture = () => {

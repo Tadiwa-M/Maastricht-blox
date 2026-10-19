@@ -34,10 +34,13 @@ export function ridgeProfile(t, S, P) {
   return [[0, 0], [D, 0], [D, lip], [D / 2 + e, H], [D / 2 - e, H], [0, lip]];
 }
 
-/** { body, glass? } for catalogue type t. seamless: plain box for glass/water bricks. */
-export function bodyParts(t, S, P, seamless = false) {
+/**
+ * { body, glass? } for catalogue type t. seamless: plain box for glass/water bricks.
+ * lite: one bevel segment instead of two for plain bricks (medium/low quality near LOD).
+ */
+export function bodyParts(t, S, P, seamless = false, lite = false) {
   const plainKind = ['brick', 'plate', 'tile'].includes(t.kind);
-  const key = `${t.id}:${seamless && plainKind ? 'seamless' : 'normal'}`;
+  const key = `${t.id}:${seamless && plainKind ? 'seamless' : 'normal'}${lite ? ':lite' : ''}`;
   return cached(key, () => {
     const W = t.w * S, D = t.d * S, H = t.h * P;
     if (seamless && plainKind) return { body: seamlessBox(W, H, D) };
@@ -47,11 +50,11 @@ export function bodyParts(t, S, P, seamless = false) {
       case 'slope': return { body: extrudeProfile(slopeProfile(t, S, P), W, D) };
       case 'slope_double': return { body: extrudeProfile(ridgeProfile(t, S, P), W, D) };
       case 'round': return { body: latheRound(Math.min(W, D) / 2 - 0.012, H - INSET, 0.02, 24, true) };
-      default: return { body: brickBox(W, H, D) };
+      default: return { body: brickBox(W, H, D, undefined, lite ? 1 : 2) };
     }
   });
 }
 
-export function studGeometry() {
-  return cached('stud', () => latheRound(STUD_R, STUD_H, 0.018, 20, false));
+export function studGeometry(lite = false) {
+  return cached(lite ? 'stud:lite' : 'stud', () => latheRound(STUD_R, STUD_H, 0.018, lite ? 12 : 20, false));
 }

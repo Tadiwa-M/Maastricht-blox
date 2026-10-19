@@ -54,6 +54,7 @@ export class Stage {
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.025;
     this.sun.shadow.radius = 2;
+    this.sun.shadow.camera.layers.enable(1); // shadow-only proxies of near LOD chunks (src/lod.js)
     this.scene.add(this.hemi, this.sun, this.sun.target);
     this.overlay = new THREE.Scene(); // drawn after post-processing (labels)
     this.width = width; this.height = height;
@@ -115,8 +116,26 @@ export class Stage {
     this.scene.fog.color.copy(hor);
     this.renderer.toneMappingExposure = THREE.MathUtils.lerp(1.0, 1.6, n);
     if (this.box) this.fitShadow();
-    if (this.post) this.post.bloom.strength = THREE.MathUtils.lerp(0.18, 0.7, n);
+    this.night = n;
+    this.post?.setNight(n);
     return n;
+  }
+
+  /** Apply a quality tier (src/quality.js): pixel ratio, shadow map size, AO and bloom. */
+  setQuality(tier) {
+    const pr = Math.min(window.devicePixelRatio || 1, tier.pixelRatio);
+    if (pr !== this.renderer.getPixelRatio()) {
+      this.renderer.setPixelRatio(pr);
+      this.renderer.setSize(this.width, this.height, false);
+      this.post?.setPixelRatio(pr);
+    }
+    const sh = this.sun.shadow;
+    if (sh.mapSize.x !== tier.shadowMap) {
+      sh.mapSize.set(tier.shadowMap, tier.shadowMap);
+      sh.map?.dispose();
+      sh.map = null;
+    }
+    this.post?.setQuality(tier);
   }
 
   resize(width, height) {
