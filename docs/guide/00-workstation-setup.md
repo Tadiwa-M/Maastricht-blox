@@ -1,8 +1,18 @@
-# 00 · Workstation setup (GPU machine)
+# 00 · Machine setup (GPU workstation + laptop, both Windows)
 
 The cloud session can't run Unity or reach the data hosts. The GPU workstation does both. This
 page gets a fresh machine from zero to "Unity compiles, tests pass, and a screenshot of the
 look test exists" with as few manual steps as possible.
+
+## Roles
+
+| Machine | Does | Doesn't |
+|---|---|---|
+| **GPU workstation** | Unity (`scripts/unity.ps1`), real-data fetch/build, demo capture | — |
+| **Laptop** (slow) | code review, tests (`scripts/check.sh`), viewer previews, driving the workstation remotely | Unity, full-slice builds |
+| **Cloud** | CI, docs, tests, viewer screenshots | Unity, data downloads (hosts blocked) |
+
+All three meet in GitHub (`week1-foundation`). Pull before you start, push when you stop.
 
 ## 1. Install (manual, once)
 
@@ -53,7 +63,18 @@ uv run blox build --out ../build/world # voxelise + lay out the real slice
 Check `docs/DATA_SOURCES.md` first: the AHN and Rijkswaterstaat endpoints changed in 2026,
 and some URLs are still UNVERIFIED.
 
-## 5. Working on the workstation
+## 5. Laptop (light setup)
+
+```powershell
+git clone https://github.com/Tadiwa-M/maastricht-blox.git
+cd maastricht-blox; git checkout week1-foundation
+.\scripts\setup-workstation.ps1     # same script; it only warns that Unity is missing
+bash scripts/check.sh                 # Git Bash
+cd viewer; node build.mjs ..\build\testscene; start dist\index.html   # orbit the look test locally
+```
+Skip Unity on the laptop; run the Unity steps on the workstation (below).
+
+## 6. Working on the workstation
 
 - `scripts/unity.ps1` runs headless: read the logs and the screenshot it leaves, fix, rerun.
 - Always push to `week1-foundation` (or a feature branch). The cloud session and the

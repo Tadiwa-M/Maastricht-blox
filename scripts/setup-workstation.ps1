@@ -1,4 +1,4 @@
-# One-time setup of a Windows workstation for Maastricht Blox. Safe to re-run.
+# One-time setup of a Windows machine (GPU workstation or laptop) for Maastricht Blox. Safe to re-run.
 # Prerequisites it checks (install manually if missing): git, Unity Hub + Unity 6 LTS.
 # It installs via winget when missing: uv, .NET 8 SDK, Node.js 22.
 $ErrorActionPreference = 'Stop'
@@ -18,7 +18,7 @@ Write-Host 'Refresh PATH (open a new terminal) if anything was just installed.'
 
 Push-Location "$Root\pipeline"; uv sync; Pop-Location
 Push-Location "$Root\proxy"; uv sync; Pop-Location
-Push-Location "$Root\viewer"; npm ci --no-audit --no-fund; Pop-Location
+Push-Location "$Root\viewer"; npm ci --no-audit --no-fund; npx playwright install chromium; Pop-Location  # browser for viewer screenshots
 dotnet restore "$Root\dotnet\Blox.sln"
 
 $gpu = Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name
