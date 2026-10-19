@@ -1,15 +1,16 @@
 """Hand-authored "look test" chunk: a corner of the Markt by the Maas.
 
 South -> north: the Maas with a stone quay, a road with pavements and lamp posts, the
-cobbled square with three trees, a row of five narrow gabled townhouses and a tall
-tower with a stepped spire. Everything is painted into a voxel tile following
+cobbled square with a cafe terrace, planters and trees, a row of four detailed
+townhouses (``facade`` grammar: stepped gables, dormers, shop fronts) and a tall tower
+with a stepped spire. Everything is painted into a voxel tile following
 CONTRACT section 7 (slopes as 3-cell stacks, tiles for paving, shape 8 for water).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
+from ..facade import GroundFloor, HouseSpec, RoofKind, paint_house
+from ..facade.props import bench, bollard, cafe_table, planter
 from ..layout.records import CHUNK
 from .canvas import Canvas
 
@@ -17,33 +18,29 @@ CX, CY = 22, 47  # chunk holding the Markt (RD 176430, 318007 -> I 1460, J 3014)
 GROUND_K = 90  # 48.0 m NAP
 K0 = GROUND_K - 9
 NZ = 150
-STOREY = 15
 FULL, N, E, S, W, RIDGE_J, TILE, WATER = 0, 1, 2, 3, 4, 6, 7, 8
 
 F_MARKT, F_MAAS, F_KADE, F_TOWER = 1, 2, 3, 20
 
 
-@dataclass(frozen=True)
-class House:
-    x0: int
-    width: int
-    storeys: int
-    wall: str
-    roof: str
-    plinth: str
-    fid: int
-
-
 HOUSES = [
-    House(1, 8, 3, "mergel", "roof_tile_red", "mergel_dark", 10),
-    House(9, 6, 4, "brick_red", "slate", "dark_grey", 11),
-    House(15, 8, 3, "white", "roof_tile_red", "light_grey", 12),
-    House(23, 6, 4, "mergel_light", "slate", "mergel_dark", 13),
-    House(29, 8, 3, "brick_dark_red", "roof_tile_dark", "dark_grey", 14),
+    HouseSpec(1, 45, 12, 16, 3, 10, "mergel", trim="cream", accent="dark_green", roof="slate",
+              roof_kind=RoofKind.STEPPED_GABLE, ground=GroundFloor.SHOP, awning=("white", "dark_green"),
+              quoins=True, plinth="mergel_dark", corner_west=True),
+    HouseSpec(13, 45, 10, 16, 2, 11, "brick_red", trim="white", accent="dark_green",
+              roof="roof_tile_dark", roof_kind=RoofKind.EAVE_DORMERS, shutters=True,
+              flowers="flower_pink"),
+    HouseSpec(23, 45, 12, 16, 3, 12, "ochre", trim="white", accent="medium_blue",
+              roof_kind=RoofKind.FLAT_CORNICE, ground=GroundFloor.SHOP, awning=("white", "medium_blue"),
+              plinth="mergel_dark"),
+    HouseSpec(35, 45, 10, 16, 3, 13, "sand_green", trim="white", accent="brick_dark_red",
+              roof="roof_tile_red", roof_kind=RoofKind.STEPPED_GABLE, shutters=True,
+              flowers="signal_yellow"),
 ]
-HOUSE_J0, HOUSE_DEPTH = 46, 16
-TOWER = (45, 48, 11, 90)  # x0, y0, size, wall height in plates
-TREES = [(8, 33), (22, 38), (36, 31)]
+TOWER = (46, 48, 11, 90)  # x0, y0, size, wall height in plates
+TREES = [(42, 29), (60, 33)]
+CAFE = [(5, 36, "bus_red"), (12, 33, "white"), (27, 36, "medium_blue"), (20, 30, "dark_green")]
+PLANTERS = [(10, 41, "flower_pink"), (33, 41, "signal_yellow")]
 LAMPS_I = [6, 22, 38, 54]
 
 
@@ -66,45 +63,6 @@ def _ground(cv: Canvas) -> None:
                 cv.cell(i, j, g - 1, "light_grey", F_MARKT, TILE)
             elif (i * 7 + j * 2) % 13 == 0:
                 cv.cell(i, j, g - 1, "dark_grey", F_MARKT, TILE)
-
-
-def _windows(width: int) -> list[int]:
-    return [1, 2, 5, 6] if width == 8 else [1, 4]
-
-
-def _house(cv: Canvas, h: House) -> None:
-    g = GROUND_K
-    x0, x1, y0, y1 = h.x0, h.x0 + h.width, HOUSE_J0, HOUSE_J0 + HOUSE_DEPTH
-    top = g + 3 + h.storeys * STOREY
-    cv.fill(x0, x1, y0, y1, g, top, h.wall, h.fid)
-    cv.clear(x0 + 1, x1 - 1, y0 + 1, y1 - 1, g, top)
-    cv.fill(x0, x1, y0, y1, g, g + 3, h.plinth, h.fid)
-    cv.clear(x0 + 1, x1 - 1, y0 + 1, y1 - 1, g, g + 3)
-    cv.fill(x0, x1, y0, y0 + 1, top - 1, top, "white" if h.wall != "white" else "light_grey", h.fid)
-    for s in range(h.storeys):
-        kb = g + 3 + s * STOREY + 4
-        for o in _windows(h.width):
-            for j in (y0, y1 - 1):
-                cv.fill(x0 + o, x0 + o + 1, j, j + 1, kb, kb + 9, "glass", h.fid)
-    door = x0 + h.width // 2 - 1
-    cv.fill(door, door + 2, y0, y0 + 1, g, g + 12, "dark_blue" if h.fid % 2 else "brick_brown", h.fid)
-    _gable_roof(cv, h, x0, x1, y0, y1, top)
-
-
-def _gable_roof(cv: Canvas, h: House, x0: int, x1: int, y0: int, y1: int, top: int) -> None:
-    t = 0
-    while x1 - x0 - 2 * t >= 2:
-        a, b, kb = x0 + t, x1 - 1 - t, top + 3 * t
-        if b - a + 1 == 2:
-            cv.fill(a, b + 1, y0, y1, kb, kb + 3, h.roof, h.fid, RIDGE_J)
-            break
-        cv.fill(a + 1, b, y0, y0 + 1, kb, kb + 3, h.wall, h.fid)  # gable ends
-        cv.fill(a + 1, b, y1 - 1, y1, kb, kb + 3, h.wall, h.fid)
-        cv.fill(a, a + 1, y0, y1, kb, kb + 3, h.roof, h.fid, W)
-        cv.fill(b, b + 1, y0, y1, kb, kb + 3, h.roof, h.fid, E)
-        cv.fill(a + 1, a + 2, y0, y1, kb, kb + 3, h.roof, h.fid)
-        cv.fill(b - 1, b, y0, y1, kb, kb + 3, h.roof, h.fid)
-        t += 1
 
 
 def _tower(cv: Canvas) -> None:
@@ -173,10 +131,17 @@ def make_scene() -> Canvas:
     cv = Canvas(CX, CY, K0, NZ)
     _ground(cv)
     for h in HOUSES:
-        _house(cv, h)
+        paint_house(cv, h, GROUND_K)
     _tower(cv)
     for x, y in TREES:
         _tree(cv, x, y)
+    for i, j, canopy in CAFE:
+        cafe_table(cv, i, j, GROUND_K, canopy)
+    for i, j, flower in PLANTERS:
+        planter(cv, i, j, GROUND_K, flower)
+    bench(cv, 38, 32, GROUND_K)
+    for i in range(4, CHUNK, 10):
+        bollard(cv, i, 24, GROUND_K)
     for x in LAMPS_I:
         _lamp(cv, x, 12)
         _lamp(cv, x + 8, 21)
@@ -198,9 +163,8 @@ def scene_features() -> list[dict]:
         box("street", F_KADE, "Maaskade (look test)", 0, 9, 63, 22, 0.0),
     ]
     for n, h in enumerate(HOUSES):
-        storeys_m = (3 + h.storeys * STOREY) * 0.2
-        feats.append(box("building", h.fid, f"Townhouse {chr(65 + n)} (look test)", h.x0, HOUSE_J0,
-                         h.x0 + h.width - 1, HOUSE_J0 + HOUSE_DEPTH - 1, storeys_m))
+        feats.append(box("building", h.fid, f"Townhouse {chr(65 + n)} (look test)", h.x0, h.y0,
+                         h.x1 - 1, h.y1 - 1, round((h.eave_k(0)) * 0.2, 1)))
     x0, y0, n, hgt = TOWER
     feats.append(box("landmark", F_TOWER, "Tower (look test)", x0, y0, x0 + n - 1, y0 + n - 1,
                      round((hgt + 6 * (n // 2) + 12) * 0.2, 1)))

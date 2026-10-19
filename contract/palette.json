@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "entries": [
   {
    "idx": 0,
@@ -246,6 +246,42 @@
    "name": "gold",
    "srgb": "#C9A23A",
    "material": "metal"
+  },
+  {
+   "idx": 41,
+   "name": "dark_green",
+   "srgb": "#2F5A3C",
+   "material": "solid"
+  },
+  {
+   "idx": 42,
+   "name": "sand_green",
+   "srgb": "#88A891",
+   "material": "solid"
+  },
+  {
+   "idx": 43,
+   "name": "ochre",
+   "srgb": "#D6A445",
+   "material": "solid"
+  },
+  {
+   "idx": 44,
+   "name": "medium_blue",
+   "srgb": "#5B8DB8",
+   "material": "solid"
+  },
+  {
+   "idx": 45,
+   "name": "flower_pink",
+   "srgb": "#D9607E",
+   "material": "solid"
+  },
+  {
+   "idx": 46,
+   "name": "sand_red",
+   "srgb": "#B5776A",
+   "material": "solid"
   }
  ]
 }
