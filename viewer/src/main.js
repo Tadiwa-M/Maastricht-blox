@@ -45,7 +45,7 @@ async function main() {
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 2;
   controls.maxDistance = 600;
-  const presets = makePresets(world, box);
+  const presets = makePresets(world, box, W() / H());
 
   function applyView(name) {
     const p = presets[name] || presets.hero;

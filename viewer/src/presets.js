@@ -22,27 +22,53 @@ function offset(azDeg, elDeg, dist) {
     .multiplyScalar(dist);
 }
 
-export function makePresets(world, box) {
+/** Building whose street-side corridor (south of its facade) is the least cluttered. */
+function clearestFacade(world, houses) {
+  let best = null, bestN = Infinity;
+  for (const f of houses) {
+    const [I0, J0, I1] = f.bboxIJ;
+    let n = 0;
+    for (let I = I0; I <= I1; I++)
+      for (let J = J0 - 16; J < J0; J++)
+        for (let K = world.groundK + 1; K < world.groundK + 20; K++) n += world.occupied(I, J, K) ? 1 : 0;
+    const score = n / (I1 - I0 + 1);
+    if (score < bestN) { bestN = score; best = f; }
+  }
+  return best;
+}
+
+/** Distance at which a sphere of radius r fills the view. */
+function fitDist(r, fovDeg, aspect) {
+  const v = THREE.MathUtils.degToRad(fovDeg) / 2;
+  const h = Math.atan(Math.tan(v) * aspect);
+  return r / Math.sin(Math.min(v, h));
+}
+
+export function makePresets(world, box, aspect = 1.6) {
   const S = world.studM;
   const groundY = world.groundK * world.plateM;
   const c = box.getCenter(new THREE.Vector3());
   const size = box.getSize(new THREE.Vector3());
-  const span = Math.max(size.x, size.z);
   const { box: bb, list } = buildingsBox(world);
   const front = bb.isEmpty() ? c.z : bb.max.z; // south facades (largest z)
   const houses = list.filter((f) => f.kind === 'building').sort((a, b) => a.centroid[0] - b.centroid[0]);
-  const pick = houses[Math.floor(houses.length / 2)] || list[0];
+  const pick = clearestFacade(world, houses) || list[0];
+  const r = Math.hypot(size.x, size.z) / 2;
 
-  const hero = new THREE.Vector3(c.x, groundY + 4, Math.min(front + span * 0.12, box.max.z));
+  // hero: the whole diorama from the south-southwest, a little toward the facades
+  const hero = new THREE.Vector3(c.x, groundY + Math.min(size.y * 0.25, 8), (c.z + front) / 2);
   const presets = {
-    hero: { target: hero, cam: hero.clone().add(offset(205, 30, span * 1.05)), fov: 35 },
-    map: { target: new THREE.Vector3(c.x, groundY, c.z), cam: new THREE.Vector3(c.x, groundY, c.z)
-      .add(offset(180, 62, span * 1.55)), fov: 35 },
+    hero: { target: hero, cam: hero.clone().add(offset(206, 30, fitDist(r, 32, aspect) * 0.8)), fov: 32 },
+    map: (() => {
+      const t = new THREE.Vector3(c.x, groundY + (box.max.y - groundY) * 0.3, c.z);
+      const r3 = Math.hypot(size.x, size.z, box.max.y - groundY) / 2;
+      return { target: t, cam: t.clone().add(offset(180, 70, fitDist(r3, 28, aspect) * 0.8)), fov: 28 };
+    })(),
   };
   if (pick) {
     const [I0, J0, I1] = pick.bboxIJ;
     const t = new THREE.Vector3((I0 + I1 + 1) / 2 * S, groundY + 3.2, -J0 * S + 0.5);
-    presets.facade = { target: t, cam: t.clone().add(offset(197, 9, 11)), fov: 40 };
+    presets.facade = { target: t, cam: t.clone().add(offset(198, 6, 6.5)), fov: 50 };
   } else {
     presets.facade = presets.hero;
   }
