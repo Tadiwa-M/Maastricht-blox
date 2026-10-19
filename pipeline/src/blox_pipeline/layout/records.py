@@ -8,6 +8,8 @@ from numpy.typing import NDArray
 CHUNK = 64  # studs per chunk side (CONTRACT section 1)
 WORLD_STUDS = 4096  # slice size in studs
 FLAG_NO_VARIATION = 0x04  # rotFlags bit2 (CONTRACT section 4); stored at the same bit here
+FLAG_HIDE_STUDS = 0x08  # rotFlags bit3 (v2): every stud is under a hollow-culled interior cell
+KNOWN_FLAGS = FLAG_NO_VARIATION | FLAG_HIDE_STUDS
 
 RECORD_DTYPE = np.dtype(
     [

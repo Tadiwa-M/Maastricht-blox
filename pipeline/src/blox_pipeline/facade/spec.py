@@ -1,4 +1,10 @@
-"""Declarative description of one house front."""
+"""Declarative description of one house front.
+
+A house is an axis-aligned box whose street front faces -j. Seen from the street, the
+cells along j are (front to back): ``y0`` = trim layer (pilasters, sills, cornices that
+stick out), ``wall_j`` = the wall plane (where window/door pieces sit), ``glass_j`` = the
+first interior row (dark "room" backdrops behind the glass), then air up to the back wall.
+"""
 
 from __future__ import annotations
 
@@ -13,8 +19,9 @@ class RoofKind(Enum):
 
 
 class GroundFloor(Enum):
-    HOUSE = "house"  # plinth, front door, windows
-    SHOP = "shop"    # shop window, sign band, striped awning
+    HOUSE = "house"    # plinth, front door, windows
+    SHOP = "shop"      # shop windows, arched shop door, sign band with lettering, awning
+    ARCHED = "arched"  # door and windows each under a round arch with a fanlight
 
 
 @dataclass(frozen=True)
@@ -37,6 +44,7 @@ class HouseSpec:
     flowers: str | None = None   # flower colour for first-floor window boxes
     plinth: str = "dark_grey"
     corner_west: bool = False   # end of a row: the west side wall gets windows too
+    balcony: bool = False       # first-floor balcony with a fence in front of the middle bay
 
     # Vertical rhythm in plates (0.2 m).
     PLINTH = 3
@@ -61,7 +69,7 @@ class HouseSpec:
 
     @property
     def glass_j(self) -> int:
-        """Window glass sits one cell behind the wall plane, so openings cast shadows."""
+        """First interior row: backdrops behind window pieces so rooms do not look empty."""
         return self.y0 + 2
 
     @property

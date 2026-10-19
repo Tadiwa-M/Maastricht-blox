@@ -1,4 +1,9 @@
-"""``layout_tile``: voxel tile (CONTRACT section 7) -> brick records (global coords)."""
+"""``layout_tile``: voxel tile (CONTRACT section 7) -> brick records (global coords).
+
+Order of work: hollow-cull (keep only cells someone could see), lay slope/ridge bricks,
+pack tiles/water, pack the remaining full cells into bricks and plates, then add the
+explicitly placed pieces and set the ``hide_studs`` flag (see ``studs``).
+"""
 
 from __future__ import annotations
 
@@ -9,8 +14,10 @@ from ..catalogue import Catalogue, load_catalogue
 from ..palette import Palette, load_palette
 from .cull import exposed_mask
 from .pack2d import feet_table, pack_volume
-from .records import CHUNK, RECORD_DTYPE, WORLD_STUDS, Records, sort_records
+from .placed import as_records, placed_problems
+from .records import CHUNK, FLAG_HIDE_STUDS, RECORD_DTYPE, WORLD_STUDS, Records, sort_records
 from .slopes import layout_slopes
+from .studs import hidden_studs
 
 FULL, TILE, WATER = 0, 7, 8
 MAX_K = 65535 - 3  # a brick's top (k + h) must fit the uint16 maxK header field
@@ -79,12 +86,16 @@ def layout_tile(
     color: NDArray[np.uint8], feature: NDArray[np.uint32], shape: NDArray[np.uint8],
     k0: int, I0: int, J0: int, *, border: int | None = None,
     catalogue: Catalogue | None = None, palette: Palette | None = None,
+    placed: Records | list[Records] | None = None,
 ) -> Records:
     """Lay out one voxel tile as bricks.
 
     ``border``: cells on each horizontal side that are context only (used for hollow
     culling, never emitted). ``None`` auto-detects a 1-cell border around whole chunks
-    (see :func:`auto_border`). Returns records (``RECORD_DTYPE``) sorted by (K, J, I).
+    (see :func:`auto_border`). ``placed``: explicitly placed pieces (global records, see
+    ``layout.placed``); they must sit on air cells inside the emit region and not overlap
+    each other, and are passed through (only their ``hide_studs`` bit is recomputed).
+    Returns records (``RECORD_DTYPE``) sorted by (K, J, I).
     """
     cat = catalogue or load_catalogue()
     pal = palette or load_palette()
@@ -96,7 +107,11 @@ def layout_tile(
     dims = color.shape
     b = auto_border(dims, I0, J0) if border is None else border
     emit = emit_mask(dims, k0, I0, J0, b)
-    keep = keep_mask(color, shape, emit, pal)
+    extra = as_records(placed)
+    errs, _ = placed_problems(extra, color, emit, I0, J0, k0, cat)
+    if errs:
+        raise ValueError("placed pieces rejected: " + "; ".join(errs))
+    keep = keep_mask(color, shape, emit, pal)  # placed cells are air here, so walls behind them stay
     lim_i, cxi = _chunk_limits(dims[0], I0)
     lim_j, cyj = _chunk_limits(dims[1], J0)
 
@@ -120,7 +135,12 @@ def layout_tile(
     lab, lc, lf = _labels(full_cells, color, feature)
     (oi, oj, ok, ot, orot, ol), _ = _pack(lab, owner, k0, _feet(cat, "brick"), _feet(cat, "plate"), lim_i, lim_j, True, next_id)
     parts.append(_records(oi, oj, ok, ot, orot, lc[ol], lf[ol], I0, J0, k0))
-    return sort_records(np.concatenate(parts))
+    parts.append(extra.copy())
+    rec = np.concatenate(parts)
+    interior = (color != 0) & ~(sl.used | tile_cells | full_cells)  # solid but not stored
+    rec["flags"] &= np.uint8(~FLAG_HIDE_STUDS & 0xFF)
+    rec["flags"][hidden_studs(rec, interior, I0, J0, k0, cat)] |= np.uint8(FLAG_HIDE_STUDS)
+    return sort_records(rec)
 
 
 def _records(i, j, k, t, rot, c, f, I0: int, J0: int, k0: int) -> Records:

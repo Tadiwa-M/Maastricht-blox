@@ -1,7 +1,11 @@
 """Brick catalogue (``contract/brick_catalogue.json``, CONTRACT.md section 2).
 
-Loads the catalogue, offers lookups by id/name and the rotation rule for footprints:
-rot 0/2 -> ``w x d`` along ``(i, j)``, rot 1/3 -> ``d x w``.
+Loads the catalogue and offers lookups by id/name. All rotation maths (extent of a
+turned piece, which cell lands where, which way the front faces) lives in
+:mod:`blox_pipeline.rotation`; this module only asks it.
+
+Kinds: the six v1 kinds are what the voxel layout packs automatically; the v2 detail
+kinds (``arch``, ``window``, ...) are only ever *placed* explicitly (CONTRACT 2.1).
 """
 
 from __future__ import annotations
@@ -15,7 +19,11 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
-KINDS = ("brick", "plate", "tile", "slope", "slope_double", "round")
+from .rotation import footprint_cell, rotated_extent
+
+LAYOUT_KINDS = ("brick", "plate", "tile", "slope", "slope_double", "round")
+DETAIL_KINDS = ("arch", "window", "door", "fence", "round_tile", "jumper", "tile_grille")
+KINDS = LAYOUT_KINDS + DETAIL_KINDS
 
 
 def repo_root() -> Path:
@@ -46,18 +54,33 @@ class BrickType:
 
     def extent(self, rot: int) -> tuple[int, int]:
         """Footprint ``(size along i, size along j)`` at rotation ``rot``."""
-        return footprint(self.w, self.d, rot)
+        return rotated_extent(self.w, self.d, rot)
 
     @property
     def is_slope(self) -> bool:
         return self.kind in ("slope", "slope_double")
 
+    @property
+    def is_detail(self) -> bool:
+        """A v2 detail piece: placed explicitly, never produced by the voxel layout."""
+        return self.kind in DETAIL_KINDS
 
-def footprint(w: int, d: int, rot: int) -> tuple[int, int]:
-    """Rotated footprint extent along ``(i, j)`` (CONTRACT.md section 2)."""
-    if rot not in (0, 1, 2, 3):
-        raise ValueError(f"rot must be 0..3, got {rot}")
-    return (w, d) if rot % 2 == 0 else (d, w)
+    def stud_offsets(self, rot: int) -> list[tuple[int, int]]:
+        """Footprint offsets ``(di, dj)`` from the record position that carry a stud.
+
+        ``backRows`` slopes have studs on the ``studRows`` rows farthest from the low
+        front edge (front = +j at rot 0, so the back rows are the low ``b`` values).
+        A ``center`` stud (jumper) straddles the whole footprint, so every cell counts.
+        """
+        if self.studs == "none" or (self.studs == "backRows" and self.stud_rows == 0):
+            return []
+        cells = []
+        for a in range(self.w):
+            for b in range(self.d):
+                if self.studs == "backRows" and b >= self.stud_rows:
+                    continue
+                cells.append(footprint_cell(self.w, self.d, rot, a, b))
+        return cells
 
 
 class Catalogue:

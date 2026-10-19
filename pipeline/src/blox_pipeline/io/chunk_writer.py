@@ -15,13 +15,13 @@ from typing import Any
 import numpy as np
 
 from ..catalogue import Catalogue, catalogue_path, load_catalogue
-from ..layout.records import CHUNK, FLAG_NO_VARIATION, RECORD_DTYPE, Records, chunk_keys, sort_records
+from ..layout.records import CHUNK, KNOWN_FLAGS, RECORD_DTYPE, Records, chunk_keys, sort_records
 from ..palette import palette_path
 from .chunk_reader import read_chunk
 from .format import FILE_RECORD_DTYPE, FLAG_DEFLATE, ChunkHeader, chunk_filename
 from .world_meta import features_document, manifest_document
 
-CONTRACT_VERSION = 1
+CONTRACT_VERSION = 2  # manifest contractVersion; chunk binary itself is still BXC1 v1
 
 
 @dataclass(frozen=True)
@@ -56,7 +56,7 @@ def _validate(rec: Records, cx: int, cy: int, cat: Catalogue) -> None:
     k = rec["K"].astype(np.int64)
     if np.any(k < 0) or np.any(k + eh[t] > 0xFFFF):
         raise ValueError("brick k out of uint16 range")
-    if np.any(rec["flags"] & ~np.uint8(FLAG_NO_VARIATION)):
+    if np.any(rec["flags"] & ~np.uint8(KNOWN_FLAGS)):
         raise ValueError("unsupported flag bits")
 
 

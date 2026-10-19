@@ -12,7 +12,7 @@ from typing import Any
 
 import numpy as np
 
-from ..layout.records import CHUNK, FLAG_NO_VARIATION, RECORD_DTYPE, Records
+from ..layout.records import CHUNK, KNOWN_FLAGS, RECORD_DTYPE, Records
 from .format import FILE_RECORD_DTYPE, HEADER_SIZE, RECORD_SIZE, ChunkHeader
 
 
@@ -45,7 +45,7 @@ def decode_chunk(data: bytes) -> ChunkData:
     rec["rot"] = raw["rotFlags"] & 3
     rec["flags"] = raw["rotFlags"] & ~np.uint8(3)
     rec["featureId"] = raw["featureId"]
-    if np.any(rec["flags"] & ~np.uint8(FLAG_NO_VARIATION)) or np.any(raw["reserved"]):
+    if np.any(rec["flags"] & ~np.uint8(KNOWN_FLAGS)) or np.any(raw["reserved"]):
         raise ValueError("reserved bits set in chunk records")
     return ChunkData(hdr, rec, raw)
 
@@ -54,8 +54,15 @@ def read_chunk(path: Path | str) -> ChunkData:
     return decode_chunk(Path(path).read_bytes())
 
 
+# v1 worlds read unchanged under v2: same chunk bytes, v2 only adds rotFlags bit3.
+SUPPORTED_CONTRACT_VERSIONS = (1, 2)
+
+
 def read_manifest(world_dir: Path | str) -> dict[str, Any]:
-    return json.loads((Path(world_dir) / "manifest.json").read_text(encoding="utf-8"))
+    doc = json.loads((Path(world_dir) / "manifest.json").read_text(encoding="utf-8"))
+    if doc.get("contractVersion") not in SUPPORTED_CONTRACT_VERSIONS:
+        raise ValueError(f"unsupported contractVersion {doc.get('contractVersion')!r}")
+    return doc
 
 
 def read_world_records(world_dir: Path | str, *, check_sha1: bool = True) -> Iterator[tuple[dict, ChunkData]]:

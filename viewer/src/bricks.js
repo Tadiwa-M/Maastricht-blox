@@ -1,95 +1,153 @@
-// Turns a World into InstancedMeshes: one per (geometry, material key), per-instance colour.
+// Turns brick records into a few InstancedMeshes: one per (geometry, material) pair.
+//
+// BrickBatcher is shared by the world, the piece gallery and the brick models: callers add
+// bricks in grid coordinates and the batcher groups identical geometry + material so a
+// whole city is drawn in a handful of draw calls. Per-instance data: transform, colour
+// (with a small deterministic variation) and, for glass, the night glow colour.
 import * as THREE from 'three';
-import { bodyGeometry, studGeometry, INSET } from './geometry.js';
-import { extent, footprintCell, studCells, ROT_MASK, NO_VARIATION } from './world.js';
+import { bodyParts, studGeometry, INSET } from './geometry.js';
+import { typeExtent, typeCell, studCells, ROT_MASK, NO_VARIATION, HIDE_STUDS } from './world.js';
+import { brickMatrix, gridToThree } from './placement.js';
+import { hash3 } from './hash.js';
+import { exteriorAir } from './exterior.js';
+import { windowGlow } from './glow.js';
 
+export { hash3 };
 const VARIATION = 0.03; // +-3 % value
+const BLACK = new THREE.Color(0, 0, 0);
 
-export function hash3(I, J, K) {
-  let h = Math.imul(I | 0, 0x8da6b343) ^ Math.imul(J | 0, 0xd8163841) ^ Math.imul(K | 0, 0xcb1ab31f);
-  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
-  h = Math.imul(h ^ (h >>> 12), 0x297a2d39);
-  h ^= h >>> 15;
-  return (h >>> 0) / 4294967296;
+/** Linear colour of a palette entry, varied by a hash of the cell unless exact. */
+export function brickColor(entry, I, J, K, exact, out = new THREE.Color()) {
+  out.set(entry?.srgb || '#ff00ff');
+  if (!exact) {
+    const f = 1 + (hash3(I, J, K) * 2 - 1) * VARIATION;
+    out.convertLinearToSRGB().multiplyScalar(f).convertSRGBToLinear();
+  }
+  return out;
 }
 
-function brickColor(world, n, out) {
-  const e = world.palette.get(world.color[n]);
-  out.set(e?.srgb || '#ff00ff');
-  if (!(world.rotFlags[n] & NO_VARIATION)) {
-    const f = 1 + (hash3(world.I[n], world.J[n], world.K[n]) * 2 - 1) * VARIATION;
-    out.convertLinearToSRGB().multiplyScalar(f).convertSRGBToLinear();
+/**
+ * Grid positions [I, J, K] (fractional, stud base centre) of the studs a brick shows.
+ * covered(I, J, K) says whether the cell above a stud hides it.
+ */
+export function exposedStuds(t, rot, I, J, K, covered) {
+  const top = K + t.h, out = [];
+  if (t.studs === 'center') { // jumper: one stud centred on the whole footprint
+    const [ei, ej] = typeExtent(t, rot);
+    for (let dj = 0; dj < ej; dj++) for (let di = 0; di < ei; di++) if (covered(I + di, J + dj, top)) return out;
+    out.push([I + ei / 2, J + ej / 2, top]);
+    return out;
+  }
+  for (const [a, b] of studCells(t)) {
+    const [di, dj] = typeCell(t, rot, a, b);
+    if (!covered(I + di, J + dj, top)) out.push([I + di + 0.5, J + dj + 0.5, top]);
   }
   return out;
 }
 
 class Bucket {
   constructor(geometry, material, key) {
-    Object.assign(this, { geometry, material, key, mats: [], cols: [], owner: [] });
+    Object.assign(this, { geometry, material, key, mats: [], cols: [], glow: null });
   }
-  push(matrix, color, n) { this.mats.push(matrix.clone()); this.cols.push(color.clone()); this.owner.push(n); }
+  push(matrix, color, glow) {
+    this.mats.push(matrix.clone());
+    this.cols.push(color.clone());
+    if (glow) (this.glow ||= new Array(this.mats.length - 1).fill(BLACK)).push(glow);
+    else if (this.glow) this.glow.push(BLACK);
+  }
   build() {
-    const mesh = new THREE.InstancedMesh(this.geometry, this.material, this.mats.length);
-    for (let q = 0; q < this.mats.length; q++) {
-      mesh.setMatrixAt(q, this.mats[q]);
-      mesh.setColorAt(q, this.cols[q]);
+    let geometry = this.geometry;
+    if (this.glow) { // per-instance glow: needs its own copy of the geometry
+      geometry = geometry.clone();
+      const a = new Float32Array(this.glow.length * 3);
+      this.glow.forEach((c, q) => c.toArray(a, q * 3));
+      geometry.setAttribute('aGlow', new THREE.InstancedBufferAttribute(a, 3));
     }
+    const mesh = new THREE.InstancedMesh(geometry, this.material, this.mats.length);
+    this.mats.forEach((m, q) => { mesh.setMatrixAt(q, m); mesh.setColorAt(q, this.cols[q]); });
     mesh.instanceMatrix.needsUpdate = true;
     mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-    mesh.computeBoundingBox?.();
-    const transparent = this.material.transparent;
-    mesh.castShadow = !transparent;
+    mesh.castShadow = !this.material.transparent;
     mesh.receiveShadow = true;
     mesh.name = this.key;
-    mesh.userData.owner = Int32Array.from(this.owner);
     return mesh;
   }
 }
 
-/** Build all brick + stud meshes. Returns { group, meshes, bricks, studs }. */
-export function buildBrickMeshes(world, mats) {
-  const S = world.studM, P = world.plateM;
-  const buckets = new Map();
-  const bucket = (key, geom, mat) => {
-    if (!buckets.has(key)) buckets.set(key, new Bucket(geom, mat, key));
-    return buckets.get(key);
-  };
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3();
-  const one = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
-  const col = new THREE.Color();
-  const studG = studGeometry();
-  let studs = 0, bricks = 0;
-  for (let n = 0; n < world.count; n++) {
-    const t = world.types.get(world.type[n]);
-    if (!t) continue;
-    const rot = world.rotFlags[n] & ROT_MASK;
-    const [ei, ej] = extent(t, rot);
-    const I = world.I[n], J = world.J[n], K = world.K[n];
-    const { key, material } = mats.forEntry(world.palette.get(world.color[n]));
-    brickColor(world, n, col);
-    pos.set((I + ei / 2) * S, K * P, -(J + ej / 2) * S);
-    q.setFromAxisAngle(up, -rot * Math.PI / 2); // clockwise from above
-    m4.compose(pos, q, one);
-    bucket(`${t.name}|${key}`, bodyGeometry(t, { studM: S, plateM: P }), material).push(m4, col, n);
-    bricks++;
-    const topK = K + t.h;
-    for (const [a, b] of studCells(t)) {
-      const [di, dj] = footprintCell(t, rot, a, b);
-      if (world.occupied(I + di, J + dj, topK)) continue;
-      pos.set((I + di + 0.5) * S, topK * P - INSET, -(J + dj + 0.5) * S);
-      m4.makeTranslation(pos.x, pos.y, pos.z);
-      bucket(`stud|${key}`, studG, material).push(m4, col, n);
-      studs++;
+export class BrickBatcher {
+  constructor(mats, studM, plateM) {
+    Object.assign(this, { mats, S: studM, P: plateM, buckets: new Map(), bricks: 0, studs: 0 });
+    this.glassEntry = null; // palette entry used for window/door panes
+  }
+
+  bucket(geometry, material, key) {
+    const k = `${geometry.uuid}|${key}`;
+    if (!this.buckets.has(k)) this.buckets.set(k, new Bucket(geometry, material, key));
+    return this.buckets.get(k);
+  }
+
+  /** One brick: body in its material (+ panes in glass). glow: night colour for glass. */
+  addBrick({ I, J, K, t, rot, entry, exact = false, glow = null }) {
+    const { key, material, cls } = this.mats.forEntry(entry);
+    const seamless = cls === 'glass' || cls === 'water';
+    const parts = bodyParts(t, this.S, this.P, seamless);
+    const m4 = brickMatrix(I, J, K, t.w, t.d, rot, this.S, this.P);
+    const col = brickColor(entry, I, J, K, exact);
+    this.bucket(parts.body, material, `${t.name}|${key}`).push(m4, col, cls === 'glass' ? glow : null);
+    if (parts.glass) {
+      const g = this.glassEntry || entry;
+      const gm = this.mats.forEntry(g);
+      this.bucket(parts.glass, gm.material, `${t.name}:pane|${gm.key}`).push(m4, brickColor(g, I, J, K, true), glow);
     }
+    this.bricks++;
   }
-  const group = new THREE.Group();
-  group.name = 'bricks';
-  const meshes = [];
-  for (const b of buckets.values()) {
-    const mesh = b.build();
-    group.add(mesh);
-    meshes.push(mesh);
+
+  /** One stud at grid position (I, J, K) = centre of its base. */
+  addStud(I, J, K, entry, color) {
+    const { key, material } = this.mats.forEntry(entry);
+    const p = gridToThree(I, J, K, this.S, this.P);
+    const m4 = new THREE.Matrix4().makeTranslation(p.x, p.y - INSET, p.z);
+    this.bucket(studGeometry(), material, `stud|${key}`).push(m4, color, null);
+    this.studs++;
   }
-  return { group, meshes, bricks, studs };
+
+  build() {
+    const group = new THREE.Group();
+    const meshes = [];
+    for (const b of this.buckets.values()) {
+      const mesh = b.build();
+      group.add(mesh);
+      meshes.push(mesh);
+    }
+    return { group, meshes, bricks: this.bricks, studs: this.studs };
+  }
+}
+
+/** First palette entry with the glass material (window panes use it). */
+export function glassEntry(palette) {
+  for (const e of palette.values()) if (e.material === 'glass') return e;
+  return null;
+}
+
+/** Build every brick and visible stud of a World. Returns { group, meshes, bricks, studs }. */
+export function buildWorldMeshes(world, mats) {
+  const batch = new BrickBatcher(mats, world.studM, world.plateM);
+  batch.glassEntry = glassEntry(world.palette);
+  const outside = exteriorAir(world);
+  const covered = (I, J, K) => world.occupied(I, J, K) || !outside(I, J, K);
+  const glows = windowGlow(world, (n) => mats.classOf(world.palette.get(world.color[n])) === 'glass');
+  const col = new THREE.Color();
+  for (let n = 0; n < world.count; n++) {
+    const t = world.typeOf(n);
+    if (!t) continue;
+    const I = world.I[n], J = world.J[n], K = world.K[n], flags = world.rotFlags[n];
+    const entry = world.palette.get(world.color[n]);
+    const exact = !!(flags & NO_VARIATION);
+    batch.addBrick({ I, J, K, t, rot: flags & ROT_MASK, entry, exact, glow: glows.get(n) });
+    if (flags & HIDE_STUDS) continue;
+    brickColor(entry, I, J, K, exact, col);
+    for (const [x, y, z] of exposedStuds(t, flags & ROT_MASK, I, J, K, covered)) batch.addStud(x, y, z, entry, col);
+  }
+  return batch.build();
 }
