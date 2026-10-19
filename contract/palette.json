@@ -76,7 +76,7 @@
   {
    "idx": 12,
    "name": "slate",
-   "srgb": "#3E464F",
+   "srgb": "#4E5864",
    "material": "solid"
   },
   {
@@ -88,7 +88,7 @@
   {
    "idx": 14,
    "name": "roof_tile_dark",
-   "srgb": "#4A3A33",
+   "srgb": "#5E483D",
    "material": "solid"
   },
   {

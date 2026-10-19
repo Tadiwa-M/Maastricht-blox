@@ -51,6 +51,13 @@ blox build:  sources/  load           -> AHN HeightGrid, 3D BAG Buildings, OsmDa
 | `preview/` | top-down PNG and isometric chunk PNG (no GPU needed) |
 | `cli.py` | `blox fetch` / `blox build` |
 
+### Terrain smoothing (`voxelise/terrain_smooth.py`)
+
+Before anything is quantised, the AHN ground model gets a NaN-aware blur
+(`VoxelConfig.terrain_smooth_m`, default 2 m). AHN noise of ±10 cm would otherwise become
+scattered one-plate steps on every square and street. Real slopes survive: a few metres of blur
+leaves the rise from the Maas to the Vrijthof intact.
+
 ### The voxel tile (CONTRACT 7)
 
 The voxel tile is the boundary between "where things are" and "which bricks". One tile is a
