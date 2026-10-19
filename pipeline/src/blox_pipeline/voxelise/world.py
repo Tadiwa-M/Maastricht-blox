@@ -20,6 +20,7 @@ class VoxelConfig:
     maas_level_m: float = 44.1  # typical Maas level at Maastricht (m NAP), above the Borgharen weir
     water_depth_m: float = 0.6  # transparent water body below the surface cell
     terrain_depth_plates: int = 3  # crust thickness below the lowest neighbouring surface
+    terrain_smooth_m: float = 2.0  # DTM blur radius: removes ±10 cm survey noise before 0.2 m plates
     storey_plates: int = 15  # 3.0 m storeys
     window_band: tuple[int, int] = (4, 11)  # plates within a storey that are glass (0.8 - 2.2 m)
     flat_pitch_deg: float = 15.0  # roofs flatter than this are flat

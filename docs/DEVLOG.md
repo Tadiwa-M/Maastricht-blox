@@ -190,3 +190,20 @@ LookTests `Passed: 67`, viewer `# pass 24  # fail 0`.
   the Chromium download (screenshots only) is now opt-in via `-WithBrowser`, because it hangs while
   extracting on Windows.
 - Next: first real-data `blox fetch` (endpoints still UNVERIFIED), Unity on the GPU workstation.
+
+## 2026-10-19 (night): first real Maastricht
+
+- Laptop: `blox fetch` worked on the first try (the PDOK AHN WCS still serves AHN), and
+  `blox build` made the full 2×2 km slice: 4096 chunks, 8725 buildings, 10388 features in 13.5 min.
+- Facade detail on real data: **4%** of exterior wall (2180 of 255k runs). Most fallback is
+  "short" (61%) and "skew" (32%): angled and jagged footprints. The rotated-building proposal is
+  now the main open decision.
+- First real-data sample committed: `samples/markt/` (49 chunks), exported with
+  `blox_pipeline.tools.sample`, so the cloud session can debug real data.
+- Fixes from the sample: flat roofs no longer use pure black (it read as holes); the DTM is
+  smoothed before quantising (contour ripples on the Markt); slate and roof_tile_dark lightened
+  slightly (palette values only, indices unchanged).
+- The viewer was too slow on the laptop for 7×7 real chunks (265k bricks): per-chunk LOD work
+  is in progress.
+- Workstation (RTX 5070, no admin rights): the setup script now installs uv/.NET/Node per user.
+  Unity needs IT or an existing install.

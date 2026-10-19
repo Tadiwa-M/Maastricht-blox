@@ -15,7 +15,8 @@ _WALL_BY_ERA: tuple[tuple[int, tuple[str, ...]], ...] = (
 _WALL_UNKNOWN = ("brick_red", "brick_brown", "brick_dark_red")
 _ROOF_PITCHED_OLD = ("slate", "slate", "roof_tile_red", "roof_tile_dark")
 _ROOF_PITCHED = ("roof_tile_red", "roof_tile_red", "roof_tile_dark", "slate")
-_ROOF_FLAT = ("dark_grey", "dark_grey", "light_grey", "black")
+# flat roofs: real ones are dark bitumen, but black reads as a hole in the model from above
+_ROOF_FLAT = ("light_grey", "light_grey", "dark_grey", "pavement")
 
 # highway -> (default colour outside the centre, colour inside the cobbled centre)
 _ROAD_COLOUR: dict[str, tuple[str, str]] = {
