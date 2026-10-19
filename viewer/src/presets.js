@@ -45,6 +45,8 @@ function fitDist(r, fovDeg, aspect) {
   return r / Math.sin(Math.min(v, h));
 }
 
+const BIG_WORLD_M = 70; // half-diagonal above which the hero is a 3/4 view, not the whole world
+
 export function makePresets(world, box, aspect = 1.6) {
   const S = world.studM;
   const groundY = world.groundK * world.plateM;
@@ -58,8 +60,15 @@ export function makePresets(world, box, aspect = 1.6) {
 
   // hero: the whole diorama from the south-southwest, a little toward the facades
   const hero = new THREE.Vector3(c.x, groundY + Math.min(size.y * 0.25, 8), (c.z + front) / 2);
+  let heroView = { target: hero, cam: hero.clone().add(offset(206, 30, fitDist(r, 32, aspect) * 0.8)), fov: 32 };
+  if (r > BIG_WORLD_M) {
+    // neighbourhood (several chunks): a 3/4 view over the centre from medium height instead of
+    // fitting everything in, which put the camera hundreds of metres up looking down
+    const t = new THREE.Vector3(c.x, groundY + 4, c.z);
+    heroView = { target: t, cam: t.clone().add(offset(206, 33, THREE.MathUtils.clamp(r * 0.85, 90, 170))), fov: 40 };
+  }
   const presets = {
-    hero: { target: hero, cam: hero.clone().add(offset(206, 30, fitDist(r, 32, aspect) * 0.8)), fov: 32 },
+    hero: heroView,
     map: (() => {
       const t = new THREE.Vector3(c.x, groundY + (box.max.y - groundY) * 0.3, c.z);
       const r3 = Math.hypot(size.x, size.z, box.max.y - groundY) / 2;

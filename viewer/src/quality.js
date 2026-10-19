@@ -3,17 +3,17 @@
 //
 //   high    the look-development settings: full-res AO, bloom, 4096 shadows, device pixel
 //           ratio up to 2; with one chunk every brick is drawn bevelled with studs (no LOD)
-//   medium  per-chunk LOD (bevelled + studs only near the camera), half-res AO, pixel
-//           ratio 1, bloom only at night, 2048 shadows
+//   medium  per-chunk LOD (bevelled + studs only near the camera, one bevel segment
+//           instead of two), half-res AO, pixel ratio 1, bloom only at night, 2048 shadows
 //   low     LOD with a small near zone, AO off, pixel ratio 1, bloom only at night
 //
 // 'auto' starts at high for a single-chunk world and medium for anything bigger, then steps
 // down while the measured frame time stays high. It never steps back up by itself (that
 // oscillates on machines right at the edge); pick 'high' in the HUD to force it.
 export const TIERS = Object.freeze({
-  high: { name: 'high', pixelRatio: 2, ao: 'full', bloom: 'always', shadowMap: 4096, nearDist: 70, maxNear: 9, studCap: 80000 },
-  medium: { name: 'medium', pixelRatio: 1, ao: 'half', bloom: 'night', shadowMap: 2048, nearDist: 45, maxNear: 4, studCap: 25000 },
-  low: { name: 'low', pixelRatio: 1, ao: 'off', bloom: 'night', shadowMap: 2048, nearDist: 22, maxNear: 2, studCap: 8000 },
+  high: { name: 'high', nearDetail: 'full', pixelRatio: 2, ao: 'full', bloom: 'always', shadowMap: 4096, nearDist: 70, maxNear: 9, studCap: 80000 },
+  medium: { name: 'medium', nearDetail: 'lite', pixelRatio: 1, ao: 'half', bloom: 'night', shadowMap: 2048, nearDist: 45, maxNear: 4, studCap: 25000 },
+  low: { name: 'low', nearDetail: 'lite', pixelRatio: 1, ao: 'off', bloom: 'night', shadowMap: 2048, nearDist: 22, maxNear: 2, studCap: 8000 },
 });
 export const MODES = ['auto', 'high', 'medium', 'low'];
 const ORDER = ['high', 'medium', 'low'];

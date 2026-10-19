@@ -151,20 +151,26 @@ class Buffers {
 const EPS = 1e-4;
 
 /**
- * Far-LOD geometry for bricks `list` (brick numbers) of a World.
+ * Far-LOD geometry for bricks `list` (brick numbers) of a World. `list` may also be an array
+ * of lists (one per chunk of a cluster): each key's index buffer then holds them in order and
+ * `ranges` gives every list's { start, count } in it, for drawing a subset (geometry groups).
  *   code(I, J, K):  occupancy-grid cell code (src/exterior.js occupancyGrid().code)
  *   codeOf(n):      the code brick n writes into the grid
  *   style(n, part): { key, color, glow? } material key + linear colour for a body/glass part
- * Returns { geometries: Map key -> BufferGeometry, triangles, faces, culled }.
+ * Returns { geometries: Map key -> BufferGeometry, ranges: Map key -> [{ start, count }],
+ *           triangles, faces, culled, segmentTriangles: [per list] }.
  */
 export function buildFarGeometry(world, list, { code, codeOf, style, glowKeys = new Set() }) {
+  const lists = list.length && typeof list[0] !== 'number' ? list : [list];
   const S = world.studM, Pm = world.plateM, K0 = world.bounds.K0;
   const bufs = new Map();
   const m4 = new THREE.Matrix4(), nv = new THREE.Vector3();
   const pts = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(),
     new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
   let faces = 0, culled = 0;
-  for (const n of list) {
+  const starts = []; // per list: Map key -> index count before it
+  const mark = () => starts.push(new Map([...bufs].map(([k, b]) => [k, b.idx.length])));
+  for (const one of lists) { mark(); for (const n of one) {
     const t = world.typeOf(n);
     if (!t) continue;
     const I = world.I[n], J = world.J[n], K = world.K[n], rot = world.rot(n);
@@ -210,12 +216,16 @@ export function buildFarGeometry(world, list, { code, codeOf, style, glowKeys = 
       if (!bufs.has(st.key)) bufs.set(st.key, new Buffers(glowKeys.has(st.key)));
       bufs.get(st.key).poly(p, nv, st.color, st.glow);
     }
-  }
-  const geometries = new Map();
+  } }
+  mark();
+  const geometries = new Map(), ranges = new Map();
   let triangles = 0;
   for (const [key, b] of bufs) {
     geometries.set(key, b.geometry());
     triangles += b.idx.length / 3;
+    const at = (s) => starts[s].get(key) ?? 0;
+    ranges.set(key, lists.map((_, s) => ({ start: at(s), count: at(s + 1) - at(s) })));
   }
-  return { geometries, triangles, faces, culled };
+  const segmentTriangles = lists.map((_, s) => [...bufs.keys()].reduce((a, k) => a + ((starts[s + 1].get(k) ?? 0) - (starts[s].get(k) ?? 0)) / 3, 0));
+  return { geometries, ranges, triangles, faces, culled, segmentTriangles };
 }

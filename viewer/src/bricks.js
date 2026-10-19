@@ -78,8 +78,9 @@ class Bucket {
 }
 
 export class BrickBatcher {
-  constructor(mats, studM, plateM) {
-    Object.assign(this, { mats, S: studM, P: plateM, buckets: new Map(), bricks: 0, studs: 0 });
+  /** lite: cheaper bevels and studs (src/geometry.js), used by the near LOD below high quality. */
+  constructor(mats, studM, plateM, lite = false) {
+    Object.assign(this, { mats, S: studM, P: plateM, lite, buckets: new Map(), bricks: 0, studs: 0 });
     this.glassEntry = null; // palette entry used for window/door panes
   }
 
@@ -93,7 +94,7 @@ export class BrickBatcher {
   addBrick({ I, J, K, t, rot, entry, exact = false, glow = null }) {
     const { key, material, cls } = this.mats.forEntry(entry);
     const seamless = cls === 'glass' || cls === 'water';
-    const parts = bodyParts(t, this.S, this.P, seamless);
+    const parts = bodyParts(t, this.S, this.P, seamless, this.lite);
     const m4 = brickMatrix(I, J, K, t.w, t.d, rot, this.S, this.P);
     const col = brickColor(entry, I, J, K, exact);
     this.bucket(parts.body, material, `${t.name}|${key}`).push(m4, col, cls === 'glass' ? glow : null);
@@ -110,7 +111,7 @@ export class BrickBatcher {
     const { key, material } = this.mats.forEntry(entry);
     const p = gridToThree(I, J, K, this.S, this.P);
     const m4 = new THREE.Matrix4().makeTranslation(p.x, p.y - INSET, p.z);
-    this.bucket(studGeometry(), material, `stud|${key}`).push(m4, color, null);
+    this.bucket(studGeometry(this.lite), material, `stud|${key}`).push(m4, color, null);
     this.studs++;
   }
 
@@ -152,8 +153,8 @@ export function worldContext(world, mats) {
  * Build bricks (all, or the brick numbers in `list`) and their visible studs.
  * Returns { group, meshes, bricks, studs }; stud meshes are named 'stud|...'.
  */
-export function buildWorldMeshes(world, mats, { list = null, ctx = worldContext(world, mats) } = {}) {
-  const batch = new BrickBatcher(mats, world.studM, world.plateM);
+export function buildWorldMeshes(world, mats, { list = null, ctx = worldContext(world, mats), lite = false, castShadow = true } = {}) {
+  const batch = new BrickBatcher(mats, world.studM, world.plateM, lite);
   batch.glassEntry = ctx.glassEntry;
   const col = new THREE.Color();
   const count = list ? list.length : world.count;
@@ -169,5 +170,7 @@ export function buildWorldMeshes(world, mats, { list = null, ctx = worldContext(
     brickColor(entry, I, J, K, exact, col);
     for (const [x, y, z] of exposedStuds(t, flags & ROT_MASK, I, J, K, ctx.covered)) batch.addStud(x, y, z, entry, col);
   }
-  return batch.build();
+  const built = batch.build();
+  if (!castShadow) for (const m of built.meshes) m.castShadow = false;
+  return built;
 }
