@@ -30,11 +30,14 @@ All three meet in GitHub (`week1-foundation`). Pull before you start, push when 
 uv, the .NET 8 SDK and Node 22 are installed by the setup script **per user, without admin
 rights** (into `%LOCALAPPDATA%`, added to your user PATH).
 
-**No admin rights?** Git for Windows and Unity Hub both have per-user install options. In
-Unity Hub set *Preferences → Installs → Installs location* to a folder you own (e.g.
-`%LOCALAPPDATA%\Unity\Editors`) before installing Unity 6; `scripts/unity.ps1` looks there.
-If an installer still asks for admin, IT has to install it, or you set `UNITY_EXE` to a Unity.exe
-you can run.
+**No admin rights?** uv, .NET and Node install per user (above). **Unity does not:** installing
+Unity without admin needs a one-time admin step (Unity's "standard user" install: an admin
+writes `C:\ProgramData\Unity\config\services-config.json` with `"hubDisableElevate": true`;
+build-support modules still need admin). See Unity's
+[standard-user install docs](https://docs.unity3d.com/Manual/ent-unpriv-install.html). So
+either check whether the machine already has Unity (`Get-ChildItem 'C:\Program Files\Unity*'`)
+or ask IT to install Unity Hub + Unity 6 LTS with Windows Build Support (or to enable
+standard-user installs). `scripts/unity.ps1` also accepts `UNITY_EXE` pointing at any Unity.exe.
 
 ## 2. Clone and set up
 
