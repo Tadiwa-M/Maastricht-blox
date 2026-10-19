@@ -14,6 +14,10 @@ look test exists" with as few manual steps as possible.
 
 All three meet in GitHub (`week1-foundation`). Pull before you start, push when you stop.
 
+> **Use PowerShell, not Command Prompt.** The commands below use PowerShell syntax (`;`, `.\x.ps1`).
+> In `cmd` type `powershell` first. If scripts are blocked, run once:
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
 ## 1. Install (manual, once)
 
 | Tool | Why | Notes |
@@ -39,7 +43,7 @@ and lists the next commands.
 ## 3. Verify
 
 ```powershell
-bash scripts/check.sh                  # all non-Unity tests (Git Bash on Windows)
+.\scripts\check.ps1                    # all non-Unity tests (wraps check.sh with Git Bash)
 .\scripts\unity.ps1 all                # Unity: setup → EditMode tests → player build → screenshot
 ```
 `unity.ps1` / `unity.sh` steps (each can run alone):
@@ -70,8 +74,8 @@ and some URLs are still UNVERIFIED.
 git clone https://github.com/Tadiwa-M/maastricht-blox.git
 cd maastricht-blox; git checkout week1-foundation
 .\scripts\setup-workstation.ps1     # same script; it only warns that Unity is missing
-bash scripts/check.sh                 # Git Bash
-cd viewer; node build.mjs ..\build\testscene; start dist\index.html   # orbit the look test locally
+.\scripts\check.ps1                   # all tests (runs check.sh via Git Bash)
+.\scripts\preview.ps1                 # build the look test and open it in the browser
 ```
 Skip Unity on the laptop. Use the Claude desktop app to run sessions on the workstation (below)
 and in the cloud.
