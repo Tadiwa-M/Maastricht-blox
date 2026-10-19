@@ -181,3 +181,12 @@ LookTests `Passed: 67`, viewer `# pass 24  # fail 0`.
   (contract change) or snapping near-axis edges more generously.
 - Walls above a lower neighbour and runs ending at concave corners/party walls get simple
   treatment (glass rhythm / corner pilaster).
+
+## 2026-10-19 (evening): laptop verified on Windows
+
+- Windows laptop set up with `scripts/setup-workstation.ps1`; `scripts/check.ps1` passes all suites
+  (pipeline, proxy, dotnet core + look, viewer). This is the first run outside the Linux container.
+- Fixes found along the way: run from PowerShell, not cmd; refresh PATH after winget installs;
+  the Chromium download (screenshots only) is now opt-in via `-WithBrowser`, because it hangs while
+  extracting on Windows.
+- Next: first real-data `blox fetch` (endpoints still UNVERIFIED), Unity on the GPU workstation.
