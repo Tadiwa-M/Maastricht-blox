@@ -60,6 +60,9 @@ Up to 64 entries, `idx` uint8 (0 = air/none). Each: `name`, `srgb` hex, `materia
 `solid | trans | glass | emissive | metal`.
 `glass` = window glass: dark/reflective by day, warm emissive at night (shader decides).
 Hand-curated; data is **quantised to the palette**, never stored as raw colours.
+Entries are **append-only**: existing indices never change meaning, so appending colours
+bumps the palette file's `version` but not `contractVersion` (palette v2 added idx 41–46
+for facade detail).
 
 ## 4. Chunk file: `chunks/c_{cx:02d}_{cy:02d}.bxc`
 
