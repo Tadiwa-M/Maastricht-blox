@@ -13,10 +13,15 @@ New-Item -ItemType Directory -Force -Path $Logs, (Join-Path $Root 'build\shots')
 
 function Find-Unity {
     if ($env:UNITY_EXE) { return $env:UNITY_EXE }
-    $hub = 'C:\Program Files\Unity\Hub\Editor'
-    $v = Get-ChildItem $hub -Directory -ErrorAction SilentlyContinue | Where-Object Name -like '6000.*' |
+    # Unity Hub's install folders: the default (needs admin) and the per-user one set in Hub
+    # (Preferences > Installs), which Hub records in secondaryInstallPath.json.
+    $roots = @("$env:ProgramFiles\Unity\Hub\Editor", "$env:LOCALAPPDATA\Unity\Editors")
+    $custom = Join-Path $env:APPDATA 'UnityHub\secondaryInstallPath.json'
+    if (Test-Path $custom) { $p = (Get-Content $custom -Raw | ConvertFrom-Json); if ($p) { $roots = @("$p") + $roots } }
+    $v = $roots | Where-Object { $_ -and (Test-Path $_) } | ForEach-Object { Get-ChildItem $_ -Directory } |
+        Where-Object Name -like '6000.*' | Where-Object { Test-Path (Join-Path $_.FullName 'Editor\Unity.exe') } |
         Sort-Object { [version]($_.Name -replace '[a-z].*$', '') } | Select-Object -Last 1
-    if (-not $v) { throw 'Unity 6 not found: set $env:UNITY_EXE' }
+    if (-not $v) { throw 'Unity 6 not found: install it with Unity Hub, or set $env:UNITY_EXE to Unity.exe' }
     return Join-Path $v.FullName 'Editor\Unity.exe'
 }
 $Unity = Find-Unity
