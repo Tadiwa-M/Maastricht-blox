@@ -11,6 +11,7 @@ from PIL import Image
 
 from ..catalogue import Catalogue, load_catalogue
 from ..io.chunk_reader import read_manifest, read_world_records
+from ..io.island_reader import read_world_islands
 from ..layout.records import CHUNK, Records
 from ..palette import load_palette
 from .cells import footprint_cells
@@ -34,9 +35,36 @@ def column_tops(rec: Records, I0: int, J0: int, ni: int, nj: int, cat: Catalogue
     if len(rec) == 0:
         return out
     c = footprint_cells(rec, cat)
-    x, y = c.I - I0, c.J - J0
+    return _merge(out, c.I - I0, c.J - J0, c.top, c.color, c.stud, ni, nj)
+
+
+def island_column_tops(rec: Records, origin: tuple[float, float], yaw_deg: float, I0: int, J0: int,
+                       ni: int, nj: int, cat: Catalogue | None = None, into: Tops | None = None) -> Tops:
+    """Like :func:`column_tops` for an island: each local footprint cell is turned into the
+    world by the island pose (CONTRACT 5.1) and drawn into the world columns it covers.
+    A turned cell is sampled at 4 points (its quarter centres) so the rotated grid leaves no
+    holes in the world raster."""
+    from ..islands.pose import island_local_to_world
+
+    cat = cat or load_catalogue()
+    out = into or Tops(np.full((nj, ni), -1, np.int64), np.zeros((nj, ni), np.uint8), np.zeros((nj, ni), bool))
+    if len(rec) == 0:
+        return out
+    c = footprint_cells(rec, cat)
+    xs, ys = [], []
+    for du, dv in ((0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75)):
+        x, z = island_local_to_world(origin, yaw_deg, (c.I + du) * STUD_M, (c.J + dv) * STUD_M)
+        xs.append(np.floor(np.asarray(x) / STUD_M).astype(np.int64) - I0)
+        ys.append(np.floor(np.asarray(z) / STUD_M).astype(np.int64) - J0)
+    rep = lambda a: np.concatenate([a] * 4)  # noqa: E731
+    return _merge(out, np.concatenate(xs), np.concatenate(ys), rep(c.top), rep(c.color), rep(c.stud), ni, nj)
+
+
+def _merge(out: Tops, x: NDArray[np.int64], y: NDArray[np.int64], top: NDArray[np.int64], col: NDArray[np.uint8],
+           stud: NDArray[np.bool_], ni: int, nj: int) -> Tops:
+    """Keep the highest top per column of ``out`` (window-relative ``x, y``)."""
     ok = (x >= 0) & (x < ni) & (y >= 0) & (y < nj)
-    x, y, top, col, stud = x[ok], y[ok], c.top[ok], c.color[ok], c.stud[ok]
+    x, y, top, col, stud = x[ok], y[ok], top[ok], col[ok], stud[ok]
     flat = y * ni + x
     order = np.lexsort((top, flat))
     flat, top, col, stud = flat[order], top[order], col[order], stud[order]
@@ -87,7 +115,8 @@ def tops_to_image(t: Tops, rgb_table: NDArray[np.uint8], px_per_stud: int) -> Im
 
 def render_preview(out_dir: Path | str, *, out_name: str = "preview.png", max_px: int = 4096,
                    px_per_stud: int | None = None) -> Path:
-    """Render ``preview.png`` of a world dir (cropped to the chunks present).
+    """Render ``preview.png`` of a world dir (cropped to the chunks present), islands
+    (CONTRACT 5.1) drawn turned into place on top of the chunks.
 
     ``px_per_stud``: default 4 (with stud hints) for small worlds, else 1; the image is
     box-downscaled when its longer side exceeds ``max_px``.
@@ -95,7 +124,7 @@ def render_preview(out_dir: Path | str, *, out_name: str = "preview.png", max_px
     world = Path(out_dir)
     cat = load_catalogue()
     rgb = load_palette().rgb_table()
-    chunks = read_manifest(world)["chunks"]
+    chunks = read_manifest(world)["chunks"] + read_manifest(world).get("islands", [])
     path = world / out_name
     if not chunks:
         Image.new("RGB", (64, 64), tuple(int(v) for v in BACKGROUND)).save(path)
@@ -106,6 +135,8 @@ def render_preview(out_dir: Path | str, *, out_name: str = "preview.png", max_px
     tops = Tops(np.full((nj, ni), -1, np.int64), np.zeros((nj, ni), np.uint8), np.zeros((nj, ni), bool))
     for _, data in read_world_records(world):
         column_tops(data.records, cx0 * CHUNK, cy0 * CHUNK, ni, nj, cat, into=tops)
+    for _, isl in read_world_islands(world):
+        island_column_tops(isl.records, isl.origin, isl.yaw_deg, cx0 * CHUNK, cy0 * CHUNK, ni, nj, cat, into=tops)
     pps = px_per_stud or (4 if max(ni, nj) <= 512 else 1)
     img = tops_to_image(tops, rgb, pps)
     if max(img.size) > max_px:

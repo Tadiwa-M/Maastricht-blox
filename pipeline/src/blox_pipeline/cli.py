@@ -85,6 +85,18 @@ def _count(records: Any) -> int:
         return 0
 
 
+def log_facade_stats(world_runs: list, island_runs: list) -> None:
+    """Facade detail share on the world grid, on islands, and overall (the number to watch)."""
+    from .voxelise.facade_runs import facade_stats
+
+    for label, runs in (("world grid", world_runs), ("islands", island_runs), ("total", world_runs + island_runs)):
+        if not runs:
+            continue
+        fs = facade_stats(runs)
+        log.info("facade detail (%s): %d/%d runs, %.0f%% of %d studs of exterior wall (fallback studs: %s)",
+                 label, fs.detailed, fs.runs, 100 * fs.share, fs.length, fs.by_reason)
+
+
 def cmd_build(args: argparse.Namespace) -> int:
     from .sources import ORTHO_CREDIT, SOURCE_CREDITS, load_all
     from .voxelise import VoxelConfig, build_features, iter_chunk_tiles, prepare_world
@@ -108,14 +120,15 @@ def cmd_build(args: argparse.Namespace) -> int:
     src = load_all(load_box, root)
     log.info("loaded %d buildings, %d roads in %.1fs", len(src.buildings), len(src.osm.roads), time.time() - t0)
     cfg = VoxelConfig(maas_level_m=args.maas_level, use_ortho_ground=not args.no_ortho,
-                      facade_detail=not args.no_facades)
+                      facade_detail=not args.no_facades, islands=not args.no_islands)
     world = prepare_world(src, cfg)
-    if world.facades:
-        from .voxelise.facade_runs import facade_stats
+    from .islands import build_islands
 
-        fs = facade_stats(world.facades)
-        log.info("facade runs: %d/%d detailed, %.0f%% of %d studs of exterior wall (fallback studs: %s)",
-                 fs.detailed, fs.runs, 100 * fs.share, fs.length, fs.by_reason)
+    islands, island_runs = build_islands(world, set(chunks), layout_tile)
+    log.info("islands: %d groups (%d buildings) turned off the grid -> %d island files, %d bricks",
+             len(world.islands), sum(len(g.members) for g in world.islands), len(islands),
+             sum(len(i.records) for i in islands))
+    log_facade_stats(world.facades, island_runs)
     out: dict[tuple[int, int], Any] = {}
     for n, (cx, cy, tile) in enumerate(iter_chunk_tiles(world, cells), 1):
         recs = own_chunk(call_layout(layout_tile, tile), cx, cy)
@@ -125,10 +138,11 @@ def cmd_build(args: argparse.Namespace) -> int:
             log.info("%d/%d chunks", n, len(chunks))
     sources = list(SOURCE_CREDITS) + ([ORTHO_CREDIT] if src.ortho is not None and not args.no_ortho else [])
     out_dir = Path(args.out)
-    write_world(out_dir, out, build_features(world.registry), sources)
+    write_world(out_dir, out, build_features(world.registry), sources, islands=islands)
     if render_preview is not None and not args.no_preview:
         render_preview(out_dir)
-    log.info("wrote %d chunks, %d features to %s in %.1fs", len(out), len(world.registry), out_dir, time.time() - t0)
+    log.info("wrote %d chunks, %d islands, %d features to %s in %.1fs", len(out), len(islands),
+             len(world.registry), out_dir, time.time() - t0)
     return 0
 
 
@@ -153,6 +167,8 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--no-ortho", action="store_true", help="ignore the aerial photo for ground colours")
     b.add_argument("--no-preview", action="store_true")
     b.add_argument("--no-facades", action="store_true", help="plain glass-cell windows, no facade grammar")
+    b.add_argument("--no-islands", action="store_true",
+                   help="keep rotated buildings on the world grid (staircase walls, CONTRACT v2 behaviour)")
     b.set_defaults(func=cmd_build)
     return p
 

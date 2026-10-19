@@ -148,7 +148,8 @@ def plan_building(world: PreparedWorld, b: PreparedBuilding, ctx: StreetContext)
     wall_top = _wall_top(L)
     style = facade_style(b.bag_id, b.year, palette.entries()[b.wall][1])
     plans = []
-    for raw in extract_runs(own, L.bld_top == NONE, box, b.feature_id):
+    open_ = (L.bld_top == NONE) & (L.island_k == NONE)  # an island next door is not a street
+    for raw in extract_runs(own, open_, box, b.feature_id):
         plans.append(_plan(raw, L, own, wall_top, edges, b, style, ctx))
     return plans
 

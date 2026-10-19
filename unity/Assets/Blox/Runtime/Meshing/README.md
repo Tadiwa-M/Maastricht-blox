@@ -17,6 +17,10 @@ PendingChunkMesh? lod = builder.ScheduleLod(coord, 4); // HLOD, factor 2/4/8, no
 // later (poll job.IsCompleted or just call):
 ChunkMeshResult r = job.Complete(mesh);              // writes the Mesh, disposes job memory; call exactly once
 StudInstance[] studs = r.Studs;                      // draw instanced (absolute world positions)
+
+PendingChunkMesh isl = builder.ScheduleIsland(islandIndex, 0); // v3 island: 0 = full detail, 2/4/8 = HLOD
+ChunkMeshBuilder.IslandTransform(islandIndex.Pose, out Vector3 pos, out Quaternion rot);
+// mesh is island-local: GameObject at pos/rot; isl.Complete(mesh).Studs are already world space
 ```
 
 Place the chunk GameObject at `(world.Spec.ChunkOriginX(coord), 0, world.Spec.ChunkOriginZ(coord))`:
@@ -87,6 +91,16 @@ polygon per brick face, so the bevel outlines exactly one brick.
 * HLOD (`LodMesherCore`): coarse cells of f x f studs x (f * 5 / 2) plates (near-cubic), solid
   when any fine cell is occupied (keeps hollow 1-stud walls), coloured by the highest brick in
   the cell, greedy-merged quads, same culling rule inside the chunk, no culling at chunk borders.
+
+## Islands (CONTRACT 5.1)
+
+`IslandMesherCore` runs the chunk mesher on an island's own grid: cell (0, 0) at the origin,
+grid = island extent + one-cell ring (`CellGrid.ComputeDims(own, types, 0, 0, sizeI, sizeJ)`),
+no neighbours. So face culling and stud exposure only see the island's bricks, as the contract
+asks. One mesh per island, positions in island-local metres (x = u along +i, z = v along +j,
+y absolute). `StudsToWorld` maps the local studs through the pose and adds the yaw to each
+stud's spin. HLOD: `LodMesherCore.ComputeDims(..., sizeI, sizeJ, factor)` (coarse grid rounded up).
+Burst job: `IslandMeshJob`; `LodMeshJob` with `SizeI/SizeJ` set.
 
 ## Brick models (CONTRACT 7.1)
 

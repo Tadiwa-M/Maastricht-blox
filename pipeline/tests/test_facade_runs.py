@@ -27,9 +27,9 @@ CAT = load_catalogue()
 DETAIL = {CAT.id(n) for n in ("window_1x2x3", "window_1x2x2", "door_1x2x4", "arch_1x4")}
 
 
-def build_town(root):
+def build_town(root, islands: bool = True):
     src = load_all(town.LOAD, root)
-    world = prepare_world(src, VoxelConfig(use_ortho_ground=False))
+    world = prepare_world(src, VoxelConfig(use_ortho_ground=False, islands=islands))
     chunks = {}
     for cx, cy, tile in iter_chunk_tiles(world, geo.rd_box_to_cells(town.BBOX)):
         rec = layout_tile(tile.color, tile.feature, tile.shape, tile.k0, tile.I0, tile.J0,
@@ -99,8 +99,12 @@ def test_window_pieces_face_out_of_their_wall(built):
     assert seen >= 80
 
 
-def test_rotated_building_falls_back_cleanly(built):
-    _, world, chunks = built
+def test_rotated_building_falls_back_cleanly_without_islands(built):
+    """``--no-islands`` (v2 behaviour): the turned house stays on the world grid as a
+    staircase of short runs with the glass-cell rhythm."""
+    root, _, _ = built
+    world, chunks = build_town(root, islands=False)
+    assert world.islands == []
     fid = fid_of(world, "5")
     runs = runs_of(world, "5")
     assert runs and all(not r.detail for r in runs)
@@ -138,10 +142,10 @@ def test_terrace_is_fully_detailed_and_share_measured(built):
     _, world, _ = built
     for sfx in "1234":
         assert all(r.detail for r in runs_of(world, sfx)), sfx
-    st = facade_stats(world.facades)
-    assert st.detailed == 10 and st.detailed_length == 170
-    assert st.by_reason == {"short": st.length - 170}
-    assert 0.55 < st.share < 0.65
+    terrace = {fid_of(world, sfx) for sfx in "1234"}
+    st = facade_stats([r for r in world.facades if r.fid in terrace])
+    assert st.detailed == 10 and st.detailed_length == 170 and st.length == 170
+    assert st.by_reason == {} and st.share == 1.0
 
 
 def test_chunk_border_handling(built):

@@ -7,7 +7,7 @@ namespace Blox.Data
 {
     /// <summary>
     /// Opens a world output directory (CONTRACT section 5: manifest.json, palette.json,
-    /// brick_catalogue.json, features.json, chunks/). Uses System.IO only, so it works in the
+    /// brick_catalogue.json, features.json, chunks/, and since v3 islands/). Uses System.IO only, so it works in the
     /// editor and standalone players (e.g. StreamingAssets on desktop).
     /// </summary>
     public static class WorldFiles
@@ -44,7 +44,22 @@ namespace Blox.Data
                 return data;
             }
 
-            return new WorldIndex(spec, palette, catalogue, features, manifest.Chunks, Loader);
+            IslandData? IslandLoader(ManifestIsland entry)
+            {
+                byte[] bytes = File.ReadAllBytes(Path.Combine(worldDir, entry.File));
+                if (verifySha1 && entry.Sha1 != null)
+                {
+                    string got = Sha1Hex(bytes);
+                    if (!string.Equals(got, entry.Sha1, StringComparison.OrdinalIgnoreCase))
+                        throw new ChunkFormatException($"sha1 mismatch for {entry.File}: {got} != {entry.Sha1}");
+                }
+                var data = IslandReader.Read(bytes, table, entry.Id);
+                if (data.Count != entry.Bricks)
+                    throw new ChunkFormatException($"{entry.File}: {data.Count} bricks, manifest says {entry.Bricks}");
+                return data;
+            }
+
+            return new WorldIndex(spec, palette, catalogue, features, manifest.Chunks, Loader, manifest.Islands, IslandLoader);
         }
 
         public static string Sha1Hex(byte[] data)

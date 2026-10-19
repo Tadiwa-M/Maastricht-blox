@@ -78,6 +78,12 @@ Rules worth knowing:
   0.8-2.2 m above each 3 m storey, one stud wide every 2 or 3 studs (per-building hash).
   Corners, roof stacks, churches and landmarks get neither. `blox build --no-facades`
   turns the grammar off.
+- **Rotated buildings (islands, CONTRACT 5.1)**: a building or terrace turned more than 3°
+  from the grid is built on its own turned grid (`src/blox_pipeline/islands/`) and written
+  to `islands/i_NNNNNN.bxi` instead of the chunks; its footprint in the chunks is paved.
+  Its walls are straight there, so they get the facade grammar. `blox build --no-islands`
+  keeps the old staircase walls. `python -m blox_pipeline.tools.island_share <world>`
+  estimates the share of turned buildings in an existing world.
 - **Roads** are tile cells (shape 7) replacing the terrain top: asphalt by default,
   cobble_grey for streets/pedestrian areas in the historic centre (Binnenstad, Wyck),
   pavement for footways, red for cycleways; OSM `surface` overrides. Railways: rail_brown

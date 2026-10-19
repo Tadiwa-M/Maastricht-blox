@@ -9,7 +9,7 @@ namespace Blox.Meshing.Core
     {
         public int Factor;        // horizontal: studs per coarse cell (2, 4 or 8)
         public int FactorK;       // vertical: plates per coarse cell (Factor * 5 / 2, near-cubic)
-        public int ChunkI0, ChunkJ0;
+        public int ChunkI0, ChunkJ0;  // cell of coarse index 0 (island: 0, 0)
         public int KC0;           // global coarse level of index 0
         public int NI, NJ, NK;
 
@@ -27,10 +27,18 @@ namespace Blox.Meshing.Core
     /// </summary>
     public static class LodMesherCore
     {
-        public static LodDims ComputeDims(ReadOnlySpan<PlacedBrick> own, ReadOnlySpan<BrickTypeInfo> types, int chunkI0, int chunkJ0, int factor)
+        public static LodDims ComputeDims(ReadOnlySpan<PlacedBrick> own, ReadOnlySpan<BrickTypeInfo> types, int chunkI0, int chunkJ0, int factor) =>
+            ComputeDims(own, types, chunkI0, chunkJ0, Units.ChunkStuds, Units.ChunkStuds, factor);
+
+        /// <summary>
+        /// General form for a grid of sizeI x sizeJ studs starting at (i0, j0); islands use their
+        /// local extent (the coarse grid rounds it up to whole coarse cells).
+        /// </summary>
+        public static LodDims ComputeDims(ReadOnlySpan<PlacedBrick> own, ReadOnlySpan<BrickTypeInfo> types, int i0, int j0, int sizeI, int sizeJ, int factor)
         {
             if (factor != 2 && factor != 4 && factor != 8) throw new ArgumentException("LOD factor must be 2, 4 or 8");
-            var d = new LodDims { Factor = factor, FactorK = factor * 5 / 2, ChunkI0 = chunkI0, ChunkJ0 = chunkJ0, NI = Units.ChunkStuds / factor, NJ = Units.ChunkStuds / factor };
+            var d = new LodDims { Factor = factor, FactorK = factor * 5 / 2, ChunkI0 = i0, ChunkJ0 = j0,
+                                  NI = (sizeI + factor - 1) / factor, NJ = (sizeJ + factor - 1) / factor };
             int minK = int.MaxValue, maxTop = int.MinValue;
             for (int n = 0; n < own.Length; n++)
             {
@@ -63,7 +71,7 @@ namespace Blox.Meshing.Core
                     for (int ci = 0; ci < ei; ci++)
                     {
                         int li = br.I + ci - d.ChunkI0, lj = br.J + cj - d.ChunkJ0;
-                        if ((uint)li >= Units.ChunkStuds || (uint)lj >= Units.ChunkStuds) continue;
+                        if ((uint)li >= (uint)(d.NI * d.Factor) || (uint)lj >= (uint)(d.NJ * d.Factor)) continue;
                         for (int p = 0; p < t.H; p++)
                         {
                             int k = br.K + p;

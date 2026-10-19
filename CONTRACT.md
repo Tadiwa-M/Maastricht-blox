@@ -172,7 +172,7 @@ Rules:
 ```
 
 The output directory (`build/world/`) contains `manifest.json`, `palette.json`,
-`brick_catalogue.json` (copies), `features.json`, `chunks/`, `preview.png`.
+`brick_catalogue.json` (copies), `features.json`, `chunks/`, `islands/` (v3), `preview.png`.
 
 ## 5.1 Islands (v3): buildings on their own rotated grid
 
@@ -209,7 +209,12 @@ in the local frame, featureId global).
 An island is at most 256 × 256 studs; larger terraces are split into several islands with
 the same yaw and adjacent origins.
 
-**Rules.** Island bricks never appear in chunks. Under an island's footprint the chunk
+**Rules.** Island bricks never appear in chunks. Records are sorted by `(k, j, i)` like chunks.
+The owning chunk `(cx, cy)` is the chunk under the centre of the island's brick extent
+transformed to world space (clamped to the map), and the pipeline always writes that chunk.
+Island ids are per build: don't store them across builds; use feature ids for anything durable.
+Per-brick colour variation hashes the island-local `(i, j, k)` (as Unity does), so a rotated
+building looks the same wherever it stands. Under an island's footprint the chunk
 grid holds ground only (paving), so nothing shows through gaps. The island footprint is grown
 by half a stud so rotated edges overlap their neighbours instead of leaving slits. Plinth bricks
 go two plates below ground to hide the seam on slopes. Stud exposure and hidden-face culling

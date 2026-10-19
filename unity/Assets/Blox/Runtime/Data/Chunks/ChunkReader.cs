@@ -36,7 +36,7 @@ namespace Blox.Data
         {
             var header = ChunkHeader.Decode(file);
             ValidateHeader(header, file.Length, expected);
-            byte[] body = ExtractBody(file, header);
+            byte[] body = ExtractBody(file, ChunkHeader.Size, (int)header.BodyBytes, (int)header.BrickCount, header.Compressed);
             var records = DecodeRecords(body, (int)header.BrickCount);
             ValidateRecords(header, records, catalogue);
             return new ChunkData { Header = header, Records = records };
@@ -58,17 +58,22 @@ namespace Blox.Data
                 throw new ChunkFormatException($"uncompressed body holds {h.BodyBytes} bytes for {h.BrickCount} records");
         }
 
-        private static byte[] ExtractBody(byte[] file, in ChunkHeader h)
+        /// <summary>
+        /// Body bytes of a chunk or island file (both use the same record body): copies or
+        /// raw-inflates <paramref name="bodyBytes"/> bytes at <paramref name="offset"/> and checks
+        /// that they decode to exactly <paramref name="count"/> 12-byte records.
+        /// </summary>
+        internal static byte[] ExtractBody(byte[] file, int offset, int bodyBytes, int count, bool compressed)
         {
-            int expectedBytes = (int)h.BrickCount * ChunkHeader.RecordSize;
-            if (!h.Compressed)
+            int expectedBytes = count * ChunkHeader.RecordSize;
+            if (!compressed)
             {
                 var raw = new byte[expectedBytes];
-                Buffer.BlockCopy(file, ChunkHeader.Size, raw, 0, expectedBytes);
+                Buffer.BlockCopy(file, offset, raw, 0, expectedBytes);
                 return raw;
             }
             var output = new byte[expectedBytes];
-            using (var src = new MemoryStream(file, ChunkHeader.Size, (int)h.BodyBytes, writable: false))
+            using (var src = new MemoryStream(file, offset, bodyBytes, writable: false))
             using (var inflate = new DeflateStream(src, CompressionMode.Decompress))
             {
                 int got = 0;

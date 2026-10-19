@@ -126,7 +126,9 @@ the voxeliser will fill (including which building wins where footprints overlap)
 `skew` is what removes staircases: a building turned 30° rasterises into steps of 1-3
 cells, and even a turned building with longer steps has no axis-aligned polygon edge
 under them, so every step falls back. A footprint edge within ~1.4° of an axis (0.25 m
-over 10 m) still counts as straight.
+over 10 m) still counts as straight. Since contract v3 a building turned more than 3° is not
+on the world grid at all: it becomes an **island** (below), where its walls *are* axis-aligned,
+so on islands `skew` and `short` staircases no longer happen.
 
 ### Planning a run
 
@@ -170,13 +172,56 @@ the rows a test-scene house has. Then `paint_run` runs through a `FramePainter` 
 - **No overlap**: every piece's cells are cleared first and locked; later fills skip locked
   cells, and a piece landing on a locked cell is skipped.
 
+### Rotated buildings: islands (CONTRACT 5.1, `pipeline/src/blox_pipeline/islands/`)
+
+A wall at 20° on the world grid is a staircase, and a staircase can't carry a window. So a
+building whose main wall is more than **3°** off the grid is built on **its own grid, turned
+to that wall**, and stored as an island (`.bxi`, [guide 03](03-chunk-format.md)) instead of
+in the chunks. The facade grammar itself did not change at all; the trick is where it runs:
+
+1. **Orientation** (`orient.py`): the dominant wall direction of the footprint, modulo 90°
+   (a wall and the wall at right angles to it say the same thing). A length-weighted
+   histogram of edge angles finds the peak, then a circular mean of the edges near the
+   peak refines it, so a chamfered corner or a skewed bay window doesn't drag the answer.
+   Island yaw = minus that angle, in (−45°, 45°]. |yaw| ≤ 3° stays on the world grid
+   (10 m of wall drifts at most half a metre).
+2. **Terraces** (`group.py`): touching island candidates (≥ 2 m of outline within 0.5 m of
+   each other: a party wall, not a corner touch) whose yaws differ by ≤ 3° form one group
+   with one length-weighted yaw. Merging goes strongest contact first and stops before a
+   group's yaws spread over 3°, so a curving street doesn't chain into one giant island.
+3. **Local frame** (`frame.py`): footprints, roof planes (polygon, normal, origin) and landmark
+   accents are turned by −yaw into local metres, written as "fake RD" `(X0 + u, Y0 + v)` so
+   the existing voxeliser, run planner and layout work on it unchanged. Footprints grow by
+   half a stud (so turned edges overlap neighbours instead of leaving slits), and the
+   origin is snapped so the longest wall along each local axis lies on a cell centre line:
+   the grown outline then lies exactly between cell centres. Ground heights are the world
+   DTM sampled at each local cell's world position.
+4. **Voxelise** (`build.py`): `plan_facades` → `build_layers` → `voxelise_tile` per 64 × 64
+   local sub-tile → `strip_ground` (terrain out; each building column extended 2 plates below
+   the local ground: the plinth hides the seam on slopes) → `layout_tile`. The walls are
+   straight now, so a terrace front is one 12-15 stud run with the full grammar.
+5. **Shop fronts are decided in the world**: `WorldStreets` turns each facade probe strip
+   back into world RD and asks the world's street context, so a terrace facing a turned
+   pedestrian street gets shop fronts exactly as an axis-aligned one would.
+6. **On the world grid** the island's footprint is paved (`pavement` tile, priority above
+   roads) and marked occupied in `Layers.island_k`: neighbours put no facade or glass
+   windows on a party wall against an island, and no tree grows inside it.
+
+`blox build --no-islands` keeps the v2 behaviour (staircases with glass cells).
+
 ### What the fixture shows (`tests/town_fixture.py`)
 
 Four terraced gabled houses (both ridge directions, one crossing a chunk border along i,
 the back walls on the first row of the next chunk in j), a house turned 30°, a residential
-street, a pedestrian street and a café POI. On it: 10 of 94 runs, **170 of 286 studs
-(59 %) of exterior wall get full detail**: the whole terrace (fronts, backs, both end
-walls); the turned house's 116 studs are all `short` staircase steps and keep glass cells.
+street, a pedestrian street and a café POI. Behind them a terrace of three touching houses
+turned −20° with a pedestrian street along its front, and a house turned only 2° (stays on
+the grid). The axis-aligned terrace: 10 runs, 170 studs, all fully detailed.
+
+| | runs detailed | exterior wall detailed |
+|---|---|---|
+| `--no-islands` (v2) | 12 / 182 | **42 %** of 506 studs (264 `short`, 32 `skew`) |
+| islands (v3) | 24 / 26 | **93 %** of 454 studs (32 `skew`: the 2° house's two 8 m walls) |
+| … of which islands | 12 / 12 | 100 % of 212 studs; the turned terrace's fronts are shops |
 `blox build` on it, viewed in the viewer: `build/shots/fixture_hero.png` (close-ups
 `fixture_south.png`, `fixture_west.png`, `fixture_north.png`).
 
@@ -190,11 +235,15 @@ cd ../viewer && node build.mjs ../build/fixture_world && node screenshot.mjs ../
 
 ### Limitations
 
-- **Maastricht's streets are not on the grid.** Only walls on axis-aligned footprint edges
-  get the grammar; buildings along diagonal streets keep the glass-cell rhythm. On real data
-  the detailed share will be well below the fixture's 59 %, and it has not been measured
-  (data hosts are blocked in the build container). Fixing this properly needs rotated
-  pieces or a per-street rotated grid, both beyond CONTRACT v2.
+- **Maastricht's streets are not on the grid**: handled by islands (above) since v3. Real-data
+  detail share with islands is not measured yet (data hosts are blocked in the build
+  container; v2 measured 4 % on the laptop). An estimate from `samples/markt`: 108 of 132
+  whole buildings (82 %) are turned more than 3° (`python -m blox_pipeline.tools.island_share`).
+- Buildings turned 1-3° stay on the grid: their long walls may still be `skew` (the fixture's
+  2° house's 8 m walls drift 0.28 m). Lowering the threshold is a one-line change (`VoxelConfig.island_min_yaw_deg`).
+- Where two detailed walls meet at a corner, a corner window can sit right behind the other
+  wall's corner window (two pieces back to back). Rare on the world grid, common on islands
+  (free-standing houses have four detailed walls). Visible only from very close.
 - Party-wall stretches above a lower neighbour are not runs (glass rhythm).
 - Run ends are corner pilasters even where a run ends at a concave corner or a party wall.
 - One style per building, one ground-floor kind per run; no balconies, dormers or roof

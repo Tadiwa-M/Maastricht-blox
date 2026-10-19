@@ -40,6 +40,7 @@ struct BloxBrickVaryings
 #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
     float4 shadowCoord : TEXCOORD6;
 #endif
+    nointerpolation float2 objectXWS : TEXCOORD7;  // xz of the object's +X axis in world (yaw of islands/models)
     UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
 };
@@ -83,6 +84,8 @@ BloxBrickVaryings BloxBrickVertex(BloxBrickAttributes input)
     o.color = input.color;
     o.faceUV = float4(input.uv0, input.uv1);
     o.classSeed = input.uv2;
+    float2 objectX = TransformObjectToWorldDir(float3(1.0, 0.0, 0.0), false).xz;
+    o.objectXWS = dot(objectX, objectX) > 1e-8 ? normalize(objectX) : float2(1.0, 0.0);
     o.fogFactor = ComputeFogFactor(o.positionCS.z);
 #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
     o.shadowCoord = TransformWorldToShadowCoord(positionWS);
@@ -125,9 +128,9 @@ BloxBrickSurface BloxEvaluateBrick(BloxBrickVaryings input)
     ep.seamDarkness = _SeamDarkness;
     ep.creviceM = _CreviceWidth * BLOX_STUD_M;
     ep.creviceAO = _CreviceAO;
-    BloxEdgeResult e = BloxEvaluateEdges(s.faceNormalWS, input.faceUV.xy, input.faceUV.zw, pixelM, ep);
+    BloxEdgeResult e = BloxEvaluateEdges(s.faceNormalWS, input.objectXWS, input.faceUV.xy, input.faceUV.zw, pixelM, ep);
 
-    float3 n = normalize(e.normalWS + BloxBrickTiltOffset(s.faceNormalWS, s.seed, _BrickTilt));
+    float3 n = normalize(e.normalWS + BloxBrickTiltOffset(s.faceNormalWS, input.objectXWS, s.seed, _BrickTilt));
     float occlusion = e.occlusion;
     float shade = 1.0;
 

@@ -8,7 +8,7 @@ The full source list is in `pipeline/README.md`; this page explains the flow.
 ```bash
 cd pipeline
 uv sync
-uv run pytest                                                   # 388 tests (2026-10-19)
+uv run pytest                                                   # 453 tests (2026-10-19)
 uv run python -m blox_pipeline.testscene --out ../build/testscene   # look-test chunk (no downloads)
 uv run python -m blox_pipeline.models                           # rewrite contract/models/*.json
 uv run blox fetch --bbox 176000,317500,176500,318000            # real data (needs internet)
@@ -16,6 +16,7 @@ uv run blox build --bbox 176000,317500,176500,318000 --out ../build/centre
 uv run python tests/town_fixture.py ../build/fixture_data       # synthetic town (no downloads) ...
 uv run blox build --data-dir ../build/fixture_data --bbox 176215,317495,176305,317550 \
     --out ../build/fixture_world --no-ortho                      # ... built the real way
+uv run python -m blox_pipeline.tools.island_share ../samples/markt   # share of turned buildings in a built world
 ```
 
 `blox fetch` and `blox build` have never run against live hosts: the build container blocks
@@ -27,12 +28,16 @@ every data host (see `docs/DATA_SOURCES.md` and `docs/STATUS.md`).
 blox fetch:  sources/                 download + cache under data/raw/
 blox build:  sources/  load           -> AHN HeightGrid, 3D BAG Buildings, OsmData
              voxelise/ prepare_world  -> slice-wide items: colours, feature ids, fixed heights,
-                                         street context, facade runs (plan_facades, once)
+                                         street context, facade runs (plan_facades, once);
+                                         islands/plan_islands takes turned buildings off the grid
+                                         and paves their footprint                CONTRACT 5.1
              voxelise/ build_layers   -> 2.5D column layers per 8x8-chunk region
              voxelise/ voxelise_tile  -> VoxelTile per chunk (+1-cell rim) + placed facade
                                          pieces (tile.placed)                      CONTRACT 7
              layout/   layout_tile    -> brick records (global coords), placed=tile.placed  CONTRACT 4
-             io/       write_world    -> chunks/*.bxc, manifest.json, features.json
+             islands/  build_islands  -> per turned group: local frame -> the same prepare/voxelise/
+                                         facade/layout code -> records in local I, J (.bxi)
+             io/       write_world    -> chunks/*.bxc, islands/*.bxi, manifest.json, features.json
              preview/  render_preview -> preview.png
 ```
 
@@ -46,10 +51,31 @@ blox build:  sources/  load           -> AHN HeightGrid, 3D BAG Buildings, OsmDa
 | `facade/` | the facade grammar: facade runs (`run.py`, `frame.py`) used by test-scene houses and real buildings ([guide 04](04-facades-and-pieces.md)) |
 | `testscene/` | hand-authored look-test chunk (`scene.py`), the `Canvas` painter (`canvas.py`), build script (`build.py`) |
 | `layout/` | voxels → bricks (below) |
-| `io/` | `.bxc` format (`format.py`), writer, reader, manifest/features documents, golden test files |
+| `islands/` | rotated buildings (CONTRACT 5.1): `orient.py` dominant wall direction, `group.py` which buildings and terraces, `frame.py` local frame + axis-aligned local world, `build.py` voxelise/lay out with the world's code, `pose.py` the shared local ↔ world transform ([guide 04](04-facades-and-pieces.md)) |
+| `io/` | `.bxc` format (`format.py`), `.bxi` islands (`island_format.py`, `island_writer.py`, `island_reader.py`), writer, reader, manifest/features documents, golden test files |
 | `models/` | brick models (bus, boat, character) → `contract/models/` ([guide 05](05-movers-and-models.md)) |
-| `preview/` | top-down PNG and isometric chunk PNG (no GPU needed) |
+| `preview/` | top-down PNG (islands drawn turned into place) and isometric PNG of any record array (a chunk or an island's local records) (no GPU needed) |
+| `tools/` | `sample.py` (export a few chunks to `samples/`), `island_share.py` (how many buildings of a built world would be islands) |
 | `cli.py` | `blox fetch` / `blox build` |
+
+### Islands (`islands/`, CONTRACT 5.1)
+
+Buildings turned more than 3° (alone, or as a terrace of touching houses with the same
+angle) are not voxelised into the chunks. `prepare_world` moves them to `world.islands`
+(`IslandGroup`: members + one yaw), paves their footprint, and `Layers.island_k` marks the
+space as taken for neighbours. After the chunks, `build_islands` builds each group in its own
+turned frame by running the *same* code on an axis-aligned copy ("fake RD" local
+coordinates, see `islands/pose.py`), so walls are straight and get the facade grammar.
+Buildings near a group but not in it (on-grid neighbours, other islands) are copied into the
+local world as occupancy only (`frame.local_neighbours`), so an island's party wall against an
+axis-aligned neighbour is not mistaken for a street front.
+`blox build` logs the facade detail share for the world grid, the islands and the total, and
+warns if an island's owning chunk has no file (renderers stream islands with their owner).
+`tests/fixtures/town_world/` is the town fixture built with `blox build` (no preview),
+committed so the C# tests read real pipeline-built islands; `test_committed_town_world_is_current`
+fails when it is stale: regenerate with `BLOX_REGEN_FIXTURES=1 uv run pytest tests/test_islands_town.py`.
+Cost: ~60 ms per island building. Full story: [guide 04](04-facades-and-pieces.md#rotated-buildings-islands-contract-51-pipelinesrcblox_pipelineislands);
+file format: [guide 03](03-chunk-format.md).
 
 ### Terrain smoothing (`voxelise/terrain_smooth.py`)
 
@@ -145,7 +171,10 @@ test scene build (`testscene/build.py`) refuses to write a chunk that fails it.
 | `tests/test_placed.py` | placed-piece rules, `hide_studs` |
 | `tests/test_facade.py` | every house variant lays out exactly; street pieces face S, side pieces W; fence spacing |
 | `tests/test_facade_frame.py` | a run painted through each frame (N/E/S/W) is the S result turned; bays move off chunk borders |
-| `tests/test_facade_runs.py` | the synthetic town (`town_fixture.py`) through the real path: layouts verify with placed pieces, pieces face out of their wall and stay in their chunk, rims agree, determinism, the turned building falls back, shop/house/plain choice, storeys, detailed share |
+| `tests/test_facade_runs.py` | the synthetic town (`town_fixture.py`) through the real path: layouts verify with placed pieces, pieces face out of their wall and stay in their chunk, rims agree, determinism, the turned building falls back, shop/house/plain choice, storeys, detailed share; `--no-islands` staircase fallback |
 | `tests/test_io.py` | `.bxc` writer/reader round trip, golden files shared with C# |
+| `tests/test_island_io.py` | `.bxi` round trip, exact header bytes, writer validation, manifest `islands`, golden island shared with C# |
+| `tests/test_islands_geometry.py` | shared `islands.json` vectors, affine matrices, orientation estimate (chamfer-robust), terrace grouping rules |
+| `tests/test_islands_town.py` | the town fixture's islands: grouping, layouts verify, pieces face out, shops from world streets, plinth, paving, occupancy, before/after detail share, determinism, 256-stud split, `blox build` + preview, the `island_share` estimator, party wall against an on-grid neighbour, committed `fixtures/town_world` is current |
 | `tests/test_models.py` | model generators and `check_model` |
 | `tests/test_testscene.py` | the look-test scene builds and verifies |

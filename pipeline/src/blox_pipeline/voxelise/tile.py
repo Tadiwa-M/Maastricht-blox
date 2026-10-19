@@ -60,7 +60,8 @@ def layers_ground(layers: Layers, I: int, J: int) -> int:
     i, j = I - layers.box.i0, J - layers.box.j0
     if not (0 <= i < layers.box.ni and 0 <= j < layers.box.nj):
         return NONE
-    if layers.bld_top[i, j] != NONE or layers.water_k[i, j] != NONE or layers.deck_k[i, j] != NONE:
+    if (layers.bld_top[i, j] != NONE or layers.water_k[i, j] != NONE or layers.deck_k[i, j] != NONE
+            or layers.island_k[i, j] != NONE):
         return NONE
     return int(layers.ground_k[i, j])
 
@@ -138,8 +139,8 @@ def _fill_buildings(tile: VoxelTile, L: Layers, kk: NDArray) -> None:
 
 
 def _occupied_top(L: Layers) -> NDArray[np.int64]:
-    """Highest solid K per column (terrain/water/building), NONE if empty."""
-    return np.maximum.reduce([L.ground_k, L.water_k, L.bld_top]).astype(np.int64)
+    """Highest solid K per column (terrain/water/building/island), NONE if empty."""
+    return np.maximum.reduce([L.ground_k, L.water_k, L.bld_top, L.island_k]).astype(np.int64)
 
 
 def _fill_windows(tile: VoxelTile, ext: Layers, L: Layers, kk: NDArray, storey: int, band: tuple[int, int]) -> None:

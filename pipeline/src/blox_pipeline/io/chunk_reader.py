@@ -54,8 +54,9 @@ def read_chunk(path: Path | str) -> ChunkData:
     return decode_chunk(Path(path).read_bytes())
 
 
-# v1 worlds read unchanged under v2: same chunk bytes, v2 only adds rotFlags bit3.
-SUPPORTED_CONTRACT_VERSIONS = (1, 2)
+# Older worlds read unchanged: v2 only added rotFlags bit3, v3 only added "islands"
+# (absent = none; read them with island_reader.read_world_islands).
+SUPPORTED_CONTRACT_VERSIONS = (1, 2, 3)
 
 
 def read_manifest(world_dir: Path | str) -> dict[str, Any]:

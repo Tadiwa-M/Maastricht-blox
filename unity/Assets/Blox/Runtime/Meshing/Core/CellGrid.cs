@@ -22,7 +22,8 @@ namespace Blox.Meshing.Core
     }
 
     /// <summary>
-    /// Dense per-cell occupancy for one chunk plus a one-cell border, built from global bricks.
+    /// Dense per-cell occupancy for one chunk (or one island, on its own grid) plus a one-cell
+    /// border, built from bricks in that grid's cell coordinates.
     /// Cell value (ushort): bits 0-5 = world directions whose cell face the occupying brick
     /// fully covers (<see cref="Dir"/> order), bit 6 = occupied, bits 8-15 = <see cref="MaterialClass"/>.
     /// Pure functions over spans so they run identically in Burst and in dotnet tests.
@@ -41,7 +42,15 @@ namespace Blox.Meshing.Core
         /// plus one cell all round, vertically [minK - 1, maxTop] of the chunk's own bricks.
         /// Returns SizeK = 0 when there are no valid bricks.
         /// </summary>
-        public static CellGridDims ComputeDims(ReadOnlySpan<PlacedBrick> own, ReadOnlySpan<BrickTypeInfo> types, int chunkI0, int chunkJ0)
+        public static CellGridDims ComputeDims(ReadOnlySpan<PlacedBrick> own, ReadOnlySpan<BrickTypeInfo> types, int chunkI0, int chunkJ0) =>
+            ComputeDims(own, types, chunkI0, chunkJ0, Units.ChunkStuds, Units.ChunkStuds);
+
+        /// <summary>
+        /// General form: own columns [i0, i0 + sizeI) x [j0, j0 + sizeJ) plus a one-cell ring.
+        /// Islands (CONTRACT 5.1) use it with their local extent (i0 = j0 = 0, up to 256 x 256),
+        /// since they are meshed on their own grid.
+        /// </summary>
+        public static CellGridDims ComputeDims(ReadOnlySpan<PlacedBrick> own, ReadOnlySpan<BrickTypeInfo> types, int i0, int j0, int sizeI, int sizeJ)
         {
             int minK = int.MaxValue, maxTop = int.MinValue;
             for (int n = 0; n < own.Length; n++)
@@ -51,7 +60,7 @@ namespace Blox.Meshing.Core
                 minK = Math.Min(minK, own[n].K);
                 maxTop = Math.Max(maxTop, own[n].K + t.H);
             }
-            var d = new CellGridDims { I0 = chunkI0 - 1, J0 = chunkJ0 - 1, SizeI = Units.ChunkStuds + 2, SizeJ = Units.ChunkStuds + 2 };
+            var d = new CellGridDims { I0 = i0 - 1, J0 = j0 - 1, SizeI = sizeI + 2, SizeJ = sizeJ + 2 };
             if (minK == int.MaxValue) { d.K0 = 0; d.SizeK = 0; return d; }
             d.K0 = minK - 1;
             d.SizeK = maxTop - minK + 2; // [minK-1, maxTop] inclusive
