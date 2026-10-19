@@ -20,7 +20,7 @@ function cached(key, make) {
 }
 
 /** Side profile (s from back to front, y up) of a slope: studded back rows, then the incline. */
-function slopeProfile(t, S, P) {
+export function slopeProfile(t, S, P) {
   const D = t.d * S, H = t.h * P, lip = LIP_PLATES * P;
   const back = (t.studRows ?? 1) * S;
   const pts = [[0, 0], [D, 0], [D, lip], [back, H]];
@@ -29,7 +29,7 @@ function slopeProfile(t, S, P) {
 }
 
 /** Ridge (slope_double): slopes down toward both the front and the back. */
-function ridgeProfile(t, S, P) {
+export function ridgeProfile(t, S, P) {
   const D = t.d * S, H = t.h * P, lip = LIP_PLATES * P, e = 0.02;
   return [[0, 0], [D, 0], [D, lip], [D / 2 + e, H], [D / 2 - e, H], [0, lip]];
 }
