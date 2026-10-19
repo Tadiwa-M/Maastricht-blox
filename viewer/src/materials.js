@@ -16,8 +16,8 @@ function plastic(extra = {}) {
 }
 
 /** Glass whose emissive light is multiplied by a per-instance colour (aGlow). */
-function windowGlass() {
-  const m = plastic({ roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.6,
+function windowGlass(extra = {}) {
+  const m = plastic({ ...extra, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.6,
     specularIntensity: 1, emissive: 0xffffff, emissiveIntensity: 0 });
   m.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
@@ -43,6 +43,7 @@ export class MaterialSet {
     this.waterUniforms = addRipples(this.water, rippleNormalTexture(), 0.6);
     this.metal = plastic({ metalness: 0.8, roughness: 0.28, clearcoat: 0.2, envMapIntensity: 1.4 });
     this.emissive = new Map();
+    this.far = new Map(); // far-LOD variants (vertex colours), see farFor()
     this.clippingPlanes = clippingPlanes;
     if (clippingPlanes) for (const m of this.all()) m.clippingPlanes = clippingPlanes;
     this.night = 0;
@@ -72,12 +73,43 @@ export class MaterialSet {
     return { key: cls, material: this[cls], cls };
   }
 
+  /**
+   * Far-LOD material for a near-material key (from forEntry): colour comes from vertex
+   * colours (merged meshes have no instances), and opaque plastic drops the clearcoat
+   * (MeshStandardMaterial: cheaper per pixel, no visible difference at that distance).
+   */
+  farFor(key) {
+    if (this.far.has(key)) return this.far.get(key);
+    let m;
+    const std = (extra) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0, ...extra });
+    if (key === 'solid') m = std({});
+    else if (key === 'metal') m = std({ metalness: 0.8, roughness: 0.28, envMapIntensity: 1.4 });
+    else if (key === 'glass') m = windowGlass({ vertexColors: true });
+    else if (key === 'trans') m = this.trans.clone();
+    else if (key === 'water') {
+      m = this.water.clone();
+      const u = addRipples(m, this.waterUniforms.uRipple.value, 0.6);
+      u.uTime = this.waterUniforms.uTime; // one clock for near and far water
+    } else if (key.startsWith('emissive:')) {
+      m = std({ emissive: this.emissive.get(key).emissive.clone(), roughness: 0.2 });
+    } else m = std({});
+    m.vertexColors = true;
+    if (this.clippingPlanes) m.clippingPlanes = this.clippingPlanes;
+    this.far.set(key, m);
+    this.setNight(this.night);
+    return m;
+  }
+
   /** night in [0, 1]: lamps and windows glow. */
   setNight(night) {
     this.night = night;
     for (const m of this.emissive.values()) m.emissiveIntensity = 0.8 + night * 3;
-    this.glass.emissiveIntensity = night * 1.6;
-    this.glass.envMapIntensity = 1.6 * (1 - 0.6 * night);
+    for (const [key, m] of this.far) if (key.startsWith('emissive:')) m.emissiveIntensity = 0.8 + night * 3;
+    for (const g of [this.glass, this.far.get('glass')]) {
+      if (!g) continue;
+      g.emissiveIntensity = night * 1.6;
+      g.envMapIntensity = 1.6 * (1 - 0.6 * night);
+    }
   }
 
   /** Animate time-dependent materials (water ripples). seconds since start. */
