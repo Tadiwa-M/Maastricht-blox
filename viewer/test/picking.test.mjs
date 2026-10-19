@@ -42,3 +42,17 @@ test('exterior flood fill sees through open air but not into a closed box', () =
   assert.equal(out(1, 1, 9), true);  // above the lid
   assert.equal(out(5, 5, 0), true);  // outside the bounds
 });
+
+test('exterior: air under an overhang is outside, air under the terrain shell is not', () => {
+  const recs = [];
+  // a 5x5 ground layer at K=0 with a 1-cell overhang at K=6 over (2, 2)
+  for (let I = 0; I < 5; I++) for (let J = 0; J < 5; J++) recs.push({ I, J, K: 0, type: 1, color: 1 });
+  recs.push({ I: 2, J: 2, K: 6, type: 1, color: 1 });
+  // a floating 3x3 "terrain shell" far away at K=12 with only air (reachable from the world edge) below it
+  for (let I = 10; I < 13; I++) for (let J = 0; J < 3; J++) recs.push({ I, J, K: 12, type: 1, color: 1 });
+  const out = exteriorAir(World.fromRecords(meta, recs));
+  assert.equal(out(2, 2, 3), true);   // under the overhang: seen from the street beside it
+  assert.equal(out(11, 1, 5), false); // under the shell: only reachable from the world's edge
+  assert.equal(out(11, 1, 15), true); // above the shell
+  assert.equal(out(13, 1, 5), true);  // beside the shell, beyond the world bounds
+});

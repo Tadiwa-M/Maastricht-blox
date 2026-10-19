@@ -21,8 +21,17 @@ export function merge(list) {
   return mergeGeometries(flat, false);
 }
 
-/** Axis-aligned box from min to max corner, optionally with rounded edges (radius r, `segments` per quarter). */
-export function slab(x0, x1, y0, y1, z0, z1, r = 0, segments = 2) {
+let bevelSegments = 2; // per rounded quarter; 1 = 108 instead of 300 triangles per box
+
+/** Build geometry with `n` bevel segments (lite near LOD: 1) instead of 2. */
+export function withBevelSegments(n, make) {
+  const old = bevelSegments;
+  bevelSegments = n;
+  try { return make(); } finally { bevelSegments = old; }
+}
+
+/** Axis-aligned box from min to max corner, optionally with rounded edges (radius r). */
+export function slab(x0, x1, y0, y1, z0, z1, r = 0, segments = bevelSegments) {
   const w = x1 - x0, h = y1 - y0, d = z1 - z0;
   const rr = Math.min(r, w / 2 - 1e-4, h / 2 - 1e-4, d / 2 - 1e-4);
   const g = rr > 0.002 ? new RoundedBoxGeometry(w, h, d, segments, rr) : new THREE.BoxGeometry(w, h, d);
@@ -30,9 +39,9 @@ export function slab(x0, x1, y0, y1, z0, z1, r = 0, segments = 2) {
   return g;
 }
 
-/** A W x H x D brick body with the seam inset and bevel (segments 1: 108 instead of 300 triangles). */
-export function brickBox(W, H, D, r = RADIUS, segments = 2) {
-  return slab(-W / 2 + INSET, W / 2 - INSET, INSET, H - INSET, -D / 2 + INSET, D / 2 - INSET, r, segments);
+/** A W x H x D brick body with the seam inset and bevel. */
+export function brickBox(W, H, D, r = RADIUS) {
+  return slab(-W / 2 + INSET, W / 2 - INSET, INSET, H - INSET, -D / 2 + INSET, D / 2 - INSET, r);
 }
 
 /** Plain box filling the whole cell volume: no seam, no bevel (glass, water). */

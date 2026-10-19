@@ -9,6 +9,9 @@ function buildingsBox(world) {
   for (const f of world.features.values()) {
     if (!f.bboxIJ || !['building', 'landmark'].includes(f.kind)) continue;
     const [I0, J0, I1, J1] = f.bboxIJ;
+    // features.json covers the whole build; a neighbourhood (build.mjs --around) has fewer chunks
+    const wb = world.bounds;
+    if (I0 < wb.I0 || J0 < wb.J0 || I1 >= wb.I1 || J1 >= wb.J1) continue;
     list.push(f);
     b.expandByPoint(new THREE.Vector3(I0 * S, 0, -(J1 + 1) * S));
     b.expandByPoint(new THREE.Vector3((I1 + 1) * S, 0, -J0 * S));
