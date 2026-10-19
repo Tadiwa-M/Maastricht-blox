@@ -1,4 +1,4 @@
-# Maastricht Blox: Interface Contract (v1)
+# Maastricht Blox: Interface Contract (v2)
 
 This file is the single source of truth shared by every component. Parallel work streams
 (pipeline, proxy, Unity data/meshing, Unity rendering) code against **this** file, not
@@ -32,7 +32,7 @@ RD → grid: `I = floor((x - x0) / 0.5)`, `J = floor((y - y0) / 0.5)`, `K = floo
 `unity.x = I * 0.5` (east), `unity.z = J * 0.5` (north), `unity.y = K * 0.2` (up).
 A cell's min corner is at those coordinates; it spans `+0.5, +0.2, +0.5`.
 
-Reference points (RD, approx.): Vrijthof (176185, 317717) · Markt (176430, 318007) ·
+Reference points (RD, approx.; Unity metres in brackets): Vrijthof (176185, 317717) → [485, 1217] · Markt (176430, 318007) ·
 Sint-Janstoren (176115, 317672) · Sint-Servaasbrug (176748, 317786) ·
 Station (177403, 317800) · Bonnefanten (177040, 317098).
 
@@ -47,12 +47,56 @@ footprint cells carry a top stud, and for slopes the `studRows` count.
 Rotated extent: rot 0/2 → `w × d` along `(i, j)`; rot 1/3 → `d × w` along `(i, j)`.
 A brick's record position `(i, j, k)` is the **minimum corner of its rotated bounding box**.
 
-**Slope orientation:** at rot 0 the low edge of the slope faces **+j** (north) and the
-high, studded back row(s) lie at the −j side. Low edge faces: rot 0 → +j, rot 1 → +i,
+**Facing (v2): the one rule to remember.** Every directional piece has a *front*. At rot 0
+the front faces **+j (north)**. Code that places pieces should say which way the front
+faces, not pick a `rot`:
+
+| facing | front faces | rot |
+|---|---|---|
+| `N` | +j | 0 |
+| `E` | +i | 1 |
+| `S` | −j | 2 |
+| `W` | −i | 3 |
+
+Unrotated footprint cell `(a, b)` (`a` along `w`, `b` along `d`) lands at offset `(di, dj)`
+from the record position:
+rot 0 → `(a, b)` · rot 1 → `(b, w−1−a)` · rot 2 → `(w−1−a, d−1−b)` · rot 3 → `(d−1−b, a)`.
+Every language implements exactly these helpers (`facing_to_rot`, `rotated_extent`,
+`footprint_cell`) and passes the shared vectors in `contract/test_vectors/rotation.json`.
+
+**Slope orientation:** a slope's front is its low edge, so at rot 0 the low edge faces
+**+j** (north) and the high, studded back row(s) lie at the −j side. Low edge faces: rot 0 → +j, rot 1 → +i,
 rot 2 → −j, rot 3 → −i. `slope_double` (ridge) at rot 0 slopes down toward both +j and −j.
+
+**Slope lip (v2):** the vertical face at a slope's low edge is **0.25 plate (0.05 m)** tall,
+like a real slope brick, not a full plate.
 
 **Studs** are only *rendered* where a stud cell's top is not covered by another brick
 (the renderer decides exposure; the data stores bricks, not studs). Tiles have no studs.
+`studs` values: `all`, `none`, `backRows` (slopes), `center` (one stud centred on the
+footprint: jumper plates).
+
+### 2.1 Detail pieces (v2, ids 38+)
+
+Placed explicitly by the facade grammar (never inferred from voxels). Directional ones
+follow the facing rule: their decorated **front faces +j at rot 0**. The whole bounding box
+counts as occupied for stud-exposure tests. Geometry every renderer must reproduce:
+
+| id | name | kind | w×d×h | geometry |
+|---|---|---|---|---|
+| 38 | `arch_1x4` | `arch` | 4×1×3 | brick with an arched opening through it: middle 2 studs, opening 2 plates tall at the sides rising to a semicircular top |
+| 39 | `arch_1x6` | `arch` | 6×1×6 | as above: middle 4 studs, opening 5 plates tall with round top |
+| 40 | `window_1x2x2` | `window` | 2×1×6 | frame (0.06 m bars, record colour) with a vertical mullion and a transom at 2/3 height; panes are `glass` material, set 0.1 m back from the front |
+| 41 | `window_1x2x3` | `window` | 2×1×9 | same, taller |
+| 42 | `door_1x2x4` | `door` | 2×1×12 | frame plus door leaf set 0.06 m back with 4 raised panels, and a small `glass` fanlight in the top 2 plates |
+| 43 | `fence_1x4` | `fence` | 4×1×3 | 0.5-plate top rail with studs, round spindles every 0.25 m, 0.5-plate bottom rail |
+| 44 | `round_tile_1x1` | `round_tile` | 1×1×1 | flat round disc, no stud |
+| 45 | `jumper_1x2` | `jumper` | 2×1×1 | plate with a single stud centred on the footprint (`studs: center`) |
+| 46 | `slope30_1x2` | `slope` | 1×2×2 | shallow slope, no studs (`studRows: 0`); front lip 0.05 m |
+| 47 | `grille_1x2` | `tile_grille` | 2×1×1 | tile with 3 grooves along `w` on top |
+
+`window`/`door` panes always render with the `glass` material (night glow included); the
+record colour is the frame.
 
 ## 3. Palette (`contract/palette.json`)
 
@@ -86,7 +130,9 @@ Body: brickCount × BrickRecord (12 bytes each, before compression)
   uint16   k            0..65535 (global vertical level)
   uint8    typeId       brick_catalogue id
   uint8    colorIdx     palette idx
-  uint8    rotFlags     bits0-1 = rot; bit2 = no_variation (exact colour, e.g. signage); bits3-7 = 0
+  uint8    rotFlags     bits0-1 = rot; bit2 = no_variation (exact colour, e.g. signage);
+                        bit3 = hide_studs (v2: every stud cell is covered by a hollow-culled
+                        interior cell, so renderers skip its studs); bits4-7 = 0
   uint8    reserved     = 0
   uint32   featureId    0 = none; else id in features.json
 ```
@@ -105,7 +151,7 @@ Rules:
 
 ```json
 {
-  "contractVersion": 1,
+  "contractVersion": 2,
   "crs": "EPSG:28992",
   "originRD": [175700, 316500],
   "baseNapM": 30.0,
@@ -152,8 +198,33 @@ border):
   `+j, +i, −j, −i` respectively; `5` = ridge along i; `6` = ridge along j; `7` = tile-only
   (flat, no studs, e.g. road surface); `8` = water surface
 Plus `k0: int` (global k of array index 0) and `(I0, J0)` (global cell of index [0,0]).
+**Placed pieces (v2):** alongside the arrays, a tile may carry a list of explicitly placed
+records (detail pieces from section 2.1, or any catalogue piece). Their cells must be air in
+the grid. They are passed through unchanged, and hollow culling treats their cells as air,
+so the wall behind a window frame keeps its faces.
 Brick layout consumes this and emits BrickRecords. It must reproduce the grid exactly
 (no gaps, no overfill) apart from slope cells mapped to slope bricks.
+
+## 7.1 Brick models (v2): things that move
+
+Buses, boats and characters are **brick models**: small assemblies rendered as one movable
+object, never baked into chunks. Files: `contract/models/<name>.json`.
+
+```json
+{ "name": "bus", "version": 1,
+  "size": [5, 24, 16],
+  "pivot": [2.5, 12.0, 0.0],
+  "forward": "+j",
+  "parts": { "leg_l": {"pivot": [1.0, 0.5, 4.0]} },
+  "bricks": [ {"i": 0, "j": 0, "k": 0, "type": 3, "color": 38, "rot": 0, "part": "leg_l"} ] }
+```
+`size` is the bounding box in studs (i, j) and plates (k); `pivot` is the model origin in
+local cells (floats; ground centre); models always face `+j` locally; `parts` are optional
+animated groups. Brick fields follow section 4 (local cells, record = min corner of the rotated bbox); `part`
+is optional. A **pose** is `{position: [x, y, z] Unity metres, yaw: degrees clockwise from
+north}`: yaw 0 means the model's +j forward points north. Movers turn a path (a polyline in
+Unity metres) plus a distance into a pose. Heading is the path tangent, smoothed over
+`turnRadiusM`. Parts animate by rotating about their pivot's local i axis (walk cycles).
 
 ## 8. Live proxy API (`proxy/`, default `http://127.0.0.1:8787`)
 
