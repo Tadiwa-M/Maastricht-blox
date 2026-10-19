@@ -11,3 +11,9 @@
 - Python: 3.11+, managed with `uv`, `pytest`, type hints, no notebooks in the main path.
 - Style: original brick style. Never use the LEGO name, logo or minifigure shape.
 - Clean modular code; small files; tests for every format reader/writer.
+- Rotations: place pieces by **facing** (N/E/S/W; a piece's front faces +j at rot 0) through each
+  language's rotation helper; never hand-roll rot math. All helpers pass `contract/test_vectors/rotation.json`.
+- Moving things (buses, boats, characters) are brick models (`contract/models/`) driven by a
+  `PathMover` producing a `Pose`; never bake them into chunks.
+- Docs are part of the work: after each change, update the matching guide in `docs/guide/` and
+  append a dated entry to `docs/DEVLOG.md` (what changed, why, open decisions).
