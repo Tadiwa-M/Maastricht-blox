@@ -1,6 +1,7 @@
 # One-time setup of a Windows machine (GPU workstation or laptop) for Maastricht Blox. Safe to re-run.
 # Prerequisites it checks (install manually if missing): git, Unity Hub + Unity 6 LTS.
 # It installs via winget when missing: uv, .NET 8 SDK, Node.js 22.
+param([switch]$WithBrowser)  # -WithBrowser: also download Chromium for viewer screenshots (shots.sh)
 $ErrorActionPreference = 'Stop'
 $Root = Resolve-Path (Join-Path $PSScriptRoot '..')
 
@@ -26,7 +27,8 @@ function In([string]$Dir, [scriptblock]$Do) {  # run in a folder and always come
 
 In "$Root\pipeline" { uv sync }
 In "$Root\proxy" { uv sync }
-In "$Root\viewer" { npm ci --no-audit --no-fund; npx playwright install chromium }  # browser for viewer screenshots
+In "$Root\viewer" { npm ci --no-audit --no-fund }
+if ($WithBrowser) { In "$Root\viewer" { npx playwright install chromium } }  # only needed for automated screenshots
 dotnet restore "$Root\dotnet\Blox.sln"
 
 $gpu = Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name
