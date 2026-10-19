@@ -1,0 +1,488 @@
+{
+ "contractVersion": 2,
+ "crs": "EPSG:28992",
+ "originRD": [
+  175700,
+  316500
+ ],
+ "baseNapM": 30.0,
+ "studM": 0.5,
+ "plateM": 0.2,
+ "chunkStuds": 64,
+ "chunksX": 64,
+ "chunksY": 64,
+ "palette": "palette.json",
+ "catalogue": "brick_catalogue.json",
+ "features": "features.json",
+ "generated": "2026-10-19T17:47:43Z",
+ "sources": [
+  {
+   "name": "AHN",
+   "version": "AHN 0.5 m DTM/DSM",
+   "licence": "CC0 (AHN4 via PDOK) / CC BY 4.0 (AHN5, AHN6)",
+   "attribution": "AHN.nl"
+  },
+  {
+   "name": "3D BAG",
+   "version": "api.3dbag.nl",
+   "licence": "CC BY 4.0",
+   "attribution": "3D BAG by TU Delft 3D geoinformation"
+  },
+  {
+   "name": "OpenStreetMap",
+   "version": "Geofabrik limburg-latest",
+   "licence": "ODbL",
+   "attribution": "OpenStreetMap contributors"
+  }
+ ],
+ "chunks": [
+  {
+   "cx": 19,
+   "cy": 44,
+   "file": "chunks/c_19_44.bxc",
+   "bricks": 6833,
+   "minK": 86,
+   "maxK": 209,
+   "sha1": "ac115ac3f242e6c00ad7669ad4f363e504f91e19"
+  },
+  {
+   "cx": 19,
+   "cy": 45,
+   "file": "chunks/c_19_45.bxc",
+   "bricks": 7529,
+   "minK": 85,
+   "maxK": 175,
+   "sha1": "61ccb6028394dc5d99e8fcbaf99689bcbb692324"
+  },
+  {
+   "cx": 19,
+   "cy": 46,
+   "file": "chunks/c_19_46.bxc",
+   "bricks": 5408,
+   "minK": 85,
+   "maxK": 207,
+   "sha1": "cd5fa65c409f212f93c4b2aa0d2f8eaefc658eee"
+  },
+  {
+   "cx": 19,
+   "cy": 47,
+   "file": "chunks/c_19_47.bxc",
+   "bricks": 6205,
+   "minK": 85,
+   "maxK": 207,
+   "sha1": "65b75a273d65b54f0971fc4a39738325b0b95cd9"
+  },
+  {
+   "cx": 19,
+   "cy": 48,
+   "file": "chunks/c_19_48.bxc",
+   "bricks": 6537,
+   "minK": 84,
+   "maxK": 193,
+   "sha1": "6c195fc07d27321788e9f79e376d0a26f49317fc"
+  },
+  {
+   "cx": 19,
+   "cy": 49,
+   "file": "chunks/c_19_49.bxc",
+   "bricks": 6253,
+   "minK": 83,
+   "maxK": 193,
+   "sha1": "740b95411617b7b0064a6600e9546c41005eb0dd"
+  },
+  {
+   "cx": 19,
+   "cy": 50,
+   "file": "chunks/c_19_50.bxc",
+   "bricks": 6937,
+   "minK": 82,
+   "maxK": 180,
+   "sha1": "c5668cf0498448f9e419f68ac8cd1bfc042ce29e"
+  },
+  {
+   "cx": 20,
+   "cy": 44,
+   "file": "chunks/c_20_44.bxc",
+   "bricks": 6066,
+   "minK": 86,
+   "maxK": 185,
+   "sha1": "d23af3aa0dd5f41a7f30897adf90126c0623e598"
+  },
+  {
+   "cx": 20,
+   "cy": 45,
+   "file": "chunks/c_20_45.bxc",
+   "bricks": 3638,
+   "minK": 86,
+   "maxK": 172,
+   "sha1": "6de122e6bc63060c00d2c9f51fdc9b6bd1b35487"
+  },
+  {
+   "cx": 20,
+   "cy": 46,
+   "file": "chunks/c_20_46.bxc",
+   "bricks": 1586,
+   "minK": 85,
+   "maxK": 130,
+   "sha1": "a42e7137f534187d9479fee43d26396902747ebe"
+  },
+  {
+   "cx": 20,
+   "cy": 47,
+   "file": "chunks/c_20_47.bxc",
+   "bricks": 1474,
+   "minK": 84,
+   "maxK": 91,
+   "sha1": "ef2ce23194b2fe0e5037ba0466ee50ac9a5a39c2"
+  },
+  {
+   "cx": 20,
+   "cy": 48,
+   "file": "chunks/c_20_48.bxc",
+   "bricks": 2703,
+   "minK": 85,
+   "maxK": 165,
+   "sha1": "67bf35e96fb4f923d3db254492b188766bb7e19c"
+  },
+  {
+   "cx": 20,
+   "cy": 49,
+   "file": "chunks/c_20_49.bxc",
+   "bricks": 5386,
+   "minK": 84,
+   "maxK": 182,
+   "sha1": "5aba05400173ca9841b68e24a194de6c61ac8c5c"
+  },
+  {
+   "cx": 20,
+   "cy": 50,
+   "file": "chunks/c_20_50.bxc",
+   "bricks": 5793,
+   "minK": 83,
+   "maxK": 176,
+   "sha1": "0ee7650cdc168dc6c0c5340d5304fe0d3ce1350a"
+  },
+  {
+   "cx": 21,
+   "cy": 44,
+   "file": "chunks/c_21_44.bxc",
+   "bricks": 7528,
+   "minK": 87,
+   "maxK": 193,
+   "sha1": "6e3e495ab23de0dc308f880989a2556e65f9c2e9"
+  },
+  {
+   "cx": 21,
+   "cy": 45,
+   "file": "chunks/c_21_45.bxc",
+   "bricks": 1679,
+   "minK": 87,
+   "maxK": 97,
+   "sha1": "9f14953772284a2c04c699fa5fe6582737fff89c"
+  },
+  {
+   "cx": 21,
+   "cy": 46,
+   "file": "chunks/c_21_46.bxc",
+   "bricks": 1945,
+   "minK": 88,
+   "maxK": 171,
+   "sha1": "44a819ad0fdd5f20ab62d862b8f879a5ac59a566"
+  },
+  {
+   "cx": 21,
+   "cy": 47,
+   "file": "chunks/c_21_47.bxc",
+   "bricks": 1666,
+   "minK": 87,
+   "maxK": 118,
+   "sha1": "79322a84e4b736146052989bdb25fc39c6a954d5"
+  },
+  {
+   "cx": 21,
+   "cy": 48,
+   "file": "chunks/c_21_48.bxc",
+   "bricks": 4203,
+   "minK": 85,
+   "maxK": 177,
+   "sha1": "0854c340a79ae89e1254716af40f0ad59b4e7c09"
+  },
+  {
+   "cx": 21,
+   "cy": 49,
+   "file": "chunks/c_21_49.bxc",
+   "bricks": 7495,
+   "minK": 85,
+   "maxK": 193,
+   "sha1": "8d79db36b8dfd7da1690dd86d1e2ea1caa1bdcb2"
+  },
+  {
+   "cx": 21,
+   "cy": 50,
+   "file": "chunks/c_21_50.bxc",
+   "bricks": 6812,
+   "minK": 85,
+   "maxK": 159,
+   "sha1": "84362386ef0ea3d8e2aa47858c833b41df201374"
+  },
+  {
+   "cx": 22,
+   "cy": 44,
+   "file": "chunks/c_22_44.bxc",
+   "bricks": 8906,
+   "minK": 89,
+   "maxK": 201,
+   "sha1": "88fe28b080907fdf79dd3ebfbbfb955d2d92b90e"
+  },
+  {
+   "cx": 22,
+   "cy": 45,
+   "file": "chunks/c_22_45.bxc",
+   "bricks": 2243,
+   "minK": 88,
+   "maxK": 177,
+   "sha1": "fb4398e1d1a0c5b10270707ce5697dc3b9db54e7"
+  },
+  {
+   "cx": 22,
+   "cy": 46,
+   "file": "chunks/c_22_46.bxc",
+   "bricks": 5435,
+   "minK": 89,
+   "maxK": 310,
+   "sha1": "96f515a5e4611394079aafdd95e1a9701629fa51"
+  },
+  {
+   "cx": 22,
+   "cy": 47,
+   "file": "chunks/c_22_47.bxc",
+   "bricks": 2321,
+   "minK": 87,
+   "maxK": 190,
+   "sha1": "7ed92860a1f647ecd6792ec29b759051b9741d69"
+  },
+  {
+   "cx": 22,
+   "cy": 48,
+   "file": "chunks/c_22_48.bxc",
+   "bricks": 5410,
+   "minK": 84,
+   "maxK": 178,
+   "sha1": "0392c998e8aa0be8cff4ea73044a29a3b1c93b39"
+  },
+  {
+   "cx": 22,
+   "cy": 49,
+   "file": "chunks/c_22_49.bxc",
+   "bricks": 8123,
+   "minK": 83,
+   "maxK": 173,
+   "sha1": "55f3034dcd8e9434ca9bc3a9fa7e1007db914f71"
+  },
+  {
+   "cx": 22,
+   "cy": 50,
+   "file": "chunks/c_22_50.bxc",
+   "bricks": 7126,
+   "minK": 84,
+   "maxK": 169,
+   "sha1": "f93a7e39a80cbcd8d045ad6e44fef8d24fa279cd"
+  },
+  {
+   "cx": 23,
+   "cy": 44,
+   "file": "chunks/c_23_44.bxc",
+   "bricks": 6294,
+   "minK": 87,
+   "maxK": 196,
+   "sha1": "18867256b6066718a2d96102cfc9456d4ec349ef"
+  },
+  {
+   "cx": 23,
+   "cy": 45,
+   "file": "chunks/c_23_45.bxc",
+   "bricks": 3353,
+   "minK": 86,
+   "maxK": 184,
+   "sha1": "d2d7caccde9b0dbed1cd0947ed62e251e81b67b0"
+  },
+  {
+   "cx": 23,
+   "cy": 46,
+   "file": "chunks/c_23_46.bxc",
+   "bricks": 3067,
+   "minK": 86,
+   "maxK": 200,
+   "sha1": "171a48b836bceada458fa60a0fc68c0371c74ca8"
+  },
+  {
+   "cx": 23,
+   "cy": 47,
+   "file": "chunks/c_23_47.bxc",
+   "bricks": 3752,
+   "minK": 86,
+   "maxK": 175,
+   "sha1": "14afb068f9f0526bd4d5b53ee9f6da6e0f2092ea"
+  },
+  {
+   "cx": 23,
+   "cy": 48,
+   "file": "chunks/c_23_48.bxc",
+   "bricks": 4878,
+   "minK": 85,
+   "maxK": 175,
+   "sha1": "683196b1923ad6f3c58a4bccb5e3cd9549e33977"
+  },
+  {
+   "cx": 23,
+   "cy": 49,
+   "file": "chunks/c_23_49.bxc",
+   "bricks": 7730,
+   "minK": 83,
+   "maxK": 173,
+   "sha1": "a7a92c8ca02851b4cffb3393b102f0c0a1f9b09f"
+  },
+  {
+   "cx": 23,
+   "cy": 50,
+   "file": "chunks/c_23_50.bxc",
+   "bricks": 6861,
+   "minK": 83,
+   "maxK": 187,
+   "sha1": "201cbebb03ed3537257fe90d013fa8a0c9a8353b"
+  },
+  {
+   "cx": 24,
+   "cy": 44,
+   "file": "chunks/c_24_44.bxc",
+   "bricks": 6373,
+   "minK": 87,
+   "maxK": 184,
+   "sha1": "564575841106b39b9cd5f729342b54ffa22d6d90"
+  },
+  {
+   "cx": 24,
+   "cy": 45,
+   "file": "chunks/c_24_45.bxc",
+   "bricks": 6609,
+   "minK": 85,
+   "maxK": 184,
+   "sha1": "8bfc16ecce1ff3e38b1825708b13b72424235e83"
+  },
+  {
+   "cx": 24,
+   "cy": 46,
+   "file": "chunks/c_24_46.bxc",
+   "bricks": 7037,
+   "minK": 85,
+   "maxK": 189,
+   "sha1": "700be783ea57f3a44851b2245ce523dd2b8dd0f2"
+  },
+  {
+   "cx": 24,
+   "cy": 47,
+   "file": "chunks/c_24_47.bxc",
+   "bricks": 4361,
+   "minK": 87,
+   "maxK": 189,
+   "sha1": "b5af58b32b782d9acc2e7d98a3f70ae905100419"
+  },
+  {
+   "cx": 24,
+   "cy": 48,
+   "file": "chunks/c_24_48.bxc",
+   "bricks": 5870,
+   "minK": 88,
+   "maxK": 208,
+   "sha1": "8373dd6c4181be3f169282e557597ba83d3f744c"
+  },
+  {
+   "cx": 24,
+   "cy": 49,
+   "file": "chunks/c_24_49.bxc",
+   "bricks": 5177,
+   "minK": 84,
+   "maxK": 190,
+   "sha1": "8791e5c52d9ead743908e2b304d0b504b1011cf4"
+  },
+  {
+   "cx": 24,
+   "cy": 50,
+   "file": "chunks/c_24_50.bxc",
+   "bricks": 7074,
+   "minK": 82,
+   "maxK": 172,
+   "sha1": "952568dcc09361caa41378755331834c163b303e"
+  },
+  {
+   "cx": 25,
+   "cy": 44,
+   "file": "chunks/c_25_44.bxc",
+   "bricks": 7571,
+   "minK": 80,
+   "maxK": 172,
+   "sha1": "d13eb3a2a6466aaa7e953cb93ed95cf898734c3a"
+  },
+  {
+   "cx": 25,
+   "cy": 45,
+   "file": "chunks/c_25_45.bxc",
+   "bricks": 5637,
+   "minK": 84,
+   "maxK": 173,
+   "sha1": "1bfbcd983abba822c66d729f69119859bb156d03"
+  },
+  {
+   "cx": 25,
+   "cy": 46,
+   "file": "chunks/c_25_46.bxc",
+   "bricks": 7232,
+   "minK": 84,
+   "maxK": 176,
+   "sha1": "19dd9a5749dc14fa581f935a47269fa895a1c935"
+  },
+  {
+   "cx": 25,
+   "cy": 47,
+   "file": "chunks/c_25_47.bxc",
+   "bricks": 5195,
+   "minK": 87,
+   "maxK": 208,
+   "sha1": "9e4d5675ca150672e57dce59ac804ae7a6c39bee"
+  },
+  {
+   "cx": 25,
+   "cy": 48,
+   "file": "chunks/c_25_48.bxc",
+   "bricks": 5156,
+   "minK": 88,
+   "maxK": 208,
+   "sha1": "7bea329131639a58f3e87aaf06665bf824b8bac9"
+  },
+  {
+   "cx": 25,
+   "cy": 49,
+   "file": "chunks/c_25_49.bxc",
+   "bricks": 6115,
+   "minK": 89,
+   "maxK": 190,
+   "sha1": "bf36c07bacef4fd997b1cc67039bbe9a9aa65aee"
+  },
+  {
+   "cx": 25,
+   "cy": 50,
+   "file": "chunks/c_25_50.bxc",
+   "bricks": 7179,
+   "minK": 78,
+   "maxK": 182,
+   "sha1": "be831a0e3907d28b88626638c7b97fde95fc6294"
+  }
+ ],
+ "sample": {
+  "centre": [
+   22,
+   47
+  ],
+  "radius": 3
+ }
+}
