@@ -9,7 +9,8 @@ import { bodyParts, studGeometry, INSET } from './geometry.js';
 import { typeExtent, typeCell, studCells, ROT_MASK, NO_VARIATION, HIDE_STUDS } from './world.js';
 import { brickMatrix, gridToThree } from './placement.js';
 import { hash3 } from './hash.js';
-import { exteriorAir } from './exterior.js';
+import { exteriorAir, occupancyGrid } from './exterior.js';
+import { cellCodeOf } from './farmesh.js';
 import { windowGlow } from './glow.js';
 
 export { hash3 };
@@ -59,6 +60,7 @@ class Bucket {
     let geometry = this.geometry;
     if (this.glow) { // per-instance glow: needs its own copy of the geometry
       geometry = geometry.clone();
+      geometry.userData.owned = true; // freed with the mesh (src/lod.js)
       const a = new Float32Array(this.glow.length * 3);
       this.glow.forEach((c, q) => c.toArray(a, q * 3));
       geometry.setAttribute('aGlow', new THREE.InstancedBufferAttribute(a, 3));
@@ -130,24 +132,42 @@ export function glassEntry(palette) {
   return null;
 }
 
-/** Build every brick and visible stud of a World. Returns { group, meshes, bricks, studs }. */
-export function buildWorldMeshes(world, mats) {
+/**
+ * Load-time facts shared by every mesh build of a World: the occupancy grid (with the cell
+ * codes the far LOD needs), which air is outside (stud exposure) and the window glow colours.
+ */
+export function worldContext(world, mats) {
+  const codeOf = cellCodeOf(world, (e) => mats.classOf(e));
+  const grid = occupancyGrid(world, codeOf);
+  const outside = exteriorAir(world, grid);
+  return {
+    grid, codeOf,
+    covered: (I, J, K) => world.occupied(I, J, K) || !outside(I, J, K),
+    glows: windowGlow(world, (n) => mats.classOf(world.palette.get(world.color[n])) === 'glass'),
+    glassEntry: glassEntry(world.palette),
+  };
+}
+
+/**
+ * Build bricks (all, or the brick numbers in `list`) and their visible studs.
+ * Returns { group, meshes, bricks, studs }; stud meshes are named 'stud|...'.
+ */
+export function buildWorldMeshes(world, mats, { list = null, ctx = worldContext(world, mats) } = {}) {
   const batch = new BrickBatcher(mats, world.studM, world.plateM);
-  batch.glassEntry = glassEntry(world.palette);
-  const outside = exteriorAir(world);
-  const covered = (I, J, K) => world.occupied(I, J, K) || !outside(I, J, K);
-  const glows = windowGlow(world, (n) => mats.classOf(world.palette.get(world.color[n])) === 'glass');
+  batch.glassEntry = ctx.glassEntry;
   const col = new THREE.Color();
-  for (let n = 0; n < world.count; n++) {
+  const count = list ? list.length : world.count;
+  for (let q = 0; q < count; q++) {
+    const n = list ? list[q] : q;
     const t = world.typeOf(n);
     if (!t) continue;
     const I = world.I[n], J = world.J[n], K = world.K[n], flags = world.rotFlags[n];
     const entry = world.palette.get(world.color[n]);
     const exact = !!(flags & NO_VARIATION);
-    batch.addBrick({ I, J, K, t, rot: flags & ROT_MASK, entry, exact, glow: glows.get(n) });
+    batch.addBrick({ I, J, K, t, rot: flags & ROT_MASK, entry, exact, glow: ctx.glows.get(n) });
     if (flags & HIDE_STUDS) continue;
     brickColor(entry, I, J, K, exact, col);
-    for (const [x, y, z] of exposedStuds(t, flags & ROT_MASK, I, J, K, covered)) batch.addStud(x, y, z, entry, col);
+    for (const [x, y, z] of exposedStuds(t, flags & ROT_MASK, I, J, K, ctx.covered)) batch.addStud(x, y, z, entry, col);
   }
   return batch.build();
 }
