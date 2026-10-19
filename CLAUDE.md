@@ -27,6 +27,8 @@
 - Clean modular code; small files; tests for every format reader/writer.
 - Rotations: place pieces by **facing** (N/E/S/W; a piece's front faces +j at rot 0) through each
   language's rotation helper; never hand-roll rot math. All helpers pass `contract/test_vectors/rotation.json`.
+- Buildings off the grid by > 3° are islands (CONTRACT 5.1): own rotated grid, `.bxi` files, one rigid
+  transform each. Inside an island everything (facing, facades) works exactly as on the world grid.
 - Moving things (buses, boats, characters) are brick models (`contract/models/`) driven by a
   `PathMover` producing a `Pose`; never bake them into chunks.
 - Docs are part of the work: after each change, update the matching guide in `docs/guide/` and
