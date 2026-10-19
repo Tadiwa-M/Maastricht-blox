@@ -8,6 +8,7 @@ from numpy.typing import NDArray
 from .. import geo
 from ..geo import CellBox
 from . import palette
+from .facade_paint import paint_facades
 from .grid import FULL, SLOPE_STACK, TILE, WATER, VoxelTile
 from .layers import NONE, Layers, shifted
 from .trees import tree_cells
@@ -49,6 +50,8 @@ def voxelise_tile(world: PreparedWorld, layers: Layers, box: CellBox) -> VoxelTi
     _fill_decks(tile, L, kk)
     for cells in tree_vox:
         _fill_tree(tile, *cells)
+    if world.facades:  # last: facade pieces win over tree leaves and glass cells
+        paint_facades(tile, world.facades_near(box.i0, box.j0, box.i1, box.j1))
     return tile
 
 

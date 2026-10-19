@@ -26,6 +26,7 @@ class VoxelConfig:
     steep_pitch_deg: float = 75.0  # roofs steeper than this are treated as walls/flat tops
     bridge_clearance_m: float = 1.5  # deck at least this far above the water it spans
     use_ortho_ground: bool = True
+    facade_detail: bool = True  # facade grammar on axis-aligned walls (False: glass cells only)
 
 
 @dataclass
@@ -65,6 +66,9 @@ class PreparedBuilding:
     window_period: int  # 0 = no regular windows
     window_offset: int
     accent: Accent | None = None
+    year: int | None = None
+    facade: bool = False  # gets the facade grammar (not a landmark, not a church)
+    shop: bool = False    # an OSM shop/amenity POI lies inside
 
 
 @dataclass
@@ -124,10 +128,13 @@ class PreparedWorld:
     water: list[WaterBody] = field(default_factory=list)
     trees: list[TreeSpec] = field(default_factory=list)
     ground_rgb: object | None = None  # RGBGrid (optional ortho)
+    streets: object | None = None  # streets.StreetContext
+    facades: list = field(default_factory=list)  # facade_runs.RunPlan, sorted
     _btree: STRtree | None = None
     _ptree: STRtree | None = None
     _wtree: STRtree | None = None
     _tree_ij: np.ndarray | None = None
+    _facade_bb: np.ndarray | None = None
 
     def index(self) -> None:
         self._tree_ij = np.array([(t.I, t.J) for t in self.trees], dtype=np.int64).reshape(-1, 2)
@@ -153,6 +160,14 @@ class PreparedWorld:
             self.index()
         assert self._wtree is not None
         return [self.water[i] for i in sorted(self._wtree.query(area))]
+
+    def facades_near(self, i0: int, j0: int, i1: int, j1: int) -> list:
+        """Detailed facade runs whose paint box touches ``[i0, i1) x [j0, j1)``, in paint order."""
+        if self._facade_bb is None or len(self._facade_bb) != len(self.facades):
+            self._facade_bb = np.array([r.bbox() for r in self.facades], np.int64).reshape(-1, 4)
+        bb = self._facade_bb
+        hit = (bb[:, 0] < i1) & (bb[:, 1] > i0) & (bb[:, 2] < j1) & (bb[:, 3] > j0)
+        return [self.facades[n] for n in np.flatnonzero(hit) if self.facades[n].detail]
 
     def trees_near(self, i0: int, j0: int, i1: int, j1: int, margin: int) -> list[TreeSpec]:
         """Trees whose trunk lies within ``margin`` cells of the box ``[i0, i1) x [j0, j1)``."""

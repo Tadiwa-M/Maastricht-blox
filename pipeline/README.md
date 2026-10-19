@@ -71,9 +71,13 @@ Rules worth knowing:
   next-lower slope stack (without it most roof cells would become plain bricks). Where two faces meet at the
   top, the stacks become ridges (5 = ridge along i, 6 = along j). Flatter roofs are flat
   full cells in a flat-roof colour.
-- **Windows**: facade cells exposed to air on one side get `glass` in a band 0.8-2.2 m above
-  each 3 m storey, one stud wide every 2 or 3 studs (per-building hash); corners, roof
-  stacks, churches and landmarks are skipped.
+- **Facades**: walls on axis-aligned footprint edges get the facade grammar (below):
+  window/door/arch pieces, storey bands, sills, shutters, shop fronts, eave cornice.
+  Every other exposed wall (rotated buildings' staircase edges, short or low walls,
+  party walls above a lower neighbour) keeps the fallback: `glass` cells in a band
+  0.8-2.2 m above each 3 m storey, one stud wide every 2 or 3 studs (per-building hash).
+  Corners, roof stacks, churches and landmarks get neither. `blox build --no-facades`
+  turns the grammar off.
 - **Roads** are tile cells (shape 7) replacing the terrain top: asphalt by default,
   cobble_grey for streets/pedestrian areas in the historic centre (Binnenstad, Wyck),
   pavement for footways, red for cycleways; OSM `surface` overrides. Railways: rail_brown
@@ -131,11 +135,21 @@ camera can see.
 
 ## Facade grammar (`src/blox_pipeline/facade/`)
 
-`HouseSpec` describes a house (width, storeys, colours, roof kind, ground floor kind,
-shutters, flower boxes, balcony, corner windows); `paint_house` builds it in this order:
-shell -> pilasters -> upper storeys (`windows.py`) -> ground floor (`ground.py`) -> west
-side windows -> cornice -> roof (`roofs.py`). `pieces.py` has the tiny "clear, place,
-backdrop" helpers. What each part uses:
+The unit is a **facade run** (`run.py: FacadeRun`, `paint_run`): one straight wall with one
+outward normal, painted in a run frame (x along the wall, y inward, pieces face `S`) as
+corner pilasters -> upper storeys (`windows.py`) -> ground floor (`ground.py`) -> eave
+cornice. `frame.py: FramePainter` turns that frame to face N/E/S/W. Two callers:
+
+- the look-test scene: `HouseSpec` (width, storeys, colours, roof kind, ground floor kind,
+  shutters, flower boxes, balcony, corner windows); `paint_house` = shell -> its front run
+  -> west side windows -> roof (`roofs.py`);
+- real buildings: `voxelise/facade_runs.py` extracts runs from the rasterised footprints and
+  plans them once per building, `voxelise/facade_style.py` picks the style from the BAG id,
+  `voxelise/streets.py` decides SHOP / HOUSE / PLAIN, and `voxelise/facade_paint.py` paints
+  them into each chunk tile and collects its placed pieces (`VoxelTile.placed`, passed to
+  `layout_tile(placed=...)` by `blox build`). See `docs/guide/04-facades-and-pieces.md`.
+
+`pieces.py` has the tiny "clear, place, backdrop" helpers. What each part uses:
 
 - every window is a `window_1x2x3` frame (trim colour) with a sloped `slope30_1x2` sill
   or a flower box with `round_tile_1x1` flowers; a dark "room" backdrop sits behind it,

@@ -10,15 +10,20 @@ An upper bay, bottom to top (k relative to the storey floor ``f``)::
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from .bays import WINDOW_W, bay_starts
 from .painter import Painter
 from .pieces import backdrop, door, flower_box, piece_h, sloped_sill, window
 from .spec import HouseSpec
 
+if TYPE_CHECKING:
+    from .run import FacadeRun
+
 SILL_GAP = 3  # plates between the storey floor and the window bottom
 
 
-def window_bay(cv: Painter, h: HouseSpec, x: int, kb: int, flowers: str | None = None) -> None:
+def window_bay(cv: Painter, h: "FacadeRun", x: int, kb: int, flowers: str | None = None) -> None:
     """One framed window with sill (or flower box), lintel and optional shutters."""
     top = window(cv, h, x, kb)
     lintel = h.trim if h.quoins else h.wall  # proud of the wall either way: casts a shadow
@@ -32,15 +37,15 @@ def window_bay(cv: Painter, h: HouseSpec, x: int, kb: int, flowers: str | None =
         sloped_sill(cv, h, x, kb)
 
 
-def balcony_bay(h: HouseSpec) -> int | None:
+def balcony_bay(h: "FacadeRun") -> int | None:
     """Bay start of the balcony (middle bay of storey 1), or None without a balcony."""
-    if not h.balcony or h.storeys < 1:
+    bays = h.bays()
+    if not h.balcony or h.storeys < 1 or not bays:
         return None
-    bays = bay_starts(h.x0, h.x1)
     return bays[len(bays) // 2]
 
 
-def balcony(cv: Painter, h: HouseSpec, x: int, floor: int) -> None:
+def balcony(cv: Painter, h: "FacadeRun", x: int, floor: int) -> None:
     """Door onto a 2-deep slab with a fence in front, posts at the sides and corbels."""
     i0, i1 = x - 1, x + WINDOW_W + 1
     door(cv, h, x, floor)
@@ -53,11 +58,11 @@ def balcony(cv: Painter, h: HouseSpec, x: int, floor: int) -> None:
     cv.place("fence_1x4", i0, h.y0 - 2, floor, "S", h.accent, h.fid)
 
 
-def upper_storeys(cv: Painter, h: HouseSpec, g: int) -> None:
+def upper_storeys(cv: Painter, h: "FacadeRun", g: int) -> None:
     for s in range(1, h.storeys + 1):
         f = h.floor_k(g, s)
         cv.fill(h.x0, h.x1, h.y0, h.wall_j, f - 1, f, h.trim, h.fid)  # storey band
-        for x in bay_starts(h.x0, h.x1):
+        for x in h.bays():
             if s == 1 and x == balcony_bay(h):
                 balcony(cv, h, x, f)
             else:

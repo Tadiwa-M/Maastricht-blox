@@ -132,3 +132,52 @@ LookTests `Passed: 67`, viewer `# pass 24  # fail 0`.
   `LookTestSceneMenu.Build()` split out of the menu handlers, `Blox.Gameplay.ShotRunner`
   (`-bloxShot`), and `WorldLoader` honours `-bloxWorld` (players have no project folder).
 - Guide: `docs/guide/00-workstation-setup.md`. Still uncompiled until the first workstation run.
+
+## 2026-10-19: Facade grammar on real 3D BAG buildings
+
+**What changed**
+- The grammar's unit is now a **facade run** (`facade/run.py: FacadeRun`, `paint_run`): one
+  straight wall, one outward normal, a length, a floor line, an eave and a style.
+  `facade/frame.py: FramePainter` turns the run frame (pieces face `S`) to N/E/S/W as a pure
+  rotation (boxes, facings, slope codes). `HouseSpec.front_run()` makes the test-scene houses
+  use the same painter. New `GroundFloor.PLAIN` (windows only).
+- Real buildings: `voxelise/facade_runs.py` finds runs on the rasterised footprints (wall
+  cells whose outward column has no building, maximal straight lines per normal) and plans
+  them once per building from that building's own layers; `facade_style.py` picks style from
+  a BAG-id hash by era; `streets.py` picks SHOP (shop/café POI inside, or facing a pedestrian
+  street/square in the centre) / HOUSE (street-facing, door) / PLAIN; `facade_paint.py`
+  carves the wall (trim layer, wall plane, backdrop rows as in a test house), paints the run
+  into each chunk tile, repaints gables above the eave plain with an attic window, and puts
+  the chunk's pieces in `VoxelTile.placed`, which `blox build` passes to
+  `layout_tile(placed=...)`. Landmarks and churches get no grammar. `--no-facades` turns it off.
+- Fallback unchanged: short runs (< 4 studs), staircase/non-axis-aligned walls (`skew`: less
+  than 75 % on an axis-aligned footprint edge), thin, low or street-blocked walls keep the
+  glass-cell rhythm.
+- Chunk borders: bays shift up to 2 studs off a border or are dropped; shop units on a border
+  are skipped; pieces that would still straddle (sills across the wall depth) become voxel
+  stand-ins. Every tile paints all runs reaching it in one order, so tile rims agree.
+- Synthetic town fixture `pipeline/tests/town_fixture.py` (4 terraced gabled LoD2.2 houses, a
+  house turned 30°, residential + pedestrian street, café POI), written as a cached data dir
+  so `blox build --data-dir` runs on it.
+
+**Numbers**
+- Fixture: 10 of 94 runs, **170 of 286 studs (59 %) of exterior wall** fully detailed (the
+  whole terrace); the turned house's 116 studs are all `short` staircase steps. Its 6 chunks
+  verify with `verify_layout(placed=...)`, 0 problems; 250 placed pieces (109 `window_1x2x3`,
+  4 attic `window_1x2x2`, 112 `slope30_1x2` sills, 12 grilles, 6 round tiles, 5 doors, 2 arches).
+- Look-test scene: voxels identical except the shop sign's wall-plane row no longer wraps
+  round the corner pilaster (8 cells): 4,245 -> 4,247 bricks (re-packing: brick_1x1 -1,
+  brick_1x4 -1, brick_1x6 +1, plate_1x1 +2, plate_1x2 +2, plate_1x3 -1, plate_1x6 +1, plate_1x8 +1,
+  plate_2x2 -1, plate_2x8 -1); placed pieces identical (137), `hide_studs` still 72.
+- Tests: pipeline `388 passed` (was 208; +6 PLAIN house variants, +144 bay/border cases,
+  +17 frame tests, +13 real-path tests; existing building tests now pin `facade_detail=False`).
+- Planning cost ~2 ms per building (400 synthetic buildings: 0.8 s vs 0.1 s without).
+- Shots: `build/shots/fixture_hero.png` plus `fixture_south.png`, `fixture_west.png`,
+  `fixture_north.png`.
+
+**Open decisions**
+- Maastricht's streets are mostly not grid-aligned, so on real data much less than 59 % will
+  be detailed; unmeasured until real data can be fetched. Options: rotated detail pieces
+  (contract change) or snapping near-axis edges more generously.
+- Walls above a lower neighbour and runs ending at concave corners/party walls get simple
+  treatment (glass rhythm / corner pilaster).

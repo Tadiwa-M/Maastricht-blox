@@ -10,7 +10,7 @@ from blox_pipeline.geo import CellBox
 from blox_pipeline.sources import OsmData, SourceData
 from blox_pipeline.sources.cityjson import read_path
 from blox_pipeline.sources.model import Building, HeightGrid, Surface
-from blox_pipeline.voxelise import build_features, build_layers, prepare_world, voxelise_tile
+from blox_pipeline.voxelise import VoxelConfig, build_features, build_layers, prepare_world, voxelise_tile
 from blox_pipeline.voxelise import palette
 from blox_pipeline.voxelise.grid import FULL, RIDGE_I, RIDGE_J, SLOPE_E, SLOPE_N, SLOPE_S, SLOPE_W
 
@@ -24,8 +24,10 @@ def flat_dtm(box: CellBox, margin: int = 40) -> HeightGrid:
                       np.full((box.ni + 2 * margin, box.nj + 2 * margin), GROUND, np.float32))
 
 
-def voxelise(buildings, box: CellBox, osm: OsmData | None = None):
-    world = prepare_world(SourceData(flat_dtm(box), None, buildings, osm or OsmData(), None))
+def voxelise(buildings, box: CellBox, osm: OsmData | None = None, facades: bool = False):
+    """Base voxeliser (glass-cell windows); ``facades=True`` adds the facade grammar."""
+    cfg = VoxelConfig(facade_detail=facades)
+    world = prepare_world(SourceData(flat_dtm(box), None, buildings, osm or OsmData(), None), cfg)
     layers = build_layers(world, box.grow(16))
     return world, voxelise_tile(world, layers, box)
 

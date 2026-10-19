@@ -8,11 +8,14 @@ The full source list is in `pipeline/README.md`; this page explains the flow.
 ```bash
 cd pipeline
 uv sync
-uv run pytest                                                   # 208 tests (2026-10-19)
+uv run pytest                                                   # 388 tests (2026-10-19)
 uv run python -m blox_pipeline.testscene --out ../build/testscene   # look-test chunk (no downloads)
 uv run python -m blox_pipeline.models                           # rewrite contract/models/*.json
 uv run blox fetch --bbox 176000,317500,176500,318000            # real data (needs internet)
 uv run blox build --bbox 176000,317500,176500,318000 --out ../build/centre
+uv run python tests/town_fixture.py ../build/fixture_data       # synthetic town (no downloads) ...
+uv run blox build --data-dir ../build/fixture_data --bbox 176215,317495,176305,317550 \
+    --out ../build/fixture_world --no-ortho                      # ... built the real way
 ```
 
 `blox fetch` and `blox build` have never run against live hosts: the build container blocks
@@ -23,10 +26,12 @@ every data host (see `docs/DATA_SOURCES.md` and `docs/STATUS.md`).
 ```
 blox fetch:  sources/                 download + cache under data/raw/
 blox build:  sources/  load           -> AHN HeightGrid, 3D BAG Buildings, OsmData
-             voxelise/ prepare_world  -> slice-wide items: colours, feature ids, fixed heights
+             voxelise/ prepare_world  -> slice-wide items: colours, feature ids, fixed heights,
+                                         street context, facade runs (plan_facades, once)
              voxelise/ build_layers   -> 2.5D column layers per 8x8-chunk region
-             voxelise/ voxelise_tile  -> VoxelTile per chunk (+1-cell rim)       CONTRACT 7
-             layout/   layout_tile    -> brick records (global coords)            CONTRACT 4
+             voxelise/ voxelise_tile  -> VoxelTile per chunk (+1-cell rim) + placed facade
+                                         pieces (tile.placed)                      CONTRACT 7
+             layout/   layout_tile    -> brick records (global coords), placed=tile.placed  CONTRACT 4
              io/       write_world    -> chunks/*.bxc, manifest.json, features.json
              preview/  render_preview -> preview.png
 ```
@@ -37,8 +42,8 @@ blox build:  sources/  load           -> AHN HeightGrid, 3D BAG Buildings, OsmDa
 | `rotation.py` | the facing rule ([guide 01](01-coordinates-and-rotation.md)) |
 | `catalogue.py`, `palette.py` | load `contract/*.json`; stud offsets and extents per type/rot |
 | `sources/` | downloads (`http.py`: resumable, idempotent), `config.py` holds **all** endpoints; readers for AHN GeoTIFF, CityJSON, OSM PBF, aerial photo |
-| `voxelise/` | turn sources into a dense `VoxelTile`: terrain, water, bridges, buildings (roof planes → slope stacks), windows as glass bands, trees, colours (`colours.py`, `landmarks.py`), features (`features.py`) |
-| `facade/` | the facade grammar: detailed townhouses with placed pieces ([guide 04](04-facades-and-pieces.md)) |
+| `voxelise/` | turn sources into a dense `VoxelTile`: terrain, water, bridges, buildings (roof planes → slope stacks), trees, colours (`colours.py`, `landmarks.py`), features (`features.py`); facades: runs (`facade_runs.py`), style (`facade_style.py`), street context (`streets.py`), painting + placed pieces (`facade_paint.py`); glass-cell windows as the fallback |
+| `facade/` | the facade grammar: facade runs (`run.py`, `frame.py`) used by test-scene houses and real buildings ([guide 04](04-facades-and-pieces.md)) |
 | `testscene/` | hand-authored look-test chunk (`scene.py`), the `Canvas` painter (`canvas.py`), build script (`build.py`) |
 | `layout/` | voxels → bricks (below) |
 | `io/` | `.bxc` format (`format.py`), writer, reader, manifest/features documents, golden test files |
@@ -58,7 +63,8 @@ chunk plus a 1-cell rim. The rim is context for hollow culling only and is never
 | `shape` | uint8 | 0 full · 1..4 slope with low edge facing +j/+i/−j/−i · 5 ridge along i · 6 ridge along j · 7 tile (flat, no studs) · 8 water surface |
 
 A tile also has `k0` (the global k of array index 0) and `(I0, J0)` (the global cell of index
-[0,0]), plus optionally a list of **placed** records.
+[0,0]), plus optionally **placed** records (`VoxelTile.placed`: the facade pieces inside the
+chunk; `cli.call_layout` passes them as `layout_tile(placed=...)`).
 
 ## How brick layout works
 
@@ -88,7 +94,7 @@ Entry point: `layout_tile(color, feature, shape, k0, I0, J0, placed=...)` in
 7. **`hide_studs`** (`layout/studs.py: hidden_studs`) is set on any record whose *every*
    stud cell has, directly above it, a solid input cell that no record covers (a
    hollow-culled interior). Renderers then skip those studs. On the look-test chunk it is set
-   on 72 of 4,245 bricks.
+   on 72 of 4,247 bricks.
 8. **Sort** by `(K, J, I)`, the chunk file order.
 
 ### Greedy packing and running bond (`layout/pack2d.py`, numba)
@@ -131,6 +137,8 @@ test scene build (`testscene/build.py`) refuses to write a chunk that fails it.
 | `tests/test_layout.py`, `test_layout_helpers.py` | layout + fuzzed verify (random tiles with slopes, water, borders) |
 | `tests/test_placed.py` | placed-piece rules, `hide_studs` |
 | `tests/test_facade.py` | every house variant lays out exactly; street pieces face S, side pieces W; fence spacing |
+| `tests/test_facade_frame.py` | a run painted through each frame (N/E/S/W) is the S result turned; bays move off chunk borders |
+| `tests/test_facade_runs.py` | the synthetic town (`town_fixture.py`) through the real path: layouts verify with placed pieces, pieces face out of their wall and stay in their chunk, rims agree, determinism, the turned building falls back, shop/house/plain choice, storeys, detailed share |
 | `tests/test_io.py` | `.bxc` writer/reader round trip, golden files shared with C# |
 | `tests/test_models.py` | model generators and `check_model` |
 | `tests/test_testscene.py` | the look-test scene builds and verifies |

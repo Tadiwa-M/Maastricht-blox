@@ -5,7 +5,9 @@ from __future__ import annotations
 from ..sources import SourceData
 from .features import FeatureRegistry
 from .prepare_buildings import prepare_buildings
+from .facade_runs import plan_facades
 from .prepare_osm import prepare_landuse, prepare_roads, prepare_trees, prepare_water, register_pois
+from .streets import street_context
 from .world import PreparedWorld, VoxelConfig
 
 
@@ -21,6 +23,9 @@ def prepare_world(src: SourceData, cfg: VoxelConfig | None = None) -> PreparedWo
         dtm=src.dtm, config=cfg, registry=reg, buildings=buildings, patches=patches, water=water,
         trees=prepare_trees(src.osm, src.dtm, src.dsm),
         ground_rgb=src.ortho if cfg.use_ortho_ground else None,
+        streets=street_context(src.osm),
     )
     world.index()
+    if cfg.facade_detail:
+        world.facades = plan_facades(world)
     return world

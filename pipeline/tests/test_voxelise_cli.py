@@ -59,7 +59,7 @@ def test_build_end_to_end_with_fake_stages(tmp_path, monkeypatch):
     make_data_dir(data)
     seen: dict = {"tiles": []}
 
-    def fake_layout(color, feature, shape, k0, I0, J0, border=None):
+    def fake_layout(color, feature, shape, k0, I0, J0, border=None, placed=None):
         from blox_pipeline.voxelise.grid import VoxelTile
 
         tile = VoxelTile(I0, J0, k0, color, feature, shape)
@@ -130,9 +130,9 @@ def test_real_build_maps_gabled_roof_to_slope_bricks(tmp_path, monkeypatch):
     layout_tile, write_world, _ = cli._import_stages()
     problems: list[str] = []
 
-    def checked_layout(color, feature, shape, k0, I0, J0, *, border=None):
-        rec = layout_tile(color, feature, shape, k0, I0, J0, border=border)
-        problems.extend(verify_layout(color, feature, shape, rec, k0, I0, J0, border=border))
+    def checked_layout(color, feature, shape, k0, I0, J0, *, border=None, placed=None):
+        rec = layout_tile(color, feature, shape, k0, I0, J0, border=border, placed=placed)
+        problems.extend(verify_layout(color, feature, shape, rec, k0, I0, J0, border=border, placed=placed))
         return rec
 
     monkeypatch.setattr(cli, "_import_stages", lambda: (checked_layout, write_world, None))

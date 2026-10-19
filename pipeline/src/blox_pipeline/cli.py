@@ -61,11 +61,13 @@ def _import_stages() -> tuple[Callable[..., Any], Callable[..., Any], Callable[.
 
 
 def call_layout(layout_tile: Callable[..., Any], tile: Any) -> Any:
-    """``layout_tile(color, feature, shape, k0, I0, J0, border=1)`` (B2's signature); the
-    tile's 1-cell rim is context for hollow culling only."""
+    """``layout_tile(color, feature, shape, k0, I0, J0, border=1, placed=...)``; the tile's
+    1-cell rim is context for hollow culling only. ``placed`` (facade pieces, CONTRACT 7) is
+    passed only when the tile has any."""
     if tile.dims[2] == 0:
         return None
-    return layout_tile(tile.color, tile.feature, tile.shape, tile.k0, tile.I0, tile.J0, border=1)
+    extra = {"placed": tile.placed} if getattr(tile, "placed", None) is not None and len(tile.placed) else {}
+    return layout_tile(tile.color, tile.feature, tile.shape, tile.k0, tile.I0, tile.J0, border=1, **extra)
 
 
 def own_chunk(records: Any, cx: int, cy: int) -> Any:
@@ -105,8 +107,15 @@ def cmd_build(args: argparse.Namespace) -> int:
     t0 = time.time()
     src = load_all(load_box, root)
     log.info("loaded %d buildings, %d roads in %.1fs", len(src.buildings), len(src.osm.roads), time.time() - t0)
-    cfg = VoxelConfig(maas_level_m=args.maas_level, use_ortho_ground=not args.no_ortho)
+    cfg = VoxelConfig(maas_level_m=args.maas_level, use_ortho_ground=not args.no_ortho,
+                      facade_detail=not args.no_facades)
     world = prepare_world(src, cfg)
+    if world.facades:
+        from .voxelise.facade_runs import facade_stats
+
+        fs = facade_stats(world.facades)
+        log.info("facade runs: %d/%d detailed, %.0f%% of %d studs of exterior wall (fallback studs: %s)",
+                 fs.detailed, fs.runs, 100 * fs.share, fs.length, fs.by_reason)
     out: dict[tuple[int, int], Any] = {}
     for n, (cx, cy, tile) in enumerate(iter_chunk_tiles(world, cells), 1):
         recs = own_chunk(call_layout(layout_tile, tile), cx, cy)
@@ -143,6 +152,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--maas-level", type=float, default=44.1, help="Maas water level, m NAP")
     b.add_argument("--no-ortho", action="store_true", help="ignore the aerial photo for ground colours")
     b.add_argument("--no-preview", action="store_true")
+    b.add_argument("--no-facades", action="store_true", help="plain glass-cell windows, no facade grammar")
     b.set_defaults(func=cmd_build)
     return p
 
