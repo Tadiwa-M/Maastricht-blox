@@ -1,5 +1,18 @@
 # Maastricht Blox: working rules
 
+## Workflow (the owner's process; follow it for every piece of work)
+1. **Outline** what we're doing, **identify tools**, **make a plan** in phases (ideally 3).
+   The living plan is `PLAN.md`; keep its phase status current.
+2. **Document everything** as we build: `docs/guide/*` for how things work, `docs/DEVLOG.md`
+   for dated decisions. Update `README.md` and this file often (new commands, rules, status).
+3. **Systematize and automate**: if a step is repeated, script it (`scripts/`), and wire
+   checks into CI (`.github/workflows/ci.yml`).
+4. **Ensure quality**: `scripts/check.sh` must pass before every push; for look changes run
+   `scripts/shots.sh`, review the screenshots and show them to the owner.
+5. Communication: concise, high-signal, direct pushback over validation.
+
+## Rules
+
 - `CONTRACT.md` + `contract/*.json` are the interface between components. Read them first.
   Never change them silently: if a change is required, bump `contractVersion` and update every component.
 - Layout: `pipeline/` (Python data → chunks), `proxy/` (Python live-data server),
