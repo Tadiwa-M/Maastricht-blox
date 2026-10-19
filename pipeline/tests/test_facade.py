@@ -49,10 +49,10 @@ def test_house_variants_lay_out_exactly(roof: RoofKind, ground: GroundFloor, bal
     # window pieces on every storey: 3 bays x 2 upper storeys (minus a balcony door),
     # 2 west bays x 2 storeys, plus the ground floor
     assert names["window_1x2x3"] >= 8
-    assert names["door_1x2x4"] == 1 + int(balcony)
+    assert names["door_1x2x4"] == int(ground is not GroundFloor.PLAIN) + int(balcony)
     assert names["fence_1x4"] >= int(balcony) + 2 * int(roof is RoofKind.FLAT_CORNICE)
     assert names["slope30_1x2"] >= 2 and names["round_tile_1x1"] >= 2
-    if ground is not GroundFloor.HOUSE:
+    if ground in (GroundFloor.SHOP, GroundFloor.ARCHED):
         assert names["arch_1x4"] >= 1
     if ground is GroundFloor.SHOP:
         assert names["grille_1x2"] >= 2

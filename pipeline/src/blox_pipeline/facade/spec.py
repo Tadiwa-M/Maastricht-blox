@@ -1,6 +1,8 @@
-"""Declarative description of one house front.
+"""Declarative description of one test-scene house.
 
-A house is an axis-aligned box whose street front faces -j. Seen from the street, the
+A house is an axis-aligned box whose street front faces -j; its front is painted as a
+facade run (``front_run`` -> ``run.paint_run``), the rest (shell, side windows, roof) here
+and in ``walls`` / ``roofs``. Seen from the street, the
 cells along j are (front to back): ``y0`` = trim layer (pilasters, sills, cornices that
 stick out), ``wall_j`` = the wall plane (where window/door pieces sit), ``glass_j`` = the
 first interior row (dark "room" backdrops behind the glass), then air up to the back wall.
@@ -10,6 +12,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .run import FacadeRun
+
+
+# Vertical rhythm in plates (0.2 m), shared by houses and facade runs.
+PLINTH, GROUND_H, STOREY_H = 3, 18, 15
 
 
 class RoofKind(Enum):
@@ -22,6 +32,7 @@ class GroundFloor(Enum):
     HOUSE = "house"    # plinth, front door, windows
     SHOP = "shop"      # shop windows, arched shop door, sign band with lettering, awning
     ARCHED = "arched"  # door and windows each under a round arch with a fanlight
+    PLAIN = "plain"    # windows only (side and back walls of real buildings)
 
 
 @dataclass(frozen=True)
@@ -46,10 +57,9 @@ class HouseSpec:
     corner_west: bool = False   # end of a row: the west side wall gets windows too
     balcony: bool = False       # first-floor balcony with a fence in front of the middle bay
 
-    # Vertical rhythm in plates (0.2 m).
-    PLINTH = 3
-    GROUND_H = 18
-    STOREY_H = 15
+    PLINTH = PLINTH
+    GROUND_H = GROUND_H
+    STOREY_H = STOREY_H
 
     def floor_k(self, g: int, storey: int) -> int:
         """Global k of the floor line of ``storey`` (0 = ground floor)."""
@@ -57,6 +67,17 @@ class HouseSpec:
 
     def eave_k(self, g: int) -> int:
         return self.floor_k(g, self.storeys + 1)
+
+    def front_run(self) -> "FacadeRun":
+        """The street front as a facade run (the grid is its frame: pieces face S)."""
+        from .run import FacadeRun
+
+        return FacadeRun(
+            x0=self.x0, x1=self.x1, y0=self.y0, storeys=self.storeys, fid=self.fid, wall=self.wall,
+            trim=self.trim, accent=self.accent, plinth=self.plinth, ground=self.ground,
+            awning=self.awning, quoins=self.quoins, shutters=self.shutters, flowers=self.flowers,
+            balcony=self.balcony,
+        )
 
     @property
     def x1(self) -> int:

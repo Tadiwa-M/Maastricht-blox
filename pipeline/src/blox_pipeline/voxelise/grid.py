@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 from numpy.typing import NDArray
@@ -27,7 +27,11 @@ SLOPE_STACK = 3
 
 @dataclass
 class VoxelTile:
-    """Dense ``[i, j, k]`` arrays; index ``[0, 0, 0]`` is global cell ``(I0, J0, k0)``."""
+    """Dense ``[i, j, k]`` arrays; index ``[0, 0, 0]`` is global cell ``(I0, J0, k0)``.
+
+    ``placed``: explicitly placed pieces (global brick records, CONTRACT 7) inside the tile
+    minus its rim; their cells are air in the arrays. ``None`` means none.
+    """
 
     I0: int
     J0: int
@@ -35,6 +39,7 @@ class VoxelTile:
     color: NDArray[np.uint8]
     feature: NDArray[np.uint32]
     shape: NDArray[np.uint8]
+    placed: NDArray | None = field(default=None)
 
     @classmethod
     def empty(cls, I0: int, J0: int, k0: int, ni: int, nj: int, nk: int) -> "VoxelTile":

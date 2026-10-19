@@ -15,6 +15,7 @@ from . import colours, palette
 from .features import FeatureRegistry
 from .landmarks import LANDMARKS, Landmark
 from .raster import stable_hash
+from .streets import is_shop
 from .world import Accent, PreparedBuilding, RoofPlane
 
 
@@ -50,6 +51,13 @@ class _OsmIndex:
         self.addr_tree = STRtree([f.geom.representative_point() for f in self.addr])
         self.osm_buildings = osm.buildings
         self.bld_tree = STRtree([f.geom for f in self.osm_buildings])
+        self.shops = [p.geom.representative_point() for p in osm.pois if is_shop(p.tags)]
+        self.shop_tree = STRtree(self.shops)
+
+    def has_shop(self, fp: BaseGeometry) -> bool:
+        """A shop/café POI inside the footprint (1 m slack: entrance nodes sit on the wall)."""
+        area = fp.buffer(1.0)
+        return any(area.contains(self.shops[i]) for i in self.shop_tree.query(area))
 
     def overlapping_named(self, fp: BaseGeometry, min_frac: float = 0.3) -> list[OsmFeature]:
         out = []
@@ -117,7 +125,9 @@ def prepare_buildings(buildings: list[Building], osm: OsmData, registry: Feature
             address=idx.address(fp), year=b.year, height_m=height,
             tags=_wikidata(osm_b),
         )
-        out.append(_prepared(b, fp, planes, fid, lm, _is_church(osm_b)))
+        pb = _prepared(b, fp, planes, fid, lm, _is_church(osm_b))
+        pb.shop = idx.has_shop(fp)
+        out.append(pb)
     return out
 
 
@@ -143,6 +153,7 @@ def _prepared(b: Building, fp: BaseGeometry, planes: list[RoofPlane], fid: int,
         wall=palette.idx(wall), roof_pitched=palette.idx(roof_p), roof_flat=palette.idx(roof_f),
         window_period=0 if no_windows else colours.window_period(b.bag_id),
         window_offset=stable_hash(b.bag_id) % 3, accent=accent,
+        year=year, facade=lm is None and not church,
     )
 
 
