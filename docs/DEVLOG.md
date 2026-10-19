@@ -335,3 +335,36 @@ snapping of the main walls, half-stud growth, owning chunk = brick-extent centre
 props (sills, awnings, street props up to 3 cells out) can overlap world features outside the
 paved footprint; the shared party wall itself is still drawn twice (neighbour's straight wall
 and the island's turned wall cross), which is inherent to mixing grids.
+
+## 2026-10-19: viewer performance for real neighbourhoods (per-chunk LOD, quality tiers)
+
+The owner's laptop showed ~0 fps on 7x7 real chunks. Measured with the new `viewer/tools/perf.mjs`
+(renderer.info, all passes per frame) on `samples/markt`: **224 draws, 341.3 M triangles, 71,817
+studs** per frame. The viewer was built for one 4k-brick chunk (300-triangle bevelled bricks,
+360-triangle studs, scene drawn three times: shadow map twice + main).
+
+- **Shadow map once per frame** (was redrawn by the AO pass's normal render): same image, -25 %
+  triangles everywhere. Look-test chunk: 498 / 6.53 M -> 380 / 4.89 M, pixel-identical within
+  the AO noise between runs.
+- **Per-chunk LOD** (`viewer/src/lod.js`, `farmesh.js`): near chunks keep the full look (lazy,
+  one chunk per frame, LRU); the rest is a merged flat-box mesh (slope prisms, glass quads that
+  still glow at night) with hidden faces removed via the occupancy grid, merged per 2x2 chunk
+  cluster and material, chunks drawn as geometry groups. Studs only near, capped.
+- **Exterior air from above** (`exterior.js`): flood from the sky down, never into "bottomless"
+  air under the terrain shell. Culls 72 % of far faces on real data (was 44 %); grid 7 s -> 0.3 s.
+- **Quality tiers** (`quality.js`, HUD selector, `#quality=`): auto = high without LOD for one
+  chunk (look test unchanged), medium for bigger worlds (lite bevels near, half-res AO, pixel
+  ratio 1, bloom only at night, 2048 shadows), stepping down to low on slow frames. The fps
+  readout was measured correctly but rounded to whole fps; now one decimal + frame ms.
+- Big-world hero is a 3/4 view over the centre; presets ignore features outside the embedded
+  chunks (the Markt facade view pointed outside the sample). `#zoom=` scales a preset.
+- Result on `samples/markt`: overview **90 draws / 2.67 M triangles** (medium), street level
+  with 3 near chunks 380 / 5.89 M (low: 200 / 2.91 M). Load to first frame ~21 s -> ~4.5 s
+  (headless). Viewer tests 24 -> 37.
+
+**Open decisions**
+- Not yet measured on the laptop iGPU; the medium street-level view is the heavy case.
+- Far chunks have no studs; a procedural stud pattern on far tops (shader, no geometry) would
+  soften the near/far change if the owner finds it visible.
+- Tilt-shift stays full resolution (cheap at pixel ratio 1; half-res needs extra passes).
+- Near-chunk build is a ~40-90 ms hitch when a chunk comes close; could be split over frames.

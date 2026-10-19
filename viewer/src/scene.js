@@ -39,6 +39,9 @@ export class Stage {
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     r.localClippingEnabled = true; // moving models are cut at the diorama edge
+    // the shadow map is rendered once per frame (render() below): with autoUpdate every
+    // renderer.render call redraws it, and the AO pass's normal render is one of those
+    r.shadowMap.autoUpdate = false;
     this.renderer = r;
 
     this.scene = new THREE.Scene();
@@ -54,7 +57,6 @@ export class Stage {
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.025;
     this.sun.shadow.radius = 2;
-    this.sun.shadow.camera.layers.enable(1); // shadow-only proxies of near LOD chunks (src/lod.js)
     this.scene.add(this.hemi, this.sun, this.sun.target);
     this.overlay = new THREE.Scene(); // drawn after post-processing (labels)
     this.width = width; this.height = height;
@@ -149,6 +151,7 @@ export class Stage {
   render(target) {
     this.sky.follow(this.camera);
     if (target) this.post.updateTiltShift(target);
+    this.renderer.shadowMap.needsUpdate = true; // consumed by the first scene render (RenderPass)
     this.post.render();
     if (this.overlay.children.length) {
       this.renderer.autoClear = false;

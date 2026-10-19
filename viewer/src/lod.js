@@ -12,12 +12,8 @@
 //         draws instead of 49 x 6.
 // update(camera) picks near chunks by distance from the camera to the chunk's box, with
 // hysteresis so a chunk on the edge does not flip every frame, caps how many are near and
-// how many studs are drawn.
-//
-// Shadows: with LOD on, only the far geometry casts shadows, for every chunk (a second mesh
-// per cluster and material on SHADOW_LAYER, which only the sun's shadow camera sees). The
-// shadow pass then costs ~20k triangles per chunk instead of ~1.4M for the bevelled look.
-// Without LOD (one chunk at high quality) the full look casts its own shadows, as before.
+// how many studs are drawn. Each look casts its own shadows (near studs do not, with LOD). (Shadow-only proxies on a
+// separate layer do not work: three.js tests shadow casters against the MAIN camera's layers.)
 import * as THREE from 'three';
 import { buildWorldMeshes, brickColor } from './bricks.js';
 import { buildFarGeometry } from './farmesh.js';
@@ -25,7 +21,6 @@ import { NO_VARIATION } from './world.js';
 
 const HYSTERESIS = 1.3; // leave the near set only beyond nearDist * this
 const CLUSTER = 2;      // far meshes merge CLUSTER x CLUSTER chunks
-export const SHADOW_LAYER = 1;
 const BLACK = new THREE.Color(0, 0, 0);
 
 class Chunk {
@@ -69,7 +64,7 @@ export class ChunkLOD {
 
   /**
    * { lod, nearDist (m), maxNear (chunks), studCap (studs), nearDetail 'full' | 'lite' }
-   * (src/quality.js). lod false: every chunk near in the full look, casting its own shadows.
+   * (src/quality.js). lod false: every chunk near in the full look (no far meshes at all).
    */
   setTier({ lod = true, nearDist = Infinity, maxNear = Infinity, studCap = Infinity, nearDetail = 'full' }) {
     const lite = lod && nearDetail === 'lite';
@@ -81,9 +76,11 @@ export class ChunkLOD {
   }
 
   buildNear(c) {
-    const built = buildWorldMeshes(this.world, this.mats, { list: c.list, ctx: this.ctx, lite: this.lite, castShadow: !this.lod });
+    const built = buildWorldMeshes(this.world, this.mats, { list: c.list, ctx: this.ctx, lite: this.lite });
     c.near = built;
     c.studMeshes = built.meshes.filter((m) => m.name.startsWith('stud|'));
+    // with LOD the shadow map spans the whole town (~11 cm texels): stud shadows would not resolve
+    if (this.lod) for (const m of c.studMeshes) m.castShadow = false;
     c.studs = built.studs;
     c.nearTris = 0; c.studTris = 0;
     for (const m of built.meshes) {
@@ -139,14 +136,9 @@ export class ChunkLOD {
         const material = mats.farFor(key);
         const main = new THREE.Mesh(geometry, [material]); // drawn by groups: the far chunks only
         main.receiveShadow = true;
-        main.castShadow = false;
+        main.castShadow = !material.transparent;
         main.name = `far|${key}`;
-        const shadow = new THREE.Mesh(geometry, material); // whole cluster, shadow camera only
-        shadow.castShadow = !material.transparent;
-        shadow.layers.set(SHADOW_LAYER);
-        shadow.visible = shadow.castShadow;
-        shadow.name = `far-shadow|${key}`;
-        this.clusterGroup.add(main, shadow);
+        this.clusterGroup.add(main);
         cl.parts.push({ main, ranges: r.ranges.get(key) });
       }
       this.clusters.push(cl);

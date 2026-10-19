@@ -1,7 +1,8 @@
 // Entry point: pick the world (embedded data or the piece gallery), build the brick
 // meshes, stage, camera presets, locomotion demo, picking and the render loop.
 //
-// URL hash: #view=hero|map|facade|gallery&t=16.5&tilt=0&ao=0&anim=0&ids=38-47&quality=auto
+// URL hash: #view=hero|map|facade|gallery&t=16.5&tilt=0&ao=0&anim=0&ids=38-47&quality=auto&zoom=0.5
+// (zoom scales the preset's camera distance: < 1 moves in)
 import * as THREE from 'three';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { loadWorld } from './world.js';
@@ -27,6 +28,7 @@ function parseHash() {
     anim: p.get('anim') !== '0',
     ids: p.get('ids'),
     quality: MODES.includes(p.get('quality')) ? p.get('quality') : 'auto',
+    zoom: p.has('zoom') ? Math.max(0.05, +p.get('zoom') || 1) : 1,
   };
 }
 
@@ -110,10 +112,10 @@ async function main() {
   const presets = makePresets(world, box, W() / H());
   let animate = opts.anim;
 
-  function applyView(name) {
+  function applyView(name, zoom = 1) {
     const p = presets[name] || presets.hero;
     stage.camera.fov = p.fov;
-    stage.camera.position.copy(p.cam);
+    stage.camera.position.copy(p.cam).sub(p.target).multiplyScalar(zoom).add(p.target);
     controls.target.copy(p.target);
     stage.camera.lookAt(p.target);
     stage.camera.updateProjectionMatrix();
@@ -130,14 +132,14 @@ async function main() {
     onQuality: setMode,
   });
   ui.tier(mode, tierName);
-  applyView(opts.view);
+  applyView(opts.view, opts.zoom);
   applyTime(opts.time);
   stage.post.setTiltShift(opts.tilt);
   stage.post.setAO(opts.ao);
   window.addEventListener('hashchange', () => {
     const o = parseHash();
     if ((o.view === 'gallery') !== isGallery || o.ids !== opts.ids) { location.reload(); return; }
-    applyView(o.view); applyTime(o.time); ui.set(o);
+    applyView(o.view, o.zoom); applyTime(o.time); ui.set(o);
     stage.post.setTiltShift(o.tilt); stage.post.setAO(o.ao); animate = o.anim;
     if (o.quality !== mode) setMode(o.quality);
   });
@@ -153,6 +155,8 @@ async function main() {
   const meter = new FpsMeter(1000);
   let frames = 0, t = 0, lastStats = 0;
   if (still) lod.settle(stage.camera); else lod.update(stage.camera, { all: true });
+  // a hidden tab gets no frames: do not count the gap as one very slow frame
+  document.addEventListener('visibilitychange', () => { meter.last = null; governor.reset(); });
   function frame(now) {
     const dt = Math.min(clock.getDelta(), 0.1);
     const ms = meter.tick(now);

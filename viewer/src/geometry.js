@@ -5,7 +5,7 @@
 // inset; slopes are extruded side profiles with the thin 0.05 m front lip (CONTRACT v2);
 // detail pieces come from src/details.js. Glass and water bricks use a seamless box so a
 // stack of them reads as one pane / one water surface.
-import { INSET, brickBox, seamlessBox, latheRound, extrudeProfile } from './shapes.js';
+import { INSET, brickBox, seamlessBox, latheRound, extrudeProfile, withBevelSegments } from './shapes.js';
 import { detailGeometry } from './details.js';
 
 export { INSET };
@@ -36,12 +36,12 @@ export function ridgeProfile(t, S, P) {
 
 /**
  * { body, glass? } for catalogue type t. seamless: plain box for glass/water bricks.
- * lite: one bevel segment instead of two for plain bricks (medium/low quality near LOD).
+ * lite: one bevel segment instead of two on every rounded box (medium/low quality near LOD).
  */
 export function bodyParts(t, S, P, seamless = false, lite = false) {
   const plainKind = ['brick', 'plate', 'tile'].includes(t.kind);
   const key = `${t.id}:${seamless && plainKind ? 'seamless' : 'normal'}${lite ? ':lite' : ''}`;
-  return cached(key, () => {
+  return cached(key, () => withBevelSegments(lite ? 1 : 2, () => {
     const W = t.w * S, D = t.d * S, H = t.h * P;
     if (seamless && plainKind) return { body: seamlessBox(W, H, D) };
     const detail = detailGeometry(t, S, P);
@@ -50,9 +50,9 @@ export function bodyParts(t, S, P, seamless = false, lite = false) {
       case 'slope': return { body: extrudeProfile(slopeProfile(t, S, P), W, D) };
       case 'slope_double': return { body: extrudeProfile(ridgeProfile(t, S, P), W, D) };
       case 'round': return { body: latheRound(Math.min(W, D) / 2 - 0.012, H - INSET, 0.02, 24, true) };
-      default: return { body: brickBox(W, H, D, undefined, lite ? 1 : 2) };
+      default: return { body: brickBox(W, H, D) };
     }
-  });
+  }));
 }
 
 export function studGeometry(lite = false) {

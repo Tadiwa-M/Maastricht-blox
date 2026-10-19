@@ -12,7 +12,7 @@
 // oscillates on machines right at the edge); pick 'high' in the HUD to force it.
 export const TIERS = Object.freeze({
   high: { name: 'high', nearDetail: 'full', pixelRatio: 2, ao: 'full', bloom: 'always', shadowMap: 4096, nearDist: 70, maxNear: 9, studCap: 80000 },
-  medium: { name: 'medium', nearDetail: 'lite', pixelRatio: 1, ao: 'half', bloom: 'night', shadowMap: 2048, nearDist: 45, maxNear: 4, studCap: 25000 },
+  medium: { name: 'medium', nearDetail: 'lite', pixelRatio: 1, ao: 'half', bloom: 'night', shadowMap: 2048, nearDist: 40, maxNear: 3, studCap: 20000 },
   low: { name: 'low', nearDetail: 'lite', pixelRatio: 1, ao: 'off', bloom: 'night', shadowMap: 2048, nearDist: 22, maxNear: 2, studCap: 8000 },
 });
 export const MODES = ['auto', 'high', 'medium', 'low'];

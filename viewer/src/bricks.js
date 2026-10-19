@@ -153,7 +153,7 @@ export function worldContext(world, mats) {
  * Build bricks (all, or the brick numbers in `list`) and their visible studs.
  * Returns { group, meshes, bricks, studs }; stud meshes are named 'stud|...'.
  */
-export function buildWorldMeshes(world, mats, { list = null, ctx = worldContext(world, mats), lite = false, castShadow = true } = {}) {
+export function buildWorldMeshes(world, mats, { list = null, ctx = worldContext(world, mats), lite = false } = {}) {
   const batch = new BrickBatcher(mats, world.studM, world.plateM, lite);
   batch.glassEntry = ctx.glassEntry;
   const col = new THREE.Color();
@@ -170,7 +170,5 @@ export function buildWorldMeshes(world, mats, { list = null, ctx = worldContext(
     brickColor(entry, I, J, K, exact, col);
     for (const [x, y, z] of exposedStuds(t, flags & ROT_MASK, I, J, K, ctx.covered)) batch.addStud(x, y, z, entry, col);
   }
-  const built = batch.build();
-  if (!castShadow) for (const m of built.meshes) m.castShadow = false;
-  return built;
+  return batch.build();
 }
