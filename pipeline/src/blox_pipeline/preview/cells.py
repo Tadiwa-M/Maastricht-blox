@@ -1,4 +1,8 @@
-"""Expand brick records into their footprint cells (shared by the preview renderers)."""
+"""Expand brick records into their footprint cells (shared by the preview renderers).
+
+Which cells carry a stud comes from ``BrickType.stud_offsets`` (which uses the shared
+rotation helpers), tabulated once per ``(type, rot)`` so the expansion stays vectorised.
+"""
 
 from __future__ import annotations
 
@@ -22,14 +26,24 @@ class FootprintCells:
     slope: NDArray[np.bool_]  # owning brick is a slope / double slope
 
 
+MAX_SIDE = 8  # longest catalogue footprint side
+
+
+def stud_table(cat: Catalogue) -> NDArray[np.bool_]:
+    """``[typeId, rot, di, dj]`` -> that footprint offset carries a stud."""
+    tab = np.zeros((256, 4, MAX_SIDE, MAX_SIDE), bool)
+    for t in cat.types:
+        for rot in range(4):
+            for di, dj in t.stud_offsets(rot):
+                tab[t.id, rot, di, dj] = True
+    return tab
+
+
 def footprint_cells(rec: Records, cat: Catalogue) -> FootprintCells:
     ei, ej, eh = cat.extent_tables()
-    stud_all = np.zeros(256, bool)
-    back_rows = np.zeros(256, np.int64)
+    studs = stud_table(cat)
     sloped = np.zeros(256, bool)
     for t in cat.types:
-        stud_all[t.id] = t.studs == "all"
-        back_rows[t.id] = t.stud_rows if t.studs == "backRows" else 0
         sloped[t.id] = t.is_slope
     t = rec["type"].astype(np.int64)
     rot = rec["rot"].astype(np.int64) & 3
@@ -39,18 +53,13 @@ def footprint_cells(rec: Records, cat: Catalogue) -> FootprintCells:
     starts = np.cumsum(sizes) - sizes
     q = np.arange(int(sizes.sum())) - starts[rid]
     di, dj = q % a[rid], q // a[rid]
-    tr, rr, br = t[rid], rot[rid], back_rows[t[rid]]
-    # back (studded) rows of slopes: the side opposite the low edge (+j, +i, -j, -i)
-    back = np.select(
-        [rr == 0, rr == 1, rr == 2, rr == 3],
-        [dj < br, di < br, dj >= b[rid] - br, di >= a[rid] - br],
-    )
+    tr, rr = t[rid], rot[rid]
     return FootprintCells(
         I=rec["I"].astype(np.int64)[rid] + di,
         J=rec["J"].astype(np.int64)[rid] + dj,
         top=rec["K"].astype(np.int64)[rid] + eh[tr],
         K=rec["K"].astype(np.int64)[rid],
         color=rec["color"][rid],
-        stud=stud_all[tr] | ((br > 0) & back),
+        stud=studs[tr, rr, di, dj],
         slope=sloped[tr],
     )

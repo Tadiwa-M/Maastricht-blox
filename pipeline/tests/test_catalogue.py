@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from blox_pipeline.catalogue import footprint, load_catalogue, repo_root
+from blox_pipeline.catalogue import KINDS, load_catalogue, repo_root
+from blox_pipeline.rotation import rotated_extent
 from blox_pipeline.palette import load_palette
 
 
@@ -11,18 +12,31 @@ def test_catalogue_loads_and_looks_up():
     assert cat[9].name == "brick_2x4"
     assert cat.id("tile_1x1") == 24
     assert "slope45_2x2" in cat and 0 not in cat
-    assert {t.kind for t in cat.types} == {"brick", "plate", "tile", "slope", "slope_double", "round"}
+    assert {t.kind for t in cat.types} == set(KINDS)
     assert cat["slope33_2x3"].stud_rows == 1
+    assert cat["window_1x2x2"].is_detail and not cat["brick_1x1"].is_detail
+
+
+def test_stud_offsets():
+    cat = load_catalogue()
+    assert sorted(cat["brick_2x2"].stud_offsets(0)) == [(0, 0), (0, 1), (1, 0), (1, 1)]
+    assert cat["tile_1x2"].stud_offsets(0) == [] and cat["slope30_1x2"].stud_offsets(1) == []
+    # slope45_1x2: low edge is the front (+j at rot 0), the stud row is the back (-j side)
+    assert cat["slope45_1x2"].stud_offsets(0) == [(0, 0)]
+    assert cat["slope45_1x2"].stud_offsets(2) == [(0, 1)]   # front faces -j: back is +j
+    assert cat["slope45_1x2"].stud_offsets(1) == [(0, 0)]   # front +i: back at low i
+    assert cat["slope45_1x2"].stud_offsets(3) == [(1, 0)]
+    assert sorted(cat["jumper_1x2"].stud_offsets(1)) == [(0, 0), (0, 1)]
 
 
 def test_footprint_rotation_rule():
     # rot 0/2: w along i, d along j; rot 1/3: swapped (CONTRACT section 2)
-    assert footprint(2, 4, 0) == (2, 4)
-    assert footprint(2, 4, 1) == (4, 2)
-    assert footprint(2, 4, 2) == (2, 4)
-    assert footprint(2, 4, 3) == (4, 2)
+    assert rotated_extent(2, 4, 0) == (2, 4)
+    assert rotated_extent(2, 4, 1) == (4, 2)
+    assert rotated_extent(2, 4, 2) == (2, 4)
+    assert rotated_extent(2, 4, 3) == (4, 2)
     with pytest.raises(ValueError):
-        footprint(1, 1, 4)
+        rotated_extent(1, 1, 4)
     cat = load_catalogue()
     assert cat["slope45_4x2"].extent(1) == (2, 4)
 

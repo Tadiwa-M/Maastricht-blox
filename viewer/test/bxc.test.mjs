@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { deflateRawSync } from 'node:zlib';
 import { parseBxc } from '../src/bxc.js';
-import { footprintCell, extent } from '../src/world.js';
+import { footprintCell, rotatedExtent } from '../src/rotation.js';
 
 function makeChunk(records, compress) {
   const body = Buffer.alloc(records.length * 12);
@@ -53,11 +53,10 @@ test('parses the generated test scene when present', async (t) => {
 });
 
 test('rotation is clockwise from above and anchored at the min corner', () => {
-  const t = { w: 2, d: 3 };
-  assert.deepEqual(extent(t, 1), [3, 2]);
+  assert.deepEqual(rotatedExtent(2, 3, 1), [3, 2]);
   // rot 1: +j (b) maps to +i; the a=0 column ends up at the high-j side
-  assert.deepEqual(footprintCell(t, 1, 0, 0), [0, 1]);
-  assert.deepEqual(footprintCell(t, 1, 0, 2), [2, 1]);
-  assert.deepEqual(footprintCell(t, 2, 0, 0), [1, 2]);
-  assert.deepEqual(footprintCell(t, 3, 0, 0), [2, 0]);
+  assert.deepEqual(footprintCell(2, 3, 1, 0, 0), [0, 1]);
+  assert.deepEqual(footprintCell(2, 3, 1, 0, 2), [2, 1]);
+  assert.deepEqual(footprintCell(2, 3, 2, 0, 0), [1, 2]);
+  assert.deepEqual(footprintCell(2, 3, 3, 0, 0), [2, 0]);
 });

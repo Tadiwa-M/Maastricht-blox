@@ -23,9 +23,13 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ..catalogue import Catalogue
+from ..rotation import front_dir
 
-FWD = {1: (0, 1), 2: (1, 0), 3: (0, -1), 4: (-1, 0)}
-ROT_OF_SLOPE = {1: 0, 2: 1, 3: 2, 4: 3}
+# Voxel slope shapes 1..4 are "low edge faces +j, +i, -j, -i", which is exactly the
+# facing order N, E, S, W, so the brick's rot is ``shape - 1`` (a slope's front is its
+# low edge, CONTRACT section 2) and FWD is the step towards that front.
+ROT_OF_SLOPE = {s: s - 1 for s in (1, 2, 3, 4)}
+FWD = {s: front_dir(r) for s, r in ROT_OF_SLOPE.items()}
 STACK = 3
 WIDTHS = {2: (4, 2, 1), 3: (2, 1)}
 SLOPE_NAMES = {
@@ -199,16 +203,12 @@ def _slopes(g: _Grid, cat: Catalogue, res: SlopeResult) -> None:
         chunk_of = g.cxi if s in (1, 3) else g.cyj
         for start, w in _split_runs(along, chunk_of, WIDTHS[d]):
             tid = cat.id(SLOPE_NAMES[(d, w)])
-            rot = ROT_OF_SLOPE[s]
-            if s == 1:
-                i0, j0 = start, front - d + 1
-            elif s == 3:
-                i0, j0 = start, front
-            elif s == 2:
-                i0, j0 = front - d + 1, start
-            else:
-                i0, j0 = front, start
-            res.bricks.append((i0, j0, kb, tid, rot, c, f))
+            # ``front`` is the row of the low edge; the record wants the min corner, which
+            # is ``d - 1`` rows behind the front when the front faces a + direction.
+            step = sum(FWD[s])
+            low = front - d + 1 if step > 0 else front
+            i0, j0 = (start, low) if s in (1, 3) else (low, start)
+            res.bricks.append((i0, j0, kb, tid, ROT_OF_SLOPE[s], c, f))
 
 
 def layout_slopes(

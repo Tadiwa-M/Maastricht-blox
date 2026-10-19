@@ -72,7 +72,7 @@ def test_writer_rejects_invalid(bad):
     elif bad == "k":
         r["K"][0] = 65534
     elif bad == "flags":
-        r["flags"][0] = 0x08
+        r["flags"][0] = 0x10  # bit4+ reserved (bit3 = hide_studs is valid since v2)
     else:
         r = r[:0]
     with pytest.raises(ValueError):
@@ -97,7 +97,7 @@ def test_write_world(tmp_path):
     (tmp_path / "chunks" / "c_00_00.bxc").write_bytes(b"stale")
     mpath = write_world(tmp_path, [a, b[:1], b[1:]], features, sources, generated="2026-10-17T12:00:00Z")
     m = json.loads(mpath.read_text())
-    assert m["contractVersion"] == 1 and m["originRD"] == [175700, 316500] and m["chunkStuds"] == 64
+    assert m["contractVersion"] == 2 and m["originRD"] == [175700, 316500] and m["chunkStuds"] == 64
     assert m["generated"] == "2026-10-17T12:00:00Z" and m["sources"] == sources
     assert [(c["cx"], c["cy"], c["bricks"]) for c in m["chunks"]] == [(3, 5, 3), (4, 5, 3)]
     for c in m["chunks"]:
