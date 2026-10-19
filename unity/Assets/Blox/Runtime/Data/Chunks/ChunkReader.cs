@@ -133,7 +133,7 @@ namespace Blox.Data
                 {
                     var t = catalogue[r.type];
                     if (t.Defined == 0) throw new ChunkFormatException($"record {n}: unknown typeId {r.type}");
-                    Footprint.Extent(t, r.Rot, out int ei, out int ej);
+                    Rotation.RotatedExtent(t, r.Rot, out int ei, out int ej);
                     if (r.i + ei > ChunkStuds || r.j + ej > ChunkStuds) throw new ChunkFormatException($"record {n}: brick crosses the chunk border");
                     minK = Math.Min(minK, r.k);
                     maxK = Math.Max(maxK, Math.Min(r.k + t.H, ushort.MaxValue));

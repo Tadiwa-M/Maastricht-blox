@@ -16,7 +16,9 @@ namespace Blox.Editor
     /// Menu <b>Blox/Create Look Test Scene</b>: a new scene with the sun (time of day), the
     /// sky, a global post-processing volume, the map camera rig (with shadow-range control)
     /// and a WorldLoader + StudRenderer pointed at <c>build/testscene</c>, framed on the
-    /// world found there. Saved to Assets/Blox/Generated/Scenes/LookTest.unity.
+    /// world found there, plus a bus looping along the road and a walking figure
+    /// (<see cref="LookTestActors"/>; press C in Play mode to walk it with WASD).
+    /// Saved to Assets/Blox/Generated/Scenes/LookTest.unity.
     /// </summary>
     internal static class LookTestSceneMenu
     {
@@ -34,7 +36,8 @@ namespace Blox.Editor
             ConfigureEnvironment(sun, assets.Sky);
             var volume = CreateVolume(assets.PostProcess);
             var camera = CreateCamera(volume, frame);
-            CreateWorld(assets, camera);
+            var loader = CreateWorld(assets, camera);
+            LookTestActors.Spawn(WorldLoader.ResolveDirectory(WorldDirectory), assets, camera, loader);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, BloxEditorPaths.LookTestScene);
@@ -122,7 +125,7 @@ namespace Blox.Editor
             return cam;
         }
 
-        private static void CreateWorld(BloxAssets assets, Camera cam)
+        private static WorldLoader CreateWorld(BloxAssets assets, Camera cam)
         {
             var go = new GameObject("World");
             var studs = go.AddComponent<StudRenderer>();
@@ -141,6 +144,7 @@ namespace Blox.Editor
                 s.Ref("studRenderer", studs);
                 s.Ref("viewCamera", cam);
             }
+            return loader;
         }
 
         private static void AddToBuildSettings(string path)

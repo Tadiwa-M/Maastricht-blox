@@ -39,7 +39,9 @@ def stud_table(cat: Catalogue) -> NDArray[np.bool_]:
     return tab
 
 
-def footprint_cells(rec: Records, cat: Catalogue) -> FootprintCells:
+def footprint_cells(rec: Records, cat: Catalogue, pane_colour: int | None = None) -> FootprintCells:
+    """``pane_colour``: if given, window pieces are drawn in it (their panes are glass;
+    the record colour is only the thin frame, too small for a voxel preview)."""
     ei, ej, eh = cat.extent_tables()
     studs = stud_table(cat)
     sloped = np.zeros(256, bool)
@@ -59,7 +61,15 @@ def footprint_cells(rec: Records, cat: Catalogue) -> FootprintCells:
         J=rec["J"].astype(np.int64)[rid] + dj,
         top=rec["K"].astype(np.int64)[rid] + eh[tr],
         K=rec["K"].astype(np.int64)[rid],
-        color=rec["color"][rid],
+        color=_colours(rec, cat, pane_colour)[rid],
         stud=studs[tr, rr, di, dj],
         slope=sloped[tr],
     )
+
+
+def _colours(rec: Records, cat: Catalogue, pane_colour: int | None) -> NDArray[np.uint8]:
+    col = rec["color"].copy()
+    if pane_colour is not None:
+        panes = np.isin(rec["type"], [t.id for t in cat.of_kind("window")])
+        col[panes] = pane_colour
+    return col

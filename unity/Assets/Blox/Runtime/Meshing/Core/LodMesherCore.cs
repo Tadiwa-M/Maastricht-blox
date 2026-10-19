@@ -58,7 +58,7 @@ namespace Blox.Meshing.Core
                 var br = own[n];
                 var t = types[br.Type];
                 if (t.Defined == 0) continue;
-                Footprint.Extent(t, br.Rot, out int ei, out int ej);
+                Rotation.RotatedExtent(t, br.Rot, out int ei, out int ej);
                 for (int cj = 0; cj < ej; cj++)
                     for (int ci = 0; ci < ei; ci++)
                     {

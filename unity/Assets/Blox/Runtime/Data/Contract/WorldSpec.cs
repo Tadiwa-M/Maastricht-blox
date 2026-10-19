@@ -29,12 +29,15 @@ namespace Blox.Data
 
     /// <summary>
     /// World constants and coordinate conversions (CONTRACT section 1). <see cref="Contract"/>
-    /// holds the v1 values; <see cref="FromManifest"/> reads them from a manifest and checks
+    /// holds the contract values; <see cref="FromManifest"/> reads them from a manifest and checks
     /// that the grid-defining values agree with the contract.
     /// </summary>
     public sealed class WorldSpec
     {
-        public const int ContractVersion = 1;
+        /// <summary>Contract version this code implements (CONTRACT.md title).</summary>
+        public const int ContractVersion = 2;
+        /// <summary>Oldest manifest contractVersion still readable: v2 only added things (detail pieces, hide_studs, models).</summary>
+        public const int MinContractVersion = 1;
 
         public double OriginRdX { get; }
         public double OriginRdY { get; }

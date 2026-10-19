@@ -37,6 +37,14 @@ namespace Blox.Editor
         public void Vec3(string path, UnityEngine.Vector3 v) { var p = Find(path); if (p != null) p.vector3Value = v; }
         public void Vec2(string path, UnityEngine.Vector2 v) { var p = Find(path); if (p != null) p.vector2Value = v; }
 
+        public void Vec3Array(string path, UnityEngine.Vector3[] values)
+        {
+            var p = Find(path);
+            if (p == null) return;
+            p.arraySize = values.Length;
+            for (int n = 0; n < values.Length; n++) p.GetArrayElementAtIndex(n).vector3Value = values[n];
+        }
+
         /// <summary>Sets an enum by its C# member name (independent of declaration order).</summary>
         public void EnumByName(string path, string member)
         {

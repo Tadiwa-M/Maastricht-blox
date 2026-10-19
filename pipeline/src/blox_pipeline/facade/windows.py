@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from .bays import WINDOW_W, bay_starts
 from .painter import Painter
-from .pieces import backdrop, door, fence_run, flower_box, piece_h, sloped_sill, window
+from .pieces import backdrop, door, flower_box, piece_h, sloped_sill, window
 from .spec import HouseSpec
 
 SILL_GAP = 3  # plates between the storey floor and the window bottom
@@ -32,7 +32,7 @@ def window_bay(cv: Painter, h: HouseSpec, x: int, kb: int, flowers: str | None =
         sloped_sill(cv, h, x, kb)
 
 
-def balcony_bay(h: HouseSpec, g: int) -> int | None:
+def balcony_bay(h: HouseSpec) -> int | None:
     """Bay start of the balcony (middle bay of storey 1), or None without a balcony."""
     if not h.balcony or h.storeys < 1:
         return None
@@ -58,7 +58,7 @@ def upper_storeys(cv: Painter, h: HouseSpec, g: int) -> None:
         f = h.floor_k(g, s)
         cv.fill(h.x0, h.x1, h.y0, h.wall_j, f - 1, f, h.trim, h.fid)  # storey band
         for x in bay_starts(h.x0, h.x1):
-            if s == 1 and x == balcony_bay(h, g):
+            if s == 1 and x == balcony_bay(h):
                 balcony(cv, h, x, f)
             else:
                 window_bay(cv, h, x, f + SILL_GAP, h.flowers if s == 1 else None)

@@ -1,10 +1,67 @@
-# Maastricht Blox: status (2026-10-17)
+# Maastricht Blox: status (updated 2026-10-19)
+
+**New here?** Start with [docs/README.md](README.md) (reading order), then
+[ARCHITECTURE.md](ARCHITECTURE.md) and the guides in [guide/](guide/). What changed and why
+is in [DEVLOG.md](DEVLOG.md).
+
+**Current test counts (2026-10-19, `scripts/check.sh`):**
+
+| Suite | Result |
+|---|---|
+| Pipeline (`cd pipeline && uv run pytest`) | `208 passed in 9.78s` |
+| Proxy (`cd proxy && uv run pytest`) | `70 passed, 1 warning in 0.99s` |
+| dotnet core (`dotnet test dotnet/Blox.sln`) | `Passed!  - Failed:     0, Passed:   319, Skipped:     0, Total:   319` |
+| LookTests (`dotnet test unity/Assets/Blox/Editor/PureTests~/Blox.LookTests.csproj`) | `Passed!  - Failed:     0, Passed:    67, Skipped:     0, Total:    67` |
+| Viewer (`cd viewer && npm test`) | `# tests 24  # pass 24  # fail 0` |
+
+Section 2 below keeps the 2026-10-17 (v1) numbers for history.
 
 Everything below was built and tested in a cloud container that **blocks every real data
 host** (PDOK, 3D BAG, Geofabrik, OVapi, Buienradar, Rijkswaterstaat, NS, adsb.lol) and has
 **no Unity**. So: all code is written against the real APIs and formats, and tested with
 hand-built fixtures that follow those formats. Nothing has run on live data or in the Unity
 editor yet. The first real run on your PC is the actual integration test.
+
+## v2 update (2026-10-19): custom detail pieces, facing, brick models, look fixes
+
+Sections 1 to 5 below describe v1 (2026-10-17). This section covers what contract v2 added
+and how it was checked across the three renderers.
+
+**What v2 added, in one place each**
+
+| Idea | Where to read it | Python | three.js viewer | Unity C# |
+|---|---|---|---|---|
+| Facing rule: say N/E/S/W, never raw `rot`; front faces +j at rot 0 | CONTRACT 2 | `pipeline/src/blox_pipeline/rotation.py` | `viewer/src/rotation.js` | `Runtime/Data/Geometry/Rotation.cs` |
+| Detail pieces 38-47 (arch, window, door, fence, round tile, jumper, slope30, grille) | CONTRACT 2.1 | placed by `facade/` via `Canvas.place` | `viewer/src/details.js` | `Runtime/Meshing/Core/Detail*.cs` |
+| `hide_studs` flag (rotFlags bit 3) | CONTRACT 4 | set in `layout/studs.py` | `viewer/src/bricks.js` | `Meshing/Core/StudExtractor.cs` |
+| Brick models (bus, boat, character) and movers | CONTRACT 7.1 | written by `blox_pipeline.models` to `contract/models/` | `viewer/src/models.js`, `mover.js`, `demo.js` | `Data/Models/`, `Data/Motion/`, `Gameplay/` |
+
+**Cross-language checks (all passing)**
+- Every language runs `contract/test_vectors/rotation.json` (pytest `test_rotation.py`,
+  viewer `rotation.test.mjs`, dotnet `RotationTests.cs`).
+- Orientation in the look-test scene: every window, door, arch and fence on a street front is
+  stored facing `S`, with air in front (or a flower box) and wall behind; the west side
+  windows face `W`. The facade screenshot shows the decorated side toward the street.
+- Studs: the pipeline sets `hide_studs` on 72 of 4,245 bricks; the C# mesher and the viewer
+  both end up with **967** exposed studs on the look-test chunk (the viewer then drops more
+  with its outside-air flood fill: 824).
+- Models: `contract/models/*.json` load in C# (`BrickModelTests.cs`) and in the viewer
+  (`viewer/test/models.test.mjs` checks parts, size and pivot for each model).
+
+**Test runs (2026-10-19)**: pipeline `208 passed`; proxy `70 passed, 1 warning`;
+dotnet core `Passed: 319`; LookTests `Passed: 67`; viewer `# pass 24  # fail 0`.
+
+**Open contract questions** (raised by the tracks, not yet decided; full list with details in
+[DEVLOG.md](DEVLOG.md#open-decisions--next-steps)): arch opening shape (renderers use a
+half-ellipse under a lintel), boat pivot on the waterline instead of the ground, the sign of
+part rotation angles, which cells the jumper's centred stud needs free, `slope30_1x2` as
+`studs: none`, window/door bar depth and what is behind the panes, and no separate water
+material class (the viewer matches `water*` names).
+
+**Still open after v2:** nothing has run in Unity; real map data still paints glass cells
+instead of placed windows and doors; no component spawns live buses in Unity yet
+(`LiveClient.SamplePoses()` is ready); `MapCameraRig` doesn't use `WorldRaycast` yet; the viewer's
+outside-air flood fill switches off above 64 M cells (every stud is drawn then).
 
 ## 1. What exists
 

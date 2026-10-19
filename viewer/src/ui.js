@@ -1,4 +1,4 @@
-// Overlay UI wiring: sun-time slider, toggles, stats, picked-feature info.
+// Overlay UI wiring: sun-time slider, toggles (tilt-shift, AO, animation), stats, info panel.
 const $ = (id) => document.getElementById(id);
 
 export function fmtHours(h) {
@@ -6,7 +6,7 @@ export function fmtHours(h) {
   return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
-export function bindUI({ time, tilt, ao, onTime, onTilt, onAO }) {
+export function bindUI({ time, tilt, ao, anim, onTime, onTilt, onAO, onAnim }) {
   const slider = $('time'), label = $('timeLabel');
   slider.value = time;
   label.textContent = fmtHours(time);
@@ -14,15 +14,20 @@ export function bindUI({ time, tilt, ao, onTime, onTilt, onAO }) {
     label.textContent = fmtHours(+slider.value);
     onTime(+slider.value);
   });
-  $('tilt').checked = tilt;
-  $('tilt').addEventListener('change', (e) => onTilt(e.target.checked));
-  $('ao').checked = ao;
-  $('ao').addEventListener('change', (e) => onAO(e.target.checked));
+  const toggles = { tilt: onTilt, ao: onAO, anim: onAnim };
+  const init = { tilt, ao, anim };
+  for (const [id, fn] of Object.entries(toggles)) {
+    $(id).checked = init[id];
+    $(id).addEventListener('change', (e) => fn(e.target.checked));
+  }
   return {
-    setTime(h) { slider.value = h; label.textContent = fmtHours(h); },
+    set(o) {
+      slider.value = o.time; label.textContent = fmtHours(o.time);
+      for (const id of Object.keys(toggles)) $(id).checked = o[id];
+    },
     stats(s) {
-      $('stats').textContent =
-        `${s.bricks.toLocaleString()} bricks · ${s.studs.toLocaleString()} studs · ${s.calls} draws · ${s.fps} fps`;
+      $('stats').textContent = `${s.bricks.toLocaleString()} bricks · ${s.studs.toLocaleString()} studs · `
+        + `${s.calls} draws · ${s.actors} movers · ${s.fps} fps`;
     },
     info(html) {
       const el = $('info');

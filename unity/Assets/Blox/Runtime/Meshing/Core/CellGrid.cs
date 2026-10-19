@@ -72,7 +72,7 @@ namespace Blox.Meshing.Core
             var t = types[br.Type];
             if (t.Defined == 0) return;
             int rot = br.Rot;
-            Footprint.Extent(t, rot, out int ei, out int ej);
+            Rotation.RotatedExtent(t, rot, out int ei, out int ej);
             // Quick reject when the brick box misses the grid.
             if (br.I + ei <= dims.I0 || br.I >= dims.I0 + dims.SizeI || br.J + ej <= dims.J0 || br.J >= dims.J0 + dims.SizeJ
                 || br.K + t.H <= dims.K0 || br.K >= dims.K0 + dims.SizeK) return;
@@ -80,7 +80,7 @@ namespace Blox.Meshing.Core
             for (int cj = 0; cj < ej; cj++)
                 for (int ci = 0; ci < ei; ci++)
                 {
-                    Footprint.UnrotateCell(ci, cj, t.W, t.D, rot, out int a, out int b);
+                    Rotation.UnrotateCell(ci, cj, t.W, t.D, rot, out int a, out int b);
                     for (int p = 0; p < t.H; p++)
                     {
                         int idx = dims.Index(br.I + ci, br.J + cj, br.K + p);

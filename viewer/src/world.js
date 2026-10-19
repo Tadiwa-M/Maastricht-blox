@@ -104,16 +104,21 @@ export class World {
 
   /** Every cell of every brick's bounding box -> brick number. */
   buildCells() {
-    const cells = new Map();
+    const cells = new Map(), tops = new Map();
     for (let n = 0; n < this.count; n++) {
       const t = this.typeOf(n);
       if (!t) continue;
       const [ei, ej] = this.extentOf(n);
-      for (let k = 0; k < t.h; k++)
-        for (let dj = 0; dj < ej; dj++)
-          for (let di = 0; di < ei; di++) cells.set(cellKey(this.I[n] + di, this.J[n] + dj, this.K[n] + k), n);
+      const top = this.K[n] + t.h;
+      for (let dj = 0; dj < ej; dj++)
+        for (let di = 0; di < ei; di++) {
+          const col = cellKey(this.I[n] + di, this.J[n] + dj, 0);
+          if (!(tops.get(col) >= top)) tops.set(col, top);
+          for (let k = 0; k < t.h; k++) cells.set(col + cellKey(0, 0, this.K[n] + k), n);
+        }
     }
     this.cells = cells;
+    this.tops = tops; // column -> first air level above its highest brick
   }
 
   /** Brick number filling cell (I, J, K), or -1 for air. */
@@ -126,8 +131,7 @@ export class World {
 
   /** First air level above the highest brick in column (I, J); bounds.K0 if empty. */
   topK(I, J) {
-    for (let K = this.bounds.K1 - 1; K >= this.bounds.K0; K--) if (this.occupied(I, J, K)) return K + 1;
-    return this.bounds.K0;
+    return this.tops.get(cellKey(I, J, 0)) ?? this.bounds.K0;
   }
 
   computeBounds() {

@@ -53,8 +53,8 @@ namespace Blox.Data
             {
                 ContractVersion = n["contractVersion"].AsInt,
             };
-            if (m.ContractVersion != WorldSpec.ContractVersion)
-                throw new FormatException($"manifest contractVersion {m.ContractVersion} is not supported (expected {WorldSpec.ContractVersion})");
+            if (m.ContractVersion < WorldSpec.MinContractVersion || m.ContractVersion > WorldSpec.ContractVersion)
+                throw new FormatException($"manifest contractVersion {m.ContractVersion} is not supported (expected {WorldSpec.MinContractVersion}..{WorldSpec.ContractVersion})");
             m.Crs = n["crs"].AsString;
             var origin = n["originRD"];
             if (origin.Count != 2) throw new FormatException("originRD must have 2 numbers");

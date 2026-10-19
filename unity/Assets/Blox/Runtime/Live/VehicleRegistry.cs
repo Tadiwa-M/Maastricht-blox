@@ -19,6 +19,12 @@ namespace Blox.Live
         private readonly Dictionary<string, VehicleDto> _latest = new Dictionary<string, VehicleDto>(StringComparer.Ordinal);
         private readonly List<string> _scratch = new List<string>();
 
+        /// <summary>
+        /// Corner smoothing for buses on their shapes (metres, see <see cref="Blox.Data.PathMover"/>).
+        /// Applied to every shape on <see cref="SetShapes"/>; 0 keeps the raw segment heading.
+        /// </summary>
+        public float TurnRadiusM { get; set; }
+
         public IReadOnlyDictionary<string, VehicleTrack> Tracks => _tracks;
         public IReadOnlyDictionary<string, ShapePolyline> Shapes => _shapes;
 
@@ -29,7 +35,7 @@ namespace Blox.Live
         {
             _shapes.Clear();
             foreach (var s in shapes.Shapes)
-                if (s.X.Length > 0) _shapes[s.ShapeId] = ShapePolyline.From(s);
+                if (s.X.Length > 0) _shapes[s.ShapeId] = new ShapePolyline(s.ShapeId, s.X, s.Z, s.CumDistM) { TurnRadiusM = TurnRadiusM };
         }
 
         public ShapePolyline? ShapeFor(string? shapeId) =>
@@ -61,7 +67,10 @@ namespace Blox.Live
             return _scratch.Count;
         }
 
-        /// <summary>Samples every vehicle at <paramref name="nowUnix"/> into <paramref name="output"/> (cleared first).</summary>
+        /// <summary>
+        /// Samples every vehicle at <paramref name="nowUnix"/> into <paramref name="output"/> (cleared first).
+        /// Use <see cref="VehiclePose.ToPose"/> to get the shared <see cref="Blox.Data.Pose"/> for placing the model.
+        /// </summary>
         public void SampleAll(double nowUnix, Dictionary<string, VehiclePose> output)
         {
             output.Clear();

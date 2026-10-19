@@ -10,7 +10,8 @@ Unity-specific (pipeline asset, renderer, post-processing, materials, scenes) is
 | `Blox.Data` | `Assets/Blox/Runtime/Data` | contract formats (engine-free) |
 | `Blox.Meshing` | `Assets/Blox/Runtime/Meshing` | Burst chunk mesher, HLOD boxes, stud lists |
 | `Blox.Rendering` | `Assets/Blox/Runtime/Rendering` | world streaming, chunk renderers, instanced studs, sun / time of day, shadow range |
-| `Blox.Gameplay` | `Assets/Blox/Runtime/Gameplay` | map camera rig (no dependency on `Blox.Rendering`) |
+| `Blox.Live` | `Assets/Blox/Runtime/Live` | live proxy client: vehicles, weather, water (motion rule as pure logic) |
+| `Blox.Gameplay` | `Assets/Blox/Runtime/Gameplay` | map camera rig, brick models (bus, character), path following, walking (no dependency on `Blox.Rendering`) |
 | `Blox.Editor` | `Assets/Blox/Editor` | `Blox/Setup Project`, `Blox/Create Look Test Scene` |
 | shaders | `Assets/Blox/Shaders` | `Blox/BrickBody`, `Blox/BrickTransparent`, `Blox/Stud`, `StudCull.compute` |
 
@@ -46,15 +47,31 @@ Unity-specific (pipeline asset, renderer, post-processing, materials, scenes) is
    (see `../pipeline/README.md`); point the WorldLoader's *World Directory* at it.
 5. **Run `Blox > Create Look Test Scene`.** It builds and saves
    `Assets/Blox/Generated/Scenes/LookTest.unity`: sun with time of day, procedural sky,
-   global volume, camera rig framed on the test world, and a `World` object with
-   WorldLoader (pointed at `../build/testscene`) and StudRenderer.
+   global volume, camera rig framed on the test world, a `World` object with
+   WorldLoader (pointed at `../build/testscene`) and StudRenderer, a **Bus** looping along
+   the road (found from the world data) and a **Walker** figure on the square. Both are
+   brick models from `../contract/models/` (CONTRACT 7.1).
 6. **Press Play.** Controls: **left drag** pan, **right drag** orbit (sideways) and tilt
    (up/down), **wheel** zoom toward the cursor; keys **WASD** pan, **Q/E** rotate,
-   **R/F** tilt, **Z/X** zoom.
+   **R/F** tilt, **Z/X** zoom. Press **C** to take control of the walking figure: WASD
+   (or the arrow keys) then walk relative to the camera, **Shift** runs, the camera
+   follows it; press C again to go back to the map camera.
 
 The world directory is resolved relative to this `unity` folder (`../build/testscene` =
 `<repo>/build/testscene`); an absolute path also works. In a standalone player, use an
 absolute path (or copy the world next to the build and point to it).
+
+## Placing and moving things (rotations made easy)
+
+- **Facing, not rot.** Every directional piece has a front that faces +j (north) at rot 0.
+  Place pieces by saying which way the front faces: `BrickRecord.Place(..., Facing.E)`,
+  `PlacedBrick.Place(..., Facing.S)`. `Blox.Data.Rotation` is the only code that knows the
+  rot maths (and is checked against `contract/test_vectors/rotation.json`).
+- **Pose.** Anything that moves (bus, boat, figure) is placed by a `Blox.Data.Pose`:
+  position in Unity metres plus yaw in degrees clockwise from north. In Unity that is
+  `Quaternion.Euler(0, yaw, 0)`. `PathMover` turns path + distance into a pose; live buses
+  (`VehiclePose.ToPose`), `PathFollower` and `CharacterWalker` all go through it.
+- See `Assets/Blox/Runtime/Gameplay/README.md` for the walk-through of models and locomotion.
 
 ## How the look is built
 
@@ -79,7 +96,13 @@ absolute path (or copy the world next to the build and point to it).
   from each chunk's stud list) says a stud really sits on that face: roads (tiles) stay
   smooth.
 - **Glass** (palette class `glass`): dark and glossy by day; at night a stable, hashed
-  share of windows glows warm through `_BloxNight`. **Emissive** colours (lamps) glow a
+  share of windows glows warm through `_BloxNight`. The hash is the brick seed (UV2.y), so
+  each window piece (CONTRACT 2.1) lights up on its own. Glass faces get no bevel or seam
+  (the mesher writes UV1 = 0 for every glass face), so stacked glass bricks read as one pane.
+- **Detail pieces** (arches, windows with mullion/transom, doors with panels and fanlight,
+  fences with round spindles, round tiles, jumpers, grille tiles, shallow slopes) are
+  meshed by `Blox.Meshing.Core.DetailMesher` from boxes, quads and posts; see
+  `Assets/Blox/Runtime/Meshing/README.md`. **Emissive** colours (lamps) glow a
   little by day and fully at night. **Water** (`trans`): procedural ripples, depth-tinted
   and more opaque with depth (needs the depth texture, enabled by setup).
 - **SSAO** (DepthNormals, small radius 0.12 m, intensity 2.4) works because every Blox

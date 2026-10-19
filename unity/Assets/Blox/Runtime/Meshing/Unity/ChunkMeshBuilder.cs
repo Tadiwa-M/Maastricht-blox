@@ -111,7 +111,7 @@ namespace Blox.Meshing
                     {
                         var p = PlacedBrick.From(r, nc.X, nc.Y);
                         var t = _world.TypeTable[r.type];
-                        Footprint.Extent(t, r.Rot, out int ei, out int ej);
+                        Rotation.RotatedExtent(t, r.Rot, out int ei, out int ej);
                         if (p.I + ei - 1 < i0 || p.I > i1 || p.J + ej - 1 < j0 || p.J > j1) continue;
                         list.Add(p);
                     }
@@ -138,16 +138,6 @@ namespace Blox.Meshing
     /// <summary>A scheduled mesh job. Call <see cref="Complete"/> exactly once (it disposes all job memory).</summary>
     public sealed class PendingChunkMesh
     {
-        private static readonly VertexAttributeDescriptor[] Layout =
-        {
-            new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
-            new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3),
-            new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.Float32, 4),
-            new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 2),
-            new VertexAttributeDescriptor(VertexAttribute.TexCoord1, VertexAttributeFormat.Float32, 2),
-            new VertexAttributeDescriptor(VertexAttribute.TexCoord2, VertexAttributeFormat.Float32, 2),
-        };
-
         private NativeMeshSink _sink;
         private readonly NativeArray<PlacedBrick> _bricks;
         private readonly Vector2Int _kRange;
@@ -176,7 +166,7 @@ namespace Blox.Meshing
                 int vCount = _sink.Vertices.Length, n0 = _sink.OpaqueIndices.Length, n1 = _sink.TransparentIndices.Length;
                 var arr = Mesh.AllocateWritableMeshData(1);
                 var md = arr[0];
-                md.SetVertexBufferParams(vCount, Layout);
+                md.SetVertexBufferParams(vCount, BrickVertexLayout.Attributes);
                 md.SetIndexBufferParams(n0 + n1, IndexFormat.UInt32);
                 md.GetVertexData<BrickVertex>().CopyFrom(_sink.Vertices.AsArray());
                 var idx = md.GetIndexData<int>();

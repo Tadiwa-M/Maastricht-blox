@@ -8,7 +8,13 @@ import pytest
 
 from blox_pipeline.catalogue import repo_root
 from blox_pipeline.rotation import (
-    Facing, facing_to_rot, footprint_cell, footprint_cells, front_dir, rot_to_facing, rotated_extent,
+    Facing,
+    facing_to_rot,
+    footprint_cell,
+    footprint_cells,
+    front_dir,
+    rot_to_facing,
+    rotated_extent,
 )
 
 VECTORS = json.loads((repo_root() / "contract" / "test_vectors" / "rotation.json").read_text())

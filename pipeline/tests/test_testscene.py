@@ -28,3 +28,17 @@ def test_build_testscene(tmp_path):
     assert used <= ids
     assert (tmp_path / "preview.png").is_file() and (tmp_path / "preview_iso.png").is_file()
     assert st.layout_s_warm < 2.0
+
+
+def test_scene_uses_detail_pieces_and_hides_buried_studs():
+    from blox_pipeline.catalogue import load_catalogue
+    from blox_pipeline.layout.records import FLAG_HIDE_STUDS
+    from blox_pipeline.testscene.build import lay_out_scene
+
+    rec, _, _ = lay_out_scene()  # raises if verify_layout finds a problem
+    cat = load_catalogue()
+    names = {cat[int(t)].name for t in rec["type"]}
+    for piece in ("window_1x2x3", "door_1x2x4", "arch_1x4", "fence_1x4", "jumper_1x2",
+                  "round_tile_1x1", "grille_1x2", "slope30_1x2", "window_1x2x2"):
+        assert piece in names
+    assert ((rec["flags"] & FLAG_HIDE_STUDS) != 0).any()

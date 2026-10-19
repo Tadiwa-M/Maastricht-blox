@@ -17,7 +17,7 @@ namespace Blox.Rendering
     /// no full-detail chunk needs it any more.
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class WorldLoader : MonoBehaviour
+    public sealed class WorldLoader : MonoBehaviour, IWorldSource
     {
         [Tooltip("World output directory. Relative paths are resolved against the Unity project folder (the folder that contains Assets/).")]
         [SerializeField] private string worldDirectory = "../build/testscene";

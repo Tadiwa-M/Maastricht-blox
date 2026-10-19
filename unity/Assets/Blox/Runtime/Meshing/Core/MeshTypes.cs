@@ -61,8 +61,15 @@ namespace Blox.Meshing.Core
             I = i; J = j; K = k; Type = type; Color = color; RotFlags = rotFlags; Pad = 0;
         }
 
+        /// <summary>A brick whose front faces <paramref name="facing"/> (the readable way to rotate).</summary>
+        public static PlacedBrick Place(int i, int j, int k, byte type, byte color, Facing facing, bool noVariation = false, bool hideStuds = false) =>
+            new PlacedBrick(i, j, k, type, color, (byte)(Rotation.FacingToRot(facing)
+                | (noVariation ? BrickRecord.FlagNoVariation : 0) | (hideStuds ? BrickRecord.FlagHideStuds : 0)));
+
         public int Rot => RotFlags & BrickRecord.RotMask;
+        public Facing Facing => Rotation.RotToFacing(RotFlags);
         public bool NoVariation => (RotFlags & BrickRecord.FlagNoVariation) != 0;
+        public bool HideStuds => (RotFlags & BrickRecord.FlagHideStuds) != 0;
 
         public static PlacedBrick From(in BrickRecord r, int chunkX, int chunkY) =>
             new PlacedBrick(chunkX * 64 + r.i, chunkY * 64 + r.j, r.k, r.type, r.color, r.rotFlags);
@@ -100,7 +107,7 @@ namespace Blox.Meshing.Core
         public static int LocalToWorld(int d, int rot)
         {
             if (d >= PosY) return d;
-            Footprint.RotateDir(Di(d), Dj(d), rot, out float di, out float dj);
+            Rotation.RotateDir(Di(d), Dj(d), rot, out float di, out float dj);
             return FromVector((int)di, (int)dj);
         }
 

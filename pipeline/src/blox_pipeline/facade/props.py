@@ -1,4 +1,8 @@
-"""Street furniture that makes a square feel inhabited."""
+"""Street furniture that makes a square feel inhabited.
+
+Round details (flower heads, bollard caps) are placed ``round_tile_1x1`` pieces; a round
+tile has no front, so its facing is irrelevant and we just say ``N``.
+"""
 
 from __future__ import annotations
 
@@ -20,8 +24,8 @@ def planter(cv: Painter, i: int, j: int, g: int, flower: str, fid: int = 0) -> N
     """2x2 stone planter with a flowering shrub."""
     cv.fill(i, i + 2, j, j + 2, g, g + 3, "mergel_dark", fid)
     cv.fill(i, i + 2, j, j + 2, g + 3, g + 6, "leaf", fid)
-    cv.fill(i, i + 1, j + 1, j + 2, g + 6, g + 7, flower, fid)
-    cv.fill(i + 1, i + 2, j, j + 1, g + 6, g + 7, flower, fid)
+    cv.place("round_tile_1x1", i, j + 1, g + 6, "N", flower, fid)
+    cv.place("round_tile_1x1", i + 1, j, g + 6, "N", flower, fid)
 
 
 def bench(cv: Painter, i: int, j: int, g: int, length: int = 4, fid: int = 0) -> None:
@@ -34,4 +38,12 @@ def bench(cv: Painter, i: int, j: int, g: int, length: int = 4, fid: int = 0) ->
 
 def bollard(cv: Painter, i: int, j: int, g: int, fid: int = 0) -> None:
     cv.fill(i, i + 1, j, j + 1, g, g + 4, "dark_grey", fid)
-    cv.fill(i, i + 1, j, j + 1, g + 4, g + 5, "gold", fid)
+    cv.place("round_tile_1x1", i, j, g + 4, "N", "gold", fid)
+
+
+def street_lamp(cv: Painter, i: int, j: int, g: int, fid: int = 0) -> None:
+    """Black post, warm lantern, black cap with a round tile on top."""
+    cv.fill(i, i + 1, j, j + 1, g, g + 14, "black", fid)
+    cv.fill(i, i + 1, j, j + 1, g + 14, g + 16, "lamp_warm", fid)
+    cv.fill(i, i + 1, j, j + 1, g + 16, g + 17, "black", fid)
+    cv.place("round_tile_1x1", i, j, g + 17, "N", "black", fid)
