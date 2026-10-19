@@ -14,11 +14,19 @@ Need git ''
 Need uv 'astral-sh.uv'
 Need dotnet 'Microsoft.DotNet.SDK.8'
 Need node 'OpenJS.NodeJS.LTS'
-Write-Host 'Refresh PATH (open a new terminal) if anything was just installed.'
+# Pick up tools winget just installed without needing a new terminal.
+$env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
+foreach ($c in 'uv', 'dotnet', 'node') {
+    if (-not (Get-Command $c -ErrorAction SilentlyContinue)) { throw "$c still not on PATH: open a new PowerShell and re-run this script" }
+}
 
-Push-Location "$Root\pipeline"; uv sync; Pop-Location
-Push-Location "$Root\proxy"; uv sync; Pop-Location
-Push-Location "$Root\viewer"; npm ci --no-audit --no-fund; npx playwright install chromium; Pop-Location  # browser for viewer screenshots
+function In([string]$Dir, [scriptblock]$Do) {  # run in a folder and always come back, even on errors
+    Push-Location $Dir; try { & $Do; if ($LASTEXITCODE) { throw "failed in $Dir" } } finally { Pop-Location }
+}
+
+In "$Root\pipeline" { uv sync }
+In "$Root\proxy" { uv sync }
+In "$Root\viewer" { npm ci --no-audit --no-fund; npx playwright install chromium }  # browser for viewer screenshots
 dotnet restore "$Root\dotnet\Blox.sln"
 
 $gpu = Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name
