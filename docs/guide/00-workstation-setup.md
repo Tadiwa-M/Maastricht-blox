@@ -26,7 +26,14 @@ All three meet in GitHub (`week1-foundation`). Pull before you start, push when 
 | Unity Hub + **Unity 6 LTS (6000.x)** | the game | add the **Windows Build Support** module (Linux: Linux Build Support) |
 | GPU driver | rendering | latest NVIDIA/AMD driver; Unity uses DX12/DX11 on Windows and Vulkan on Linux |
 
-uv, the .NET 8 SDK and Node 22 are installed by the setup script (Windows via `winget`).
+uv, the .NET 8 SDK and Node 22 are installed by the setup script **per user, without admin
+rights** (into `%LOCALAPPDATA%`, added to your user PATH).
+
+**No admin rights?** Git for Windows and Unity Hub both have per-user install options. In
+Unity Hub set *Preferences → Installs → Installs location* to a folder you own (e.g.
+`%LOCALAPPDATA%\Unity\Editors`) before installing Unity 6; `scripts/unity.ps1` looks there.
+If an installer still asks for admin, IT has to install it, or you set `UNITY_EXE` to a Unity.exe
+you can run.
 
 ## 2. Clone and set up
 
