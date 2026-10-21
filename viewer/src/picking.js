@@ -42,3 +42,19 @@ export function pickBrick(world, origin, direction, maxSteps = 20000) {
   }
   return null;
 }
+
+/**
+ * Nearest hit over several grids: targets = [{ world, toLocal?(p, isDirection) }]. toLocal maps
+ * the three.js ray into that grid's space (islands: src/island.js worldToLocalThree); it must
+ * be rigid, so hit distances stay comparable. Returns the hit plus its `target`, or null.
+ */
+export function pickNearest(targets, origin, direction) {
+  let best = null;
+  for (const target of targets) {
+    const o = target.toLocal ? target.toLocal(origin, false) : origin;
+    const d = target.toLocal ? target.toLocal(direction, true) : direction;
+    const hit = pickBrick(target.world, o, d);
+    if (hit && (!best || hit.distance < best.distance)) best = { ...hit, target };
+  }
+  return best;
+}

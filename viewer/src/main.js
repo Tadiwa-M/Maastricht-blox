@@ -14,7 +14,8 @@ import { Stage } from './scene.js';
 import { makePresets } from './presets.js';
 import { galleryWorld, parseIds } from './gallery.js';
 import { setupDemo } from './demo.js';
-import { pickBrick } from './picking.js';
+import { pickNearest } from './picking.js';
+import { loadIslands, islandWorldBox, worldToLocalThree } from './island.js';
 import { FACING_NAMES } from './rotation.js';
 import { bindUI, escapeHtml } from './ui.js';
 
@@ -38,29 +39,43 @@ function worldBox(world) {
   return new THREE.Box3(new THREE.Vector3(I0 * S, K0 * P, -J1 * S), new THREE.Vector3(I1 * S, K1 * P, -J0 * S));
 }
 
-/** Click -> brick under the cursor (grid raymarch) -> info panel + highlight box. */
-function bindPicking(canvas, stage, world, ui) {
+/** Feature title for the info panel: its name, else kind + address or BAG id. */
+function featureHead(f) {
+  if (!f) return '<b>No feature</b>';
+  const title = f.name || (f.address ? `${f.kind} at ${f.address}` : `${f.kind} ${f.bagId || '#' + f.id}`);
+  const sub = [f.kind, f.address, f.year].filter((x) => x).map(escapeHtml).join(' · ');
+  return `<b>${escapeHtml(title)}</b><span>${sub}</span>`;
+}
+
+/**
+ * Click -> brick under the cursor (grid raymarch over the chunks and every island, ray moved
+ * into island space; nearest hit wins) -> info panel + highlight box (in the hit's own frame).
+ */
+function bindPicking(canvas, stage, world, islands, lod, ui) {
   const ray = new THREE.Raycaster();
   const sel = new THREE.Box3Helper(new THREE.Box3(), 0xffe066);
   sel.visible = false;
   stage.scene.add(sel);
+  const targets = [{ world, parent: stage.scene },
+    ...islands.map((w, q) => ({ world: w, parent: lod.sources[q + 1].parent, toLocal: (p, dir) => worldToLocalThree(w.island, p, dir) }))];
   let down = null;
   canvas.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; });
   canvas.addEventListener('pointerup', (e) => {
     if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
     const r = canvas.getBoundingClientRect();
     ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), stage.camera);
-    const hit = pickBrick(world, ray.ray.origin, ray.ray.direction);
+    const hit = pickNearest(targets, ray.ray.origin, ray.ray.direction);
     if (!hit) { ui.info(''); sel.visible = false; return; }
-    const n = hit.n, t = world.typeOf(n), rot = world.rot(n), [ei, ej] = world.extentOf(n);
-    const col = world.palette.get(world.color[n]), f = world.features.get(world.feature[n]);
-    const S = world.studM, P = world.plateM;
-    sel.box.min.set(world.I[n] * S, world.K[n] * P, -(world.J[n] + ej) * S);
-    sel.box.max.set((world.I[n] + ei) * S, (world.K[n] + t.h) * P, -world.J[n] * S);
+    const w = hit.target.world, n = hit.n, t = w.typeOf(n), rot = w.rot(n), [ei, ej] = w.extentOf(n);
+    const col = w.palette.get(w.color[n]), f = w.features.get(w.feature[n]);
+    const S = w.studM, P = w.plateM;
+    sel.box.min.set(w.I[n] * S, w.K[n] * P, -(w.J[n] + ej) * S);
+    sel.box.max.set((w.I[n] + ei) * S, (w.K[n] + t.h) * P, -w.J[n] * S);
+    if (sel.parent !== hit.target.parent) hit.target.parent.add(sel);
     sel.visible = true;
-    const head = f ? `<b>${escapeHtml(f.name)}</b><span>${escapeHtml(f.kind)}${f.address ? ' · ' + escapeHtml(f.address) : ''}</span>`
-      : '<b>No feature</b>';
-    ui.info(`${head}<small>${escapeHtml(t.name)} · ${escapeHtml(col?.name ?? '?')} · I${world.I[n]} J${world.J[n]} K${world.K[n]} · faces ${FACING_NAMES[rot]} (rot ${rot})</small>`);
+    const where = w.island ? `island ${w.island.id} (${w.island.yawDeg.toFixed(1)}°) · i${w.I[n]} j${w.J[n]} K${w.K[n]}`
+      : `I${w.I[n]} J${w.J[n]} K${w.K[n]}`;
+    ui.info(`${featureHead(f)}<small>${escapeHtml(t.name)} · ${escapeHtml(col?.name ?? '?')} · ${where} · faces ${FACING_NAMES[rot]} (rot ${rot})</small>`);
   });
 }
 
@@ -69,21 +84,24 @@ async function main() {
   if (!data) throw new Error('window.BLOX_WORLD missing: build dist/world.js first');
   const opts = parseHash();
   const isGallery = opts.view === 'gallery';
-  let world, labels = null;
+  let world, labels = null, islands = [];
   if (isGallery) ({ world, labels } = galleryWorld(data.contract || data, parseIds(opts.ids)));
-  else world = await loadWorld(data);
+  else { world = await loadWorld(data); islands = await loadIslands(data); }
 
   const canvas = document.getElementById('view');
   const W = () => window.innerWidth, H = () => window.innerHeight;
   const stage = new Stage(canvas, W(), H());
   const mats = new MaterialSet();
-  const lod = new ChunkLOD(world, mats, worldContext(world, mats));
+  const totalBricks = islands.reduce((a, w) => a + w.count, world.count);
+  const lod = new ChunkLOD(world, mats, worldContext(world, mats),
+    islands.map((w) => ({ world: w, ctx: worldContext(w, mats) })));
   stage.scene.add(lod.group);
   // the gallery is one small scene: always the full look
-  const size = isGallery ? { chunks: 1, bricks: 0 } : { chunks: lod.chunks.length, bricks: world.count };
+  const size = isGallery ? { chunks: 1, bricks: 0 } : { chunks: lod.chunks.length, bricks: totalBricks };
   let mode = opts.quality, tierName = initialTier(mode, size), governor = new FrameGovernor(tierName);
   if (labels) stage.overlay.add(labels);
   const box = worldBox(world);
+  for (const w of islands) box.union(islandWorldBox(w));
   stage.setBounds(box, world.studM);
   stage.initPost();
   function applyTier(name) {
@@ -109,7 +127,7 @@ async function main() {
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 2;
   controls.maxDistance = 600;
-  const presets = makePresets(world, box, W() / H());
+  const presets = makePresets(world, box, W() / H(), islands);
   let animate = opts.anim;
 
   function applyView(name, zoom = 1) {
@@ -144,7 +162,7 @@ async function main() {
     if (o.quality !== mode) setMode(o.quality);
   });
   window.addEventListener('resize', () => stage.resize(W(), H()));
-  bindPicking(canvas, stage, world, ui);
+  bindPicking(canvas, stage, world, islands, lod, ui);
 
   const r = stage.renderer;
   r.info.autoReset = false;
@@ -176,15 +194,15 @@ async function main() {
     if (now - lastStats > 250 || still) {
       lastStats = now;
       const ls = lod.stats();
-      ui.stats({ bricks: world.count, studs: ls.studs, near: ls.near, chunks: ls.chunks, calls: r.info.render.calls,
+      ui.stats({ bricks: totalBricks, studs: ls.studs, near: ls.near, chunks: ls.chunks, calls: r.info.render.calls,
         triangles: r.info.render.triangles, fps: meter.label(), actors: demo?.actors.length || 0 });
     }
     if (++frames === 4) window.__bloxReady = true;
     if (still && frames >= 4) return; // screenshot mode: freeze so capture is cheap
     requestAnimationFrame(frame);
   }
-  const built = { bricks: world.count, get studs() { return lod.studsShown; } };
-  window.__blox = { world, stage, controls, presets, built, demo, lod,
+  const built = { bricks: totalBricks, get studs() { return lod.studsShown; } };
+  window.__blox = { world, islands, stage, controls, presets, built, demo, lod,
     quality: { describe: () => `${mode}:${tierName}` } };
   // screenshot hook: render synchronously and read the canvas back (cheaper than a
   // compositor capture under software GL)

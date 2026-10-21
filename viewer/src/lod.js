@@ -12,20 +12,26 @@
 //         draws instead of 49 x 6.
 // update(camera) picks near chunks by distance from the camera to the chunk's box, with
 // hysteresis so a chunk on the edge does not flip every frame, caps how many are near and
-// how many studs are drawn. Each look casts its own shadows (near studs do not, with LOD). (Shadow-only proxies on a
+// how many studs are drawn.
+//
+// Islands (CONTRACT 5.1, src/island.js) are extra "chunks" with their own World in local cells:
+// one per island, its near and far looks built from that World exactly like a chunk's and
+// hung under a THREE.Group carrying the island pose. Their box (for the near/far choice) is
+// the island's world-space bounding box; near/stud caps are shared with the chunks. Each look casts its own shadows (near studs do not, with LOD). (Shadow-only proxies on a
 // separate layer do not work: three.js tests shadow casters against the MAIN camera's layers.)
 import * as THREE from 'three';
 import { buildWorldMeshes, brickColor } from './bricks.js';
 import { buildFarGeometry } from './farmesh.js';
 import { NO_VARIATION } from './world.js';
+import { applyIslandPose, islandWorldBox } from './island.js';
 
 const HYSTERESIS = 1.3; // leave the near set only beyond nearDist * this
 const CLUSTER = 2;      // far meshes merge CLUSTER x CLUSTER chunks
 const BLACK = new THREE.Color(0, 0, 0);
 
 class Chunk {
-  constructor(cx, cy) {
-    Object.assign(this, { cx, cy, list: [], box: new THREE.Box3(), near: null, isNear: false, dist: 0, used: 0,
+  constructor(cx, cy, src) {
+    Object.assign(this, { cx, cy, src, list: [], box: new THREE.Box3(), near: null, isNear: false, dist: 0, used: 0,
       farTris: 0, nearTris: 0, studTris: 0, studs: 0, studMeshes: [] });
   }
 }
@@ -38,10 +44,15 @@ function meshTriangles(m) {
 }
 
 export class ChunkLOD {
-  /** ctx: worldContext(world, mats) from src/bricks.js. */
-  constructor(world, mats, ctx) {
+  /**
+   * ctx: worldContext(world, mats) from src/bricks.js. islands: [{ world, ctx }] with
+   * world.island = { id, origin, yawDeg, cx, cy } (src/island.js).
+   */
+  constructor(world, mats, ctx, islands = []) {
     Object.assign(this, { world, mats, ctx, group: new THREE.Group(), frame: 0, clusters: null, studsShown: 0 });
     this.group.name = 'chunks';
+    const main = { world, ctx, parent: this.group, island: null };
+    this.sources = [main];
     const CS = world.chunkStuds, S = world.studM, P = world.plateM;
     const map = new Map();
     const lo = new THREE.Vector3(), hi = new THREE.Vector3();
@@ -50,7 +61,7 @@ export class ChunkLOD {
       if (!t) continue;
       const cx = Math.floor(world.I[n] / CS), cy = Math.floor(world.J[n] / CS);
       const key = `${cx},${cy}`;
-      if (!map.has(key)) map.set(key, new Chunk(cx, cy));
+      if (!map.has(key)) map.set(key, new Chunk(cx, cy, main));
       const c = map.get(key);
       c.list.push(n);
       const [ei, ej] = world.extentOf(n);
@@ -58,6 +69,18 @@ export class ChunkLOD {
       c.box.expandByPoint(hi.set((world.I[n] + ei) * S, (world.K[n] + t.h) * P, -world.J[n] * S));
     }
     this.chunks = [...map.values()];
+    for (const isl of islands) {
+      const { id, cx, cy, origin, yawDeg } = isl.world.island;
+      const parent = applyIslandPose(new THREE.Group(), origin, yawDeg);
+      parent.name = `island ${id}`;
+      this.group.add(parent);
+      const src = { world: isl.world, ctx: isl.ctx, parent, island: isl.world.island };
+      this.sources.push(src);
+      const c = new Chunk(cx, cy, src);
+      for (let n = 0; n < isl.world.count; n++) if (isl.world.typeOf(n)) c.list.push(n);
+      c.box.copy(islandWorldBox(isl.world));
+      this.chunks.push(c);
+    }
     for (const c of this.chunks) c.list = Int32Array.from(c.list);
     this.setTier({ lod: false });
   }
@@ -72,11 +95,11 @@ export class ChunkLOD {
     Object.assign(this, lod ? { nearDist, maxNear, studCap } : { nearDist: Infinity, maxNear: Infinity, studCap: Infinity });
     Object.assign(this, { lod, lite });
     if (lod && !this.clusters) this.buildFar();
-    if (this.clusters) this.clusterGroup.visible = lod;
+    if (this.clusters) for (const g of this.farGroups) g.visible = lod;
   }
 
   buildNear(c) {
-    const built = buildWorldMeshes(this.world, this.mats, { list: c.list, ctx: this.ctx, lite: this.lite });
+    const built = buildWorldMeshes(c.src.world, this.mats, { list: c.list, ctx: c.src.ctx, lite: this.lite });
     c.near = built;
     c.studMeshes = built.meshes.filter((m) => m.name.startsWith('stud|'));
     // with LOD the shadow map spans the whole town (~11 cm texels): stud shadows would not resolve
@@ -86,13 +109,13 @@ export class ChunkLOD {
     for (const m of built.meshes) {
       if (m.name.startsWith('stud|')) c.studTris += meshTriangles(m); else c.nearTris += meshTriangles(m);
     }
-    built.group.name = `near ${c.cx},${c.cy}`;
-    this.group.add(built.group);
+    built.group.name = c.src.island ? `near island ${c.src.island.id}` : `near ${c.cx},${c.cy}`;
+    c.src.parent.add(built.group);
   }
 
   freeNear(c) {
     if (!c.near) return;
-    this.group.remove(c.near.group);
+    c.src.parent.remove(c.near.group);
     for (const m of c.near.meshes) {
       m.dispose();
       if (m.geometry.userData.owned) m.geometry.dispose();
@@ -101,9 +124,30 @@ export class ChunkLOD {
     c.studMeshes = [];
   }
 
-  /** Far look of every chunk, merged per cluster and material. */
+  /** Far look of every chunk, merged per cluster and material (one cluster per island). */
   buildFar() {
-    const { world, mats, ctx } = this;
+    this.clusters = [];
+    this.farGroups = [];
+    this.farFaces = 0; this.farCulled = 0;
+    for (const src of this.sources) {
+      const byCluster = new Map();
+      for (const c of this.chunks) {
+        if (c.src !== src) continue;
+        const k = src.island ? 'island' : `${Math.floor(c.cx / CLUSTER)},${Math.floor(c.cy / CLUSTER)}`;
+        if (!byCluster.has(k)) byCluster.set(k, []);
+        byCluster.get(k).push(c);
+      }
+      if (!byCluster.size) continue;
+      const farGroup = new THREE.Group();
+      farGroup.name = 'far';
+      src.parent.add(farGroup);
+      this.farGroups.push(farGroup);
+      for (const chunks of byCluster.values()) this.buildCluster(src, chunks, farGroup);
+    }
+  }
+
+  buildCluster({ world, ctx }, chunks, farGroup) {
+    const { mats } = this;
     const col = new THREE.Color();
     const style = (n, part) => {
       const entry = part === 'glass' ? (ctx.glassEntry || world.palette.get(world.color[n])) : world.palette.get(world.color[n]);
@@ -116,33 +160,20 @@ export class ChunkLOD {
       const n = world.brickAt(I, J, K);
       return n < 0 ? 1 : ctx.codeOf(n);
     };
-    const byCluster = new Map();
-    for (const c of this.chunks) {
-      const k = `${Math.floor(c.cx / CLUSTER)},${Math.floor(c.cy / CLUSTER)}`;
-      if (!byCluster.has(k)) byCluster.set(k, []);
-      byCluster.get(k).push(c);
+    const r = buildFarGeometry(world, chunks.map((c) => c.list), { code, codeOf: ctx.codeOf, style, glowKeys: new Set(['glass']) });
+    chunks.forEach((c, s) => { c.farTris = r.segmentTriangles[s]; });
+    this.farFaces += r.faces; this.farCulled += r.culled;
+    const cl = { chunks, parts: [], sig: '' };
+    for (const [key, geometry] of r.geometries) {
+      const material = mats.farFor(key);
+      const main = new THREE.Mesh(geometry, [material]); // drawn by groups: the far chunks only
+      main.receiveShadow = true;
+      main.castShadow = !material.transparent;
+      main.name = `far|${key}`;
+      farGroup.add(main);
+      cl.parts.push({ main, ranges: r.ranges.get(key) });
     }
-    this.clusterGroup = new THREE.Group();
-    this.clusterGroup.name = 'far';
-    this.group.add(this.clusterGroup);
-    this.clusters = [];
-    this.farFaces = 0; this.farCulled = 0;
-    for (const chunks of byCluster.values()) {
-      const r = buildFarGeometry(world, chunks.map((c) => c.list), { code, codeOf: ctx.codeOf, style, glowKeys: new Set(['glass']) });
-      chunks.forEach((c, s) => { c.farTris = r.segmentTriangles[s]; });
-      this.farFaces += r.faces; this.farCulled += r.culled;
-      const cl = { chunks, parts: [], sig: '' };
-      for (const [key, geometry] of r.geometries) {
-        const material = mats.farFor(key);
-        const main = new THREE.Mesh(geometry, [material]); // drawn by groups: the far chunks only
-        main.receiveShadow = true;
-        main.castShadow = !material.transparent;
-        main.name = `far|${key}`;
-        this.clusterGroup.add(main);
-        cl.parts.push({ main, ranges: r.ranges.get(key) });
-      }
-      this.clusters.push(cl);
-    }
+    this.clusters.push(cl);
   }
 
   /** Geometry groups for the far chunks of a cluster (one group per contiguous run). */

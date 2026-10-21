@@ -1,6 +1,8 @@
 // Camera presets derived from the world bounds and building features (not hard-coded).
 // Azimuths are compass degrees (0 = north, 90 = east); three.js north is -z.
 import * as THREE from 'three';
+import { frontDir } from './rotation.js';
+import { localToWorld, mainFacing, islandWorldBox } from './island.js';
 
 function buildingsBox(world) {
   const S = world.studM;
@@ -50,7 +52,38 @@ function fitDist(r, fovDeg, aspect) {
 
 const BIG_WORLD_M = 70; // half-diagonal above which the hero is a 3/4 view, not the whole world
 
-export function makePresets(world, box, aspect = 1.6) {
+/**
+ * Island presets (CONTRACT 5.1): 'island' looks at the street facade of the biggest island
+ * (the side most of its windows and doors face, in its own frame) from 9 m, 18 degrees off
+ * square like 'facade'; 'islandmap' looks straight down on all islands (compare with the
+ * pipeline's preview.png).
+ */
+function islandPresets(islands, plateM) {
+  if (!islands.length) return {};
+  const w = islands.reduce((a, b) => (b.count > a.count ? b : a));
+  const { origin, yawDeg } = w.island;
+  const S = w.studM, { I0, J0, I1, J1, K0 } = w.bounds;
+  const rot = mainFacing(w);
+  const [di, dj] = frontDir(rot);
+  // centre of the facade in local metres: the bounds side the front faces
+  const u = di > 0 ? I1 * S : di < 0 ? I0 * S : ((I0 + I1) / 2) * S;
+  const v = dj > 0 ? J1 * S : dj < 0 ? J0 * S : ((J0 + J1) / 2) * S;
+  const [x, z] = localToWorld(origin, yawDeg, u, v);
+  const [fx, fz] = localToWorld([0, 0], yawDeg, di, dj); // front direction (east, north)
+  const az = THREE.MathUtils.radToDeg(Math.atan2(fx, fz));
+  const t = new THREE.Vector3(x, (K0 + 2) * plateM + 3.2, -z);
+  const out = { island: { target: t, cam: t.clone().add(offset(az + 18, 6, 9)), fov: 50 } };
+  const all = new THREE.Box3();
+  for (const iw of islands) all.union(islandWorldBox(iw));
+  const c = all.getCenter(new THREE.Vector3()), size = all.getSize(new THREE.Vector3());
+  const ct = new THREE.Vector3(c.x, all.max.y, c.z);
+  // narrow field of view from far up: nearly orthographic, so walls don't lean over the plot
+  const span = Math.max(size.x, size.z) * 1.3 + 8;
+  out.islandmap = { target: ct, cam: ct.clone().add(offset(180, 89.9, span / (2 * Math.tan(THREE.MathUtils.degToRad(10))))), fov: 20 };
+  return out;
+}
+
+export function makePresets(world, box, aspect = 1.6, islands = []) {
   const S = world.studM;
   const groundY = world.groundK * world.plateM;
   const c = box.getCenter(new THREE.Vector3());
@@ -92,5 +125,6 @@ export function makePresets(world, box, aspect = 1.6) {
   } else {
     presets.facade = presets.hero;
   }
+  Object.assign(presets, islandPresets(islands, world.plateM));
   return presets;
 }
