@@ -12,7 +12,7 @@ npm i
 node build.mjs [worldDir]        # default ../build/testscene -> dist/{index.html,viewer.js,world.js}
                                  # (also embeds contract/models/*.json and the contract catalogue)
 node screenshot.mjs [outDir] [views] [hashExtra]   # default ../build/shots, hero,map,facade
-npm test                         # chunk reader, rotation vectors, picking, movers, far LOD, quality tiers
+npm test                         # chunk + island readers, rotation + island vectors, picking, movers, far LOD, quality tiers
 node tools/perf.mjs [views] [hashExtra]          # draw calls + triangles per frame from renderer.info
 node tools/tile-world.mjs <src> <out> [n=7]      # n x n copy of a world's chunks (perf test world)
 ```
@@ -22,8 +22,8 @@ through any static server, e.g. `npx http-server dist`.
 
 Regenerate the test world: `cd ../pipeline && uv run python -m blox_pipeline.testscene --out ../build/testscene`.
 
-URL hash options: `#view=hero|map|facade|river|gallery&t=16.5&tilt=0&ao=0&anim=0&ids=38-47&quality=auto&zoom=0.5`
-(`t` = sun time in hours, after 18:30 it is night: lamps and windows glow; `anim=0` pauses the
+URL hash options: `#view=hero|map|facade|river|island|islandmap|gallery&t=16.5&tilt=0&ao=0&anim=0&ids=38-47&quality=auto&zoom=0.5`
+(`island` = street facade of the biggest island, `islandmap` = top view of all islands; `t` = sun time in hours, after 18:30 it is night: lamps and windows glow; `anim=0` pauses the
 movers; `ids` limits the gallery to some catalogue ids; `quality` = auto|high|medium|low, also a
 HUD selector; `zoom` scales the preset camera distance).
 
@@ -40,6 +40,12 @@ Examples: `node screenshot.mjs ../build/shots hero t=20.5` writes `hero_t_20_5.p
 
 Controls: left drag pans, right drag orbits, wheel zooms; click a brick to see its feature,
 type, colour, cell and which way it faces.
+
+**Islands** (CONTRACT 5.1, rotated buildings): `build.mjs` embeds `islands/*.bxi` from the
+manifest (`--around` keeps those whose owning chunk is in range). Each island is its own World
+in local cells, drawn by the same near/far LOD code as a chunk inside a `THREE.Group` at the
+island pose; picking moves the ray into island space. Try
+`node build.mjs ../pipeline/tests/fixtures/town_world && node screenshot.mjs ../build/shots/islands hero,island,islandmap`.
 
 ## How it fits together
 
@@ -80,6 +86,7 @@ they can turn around out of sight.
 | File | Role |
 |---|---|
 | `src/bxc.js` | `.bxc` chunk reader (header, raw-DEFLATE body via `DecompressionStream`) |
+| `src/bxi.js`, `src/island.js` | `.bxi` island reader; island pose, island World in local cells, world box, inverse pose for picking |
 | `src/rotation.js` | facing rule: `facingToRot`, `rotatedExtent`, `footprintCell`, `frontDir` (pure) |
 | `src/placement.js` | grid / Unity metres to three.js coordinates, brick matrix |
 | `src/world.js` | World: bricks in typed arrays, cell -> brick map, column tops, bounds |
@@ -88,7 +95,7 @@ they can turn around out of sight.
 | `src/geometry.js` | bricks, plates, tiles, slopes (0.05 m lip), round pieces (cached) |
 | `src/details.js` | v2 detail pieces: arch, window, door, fence, round tile, jumper, grille |
 | `src/bricks.js` | BrickBatcher: instanced meshes, colour variation, stud exposure, hide_studs |
-| `src/lod.js` | ChunkLOD: near (instanced, studs) or far (merged) look per chunk, 2x2 far clusters, stud cap |
+| `src/lod.js` | ChunkLOD: near (instanced, studs) or far (merged) look per chunk and per island, 2x2 far clusters, stud cap |
 | `src/farmesh.js` | far LOD geometry: flat boxes / slope prisms / glass quads, hidden faces culled |
 | `src/quality.js` | quality tiers, auto step-down on slow frames, fps meter |
 | `tools/perf.mjs`, `tools/tile-world.mjs` | per-frame draw calls and triangles; tiled test world |
@@ -96,7 +103,7 @@ they can turn around out of sight.
 | `src/glow.js`, `src/hash.js` | which windows are lit at night (per window, deterministic) |
 | `src/sky.js`, `src/ground.js` | gradient sky + its environment map; studded baseplate ground |
 | `src/scene.js`, `src/post.js` | renderer, sun/time of day, shadows; AO, bloom, distance-aware tilt-shift |
-| `src/picking.js` | click picking by stepping through the occupancy grid (3D DDA) |
+| `src/picking.js` | click picking by stepping through the occupancy grid (3D DDA); `pickNearest` over chunks + islands |
 | `src/models.js`, `src/mover.js`, `src/demo.js`, `src/placeholders.js` | brick models, path movers, the demo actors |
 | `src/gallery.js`, `src/labels.js` | `#view=gallery`: every piece at N/E/S/W with a yellow marker in front |
 | `src/presets.js` | camera presets derived from bounds and building features |

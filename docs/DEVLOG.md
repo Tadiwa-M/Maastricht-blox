@@ -368,3 +368,32 @@ studs** per frame. The viewer was built for one 4k-brick chunk (300-triangle bev
   soften the near/far change if the owner finds it visible.
 - Tilt-shift stays full resolution (cheap at pixel ratio 1; half-res needs extra passes).
 - Near-chunk build is a ~40-90 ms hitch when a chunk comes close; could be split over frames.
+
+## 2026-10-19: Viewer renders rotated building islands (CONTRACT v3 section 5.1)
+
+The browser viewer now reads `islands/*.bxi` and draws each island as one rigid object.
+
+- `viewer/src/bxi.js` reads the 40-byte `BXI1` header + records (record decoding shared with
+  `bxc.js`); tested against the pipeline's golden island (both files, header hex, records,
+  each record's world position through the pose).
+- `viewer/src/island.js`: one World per island **in local cells**, so occupancy, exterior flood
+  fill, stud exposure, hidden-face culling, glow and colour variation (hash of local i, j, k)
+  all run in island space unchanged. The group pose is `(originX, 0, -originZ)`, rotation
+  **-yaw** about +Y in three.js (right-handed), checked against `contract/test_vectors/islands.json`.
+- `lod.js`: islands are extra LOD "chunks" with their own source World, near/far looks under the
+  posed group, near/far by the island's world bounding box. `picking.js: pickNearest` moves the
+  ray into each island's frame, nearest hit wins; the info panel shows the building.
+- `build.mjs` embeds islands (`--around` filters by owning chunk). New presets `#view=island`
+  (street facade of the biggest island, chosen by where its windows/doors face) and
+  `#view=islandmap` (top view to compare with `preview.png`).
+- Verified on `pipeline/tests/fixtures/town_world`: plinths stand on the pavement plots (91-93 %
+  of plinth cells, rest is the half-stud growth; a flipped yaw gives < 25 %; now a test). The
+  look-test chunk and `samples/markt` give identical draw calls/triangles/studs to before.
+  Viewer tests 37 -> 44.
+
+**Open decisions**
+- Feature names are empty for most fixture buildings; the panel falls back to kind + address
+  or BAG id.
+- Island near looks count against the same `maxNear`/stud caps as chunks; a dense real
+  neighbourhood with many islands may want its own cap.
+- `presets.js: clearestFacade` (the `facade` view) still only scores world-grid buildings.

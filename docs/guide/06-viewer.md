@@ -11,7 +11,7 @@ cd viewer
 npm i
 node build.mjs ../build/testscene     # bundles src/ + embeds the world and contract/models -> dist/
 open dist/index.html                  # file:// works (self-contained bundle)
-npm test                              # 37 tests (2026-10-19): bxc, rotation, picking, movers, models, far LOD, quality
+npm test                              # 44 tests (2026-10-19): bxc, bxi + islands, rotation, picking, movers, models, far LOD, quality
 node screenshot.mjs ../build/shots hero t=20.5   # headless Chromium (Playwright) -> hero_t_20_5.png
 node tools/perf.mjs hero,facade quality=low      # draw calls + triangles per frame (renderer.info)
 node tools/tile-world.mjs ../build/testscene ../build/tiled7 7   # 7x7 copy of the look-test chunk
@@ -20,8 +20,9 @@ node tools/tile-world.mjs ../build/testscene ../build/tiled7 7   # 7x7 copy of t
 Or from the repo root: `scripts/shots.sh` regenerates the models and the test scene, then
 takes `hero`, `facade`, `gallery` and a night hero shot into `build/shots/`.
 
-URL hash: `#view=hero|map|facade|river|gallery&t=16.5&tilt=0&ao=0&anim=0&ids=38-47&quality=auto&zoom=0.5`.
-`t` is the sun time in hours (after 18:30 lamps and windows glow); `ids` limits the gallery;
+URL hash: `#view=hero|map|facade|river|island|islandmap|gallery&t=16.5&tilt=0&ao=0&anim=0&ids=38-47&quality=auto&zoom=0.5`.
+`island` looks at the street facade of the biggest island, `islandmap` straight down on all
+islands (compare with the pipeline's `preview.png`). `t` is the sun time in hours (after 18:30 lamps and windows glow); `ids` limits the gallery;
 `quality` is `auto|high|medium|low` (also in the HUD); `zoom` scales the preset camera distance.
 Controls: left drag pans, right drag orbits, wheel zooms, and a click shows a brick's feature,
 type, colour, cell and facing.
@@ -32,10 +33,11 @@ type, colour, cell and facing.
 build.mjs: world dir + contract/models -> dist/world.js (embedded data) + dist/viewer.js
 
 main.js ── world.js (World: typed arrays, cell -> brick map, bounds)  <- bxc.js (chunk reader)
+   │   island.js (one World per island, local cells; pose)                <- bxi.js (island reader)
    │          ├─ exterior.js   occupancy grid (1 byte/cell) + flood fill of outside air
    │          ├─ glow.js       which windows are lit at night (per window, hashed)
    │          └─ picking.js    click -> brick via 3D DDA through the grid
-   ├── lod.js     ChunkLOD: per chunk a near look (bricks.js) or far look (farmesh.js)
+   ├── lod.js     ChunkLOD: per chunk and per island a near look (bricks.js) or far look (farmesh.js)
    ├── quality.js tiers high/medium/low, auto step-down (FrameGovernor), FpsMeter
    ├── bricks.js  BrickBatcher: one InstancedMesh per (geometry, material); colour variation,
    │              stud exposure, hide_studs; worldContext (occupancy grid, glows) shared by all
@@ -69,6 +71,44 @@ rotates by `−rot·90°` about +y. See [guide 01](01-coordinates-and-rotation.m
 - **Performance (LOD and quality tiers):** see the next section.
 - **Picking** steps cell by cell along the ray (Amanatides & Woo), so the cost depends on ray
   length, not brick count (`picking.js`, tested in `test/picking.test.mjs`).
+
+## Islands (rotated buildings, CONTRACT 5.1)
+
+Buildings more than 3° off the world grid come as `islands/i_XXXXXX.bxi`: a 40-byte `BXI1`
+header with the pose (origin in Unity metres, yaw clockwise from north) and the usual 12-byte
+records with **local** `i, j` and global `k` (`src/bxi.js`, tested against the pipeline's
+golden file `pipeline/tests/fixtures/golden/i_000001.bxi` + `golden_island.json`).
+
+- **One World per island, in local cells** (`src/island.js: islandWorld`): `I = i`, `J = j`,
+  `K = k`. Everything that reads a World then works in island space with no special cases:
+  occupancy grid and exterior flood fill (stud exposure, far hidden faces), stud positions,
+  window glow, picking, and colour variation hashed on the island-local `(i, j, k)` as the
+  contract asks (same as Unity's `IslandMesherCore`). Nothing in the viewer looks at world
+  axes inside an island; the chunk grid never sees island cells.
+- **Pose in three.js** (`applyIslandPose`): local cells map to three.js `(u, y, -v)` exactly
+  like chunks, and the island's `THREE.Group` sits at `(originX, 0, -originZ)` turned by
+  **`-yaw`** about +Y (clockwise from above is negative about +Y in three.js; Unity uses
+  `+yaw` because it is left-handed). `test/island.test.mjs` pushes every point of
+  `contract/test_vectors/islands.json` through a real group, checks local +j lands on
+  `(sin yaw, cos yaw)` in (east, north), and that the inverse used by picking round-trips.
+- **LOD** (`src/lod.js`): each island is one extra "chunk" whose source is its own World,
+  near/far looks are built by the same code and hung under the posed group; the near/far
+  choice uses the island's world-space bounding box (local box through the pose). Near and
+  stud caps are shared with the chunks. Far meshes: one cluster per island.
+- **Picking** (`pickNearest`): the ray is turned into each island's local frame (rigid, so
+  distances compare) and run through that island's grid; the nearest hit over chunks and
+  islands wins. The highlight box is parented to the island group, so it turns with it. The
+  info panel shows the feature name (or kind + address / BAG id when the feature has no name)
+  and `island N (yaw°) · i j K`.
+- **Check that islands sit on their plots**: `test/island.test.mjs` loads the committed
+  `pipeline/tests/fixtures/town_world` (terrace at yaw +20°, house at -30°) and asserts that
+  > 85 % of each island's plinth cells stand on the pavement plot the pipeline wrote into
+  the chunks (measured: 91 % and 93 %; the rest is the half-stud growth over the staircased
+  plot edge; flipping the yaw sign drops this to < 25 %). Visually: `#view=islandmap` against
+  the pipeline's `preview.png`.
+- `build.mjs` embeds the islands listed in the manifest; with `--around` it keeps the islands
+  whose owning chunk `(cx, cy)` is in range. Worlds without islands load as before (the
+  look-test chunk renders with the same draw calls/triangles/studs; `samples/markt` too).
 
 ## Performance: per-chunk LOD and quality tiers
 
@@ -174,3 +214,4 @@ is meaningless; compare triangles and draw calls.
 | `test/models.test.mjs` | every `contract/models/*.json` builds with the right parts, size and pivot, facing forward |
 | `test/farmesh.test.mjs` | far LOD hidden-face counts: lone brick, neighbours, solid block, sealed interior, glass/water, slope caps, window glass |
 | `test/quality.test.mjs` | starting tier and LOD switch by world size, tier ordering, auto step-down, fps meter |
+| `test/island.test.mjs` | `.bxi` golden file (compressed + raw), bad input, pose vs `islands.json` through a THREE.Group, island picking + nearest hit, LOD wiring on the town fixture, islands on their paved plots |
