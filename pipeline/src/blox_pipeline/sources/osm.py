@@ -31,9 +31,13 @@ def clip_path(root: Path | None = None) -> Path:
 
 def fetch_osm(root: Path | None = None) -> Path:
     """Download the Geofabrik extract (cached) and clip it to the slice + margin."""
+    if not source_path(root).exists():
+        log.info("OSM: downloading the Geofabrik Limburg extract (~100 MB, quiet for a few minutes; "
+                 "an interrupted download resumes on the next run)")
     src = download(config.OSM_PBF_URL, source_path(root), session=make_session())
     dst = clip_path(root)
     if not dst.exists():
+        log.info("OSM: clipping the extract to the slice (two passes over the file, a few minutes)")
         clip_pbf(src, dst, slice_box().buffer(config.OSM_CLIP_MARGIN_M).to_wgs84())
     return dst
 
