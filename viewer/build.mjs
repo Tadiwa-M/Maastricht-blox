@@ -62,15 +62,26 @@ async function embedWorld() {
     bytes += buf.length;
     chunks[f.split('/').pop()] = buf.toString('base64');
   }
+  // islands (CONTRACT 5.1): listed in the manifest; --around keeps those whose owning chunk is in range
+  let islandList = manifest.islands || [];
+  if (keep) islandList = manifest.islands = islandList.filter((e) => keep(e.cx, e.cy));
+  const islands = {};
+  let islandBytes = 0;
+  for (const e of islandList) {
+    const buf = await readFile(join(worldDir, e.file));
+    islandBytes += buf.length;
+    islands[e.file.split('/').pop()] = buf.toString('base64');
+  }
   const models = await readModels();
   // the gallery shows the contract's catalogue, which may be newer than the world's copy
   const contract = {
     catalogue: await readJson(join(here, '..', 'contract', 'brick_catalogue.json')),
     palette: await readJson(join(here, '..', 'contract', 'palette.json')),
   };
-  const js = `window.BLOX_WORLD = ${JSON.stringify({ manifest, palette, catalogue, features, chunks, models, contract })};\n`;
+  const js = `window.BLOX_WORLD = ${JSON.stringify({ manifest, palette, catalogue, features, chunks, islands, models, contract })};\n`;
   await writeFile(join(dist, 'world.js'), js);
-  console.log(`world.js: ${files.length} chunks (${(bytes / 1024).toFixed(1)} KiB) from ${worldDir}`);
+  console.log(`world.js: ${files.length} chunks (${(bytes / 1024).toFixed(1)} KiB), ${islandList.length} islands `
+    + `(${(islandBytes / 1024).toFixed(1)} KiB) from ${worldDir}`);
 }
 
 await mkdir(dist, { recursive: true });

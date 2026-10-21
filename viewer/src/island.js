@@ -89,3 +89,15 @@ export function mainFacing(world) {
   const best = n4.indexOf(Math.max(...n4));
   return n4[best] ? best : 2;
 }
+
+/**
+ * World three.js point or direction -> island-local three.js (inverse pose; pure math, so
+ * picking can run in island space). Returns { x, y, z }.
+ */
+export function worldToLocalThree(island, p, isDirection = false) {
+  const s = Math.sin(island.yawDeg * DEG), c = Math.cos(island.yawDeg * DEG);
+  const dx = p.x - (isDirection ? 0 : island.origin[0]);
+  const dz = -p.z - (isDirection ? 0 : island.origin[1]); // Unity z = -three z
+  const u = dx * c - dz * s, v = dx * s + dz * c;
+  return { x: u, y: p.y, z: -v };
+}
