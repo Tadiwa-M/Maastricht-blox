@@ -73,6 +73,7 @@ def download(
             part.unlink(missing_ok=True)
             raise
     part.replace(dest)
+    part.with_name(part.name + ".etag").unlink(missing_ok=True)
     return dest
 
 
@@ -84,13 +85,23 @@ def _fetch_into(
     chunk_bytes: int,
 ) -> None:
     have = part.stat().st_size if part.exists() else 0
+    tag_file = part.with_name(part.name + ".etag")
     headers = {"Range": f"bytes={have}-"} if have else {}
+    if have and tag_file.exists():
+        # "latest" files (e.g. Geofabrik's daily extract) change between runs: If-Range makes the
+        # server send the whole new file (200) instead of appending new bytes to an old file.
+        headers["If-Range"] = tag_file.read_text(encoding="utf-8").strip()
+    elif have:
+        headers = {}  # can't prove the partial file is the same version: start over
     with sess.get(url, params=params, headers=headers, stream=True, timeout=config.HTTP_TIMEOUT_S) as r:
         if r.status_code == 416:  # range not satisfiable: we already have everything
             return
         if r.status_code not in (200, 206):
             raise DownloadError(f"HTTP {r.status_code} for {r.url}")
         mode = "ab" if (have and r.status_code == 206) else "wb"
+        tag = r.headers.get("ETag") or r.headers.get("Last-Modified")
+        if tag and mode == "wb":
+            tag_file.write_text(tag, encoding="utf-8")
         expected = r.headers.get("Content-Length")
         written = 0
         with open(part, mode) as fh:

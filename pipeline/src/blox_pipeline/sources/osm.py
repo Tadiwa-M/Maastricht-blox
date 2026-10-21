@@ -13,7 +13,7 @@ from shapely.geometry.base import BaseGeometry
 
 from ..geo import RDBox, slice_box, wgs84_to_rd
 from . import config
-from .http import download, make_session
+from .http import DownloadError, download, make_session
 from .osm_classify import classify_area, classify_node, classify_way
 from .model import OsmData, OsmFeature
 
@@ -38,7 +38,11 @@ def fetch_osm(root: Path | None = None) -> Path:
     dst = clip_path(root)
     if not dst.exists():
         log.info("OSM: clipping the extract to the slice (two passes over the file, a few minutes)")
-        clip_pbf(src, dst, slice_box().buffer(config.OSM_CLIP_MARGIN_M).to_wgs84())
+        try:
+            clip_pbf(src, dst, slice_box().buffer(config.OSM_CLIP_MARGIN_M).to_wgs84())
+        except RuntimeError as exc:  # pyosmium: "failed to uncompress data" = corrupt download
+            src.unlink(missing_ok=True)
+            raise DownloadError(f"OSM extract {src.name} is corrupt ({exc}); deleted it, run 'blox fetch' again") from exc
     return dst
 
 

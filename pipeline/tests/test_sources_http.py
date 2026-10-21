@@ -64,10 +64,22 @@ def test_download_is_idempotent(server, session, tmp_path):
 def test_download_resumes_part_file(server, session, tmp_path):
     dest = tmp_path / "x.tif"
     (tmp_path / "x.tif.part").write_bytes(PAYLOAD[:1000])
+    (tmp_path / "x.tif.part.etag").write_text('"v1"')  # version of the partial file
     download(f"{server}/x.tif", dest, session=session)
     assert _Handler.hits == ["bytes=1000-"]
     assert dest.read_bytes() == PAYLOAD
     assert not (tmp_path / "x.tif.part").exists()
+    assert not (tmp_path / "x.tif.part.etag").exists()
+
+
+def test_part_file_of_unknown_version_starts_over(server, session, tmp_path):
+    """A partial file without a recorded version may be from yesterday's "latest" file:
+    resuming would splice two versions together (the corrupt-OSM bug), so start over."""
+    dest = tmp_path / "x.tif"
+    (tmp_path / "x.tif.part").write_bytes(b"stale bytes from another version")
+    download(f"{server}/x.tif", dest, session=session)
+    assert _Handler.hits == [""]
+    assert dest.read_bytes() == PAYLOAD
 
 
 def test_validator_rejects_error_documents(server, session, tmp_path):
