@@ -48,6 +48,7 @@ def download(
     then removed and the error re-raised without retrying.
     """
     if dest.exists() and dest.stat().st_size > 0:
+        log.debug("cached %s", dest)
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_name(dest.name + ".part")
