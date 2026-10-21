@@ -9,7 +9,7 @@ import { Sky } from './sky.js';
 import { makeGround } from './ground.js';
 import { Post } from './post.js';
 
-const DAY_TOP = new THREE.Color('#5b8fd6'), DAY_HORIZON = new THREE.Color('#e9e2d6');
+const DAY_TOP = new THREE.Color('#3a78d4'), DAY_HORIZON = new THREE.Color('#c9dcee');
 const DUSK_TOP = new THREE.Color('#40619a'), DUSK_HORIZON = new THREE.Color('#f3c39a');
 const NIGHT_TOP = new THREE.Color('#060a17'), NIGHT_HORIZON = new THREE.Color('#1b2540');
 const SUN_NOON = new THREE.Color('#fff4e2'), SUN_LOW = new THREE.Color('#ffb46b');
@@ -69,8 +69,9 @@ export class Stage {
     this.radius = box.getSize(new THREE.Vector3()).length() / 2;
     this.ground = makeGround(c.x, box.min.y - 0.01, c.z, studM);
     this.scene.add(this.ground);
-    this.scene.fog.near = Math.max(60, this.radius * 3);
-    this.scene.fog.far = Math.max(500, this.radius * 18);
+    // fade the baseplate into the horizon haze soon after the model ends, so the sky shows
+    this.scene.fog.near = Math.max(60, this.radius * 1.2);
+    this.scene.fog.far = Math.max(300, this.radius * 3);
   }
 
   initPost() {

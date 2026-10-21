@@ -101,7 +101,8 @@ export function makePresets(world, box, aspect = 1.6, islands = []) {
     // neighbourhood (several chunks): a 3/4 view over the centre from medium height instead of
     // fitting everything in, which put the camera hundreds of metres up looking down
     const t = new THREE.Vector3(c.x, groundY + 4, c.z);
-    heroView = { target: t, cam: t.clone().add(offset(206, 33, THREE.MathUtils.clamp(r * 0.85, 90, 170))), fov: 40 };
+    // 16° elevation leaves the top of the frame above the horizon, so the sky is in the shot
+    heroView = { target: t, cam: t.clone().add(offset(206, 16, THREE.MathUtils.clamp(r * 0.85, 90, 170))), fov: 40 };
   }
   const presets = {
     hero: heroView,
