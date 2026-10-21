@@ -36,7 +36,7 @@ export function studCells(t) {
 
 export const cellKey = (I, J, K) => I + J * 4096 + K * 16777216;
 
-function b64ToBytes(b64) {
+export function b64ToBytes(b64) {
   const s = atob(b64);
   const out = new Uint8Array(s.length);
   for (let n = 0; n < s.length; n++) out[n] = s.charCodeAt(n);

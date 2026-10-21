@@ -26,14 +26,10 @@ async function inflateRaw(data) {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
-/** Decode a .bxc file into a header plus column arrays of its records (local i/j). */
-export async function parseBxc(bytes) {
-  const h = parseHeader(bytes);
-  let body = bytes.subarray(HEADER_BYTES, HEADER_BYTES + h.bodyBytes);
-  if (h.flags & FLAG_DEFLATE) body = await inflateRaw(body);
-  const n = h.brickCount;
+/** Decode n 12-byte brick records (CONTRACT section 4) into column arrays. */
+export function decodeRecords(body, n, what = 'body') {
   if (body.byteLength !== n * RECORD_BYTES) {
-    throw new Error(`chunk ${h.cx},${h.cy}: body ${body.byteLength} B, expected ${n * RECORD_BYTES}`);
+    throw new Error(`${what}: body ${body.byteLength} B, expected ${n * RECORD_BYTES}`);
   }
   const dv = new DataView(body.buffer, body.byteOffset, body.byteLength);
   const rec = {
@@ -50,5 +46,19 @@ export async function parseBxc(bytes) {
     rec.rotFlags[r] = body[o + 6];
     rec.feature[r] = dv.getUint32(o + 8, true);
   }
-  return { header: h, records: rec };
+  return rec;
+}
+
+/** Body bytes of a file: raw or raw-DEFLATE (flags bit0). */
+export async function readBody(bytes, offset, bodyBytes, flags) {
+  const body = bytes.subarray(offset, offset + bodyBytes);
+  if (body.byteLength !== bodyBytes) throw new Error(`truncated body: ${body.byteLength} of ${bodyBytes} B`);
+  return flags & FLAG_DEFLATE ? inflateRaw(body) : body;
+}
+
+/** Decode a .bxc file into a header plus column arrays of its records (local i/j). */
+export async function parseBxc(bytes) {
+  const h = parseHeader(bytes);
+  const body = await readBody(bytes, HEADER_BYTES, h.bodyBytes, h.flags);
+  return { header: h, records: decodeRecords(body, h.brickCount, `chunk ${h.cx},${h.cy}`) };
 }
