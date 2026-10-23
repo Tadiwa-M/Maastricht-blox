@@ -397,3 +397,13 @@ The browser viewer now reads `islands/*.bxi` and draws each island as one rigid 
 - Island near looks count against the same `maxNear`/stud caps as chunks; a dense real
   neighbourhood with many islands may want its own cap.
 - `presets.js: clearestFacade` (the `facade` view) still only scores world-grid buildings.
+
+## 2026-10-23: real city with islands; launch pivots to the browser
+
+- Workstation full build: 4096 chunks and **2448 rotated-building islands**. A real-data bug was
+  fixed: the island plinth overwrote door pieces on sloping streets.
+- Sample `samples/markt_v3` (49 chunks, 40 islands) exported; `tools.sample` now includes islands.
+- Downloads no longer splice two versions of a daily "latest" file (the corrupt-OSM bug).
+- **Decision:** launch as a playable **web** city (three.js engine), not a Unity download.
+  Reasons: link-clickable for the LinkedIn audience, already renders the real data, works on
+  phones. Unity is parked until after launch. See PLAN.md phase 2.
