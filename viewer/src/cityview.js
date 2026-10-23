@@ -154,7 +154,7 @@ export class CityView {
     for (const v of cached.slice(maxNear + 4)) { this.freeNear(v); v.world = null; v.ctx = null; }
     // keep the World (cell map) of near items only: it is the biggest per-item structure
     for (const v of views) if (!v.near && v.world && v.dist > nearDist * 3) { v.world = null; v.ctx = null; }
-    const fs = this.far.update(eye, this.coverDirty);
+    this.far.update(eye, this.coverDirty);
     this.coverDirty = false;
     return pending;
   }
@@ -162,12 +162,13 @@ export class CityView {
   settled() { return this.loader.settled() && this.far.settled(); }
 
   stats() {
-    let near = 0, mid = 0, tris = 0;
+    let near = 0, mid = 0, nearTris = 0, midTris = 0;
     for (const v of this.views.values()) {
-      if (v.isNear) { near++; tris += v.nearTris + (v.studMeshes[0]?.visible ? 0 : 0); } else { mid++; tris += v.triangles; }
+      if (v.isNear) { near++; nearTris += v.nearTris; } else { mid++; midTris += v.triangles; }
     }
-    const f = this.far.lastStats || { triangles: 0 };
-    return { near, mid, studs: this.studsShown, triangles: tris + f.triangles, farTriangles: f.triangles, ...this.far.stats() };
+    const { triangles: farTris = 0, ...far } = this.far.stats();
+    // triangles: one geometry pass before frustum culling (near counts include hidden studs)
+    return { near, mid, studs: this.studsShown, nearTris, midTris, farTris, triangles: nearTris + midTris + farTris, ...far };
   }
 
   /**

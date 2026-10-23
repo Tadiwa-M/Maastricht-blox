@@ -1,43 +1,43 @@
-// Load dist/ in headless Chromium and report what one frame costs: draw calls and triangles
-// from renderer.info (all passes: shadow, AO normals, main), plus brick/stud counts and load time.
-// Usage: node tools/perf.mjs [views=hero,map] [extraHash e.g. "quality=high"]
-// SwiftShader fps means nothing; the triangle and draw-call counts are what transfer to a GPU.
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { extname, join, dirname, normalize } from 'node:path';
+// Load dist/ (or a site build: --site <dir>) in headless Chromium and report what one frame
+// costs: draw calls and triangles from renderer.info (all passes: shadow, AO normals, main),
+// streaming/LOD state, load times and memory.
+// Usage: node tools/perf.mjs [views=hero,map] [extraHash e.g. "quality=high"] [--site ../build/site]
+// SwiftShader fps means nothing; triangles, draw calls, load time and memory are what transfer.
+//   load    ms from page start to the whole-city silhouette (site) / first frame, and to
+//           "ready" (every wanted chunk/island streamed and near looks built)
+//   memory  JS heap (performance.memory, precise), GPU geometries/textures (renderer.info.memory)
+import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { serve, siteArg } from './serve.mjs';
 
-const dist = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
-const views = (process.argv[2] || 'hero').split(',');
-const extra = process.argv[3] ? `&${process.argv[3]}` : '';
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript' };
-const server = createServer(async (req, res) => {
-  const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^([/\\])+/, '');
-  try {
-    const body = await readFile(join(dist, path || 'index.html'));
-    res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/octet-stream' });
-    res.end(body);
-  } catch { res.writeHead(404); res.end(); }
-});
-await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+const argv = process.argv.slice(2);
+const root = siteArg(argv, join(dirname(fileURLToPath(import.meta.url)), '..', 'dist'));
+const views = (argv[0] || 'hero').split(',');
+const extra = argv[1] ? `&${argv[1]}` : '';
+const { server, url } = await serve(root);
 const browser = await chromium.launch({
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-gl=angle'],
+  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-gl=angle', '--enable-precise-memory-info', '--js-flags=--expose-gc'],
 });
 try {
   for (const view of views) {
     const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
     page.on('pageerror', (e) => console.log(`[${view}] pageerror ${e.message}`));
+    page.on('console', (m) => { if (m.type() === 'error') console.log(`[${view}] ${m.text()}`); });
     const t0 = Date.now();
-    await page.goto(`http://127.0.0.1:${server.address().port}/index.html?shot=1#view=${view}${extra}`);
+    await page.goto(`${url}index.html?shot=1#view=${view}${extra}`);
     await page.waitForFunction(() => window.__bloxReady === true || window.__bloxError, null, { timeout: 1800000 });
     const err = await page.evaluate(() => window.__bloxError);
     if (err) throw new Error(err);
     const s = await page.evaluate(() => {
+      if (typeof window.gc === 'function') window.gc();
       const b = window.__blox;
-      const info = b.stage.renderer.info.render;
-      return { calls: info.calls, triangles: info.triangles, bricks: b.built.bricks, studs: b.built.studs,
-        tier: b.quality?.describe?.() ?? null, lod: b.lod?.stats?.() ?? null };
+      const info = b.stage.renderer.info;
+      const mem = performance.memory;
+      return { calls: info.render.calls, triangles: info.render.triangles, studs: b.built.studs,
+        tier: b.quality?.describe?.() ?? null, lod: b.lod?.stats?.() ?? null, times: window.__bloxTimes ?? null,
+        heapMiB: mem ? +(mem.usedJSHeapSize / 1048576).toFixed(1) : null,
+        geometries: info.memory.geometries, textures: info.memory.textures };
     });
     console.log(`${view}${extra}: ${JSON.stringify(s)} (ready after ${((Date.now() - t0) / 1000).toFixed(1)} s)`);
     await page.close();

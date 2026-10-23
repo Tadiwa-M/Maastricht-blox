@@ -6,10 +6,12 @@
 //   city   the whole city from the south-southwest     map    straight down on the whole city
 //   hero   3/4 view over the Markt (or the data centre) street  street level on the Markt
 //   <place> markt | vrijthof | brug | station | bonnefanten: a 3/4 view over that place
-//   at=x,z (Unity metres east, north) + dist: look at any point; worker=0: prepare on the main thread
+//   at=x,z (Unity metres east, north) + dist: look at any point; worker=0: prepare on the main thread;
+//   stream=0: baked far regions only (check the bake), farlevel=1|2|3: force one baked level
 import * as THREE from 'three';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { MaterialSet } from './materials.js';
+import { World } from './world.js';
 import { TIERS, MODES, initialTier, FrameGovernor, FpsMeter } from './quality.js';
 import { Stage } from './scene.js';
 import { FarRegions } from './farregion.js';
@@ -40,6 +42,8 @@ function parseHash() {
     at: at?.length === 2 && at.every(Number.isFinite) ? at : null,
     dist: p.has('dist') ? +p.get('dist') : null,
     worker: p.get('worker') !== '0',
+    stream: p.get('stream') !== '0',
+    farLevel: p.has('farlevel') ? +p.get('farlevel') : null,
   };
 }
 
@@ -101,6 +105,49 @@ export function cityPresets(index, box, approxGround) {
   return out;
 }
 
+/**
+ * Street-level camera near (x, z): the open ground spot (no roof above, at the lowest ground
+ * around) closest to the point, looked at from the side with the longest clear line of sight,
+ * eye 1.7 m above the street, 6 degrees down. Needs the area streamed (city query API);
+ * returns null while it is unknown.
+ */
+export function findStreetSpot(city, x, z, { search = 40, step = 2, eye = 1.7, dist = 24 } = {}) {
+  const open = (px, pz) => {
+    const g = city.groundHeight(px, pz);
+    return typeof g === 'number' ? g : null;
+  };
+  let lowest = Infinity;
+  for (let dx = -search; dx <= search; dx += step * 4) for (let dz = -search; dz <= search; dz += step * 4) {
+    const g = open(x + dx, z + dz);
+    if (g !== null) lowest = Math.min(lowest, g);
+  }
+  if (lowest === Infinity) return null;
+  // nearest column whose top is street level (within 0.5 m of the lowest ground seen)
+  let best = null;
+  for (let r = 0; r <= search && !best; r += step)
+    for (let a = 0; a < 360 && !best; a += r ? Math.max(5, (step / r) * 57) : 360) {
+      const px = x + r * Math.cos(a * DEG), pz = z + r * Math.sin(a * DEG);
+      const g = open(px, pz);
+      if (g !== null && g - lowest < 0.5) best = { x: px, z: pz, y: g };
+    }
+  if (!best) return null;
+  const target = new THREE.Vector3(best.x, best.y + eye, best.z);
+  // the direction with the longest clear eye-level line (camera stands there, looks back)
+  let bestAz = 200, bestFree = -1;
+  for (let az = 0; az < 360; az += 15) {
+    let free = 0;
+    for (let d = 1; d <= dist; d += 1) {
+      const o = offset(az, 0, d);
+      const s = city.isSolid(target.x + o.x, target.y, target.z + o.z);
+      if (s !== false) break;
+      free = d;
+    }
+    if (free > bestFree) { bestFree = free; bestAz = az; }
+  }
+  const camDist = Math.max(6, Math.min(dist, bestFree - 1));
+  return { target, cam: target.clone().add(offset(bestAz, 6, camDist)) };
+}
+
 function featureHead(f) {
   if (!f) return '<b>No feature</b>';
   const title = f.name || (f.address ? `${f.kind} at ${f.address}` : `${f.kind} ${f.bagId || '#' + f.id}`);
@@ -128,6 +175,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const box = cityBox(index);
   const approxGround = groundGrid(farIndex, index);
   const centre = box.getCenter(new THREE.Vector3());
+  const cityRadius = Math.hypot(box.max.x - box.min.x, box.max.z - box.min.z) / 2;
   stage.setBounds(box, index.studM, { groundSize: 40000, groundY: approxGround(centre.x, centre.z) - 3 });
   stage.initPost();
 
@@ -153,21 +201,23 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     const tier = TIERS[name];
     stage.setQuality(tier);
     view.setTier(tier);
-    loader.setRadius(tier.streamRadius);
-    far.showDist = tier.farDist;
+    loader.setRadius(opts.stream ? tier.streamRadius : 0);
+    far.showDist = opts.farLevel ? [[0, 0], [Infinity, 0], [Infinity, Infinity]][opts.farLevel - 1] : tier.farDist;
     ui?.tier(mode, name);
   }
   function setMode(m) { mode = m; governor = new FrameGovernor(initialTier(m, size)); applyTier(initialTier(m, size)); }
   applyTier(tierName);
 
   const controls = new MapControls(stage.camera, canvas);
-  const cam = new CityCamera(stage.camera, controls, { box, groundAt: (x, z) => {
-    const g = city.groundHeight(x, z);
+  const cam = new CityCamera(stage.camera, controls, { box, groundAt: (x, z, fromY) => {
+    const g = city.groundHeight(x, z, fromY);
     return typeof g === 'number' ? g : approxGround(x, z);
   } });
   const presets = cityPresets(index, box, approxGround);
+  let streetWanted = null; // street view: re-aim once the area is streamed in (needs the query API)
   function applyView(o) {
     let p = presets[o.view] || presets.city;
+    streetWanted = o.view === 'street' ? { target: p.target.clone(), zoom: o.zoom } : null;
     if (o.at) {
       const t = new THREE.Vector3(o.at[0], 0, -o.at[1]);
       t.y = approxGround(t.x, t.z);
@@ -249,13 +299,25 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     frustum.setFromProjectionMatrix(pv);
     loader.update(stage.camera.position, inView);
     if (times.silhouette === undefined && far.silhouetteReady()) times.silhouette = performance.now() - t0;
-    const ready = still && far.silhouetteReady() && loader.settled() && far.settled();
+    if (streetWanted && loader.settled()) {
+      const spot = findStreetSpot(city, streetWanted.target.x, streetWanted.target.z);
+      if (spot) {
+        controls.target.copy(spot.target);
+        stage.camera.position.copy(spot.cam).sub(spot.target).multiplyScalar(streetWanted.zoom).add(spot.target);
+        controls.update();
+        cam.update();
+      }
+      streetWanted = null;
+      return requestAnimationFrame(frame);
+    }
+    const ready = still && !streetWanted && far.silhouetteReady() && loader.settled() && far.settled();
     view.update(stage.camera, { all: ready });
     // view-dependent look: haze, shadow box and AO follow the zoom
     const t = controls.target;
     const zoomed = THREE.MathUtils.clamp(dist, 10, 4000);
-    stage.scene.fog.near = zoomed * 0.9 + 140;
-    stage.scene.fog.far = stage.scene.fog.near + 900 + zoomed * 2.2;
+    // the baseplate beyond the city fades into the horizon haze, the city itself stays clear
+    stage.scene.fog.near = zoomed * 0.6 + 300;
+    stage.scene.fog.far = zoomed + cityRadius * 1.25;
     const sr = THREE.MathUtils.clamp(dist * 1.1, 45, 1600);
     shadowBox.min.set(t.x - sr, t.y - 10, t.z - sr); shadowBox.max.set(t.x + sr, t.y + Math.min(140, sr), t.z + sr);
     stage.setShadowFocus(shadowBox);
@@ -289,7 +351,12 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     stage.render(controls.target);
     return { url: canvas.toDataURL('image/png'), ms: performance.now() - ts };
   };
-  const ctx = { stage, camera: stage.camera, controls, city, models: extras.models || {}, ui, world: null, islands: [], features };
+  // hooks get an empty World for palette/catalogue/feature lookups (no bricks: ask `city`)
+  const metaWorld = new World({ ...meta, features: { features: [] } });
+  metaWorld.features = features;
+  metaWorld.finish();
+  const ctx = { stage, camera: stage.camera, controls, city, models: extras.models || {}, ui, world: metaWorld, islands: [],
+    lod: null, box, demo: null, quality: () => tierName, still, features };
   hooks.push(...(await initHooks(ctx)).filter(Boolean));
   requestAnimationFrame(frame);
 }

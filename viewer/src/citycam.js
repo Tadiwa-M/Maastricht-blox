@@ -22,8 +22,8 @@ export function zoomT(dist) {
 export function tiltFor(dist) {
   const t = zoomT(dist);
   return {
-    maxPolar: THREE.MathUtils.lerp(86, 42, t) * DEG,   // how far you may lean toward the horizon
-    preferred: THREE.MathUtils.lerp(76, 28, t * t * (3 - 2 * t)) * DEG, // where zooming eases to
+    maxPolar: THREE.MathUtils.lerp(87, 52, t ** 1.6) * DEG, // how far you may lean toward the horizon
+    preferred: THREE.MathUtils.lerp(80, 40, t * t * (3 - 2 * t)) * DEG, // where zooming eases to
   };
 }
 
@@ -35,7 +35,10 @@ export function clampTarget(p, box, margin = 50) {
 }
 
 export class CityCamera {
-  /** groundAt(x, z) -> y metres (always a number); box: THREE.Box3 of the city. */
+  /**
+   * groundAt(x, z, fromY?) -> y metres (always a number): the top of the ground at or below
+   * fromY (default: the top of the column); box: THREE.Box3 of the city.
+   */
   constructor(camera, controls, { box, groundAt }) {
     Object.assign(this, { camera, controls, box, groundAt });
     controls.zoomToCursor = true;
@@ -57,8 +60,9 @@ export class CityCamera {
     const { camera, controls } = this;
     const t = controls.target;
     clampTarget(t, this.box);
-    // target rides on the ground: move target and camera together (a vertical pan)
-    const gy = this.groundAt(t.x, t.z);
+    // target rides on the ground (at eye height when close): move target and camera together
+    const lift = 1.7 * (1 - zoomT(camera.position.distanceTo(t)));
+    const gy = this.groundAt(t.x, t.z, t.y + 2) + lift;
     const dy = (gy - t.y) * 0.25;
     if (Math.abs(dy) > 1e-3) { t.y += dy; camera.position.y += dy; }
     this.off.copy(camera.position).sub(t);
@@ -74,7 +78,7 @@ export class CityCamera {
       camera.position.copy(t).add(this.off);
     }
     // never under the bricks
-    const cg = this.groundAt(camera.position.x, camera.position.z);
+    const cg = this.groundAt(camera.position.x, camera.position.z, camera.position.y + 1);
     if (camera.position.y < cg + 1.6) camera.position.y = cg + 1.6;
     const near = THREE.MathUtils.clamp(dist * 0.004, 0.15, 8);
     const far = Math.max(3000, dist * 2.5 + 2500);

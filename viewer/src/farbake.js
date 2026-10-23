@@ -6,7 +6,8 @@
 //      their pose) votes for its coarse cell of cellStuds x cellStuds x cellPlates (default
 //      2 x 2 x 3 = 1 m x 1 m x 0.6 m). Any vote makes the cell solid (thin walls and roof
 //      shells survive); its colour is the majority vote (Boyer-Moore), windows and doors vote
-//      glass. Each solid cell remembers its owner chunk (islands: the island's owning chunk),
+//      glass; the colour of its highest fine cell is kept apart for its top face (paving on
+//      top of earth reads as paving). Each solid cell remembers its owner chunk (islands: the island's owning chunk),
 //      so a region's faces can be hidden chunk by chunk when the real chunk is streamed in.
 //   2. Outside air: flood fill from the sky down and sideways (never into the "bottomless"
 //      air under the terrain shell, as src/exterior.js). The grid covers the region plus its
@@ -45,6 +46,8 @@ export class CoarseGrid {
     this.color = new Uint8Array(n);
     this.votes = new Uint8Array(n);
     this.owner = new Uint16Array(n); // 0 = context only (not emitted), else owner index + 1
+    this.topColor = new Uint8Array(n); // colour of the highest fine level seen in the cell
+    this.topLevel = new Uint8Array(n); // that level within the cell + 1
   }
 
   index(gi, gj, gk) {
@@ -53,9 +56,11 @@ export class CoarseGrid {
     return x + this.ni * (y + this.nj * z);
   }
 
-  vote(gi, gj, gk, color, owner) {
+  /** level: the highest fine level (0-based, within the coarse cell) this vote covers. */
+  vote(gi, gj, gk, color, owner, level = 0) {
     const c = this.index(gi, gj, gk);
     if (c < 0) return;
+    if (level + 1 >= this.topLevel[c]) { this.topLevel[c] = level + 1; this.topColor[c] = color; }
     if (this.color[c] === color) { if (this.votes[c] < 255) this.votes[c]++; if (owner && !this.owner[c]) this.owner[c] = owner; } else if (this.votes[c] === 0) { this.color[c] = color; this.owner[c] = owner; this.votes[c] = 1; } else this.votes[c]--;
   }
 }
@@ -77,12 +82,12 @@ export function rasterise(grid, src, { cellStuds, cellPlates, owner }) {
         let wi = I[n] + di, wj = J[n] + dj;
         if (src.toWorld) [wi, wj] = src.toWorld(wi + 0.5, wj + 0.5);
         const gi = Math.floor(wi / cellStuds), gj = Math.floor(wj / cellStuds);
-        let last = -1;
-        for (let k = 0; k < t.h; k++) {
+        // one vote per coarse cell per column of the brick, with the highest fine level it fills
+        for (let k = 0; k < t.h; ) {
           const gk = Math.floor((K[n] + k) / cellPlates);
-          if (gk === last) continue; // one vote per coarse cell per column of the brick
-          last = gk;
-          grid.vote(gi, gj, gk, col, owner);
+          const end = Math.min(t.h, (gk + 1) * cellPlates - K[n]);
+          grid.vote(gi, gj, gk, col, owner, K[n] + end - 1 - gk * cellPlates);
+          k = end;
         }
       }
   }
@@ -139,7 +144,7 @@ export function outsideAir(grid) {
  * Returns quads sorted by owner: { owner, x, y, z, w, h, dir, color } columns + counts per owner.
  */
 export function meshGrid(grid, outside, { isWater, isGlass }) {
-  const { ni, nj, nk, color, owner } = grid;
+  const { ni, nj, nk, color, owner, topColor } = grid;
   const dims = [ni, nj, nk], strides = [1, ni, ni * nj];
   const water = new Uint8Array(256), glass = new Uint8Array(256);
   for (let c = 1; c < 256; c++) { water[c] = isWater(c) ? 1 : 0; glass[c] = isGlass(c) ? 1 : 0; }
@@ -157,14 +162,14 @@ export function meshGrid(grid, outside, { isWater, isGlass }) {
             p[a] = s; p[u] = iu; p[v] = jv;
             const c = p[0] + strides[1] * p[1] + strides[2] * p[2];
             let key = 0;
-            const col = color[c];
+            const col = color[c] && dir === 4 ? topColor[c] || color[c] : color[c];
             if (col && owner[c]) {
               const ns = s + sgn;
               let show;
               if (ns < 0 || ns >= dims[a]) show = true;
               else {
                 const nb = c + sgn * strides[a];
-                show = outside[nb] === 1 || (color[nb] && water[color[nb]] && !water[col]);
+                show = outside[nb] === 1 || (color[nb] && water[color[nb]] && !water[color[c]]);
               }
               if (show) key = glass[col] ? -(col | (owner[c] << 8)) : (col | (owner[c] << 8));
             }
