@@ -98,7 +98,7 @@ export function cityPresets(index, box, approxGround) {
   const out = {
     city: (() => { const t = at(c.x, c.z); return { target: t, cam: t.clone().add(offset(200, 42, Math.max(150, r * 1.55))), fov: 40 }; })(),
     map: (() => { const t = at(c.x, c.z); return { target: t, cam: t.clone().add(offset(180, 89, Math.max(150, r * 2.3))), fov: 40 }; })(),
-    hero: { target: focus, cam: focus.clone().add(offset(206, 24, Math.min(320, Math.max(90, r * 0.6)))), fov: 40 },
+    hero: { target: focus, cam: focus.clone().add(offset(206, 17, Math.min(320, Math.max(90, r * 0.6)))), fov: 40 },
     street: { target: focus.clone().setY(focus.y + 2), cam: focus.clone().setY(focus.y + 2).add(offset(200, 8, 26)), fov: 50 },
   };
   for (const [name, t] of Object.entries(places)) out[name] = { target: t, cam: t.clone().add(offset(206, 30, 160)), fov: 40 };

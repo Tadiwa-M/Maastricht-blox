@@ -138,6 +138,9 @@ instead.
 
 ## Scripted movers
 
+The web game's real city life (timetable buses, pedestrians, boats) is in **City life** below;
+these scripted movers are the fallback when a world has no `life/` export.
+
 | Who | Unity | Viewer |
 |---|---|---|
 | bus on the road | `Gameplay/Locomotion/PathFollower.cs`, path made by `Editor/LookTestActors.cs` from the longest run of asphalt tops (east on the south lane, back west on the north lane, turning beyond the edge) | `viewer/src/demo.js` (same idea; clipped at the diorama edge) |
@@ -145,6 +148,150 @@ instead.
 | walkers | a `Walker` figure (`CharacterWalker`) | `demo.js`: two figures loop a clear rectangle on the square |
 
 All path endpoints come from the world data, with no hard-coded coordinates.
+
+## City life (web game): buses, pedestrians, boats with zero servers
+
+Everything is pre-baked by the pipeline and animated in the browser from a clock, so a static
+site is enough. Live GPS buses (above) stay a later, optional layer.
+
+```
+OVapi gtfs-nl.zip ──┐ blox fetch --only gtfs      data/raw/gtfs/gtfs-nl.zip (refetched after 7 days)
+OSM slice clip ─────┤ blox life --out build/world
+                    ▼
+build/world/life/index.json      {version, files: {transit, walkways, river}, bytes, week, boxUnity}
+                 transit.json    routes, shapes, patterns, trips (one reference week)
+                 walkways.json   walk graph: nodes, edges, spawn weights
+                 river.json      Maas centreline + width
+                    ▼  (viewer/src/life/data.js: fetched next to the page, or <site>/world/life/)
+viewer/src/life/index.js  initLife(ctx) -> { update(dt) } per frame (main.js initHooks)
+```
+
+The world manifest (CONTRACT 5) is not changed; `life/index.json` is the only entry point.
+All coordinates are Unity metres (x east, z north), rounded to 0.1 m; times are whole seconds.
+
+### Export (`pipeline/src/blox_pipeline/life/`)
+
+```
+blox fetch --only gtfs                       # national feed, ~240 MB, cached
+blox life --out build/world [--date 2026-10-26] [--bbox ...] [--margin 500] [--modes bus]
+          [--gtfs other.zip] [--no-transit] [--no-walkways]
+```
+
+| Module | Does |
+|---|---|
+| `fetch.py` | downloads `sources/config.py: GTFS_URL` to `data/raw/gtfs/` (zip checked, older than 7 days refetched) |
+| `csvzip.py` | streams CSV rows from the zip (stop_times.txt is ~1 GB unzipped; never extracted) |
+| `calendar.py` | `calendar.txt` + `calendar_dates.txt`; the **reference week** = 7 days from `--date` (moved inside the feed's validity), one per weekday |
+| `transit.py` | bus routes whose shape comes within `--margin` (500 m) of the bbox; shapes densified <= 10 m and clipped to the box (one point beyond each edge) with the **full shape's** cumulative distance; stops projected onto the shape in calling order (earliest segment within 5 m of the best, so out-and-back streets work; > 60 m off = ignored); only the stops bracketing the clipped part kept |
+| `walkways.py` | walk graph from OSM (below) |
+| `river.py` | `waterway=river` named Maas/Meuse, merged and clipped, densified 20 m; width from the water polygon; a hand-set approximate line if OSM has none |
+| `export.py` | writes the files (compact JSON) and `index.json` with their sizes |
+
+**transit.json**
+
+```jsonc
+{ "version": 1, "kind": "transit",
+  "meta": { "tz": "Europe/Amsterdam", "week": ["2026-10-26", ... 7 dates, Monday first] },
+  "routes": [ { "short": "4", "long": "...", "colour": "#00A0E0", "mode": "bus" } ],
+  "shapes": [ { "id": "sh4", "pts": [x, z, dist, x, z, dist, ...] } ],   // dist = metres along the full shape
+  "patterns": [ { "shape": 0, "route": 0, "head": "Station",
+                  "st": [arr, dep, dist, ...] } ],   // seconds since the trip's first kept stop
+  "trips": [ [pattern, startSec, dayMask], ... ] }   // sorted by start; bit 0 = Monday
+```
+
+A trip is `{shape, route short name, colour, headsign, stop times (seconds since midnight,
+distAlongShape)}` compacted: trips with the same shape, route, headsign and relative timing
+share a **pattern**, and identical (pattern, start) rows of different services are merged by
+OR-ing their day masks. `startSec` may be >= 86400 (GTFS 25:10:00): such a trip belongs to its
+service day and runs early the next morning. Size check: a synthetic feed with 45 routes
+through the slice and 55 000 trips a week gives **0.85 MB** (180 patterns, 9 180 trips).
+
+**walkways.json**: `{ nodes: [x, z, ...], weights: [int per node], edges: [a, b, ...] }`.
+
+- ways: `highway=footway` (sidewalks, crossings), `pedestrian`, `path`, `living_street`, `steps`,
+  and cycleways/tracks with `foot=yes|designated`; not `foot=no` or private access. Nodes every
+  <= 12 m, shared OSM nodes merged.
+- sidewalks: roads with `sidewalk=both|left|right` (and `sidewalk:left/right/both=yes`) get
+  offset lines at width / 2 + 1 m; untagged primary..residential streets are **assumed** to
+  have both (weight x 0.6); `no`, `none`, `separate` give none.
+- squares: `place=square`, `area:highway=pedestrian|footway|...`, `highway=pedestrian + area=yes`
+  get a 6 m lattice of nodes linked 8-ways inside the polygon, tied to the ways crossing them.
+- dead ends within 5 m of another way are joined to it (the edge is split); components with
+  fewer than 3 nodes are dropped.
+- spawn weight = way kind (square 4, pedestrian 3, living street 2, footway/sidewalk 1.5,
+  crossing 1, steps 0.8, path 0.7) x (1 + 0.4 per shop/cafe/restaurant within 30 m, max 8),
+  stored x 2 as integers.
+
+Tests: `pipeline/tests/test_life_transit.py`, `test_life_walkways.py`, `test_life_cli.py` with the
+synthetic GTFS zip and OSM file in `tests/life_fixture.py`.
+
+### Viewer (`viewer/src/life/`)
+
+| File | Does |
+|---|---|
+| `index.js` | `initLife(ctx)`: loads data, builds the movers, returns `{ update(dt) }`; `window.__bloxLife` (state, `step(dt)` for screenshots) |
+| `clock.js` | `LifeClock`: weekday + seconds, speed 1x / 10x / 60x, wraps Sunday -> Monday; starts at real Maastricht time (`Intl`, Europe/Amsterdam) or the URL `#t=8.25&day=sat&speed=60` |
+| `ui.js` | HUD row: clock, 1x/10x/60x, "now". Dragging the sun slider sets the clock's time; the running clock moves the slider (and the sun) in quarter-hour steps |
+| `schedule.js` | `Timetable.activeAt(day, sec)`, `tripDistAt` (pure) |
+| `buses.js` | `TimetableBuses`: poses, LOD, colours, signs |
+| `walkgraph.js` | `WalkGraph`, `Walker`, `avoid`, `rng` (pure) |
+| `walkers.js` | `Pedestrians`: the crowd, `crowdFactor`, `clearVehicles` |
+| `boats.js` | `Boats`: river loop |
+| `instancer.js` | `InstancedModel`: many copies of a brick model in a few draw calls |
+| `lodpick.js` | `assignLod` (pure) |
+| `ground.js` | `makeGround`: the height movers stand at |
+| `data.js`, `fallback.js` | loading; walk graph from the world's own paved cells |
+
+**Bus position.** For the clock's (day, sec): today's trips with that day's bit, plus
+yesterday's trips at `sec + 86400` (after-midnight runs). Between departure from one stop and
+arrival at the next the distance is linear in time; between arrival and departure the bus
+dwells. Where the feed gives no dwell (arrival = departure) the bus leaves `min(15 s, 30 % of
+the next leg)` late, so arrivals stay on time. Before the first or after the last stop, or
+outside the exported part of the shape, the trip is not drawn. The pose is the shared
+`PathMover` rule (turn radius 6 m) on the shape with its exported distances, shifted 1.6 m to
+the right so the two directions use their own lane; `y` = ground. Buses follow the clock, so
+at 60x they drive 60x as fast; pedestrians and boats stay real-time.
+
+**LOD and pools.** `assignLod`: the nearest 24 buses within 180 m are full instanced brick
+models (body recoloured to the nearest palette colour of the route colour, wheels turned by
+distance / radius, a route-number sign on the nose and the roof for the nearest 8); the next
+300 within 900 m are coloured boxes; the rest are hidden. Every mover kind is one
+`InstancedModel`: the model is split once into bricks and studs, grouped by (geometry,
+material), and each copy is a slot with its own pose, part angles and colours: the whole crowd is 5 draw
+calls (13 instances per figure), all full-model buses 22 (232 instances per bus). Measured: ~0.8 ms of JavaScript per frame for 4 buses + 90 walkers.
+
+**Pedestrians.** Count by quality tier (high 360, medium 200, low 90) x `crowdFactor(hour)`
+(1.0 in the afternoon, 0.35 at 22:00, 0.06 at 05:00). They spawn on graph nodes near the
+camera target (weighted by spawn weight) within a radius that grows with camera distance
+(50-220 m) and are recycled to a node 0.5-1 radius away when they drift beyond 1.25 radii.
+Random walk: at each node a weighted pick of the neighbours (weight^0.5 x preference for going
+straight on), back only at dead ends. Corners are a quadratic curve through the node (radius
+1.2 m), the displayed heading also turns at most 540 deg/s. Each walker has a speed of
+0.9-1.7 m/s, a lateral place on the way (+-0.8 m), and palette colours by role from
+`character.json` (shirt 44, trousers 21, skin 18, hair 7). `avoid`: slow down behind someone
+going the same way, step to the right for oncoming people; `clearVehicles`: anyone inside a
+bus's footprint (+0.8 m) is moved out to the nearer side. The walk cycle is `WalkCycle`.
+
+**Boats.** Two boats loop up one side of the Maas and down the other (lane = 22 % of the river
+width, max 18 m), 3-3.4 m/s, turn radius 14 m; `y` = the water tops of the world along the
+river, else the city's ground there, else 44.1 m NAP.
+
+**Ground.** `city.groundHeight(x, -z, approxGround + 2.5 m)` (src/city.js uses three.js
+coordinates) so tree crowns and arcade roofs are not taken for the street; `'unknown'` (not
+streamed yet) is asked again later. Without the city API: the embedded World's column top if
+within 1.6 m of its ground level, else flat ground.
+
+**Fallbacks.** No `life/` export (samples, the look-test town): no timetable buses (the demo
+bus loop and boat of `demo.js` stay), and walkers use a graph built from the world's own
+paved top cells (cobbles, pavement; 2 m lattice; not under rotated-building islands). With an
+export, the demo bus/boat/walkers are hidden when their life counterpart exists. The world box
+clips the movers (clipping planes), like the demo.
+
+Tests: `viewer/test/life.schedule.test.mjs` (interpolation, dwell, before/after, day masks, day
+rollover, clipped shapes), `life.clock.test.mjs`, `life.walkers.test.mjs` (graph, walk stays on
+the edges and turns smoothly, spawn, avoidance, crowd curve, vehicle clearance, fallback graph),
+`life.pool.test.mjs` (LOD caps, instanced counts and placement, bus pose/lane/heading, colours,
+river loop).
 
 ## Walk mode (Unity)
 
