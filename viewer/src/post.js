@@ -62,7 +62,14 @@ export class Post {
 
   setAO(on) {
     this.aoWanted = on;
-    this.gtao.enabled = on && this.quality.ao !== 'off';
+    this.gtao.enabled = on && this.quality.ao !== 'off' && this.aoInRange !== false;
+  }
+
+  /** City mode: AO only where it can show (its 0.18 m radius is sub-pixel from far away). */
+  setAOInRange(on) {
+    if (on === this.aoInRange) return;
+    this.aoInRange = on;
+    this.setAO(this.aoWanted);
   }
 
   /** Night factor 0..1: bloom strength, and whether bloom runs at all on lower tiers. */

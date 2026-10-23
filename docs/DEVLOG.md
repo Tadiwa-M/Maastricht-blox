@@ -407,3 +407,40 @@ The browser viewer now reads `islands/*.bxi` and draws each island as one rigid 
 - **Decision:** launch as a playable **web** city (three.js engine), not a Unity download.
   Reasons: link-clickable for the LinkedIn audience, already renders the real data, works on
   phones. Unity is parked until after launch. See PLAN.md phase 2.
+
+## 2026-10-23: Walk mode (phase 2, track P: player)
+
+Drop into a third-person walk anywhere in the web city (`viewer/src/player/`, guide 09).
+
+- **Modes:** map (MapControls) <-> walk. Enter with the "Walk here" button, F (cursor), a
+  double-click / double-tap or gamepad A (screen centre); leave with Esc, gamepad B or "Map".
+  The camera tweens 1.1 s between them. `#mode=walk&at=x,z` (Unity metres) starts walking.
+- **Character:** the original blocky `contract/models/character.json` at contract scale, walk
+  cycle from `mover.js` (longer stride when running), forward lean, idle arm sway.
+- **Controller:** kinematic cylinder (r 0.35 m, h 1.9 m) against a city query API
+  `isSolid(x, y, z)` / `groundHeight(x, z)` (three.js metres, `'unknown'` when not loaded).
+  Walk 1.4 m/s, run 4 m/s, eased acceleration, step-up ≤ 0.42 m (kerbs, steps; a 3-plate brick
+  is a wall), sub-stepped moves (no tunnelling), gravity with exact landing, small jump.
+  Unknown space is solid, so the player can't walk or fall into unloaded areas.
+- **Islands collide** through the same API: until the core's streaming `src/city.js` is passed
+  in, `city-adapter.js` builds it from the World + island poses (inverse pose into local
+  cells, as picking does). Probe on `samples/markt_v3`: walking into the 6 nearest islands
+  leaves 0 body samples inside solid cells.
+- **Camera:** shoulder-height orbit, 5-ray pull-in against walls (instant in, smooth out),
+  wheel / triggers / pinch zoom, figure hidden when the camera is squeezed in.
+- **Input:** one `BINDINGS` table (keys, gamepad standard mapping, deadzones, sensitivities);
+  keyboard, Gamepad API (hot-plug toast), touch joystick + drag-look + pinch (touch devices
+  only). Gamepad also pans/orbits/zooms the map.
+- **HUD:** mode hint, nearest street name (bounding-box heuristic over `features.json`), help
+  overlay (H / Select).
+- Integration: `main.js` `[player hook]` dynamic-imports `player/index.js`; the player's tick
+  runs inside a wrapper around `stage.render`, after `controls.update()` and right before
+  drawing, so the walk camera is never a frame late or overridden.
+- Tests: 24 player tests (input 7, controller 10, camera/ray/streets/hash 7); viewer suite 90 green with the other tracks' tests.
+
+**Open decisions**
+- The contract character is 2 m wide with arms: it overlaps walls sideways and can't fit a
+  door. Slim the model (pipeline) or accept it as the toy look?
+- Water is walkable (solid). Needs a material query in the city API to swim/stop at banks.
+- `ctx.city` should come from the core's `src/city.js` once it exists (the hook passes
+  `window.__blox.city` for now).

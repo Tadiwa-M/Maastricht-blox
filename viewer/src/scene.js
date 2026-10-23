@@ -63,11 +63,11 @@ export class Stage {
   }
 
   /** World box in metres: adds the baseplate ground, fits fog, shadows and AO to it. */
-  setBounds(box, studM) {
+  setBounds(box, studM, { groundSize = 4000, groundY = box.min.y - 0.01 } = {}) {
     this.box = box.clone();
     const c = box.getCenter(new THREE.Vector3());
     this.radius = box.getSize(new THREE.Vector3()).length() / 2;
-    this.ground = makeGround(c.x, box.min.y - 0.01, c.z, studM);
+    this.ground = makeGround(c.x, groundY, c.z, studM, groundSize);
     this.scene.add(this.ground);
     // fade the baseplate into the horizon haze soon after the model ends, so the sky shows
     this.scene.fog.near = Math.max(60, this.radius * 1.2);
@@ -78,11 +78,22 @@ export class Stage {
     this.post = new Post(this.renderer, this.scene, this.camera, this.width, this.height, this.box);
   }
 
+  /**
+   * City mode: the shadow map covers a box around a focus point (the orbit target) instead of
+   * the whole world, so a 2 km city still gets street-level shadow detail. null = whole world.
+   */
+  setShadowFocus(box) {
+    this.shadowBox = box ? box.clone() : null;
+    if (this.sunDir) this.fitShadow();
+  }
+
   fitShadow() {
     const s = this.sun, cam = s.shadow.camera;
-    const c = this.box.getCenter(new THREE.Vector3());
+    const box = this.shadowBox || this.box;
+    const radius = this.shadowBox ? box.getSize(new THREE.Vector3()).length() / 2 : this.radius;
+    const c = box.getCenter(new THREE.Vector3());
     s.target.position.copy(c);
-    s.position.copy(c).addScaledVector(this.sunDir, this.radius * 2 + 10);
+    s.position.copy(c).addScaledVector(this.sunDir, radius * 2 + 10);
     s.updateMatrixWorld();
     s.target.updateMatrixWorld();
     cam.position.copy(s.position);
@@ -90,7 +101,7 @@ export class Stage {
     cam.updateMatrixWorld();
     const inv = cam.matrixWorldInverse, p = new THREE.Vector3();
     const lo = new THREE.Vector3(Infinity, Infinity, Infinity), hi = lo.clone().negate();
-    const { min, max } = this.box;
+    const { min, max } = box;
     for (let q = 0; q < 8; q++) {
       p.set(q & 1 ? max.x : min.x, q & 2 ? max.y : min.y, q & 4 ? max.z : min.z).applyMatrix4(inv);
       lo.min(p); hi.max(p);

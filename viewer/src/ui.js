@@ -31,7 +31,12 @@ export function bindUI({ time, tilt, ao, anim, quality, onTime, onTilt, onAO, on
     },
     /** Tier actually in use (auto shows what it picked). */
     tier(mode, name) { $('tierLabel').textContent = mode === 'auto' ? `→ ${name}` : ''; },
+    /** Replace the view links (city mode has its own presets). */
+    views(names) {
+      $('views').innerHTML = 'View: ' + names.map((n) => `<a href="#view=${encodeURIComponent(n)}">${escapeHtml(n)}</a>`).join('');
+    },
     stats(s) {
+      if (s.text) { $('stats').textContent = s.text; return; }
       $('stats').textContent = `${s.bricks.toLocaleString()} bricks · ${s.near}/${s.chunks} chunks near · `
         + `${s.studs.toLocaleString()} studs · ${s.calls} draws · ${(s.triangles / 1e6).toFixed(2)} M tris · `
         + `${s.actors} movers · ${s.fps}`;

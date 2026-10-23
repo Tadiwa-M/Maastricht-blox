@@ -26,6 +26,8 @@ islands (compare with the pipeline's `preview.png`). `t` is the sun time in hour
 `quality` is `auto|high|medium|low` (also in the HUD); `zoom` scales the preset camera distance.
 Controls: left drag pans, right drag orbits, wheel zooms, and a click shows a brick's feature,
 type, colour, cell and facing.
+**Walk mode** (third-person player, keyboard/gamepad/touch, `#mode=walk&at=x,z`): see
+[guide 09](09-player.md).
 
 ## Module map
 
