@@ -444,3 +444,46 @@ Drop into a third-person walk anywhere in the web city (`viewer/src/player/`, gu
 - Water is walkable (solid). Needs a material query in the city API to swim/stop at banks.
 - `ctx.city` should come from the core's `src/city.js` once it exists (the hook passes
   `window.__blox.city` for now).
+
+## 2026-10-23: City life (phase 2, track L): timetable buses, pedestrians, boats
+
+The city moves with zero servers: everything is baked by the pipeline and animated in the
+browser from a clock. Guide: `docs/guide/05-movers-and-models.md` (City life).
+
+- **Pipeline `blox life --out build/world`** (`pipeline/src/blox_pipeline/life/`) writes
+  `life/index.json` + `transit.json`, `walkways.json`, `river.json`. The world manifest is not
+  changed (no contract bump). `blox fetch --only gtfs` caches the OVapi national feed
+  (`sources/config.py: GTFS_URL`) under `data/raw/gtfs/`, refetched after 7 days.
+- **Transit:** bus routes within 500 m of the slice, one reference week (7 dates from `--date`,
+  one per weekday, from calendar + calendar_dates), shapes densified <= 10 m, clipped, with the
+  full shape's cumulative distance; stop times projected onto the shape. Trips sharing timing
+  collapse into patterns; identical (pattern, start) rows of different services merge their day
+  masks. A national-feed-like synthetic feed (45 routes, 55 000 trips a week) gives 0.85 MB.
+- **Walkways:** OSM footways/pedestrian/path/living_street/steps, sidewalks (tagged, or assumed
+  on untagged urban streets), squares as a 6 m lattice, dead ends snapped; spawn weights by kind
+  and nearby shops.
+- **Viewer `src/life/`:** clock (real Maastricht time or `#t=&day=&speed=`, 1x/10x/60x, coupled
+  to the sun slider both ways); buses interpolated between stop times with dwell and
+  after-midnight trips, posed with the shared PathMover rule in the right lane; LOD full model /
+  box / hidden with caps; pedestrians random-walk the graph with rounded corners, palette
+  colours, walk cycle, loose avoidance, step out of bus footprints, fewer at night; two boats
+  loop the Maas. Every mover kind is one `InstancedModel` (crowd = 5 draw calls).
+- **Fallback:** without an export the demo bus/boat stay and walkers use the world's paved cells
+  (not under islands).
+- Hook: `initLife(ctx)` returns `{ update(dt) }`, called by `main.js initHooks` in both the
+  diorama and the streamed city. Ground from `city.groundHeight` (three.js z!) under
+  `approxGround + 2.5 m`.
+- Verified on `samples/markt_v3` with a synthetic export (two fake routes along real streets of
+  the sample, walkways from its cobbled cells): diorama street/overview/dusk shots and the
+  streamed site. Tests: pipeline +18 (`test_life_*.py`), viewer +24 (`test/life.*.test.mjs`).
+
+**Open decisions**
+- No real GTFS/OSM could be fetched here: real sizes, stop snapping and the assumed-sidewalk
+  rule need a check on the workstation (`blox fetch --only gtfs,osm` then `blox life`).
+- `build.mjs` (core) does not yet copy `<world>/life/` into the site (`<site>/world/life/`) or
+  embed it in the diorama (`window.BLOX_WORLD.life`); `life/data.js` already looks in both places.
+- Bus bodies take the nearest palette colour to the route colour; Arriva Limburg's real livery
+  would need a palette entry.
+- Walkers don't wait at crossings or stops, and buses don't yield to walkers (walkers are pushed
+  aside). Trains (`--modes bus,rail`) are exported but would be drawn as buses.
+- The river fallback line is approximate (only used without OSM).
