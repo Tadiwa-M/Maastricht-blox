@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { brickColor } from './bricks-color.js';
 import { windowColor } from './glow.js';
 import { keyOf, farFamily, shineOf } from './matkey.js';
-import { glowBytes } from './farmesh.js';
+import { glowBytes, releaseAfterUpload } from './farmesh.js';
 import { StreamScheduler, READY } from './stream.js';
 
 // local mesh axes: X = i (east), Y = k (up), Z = j (north; mesh scale z < 0 turns it to -z)
@@ -117,7 +117,7 @@ function geometryOf(a) {
   g.setAttribute('aExtra', new THREE.BufferAttribute(a.extra, 4, true));
   g.setIndex(new THREE.BufferAttribute(a.index, 1));
   g.computeBoundingSphere();
-  return g;
+  return releaseAfterUpload(g);
 }
 
 /** Region meshes of one level: { group, parts: [{ mesh, ranges }], owners, triangles }. */
@@ -224,7 +224,10 @@ export class FarRegions {
 
   /** eye: camera position; dirty: something changed what is covered. */
   update(eye, coverChanged = false) {
-    for (const s of this.schedulers.values()) s.update(eye);
+    // the whole silhouette first, then the finer levels
+    const base = this.schedulers.get(this.coarsest);
+    base.update(eye);
+    if (base.settled()) for (const [l, s] of this.schedulers) if (l !== this.coarsest) s.update(eye);
     let tris = 0, draws = 0;
     for (const reg of this.regions.values()) {
       const dx = Math.max(reg.box.min.x - eye.x, 0, eye.x - reg.box.max.x), dz = Math.max(reg.box.min.z - eye.z, 0, eye.z - reg.box.max.z);

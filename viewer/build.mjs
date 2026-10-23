@@ -52,6 +52,24 @@ async function readModels() {
   return models;
 }
 
+/**
+ * Life export of a world (`blox life --out <world>`, Track L): life/index.json lists its files
+ * ({ files: { transit: 'transit.json', ... } }). Returns { names: [file names], data: { index,
+ * transit, ... } } or null when the world has none.
+ */
+async function readLife() {
+  const dir = join(worldDir, 'life');
+  if (!existsSync(join(dir, 'index.json'))) return null;
+  const index = await readJson(join(dir, 'index.json'));
+  const data = { index }, names = ['index.json'];
+  for (const [k, f] of Object.entries(index.files || {})) {
+    if (!existsSync(join(dir, f))) { console.warn(`life: ${f} listed but missing`); continue; }
+    data[k] = await readJson(join(dir, f));
+    names.push(f);
+  }
+  return { names, data };
+}
+
 async function embedWorld() {
   const manifest = await readJson(join(worldDir, 'manifest.json'));
   const palette = await readJson(join(worldDir, manifest.palette || 'palette.json'));
@@ -90,7 +108,9 @@ async function embedWorld() {
     catalogue: await readJson(join(here, '..', 'contract', 'brick_catalogue.json')),
     palette: await readJson(join(here, '..', 'contract', 'palette.json')),
   };
-  const js = `window.BLOX_WORLD = ${JSON.stringify({ manifest, palette, catalogue, features, chunks, islands, models, contract })};\n`;
+  const life = await readLife(); // null = no life export (life/ then skips fetching)
+  console.log(`life: ${life ? life.names.join(', ') : 'none'}`);
+  const js = `window.BLOX_WORLD = ${JSON.stringify({ manifest, palette, catalogue, features, chunks, islands, models, contract, life: life?.data ?? null })};\n`;
   await writeFile(join(dist, 'world.js'), js);
   console.log(`world.js: ${files.length} chunks (${(bytes / 1024).toFixed(1)} KiB), ${islandList.length} islands `
     + `(${(islandBytes / 1024).toFixed(1)} KiB) from ${worldDir}`);
@@ -156,7 +176,14 @@ async function buildSite(outDir) {
     palette: await readJson(join(here, '..', 'contract', 'palette.json')),
   };
   await writeFile(join(wdir, 'models.json'), JSON.stringify({ models: await readModels(), contract }));
-  await writeFile(join(outDir, 'world.js'), "window.BLOX_SITE = { base: 'world/' };\n");
+  const life = await readLife();
+  if (life) {
+    await mkdir(join(wdir, 'life'), { recursive: true });
+    for (const f of life.names) await place(join(worldDir, 'life', f), join(wdir, 'life', f));
+  }
+  console.log(`life: ${life ? life.names.join(', ') : 'none'}`);
+  // life: whether world/life/ exists, so the page doesn't fetch (and 404) when it doesn't
+  await writeFile(join(outDir, 'world.js'), `window.BLOX_SITE = { base: 'world/', life: ${!!life} };\n`);
   console.log(`site: ${index.chunks.length} chunks + ${index.islands.length} islands (${(bytes / 1048576).toFixed(1)} MiB) `
     + `from ${worldDir} -> ${outDir} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 }

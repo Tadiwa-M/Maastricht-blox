@@ -8,7 +8,7 @@
 // Islands hang under a group at their pose (src/island.js), exactly as in src/lod.js.
 import * as THREE from 'three';
 import { buildWorldMeshes, worldContext } from './bricks.js';
-import { arraysToGeometry } from './farmesh.js';
+import { arraysToGeometry, releaseAfterUpload } from './farmesh.js';
 import { applyIslandPose, worldToLocalThree } from './island.js';
 import { worldFromRecords } from './prepare.js';
 import { pickNearest } from './picking.js';
@@ -27,7 +27,7 @@ export class CityView {
     this.coverDirty = true;
     this.frame = 0;
     this.studsShown = 0;
-    this.tier = { nearDist: 40, maxNear: 3, studCap: 20000, nearDetail: 'lite' };
+    this.tier = { nearDist: 40, maxNear: 3, studCap: 20000, nearDetail: 'lite', nearTriCap: 2.5e6 };
     // islands owned per chunk (baked faces of an island belong to its owning chunk)
     this.owned = new Map();
     for (const i of index.islands) {
@@ -47,9 +47,9 @@ export class CityView {
     return true;
   }
 
-  setTier({ nearDist = 40, maxNear = 3, studCap = 20000, nearDetail = 'lite' }) {
+  setTier({ nearDist = 40, maxNear = 3, studCap = 20000, nearDetail = 'lite', nearTriCap = Infinity }) {
     const changed = nearDetail !== this.tier.nearDetail;
-    this.tier = { nearDist, maxNear, studCap, nearDetail };
+    this.tier = { nearDist, maxNear, studCap, nearDetail, nearTriCap };
     if (changed) for (const v of this.views.values()) this.freeNear(v);
   }
 
@@ -62,13 +62,14 @@ export class CityView {
       box: new THREE.Box3(new THREE.Vector3().copy(it.box.min), new THREE.Vector3().copy(it.box.max)) };
     for (const [fam, arrays] of Object.entries(p.far || {})) {
       const mat = this.mats.cityFar(fam);
-      const mesh = new THREE.Mesh(arraysToGeometry(arrays), mat);
+      const mesh = new THREE.Mesh(releaseAfterUpload(arraysToGeometry(arrays)), mat);
       mesh.castShadow = !mat.transparent;
       mesh.receiveShadow = true;
       mesh.name = `mid|${fam}`;
       parent.add(mesh);
       view.mid.push(mesh);
     }
+    delete p.far; // the arrays live in the geometry now (and leave the CPU after upload)
     parent.updateMatrixWorld(true);
     this.group.add(parent);
     this.views.set(it.key, view);
@@ -127,11 +128,17 @@ export class CityView {
     const views = [...this.views.values()];
     for (const v of views) v.dist = boxDistance(v.box, eye);
     views.sort((a, b) => a.dist - b.dist);
-    const { nearDist, maxNear, studCap } = this.tier;
+    const { nearDist, maxNear, studCap, nearTriCap } = this.tier;
     const want = new Set();
+    let budget = nearTriCap;
     for (const v of views) {
       if (want.size >= maxNear) break;
-      if (v.dist < (v.isNear ? nearDist * HYSTERESIS : nearDist)) want.add(v);
+      if (!(v.dist < (v.isNear ? nearDist * HYSTERESIS : nearDist))) continue;
+      // near cost ~ 25x the mid look (lite bevels); the closest item is always allowed
+      const cost = v.nearTris ?? v.triangles * 25;
+      if (want.size && cost > budget) continue;
+      budget -= cost;
+      want.add(v);
     }
     let built = 0, pending = false;
     for (const v of views) {
