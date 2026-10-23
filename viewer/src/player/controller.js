@@ -58,9 +58,9 @@ export class CharacterController {
   /** Body overlaps something (the lowest 2 mm excluded so standing on a surface is free). */
   bodyHits(x, y, z) { return this.hits(x, y, z, 0.002, this.o.height); }
 
-  /** Something under the feet (within `depth` metres)? Uses the centre and an inner ring. */
+  /** Something under the feet (within `depth` metres)? Centre + the body ring. */
   footSolid(x, y, z, depth = 0.03) {
-    const r = this.o.radius * 0.7;
+    const r = this.o.radius * 0.98; // same ring as the body: resting on a ledge edge is standing
     if (this.solid(x, y - depth, z)) return true;
     for (const [c, s] of RING) if (this.solid(x + c * r, y - depth, z + s * r)) return true;
     return false;

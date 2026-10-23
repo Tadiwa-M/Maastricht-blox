@@ -217,6 +217,12 @@ async function main() {
     import('./player/index.js').then((m) => m.initPlayer({ stage, camera: stage.camera, controls, city: window.__blox.city || null, // Track S: pass the src/city.js instance here
       models: data.models, ui, world, islands, lod })).catch((e) => console.error('player', e));
   }
+  // [life hook] timetable buses, pedestrians, river boats (src/life/)
+  if (!isGallery) {
+    import('./life/index.js').then((m) => m.initLife({ stage, camera: stage.camera, controls,
+      city: () => window.__blox.city || null, models: data.models, ui, world, box, demo,
+      quality: () => tierName, still })).catch((e) => console.error('life', e));
+  }
   requestAnimationFrame(frame);
 }
 
