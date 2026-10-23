@@ -13,16 +13,22 @@ New-Item -ItemType Directory -Force -Path $Logs, (Join-Path $Root 'build\shots')
 
 function Find-Unity {
     if ($env:UNITY_EXE) { return $env:UNITY_EXE }
-    # Unity Hub's install folders: the default (needs admin) and the per-user one set in Hub
-    # (Preferences > Installs), which Hub records in secondaryInstallPath.json.
-    $roots = @("$env:ProgramFiles\Unity\Hub\Editor", "$env:LOCALAPPDATA\Unity\Editors")
+    # 1) Unity Hub's editor folders: default, per-user, and the custom one Hub records.
+    $roots = @("$env:ProgramFiles\Unity\Hub\Editor", "$env:LOCALAPPDATA\Unity\Editors", "$env:ProgramFiles\Unity\Editor")
     $custom = Join-Path $env:APPDATA 'UnityHub\secondaryInstallPath.json'
     if (Test-Path $custom) { $p = (Get-Content $custom -Raw | ConvertFrom-Json); if ($p) { $roots = @("$p") + $roots } }
-    $v = $roots | Where-Object { $_ -and (Test-Path $_) } | ForEach-Object { Get-ChildItem $_ -Directory } |
-        Where-Object Name -like '6000.*' | Where-Object { Test-Path (Join-Path $_.FullName 'Editor\Unity.exe') } |
-        Sort-Object { [version]($_.Name -replace '[a-z].*$', '') } | Select-Object -Last 1
-    if (-not $v) { throw 'Unity 6 not found: install it with Unity Hub, or set $env:UNITY_EXE to Unity.exe' }
-    return Join-Path $v.FullName 'Editor\Unity.exe'
+    $found = $roots | Where-Object { $_ -and (Test-Path $_) } | ForEach-Object { Get-ChildItem $_ -Directory } |
+        Where-Object Name -like '6000.*' | ForEach-Object { Join-Path $_.FullName 'Editor\Unity.exe' } | Where-Object { Test-Path $_ }
+    # 2) Anything else (Unity CLI / custom installs): search the usual install places, newest 6000.* wins.
+    if (-not $found) {
+        $search = @("$env:ProgramFiles", "$env:LOCALAPPDATA", "$env:LOCALAPPDATA\Programs", "$HOME") | Where-Object { Test-Path $_ }
+        $found = $search | ForEach-Object { Get-ChildItem $_ -Recurse -Depth 5 -Filter Unity.exe -ErrorAction SilentlyContinue } |
+            Where-Object { $_.FullName -match '6000\.' } | ForEach-Object FullName
+    }
+    $best = $found | Sort-Object { [version](([regex]::Match($_, '6000\.\d+\.\d+')).Value) } | Select-Object -Last 1
+    if (-not $best) { throw 'Unity 6 not found: set $env:UNITY_EXE to the full path of Unity.exe' }
+    Write-Host "Unity: $best"
+    return $best
 }
 $Unity = Find-Unity
 
