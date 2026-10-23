@@ -1,30 +1,21 @@
-// Serve dist/ on a tiny static server, render preset views in headless Chromium and save PNGs.
-// Usage: node screenshot.mjs [outDir] [views=hero,map,facade] [extraHash e.g. "t=20"]
-import { createServer } from 'node:http';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { extname, join, resolve, dirname, normalize } from 'node:path';
+// Serve dist/ (or a site build: --site <dir>) on a tiny static server, render preset views in
+// headless Chromium and save PNGs.
+// Usage: node screenshot.mjs [outDir] [views=hero,map,facade] [extraHash e.g. "t=20"] [--site ../build/site]
+// Views are any #view= preset (city mode: city, hero, street, map, markt, ...).
+import { writeFile, mkdir } from 'node:fs/promises';
+import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { serve, siteArg } from './tools/serve.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const dist = join(here, 'dist');
-const outDir = resolve(process.argv[2] || join(here, '..', 'build', 'shots'));
-const views = (process.argv[3] || 'hero,map,facade').split(',');
-const extra = process.argv[4] ? `&${process.argv[4]}` : '';
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png' };
-
-const server = createServer(async (req, res) => {
-  const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^([/\\])+/, '');
-  try {
-    const body = await readFile(join(dist, path || 'index.html'));
-    res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/octet-stream' });
-    res.end(body);
-  } catch {
-    res.writeHead(404); res.end('not found');
-  }
-});
-await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
-const base = `http://127.0.0.1:${server.address().port}/index.html?shot=1`;
+const argv = process.argv.slice(2);
+const root = siteArg(argv, join(here, 'dist'));
+const outDir = resolve(argv[0] || join(here, '..', 'build', 'shots'));
+const views = (argv[1] || 'hero,map,facade').split(',');
+const extra = argv[2] ? `&${argv[2]}` : '';
+const { server, url } = await serve(root);
+const base = `${url}index.html?shot=1`;
 
 const browser = await chromium.launch({
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-gl=angle'],
@@ -36,12 +27,12 @@ try {
     page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log(`[${view}] ${m.text()}`); });
     page.on('pageerror', (e) => console.log(`[${view}] pageerror ${e.message}`));
     await page.goto(`${base}#view=${view}${extra}`);
-    await page.waitForFunction(() => window.__bloxReady === true || window.__bloxError, null, { timeout: 180000 });
+    await page.waitForFunction(() => window.__bloxReady === true || window.__bloxError, null, { timeout: 600000 });
     const err = await page.evaluate(() => window.__bloxError);
     if (err) throw new Error(err);
-    const file = join(outDir, `${view}${process.argv[4] ? '_' + process.argv[4].replace(/[^a-z0-9]+/gi, '_') : ''}.png`);
-    const { url, ms } = await page.evaluate(() => window.__bloxCapture());
-    await writeFile(file, Buffer.from(url.split(',')[1], 'base64'));
+    const file = join(outDir, `${view}${argv[2] ? '_' + argv[2].replace(/[^a-z0-9]+/gi, '_') : ''}.png`);
+    const { url: png, ms } = await page.evaluate(() => window.__bloxCapture());
+    await writeFile(file, Buffer.from(png.split(',')[1], 'base64'));
     console.log(`frame ${ms.toFixed(0)} ms`);
     console.log(`wrote ${file}`);
     await page.close();

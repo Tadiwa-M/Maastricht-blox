@@ -1,17 +1,29 @@
-// Build the viewer: bundle src/ (three included) to dist/viewer.js, embed a world dir as
-// dist/world.js (plus contract/models/*.json brick models) and copy dist/index.html.
-// Usage: node build.mjs [worldDir] [--around markt|vrijthof|brug|station|bonnefanten|<cx>,<cy>] [--radius chunks]
-// A full 2x2 km world is too big for one browser page: --around embeds only the chunks within
-// --radius (default 3, i.e. 7x7 chunks = 224 m square) of a place.
+// Build the viewer. Two outputs:
+//
+//   embed (default)  dist/{index.html, viewer.js, world.js}: the world dir base64-embedded in
+//                    world.js (plus contract/models/*.json). Self-contained, works from file://.
+//                    For small worlds, samples and the artifact.
+//   --site <outDir>  a static web site that streams the world: outDir/{index.html, viewer.js,
+//                    stream-worker.js, world.js (just window.BLOX_SITE)} and outDir/world/ with
+//                    the world files (hard links when possible, else copies), index.json (stream
+//                    index: chunk boxes, island world boxes), models.json, and far/ (whole-city
+//                    baked far meshes, tools/bake-far.mjs). Serve it with any static server.
+//
+// Usage: node build.mjs [worldDir] [--site outDir] [--around markt|vrijthof|brug|station|bonnefanten|<cx>,<cy>] [--radius chunks]
+// --around keeps only the chunks within --radius (default 3, i.e. 7x7 chunks = 224 m square) of a
+// place (embed mode; a full 2x2 km world is too big for one embedded page).
 import { build } from 'esbuild';
-import { mkdir, readFile, readdir, writeFile, copyFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile, copyFile, link, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { bakeFar } from './tools/bake-far.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
 const around = opt('--around');
+const site = opt('--site');
 const radius = Number(opt('--radius') ?? 3);
 const worldDir = resolve(args[0] || join(here, '..', 'build', 'testscene'));
 
@@ -84,17 +96,76 @@ async function embedWorld() {
     + `(${(islandBytes / 1024).toFixed(1)} KiB) from ${worldDir}`);
 }
 
-await mkdir(dist, { recursive: true });
-await build({
-  entryPoints: [join(here, 'src', 'main.js')],
-  bundle: true,
-  format: 'esm',
-  target: 'es2022',
-  minify: true,
-  sourcemap: false,
-  outfile: join(dist, 'viewer.js'),
-  logLevel: 'warning',
-});
-await copyFile(join(here, 'src', 'index.html'), join(dist, 'index.html'));
-await embedWorld();
-console.log(`built ${dist}`);
+/**
+ * esbuild plugin: the other tracks' entry modules (src/life/index.js, src/player/index.js) are
+ * optional. When one doesn't exist yet the dynamic import in main.js gets an empty module.
+ */
+const optionalModules = {
+  name: 'optional-modules',
+  setup(b) {
+    b.onResolve({ filter: /^\.\/(life|player)\/index\.js$/ }, (a) => {
+      const path = join(a.resolveDir, a.path);
+      return existsSync(path) ? { path } : { path: a.path, namespace: 'optional-empty' };
+    });
+    b.onLoad({ filter: /.*/, namespace: 'optional-empty' }, () => ({ contents: 'export {};', loader: 'js' }));
+  },
+};
+
+async function bundle(out) {
+  const common = { bundle: true, target: 'es2022', minify: true, sourcemap: false, logLevel: 'warning' };
+  await build({ ...common, entryPoints: [join(here, 'src', 'main.js')], format: 'esm', outfile: join(out, 'viewer.js'), plugins: [optionalModules] });
+  await build({ ...common, entryPoints: [join(here, 'src', 'stream-worker.js')], format: 'iife', outfile: join(out, 'stream-worker.js') });
+  await copyFile(join(here, 'src', 'index.html'), join(out, 'index.html'));
+}
+
+/** Hard link (fast, no extra disk) or copy when linking fails (other drive, Windows rules). */
+async function place(src, dst) {
+  await rm(dst, { force: true });
+  try { await link(src, dst); } catch { await copyFile(src, dst); }
+}
+
+/** Static streaming site: see the header. */
+async function buildSite(outDir) {
+  const t0 = Date.now();
+  await mkdir(outDir, { recursive: true });
+  await bundle(outDir);
+  const wdir = join(outDir, 'world');
+  await rm(wdir, { recursive: true, force: true });
+  await mkdir(join(wdir, 'chunks'), { recursive: true });
+  await mkdir(join(wdir, 'islands'), { recursive: true });
+  const manifest = await readJson(join(worldDir, 'manifest.json'));
+  for (const f of ['manifest.json', manifest.palette || 'palette.json', manifest.catalogue || 'brick_catalogue.json', manifest.features || 'features.json']) {
+    if (existsSync(join(worldDir, f))) await place(join(worldDir, f), join(wdir, f.replace(/^.*\//, '')));
+  }
+  if (!existsSync(join(wdir, 'features.json'))) await writeFile(join(wdir, 'features.json'), '{"features":[]}');
+  const baked = await bakeFar(worldDir, wdir);
+  let bytes = 0;
+  for (const e of [...baked.chunks, ...baked.islands]) {
+    await place(join(worldDir, e.file), join(wdir, e.file));
+    bytes += e.bytes;
+  }
+  const index = {
+    version: 1, studM: manifest.studM || 0.5, plateM: manifest.plateM || 0.2, chunkStuds: manifest.chunkStuds || 64,
+    chunksX: manifest.chunksX || 64, chunksY: manifest.chunksY || 64,
+    chunks: baked.chunks.map(({ cx, cy, file, minK, maxK, bytes: b }) => ({ cx, cy, file, minK, maxK, bytes: b })),
+    islands: baked.islands.map(({ id, file, cx, cy, rect, minK, maxK, bytes: b }) => ({ id, file, cx, cy, rect: rect.map((v) => +v.toFixed(2)), minK, maxK, bytes: b })),
+  };
+  await writeFile(join(wdir, 'index.json'), JSON.stringify(index));
+  const contract = {
+    catalogue: await readJson(join(here, '..', 'contract', 'brick_catalogue.json')),
+    palette: await readJson(join(here, '..', 'contract', 'palette.json')),
+  };
+  await writeFile(join(wdir, 'models.json'), JSON.stringify({ models: await readModels(), contract }));
+  await writeFile(join(outDir, 'world.js'), "window.BLOX_SITE = { base: 'world/' };\n");
+  console.log(`site: ${index.chunks.length} chunks + ${index.islands.length} islands (${(bytes / 1048576).toFixed(1)} MiB) `
+    + `from ${worldDir} -> ${outDir} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+}
+
+if (site) {
+  await buildSite(resolve(site));
+} else {
+  await mkdir(dist, { recursive: true });
+  await bundle(dist);
+  await embedWorld();
+  console.log(`built ${dist}`);
+}

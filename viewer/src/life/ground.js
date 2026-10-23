@@ -21,7 +21,7 @@ export function makeGround(ctx, world = ctx.world) {
   const flat = world?.groundK !== undefined ? world.groundK * P : 0;
   const cache = new Map();
   const fromWorld = (x, z) => {
-    if (!world?.topK) return flat;
+    if (!(world?.count > 0)) return flat;
     const top = world.topK(Math.floor(x / S), Math.floor(z / S)) * P;
     return Math.abs(top - flat) <= 1.6 ? top : flat; // ignore roofs, trees, awnings
   };

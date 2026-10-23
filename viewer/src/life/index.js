@@ -1,7 +1,7 @@
 // City life for the web game: timetable buses, pedestrians and river boats, with zero
-// servers. Entry point called from main.js at the `// [life hook]`:
-//   import('./life/index.js').then((m) => m.initLife(ctx))
-// ctx = { stage, camera, controls, city, models, ui, world, box, demo, quality, still }.
+// servers. Entry point, called once from main.js initHooks (the `// [life hook]`):
+//   const hook = await initLife(ctx); hook.update(dt) every frame before drawing
+// ctx = { stage, camera, controls, city, models, ui, world, islands, box, demo, quality, still }.
 // Data: life/*.json from `blox life` (data.js); without it, walkers use the world's paved
 // cells and the demo bus/boat (src/demo.js) stay. Guide: docs/guide/05-movers-and-models.md.
 import * as THREE from 'three';
@@ -15,7 +15,7 @@ import { Pedestrians, WALKERS_BY_TIER } from './walkers.js';
 import { Boats } from './boats.js';
 import { makeGround, cityOf } from './ground.js';
 import { loadLifeData } from './data.js';
-import { walkwaysFromWorld } from './fallback.js';
+import { walkwaysFromWorld, islandBlocker } from './fallback.js';
 import { bindLifeUI } from './ui.js';
 
 /** Keep only walk-graph nodes inside rect [x0, z0, x1, z1] (Unity metres). */
@@ -48,7 +48,7 @@ export function initialClock(hash = typeof location !== 'undefined' ? location.h
 
 /** Unity y of the water surface: water tops along the river in the world, else 44.1 m NAP. */
 function waterLevel(world, river, ctx) {
-  if (world?.topK && river) {
+  if (world?.count > 0 && river) {
     const S = world.studM, P = world.plateM, ys = [];
     for (let q = 0; q < river.path.length; q += 2) {
       const I = Math.floor(river.path[q] / S), J = Math.floor(river.path[q + 1] / S);
@@ -65,6 +65,7 @@ function waterLevel(world, river, ctx) {
   return 44.1 - 30.0;
 }
 
+/** Returns { update(dt) } for the render loop (main.js initHooks). */
 export async function initLife(ctx) {
   const state = { ready: false, buses: null, walkers: null, boats: null, clock: null, source: null };
   if (typeof window !== 'undefined') window.__bloxLife = state;
@@ -96,7 +97,7 @@ export async function initLife(ctx) {
     hideDemo('bus');
   }
   let walkDoc = data?.walkways || null;
-  if (!walkDoc && world.topK) walkDoc = walkwaysFromWorld(world);
+  if (!walkDoc && world.count > 0) walkDoc = walkwaysFromWorld(world, { blocked: islandBlocker(ctx.islands) });
   if (walkDoc) {
     const graph = new WalkGraph(clipWalkways(walkDoc, rect));
     if (graph.buckets.size) {
@@ -124,38 +125,33 @@ export async function initLife(ctx) {
     const t = ctx.controls?.target, h = t ? camera.position.distanceTo(t) : 100;
     return Math.max(50, Math.min(220, h * 1.1));
   };
-  let night = -1, last = performance.now(), statT = 0;
+  let night = -1, statT = 0;
   function step(dt) {
     if (stage.night !== undefined && stage.night !== night) { night = stage.night; mats.setNight(night); }
     clock.advance(dt);
-    const animOn = typeof document === 'undefined' || document.getElementById('anim')?.checked !== false;
     if (state.buses) state.buses.update(clock, camera);
     if (state.walkers) {
       state.walkers.setCount(WALKERS_BY_TIER[tier()] ?? WALKERS_BY_TIER.medium, target());
-      state.walkers.update(animOn ? dt : 0, target(), livingRadius());
+      state.walkers.update(dt, target(), livingRadius());
     }
-    if (state.boats) state.boats.update(animOn ? dt : 0);
+    if (state.boats) state.boats.update(dt);
     ui.update();
+    if ((statT += dt) > 0.5 || dt === 0) {
+      statT = 0;
+      const b = state.buses?.stats;
+      ui.stats([b ? `${b.active} buses (${b.full} near)` : 'no timetable', `${state.walkers?.count || 0} walkers`,
+        `${state.boats?.items.length || 0} boats`].join(' · '));
+    }
   }
-  // a shot is one still frame: everything placed once at the URL's time
   state.step = step; // screenshots: re-place everything after moving the camera
   step(0);
   if (state.walkers) for (let q = 0; q < 3; q++) state.walkers.update(0.4, target(), livingRadius()); // spread the walk cycles
   state.ready = true;
-  if (still) return state;
-  function frame(now) {
-    const dt = Math.min((now - last) / 1000, 0.1);
-    last = now;
-    const anim = document.getElementById('anim')?.checked !== false;
-    step(anim ? dt : 0);
-    if ((statT += dt) > 0.5) {
-      statT = 0;
-      const b = state.buses?.stats;
-      ui.stats([b ? `${b.active} buses (${b.full} near)` : 'demo bus', `${state.walkers?.count || 0} walkers`,
-        `${state.boats?.items.length || 0} boats`, state.source === 'export' ? 'timetable' : 'no life export'].join(' · '));
-    }
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-  return state;
+  /** Called by main.js / citymode.js every frame before drawing. A shot is one still frame. */
+  return {
+    update(dt) {
+      const anim = typeof document === 'undefined' || document.getElementById('anim')?.checked !== false;
+      step(still || !anim ? 0 : Math.min(dt, 0.1));
+    },
+  };
 }

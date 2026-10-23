@@ -10,10 +10,26 @@ function topName(world, I, J) {
 }
 
 /**
+ * blocked(x, z) for Unity metres: true where a rotated-building island (CONTRACT 5.1) stands,
+ * so the pavement under its plinth is not walked. islands: island Worlds (src/island.js).
+ */
+export function islandBlocker(islands) {
+  const DEG = Math.PI / 180;
+  const list = (islands || []).filter((w) => w.island).map((w) => ({ w, s: Math.sin(w.island.yawDeg * DEG), c: Math.cos(w.island.yawDeg * DEG) }));
+  if (!list.length) return null;
+  return (x, z) => list.some(({ w, s, c }) => {
+    const dx = x - w.island.origin[0], dz = z - w.island.origin[1];
+    const I = Math.floor((dx * c - dz * s) / w.studM), J = Math.floor((dx * s + dz * c) / w.studM);
+    const b = w.bounds;
+    return I >= b.I0 && I < b.I1 && J >= b.J0 && J < b.J1 && w.topK(I, J) > b.K0;
+  });
+}
+
+/**
  * Walkways doc (same shape as life/walkways.json) from paved columns at ground level, on a
  * lattice of `step` studs, linked to their 8 neighbours when both ends are paved.
  */
-export function walkwaysFromWorld(world, { step = 4, maxRise = 2 } = {}) {
+export function walkwaysFromWorld(world, { step = 4, maxRise = 2, blocked = null } = {}) {
   const { I0, J0, I1, J1 } = world.bounds, S = world.studM;
   const ni = Math.floor((I1 - I0) / step), nj = Math.floor((J1 - J0) / step);
   const id = new Int32Array(ni * nj).fill(-1);
@@ -22,7 +38,7 @@ export function walkwaysFromWorld(world, { step = 4, maxRise = 2 } = {}) {
     const I = I0 + a * step + (step >> 1), J = J0 + b * step + (step >> 1);
     if (Math.abs(world.topK(I, J) - world.groundK) > maxRise) continue;
     const w = PAVED[topName(world, I, J)];
-    if (!w) continue;
+    if (!w || blocked?.((I + 0.5) * S, (J + 0.5) * S)) continue;
     id[a * nj + b] = nodes.length / 2;
     nodes.push((I + 0.5) * S, (J + 0.5) * S);
     weights.push(Math.round(w * 2));

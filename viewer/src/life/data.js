@@ -1,6 +1,7 @@
 // Loading life data: life/index.json (+ transit, walkways, river) written by
 // `blox life --out <world>`. Looked up, in order: window.BLOX_WORLD.life (embedded),
-// the #life=<dir> URL parameter, ctx.lifeUrl, then "life/" next to the page.
+// the #life=<dir> URL parameter, ctx.lifeUrl, then <site base>life/ (streamed site build) or
+// "life/" next to the page.
 // Missing data is fine: life falls back to what the world itself offers (fallback.js).
 
 async function fetchJson(url) {
@@ -12,7 +13,8 @@ async function fetchJson(url) {
 /** Base URL of the life directory (ends with '/'). */
 export function lifeBase(ctx, hash = typeof location !== 'undefined' ? location.hash : '') {
   const p = new URLSearchParams(String(hash).replace(/^#/, ''));
-  const base = p.get('life') || ctx.lifeUrl || 'life/';
+  const site = typeof window !== 'undefined' ? window.BLOX_SITE?.base : null; // streamed site: <base>life/
+  const base = p.get('life') || ctx.lifeUrl || (site ? `${site.replace(/\/?$/, '/')}life/` : 'life/');
   return base.endsWith('/') ? base : `${base}/`;
 }
 
