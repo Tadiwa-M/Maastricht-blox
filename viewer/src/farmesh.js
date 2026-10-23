@@ -121,31 +121,54 @@ export function farPiece(t, S, P) {
 // ---- builder ---------------------------------------------------------------------------
 
 class Buffers {
-  constructor(withGlow) {
-    Object.assign(this, { pos: [], nrm: [], col: [], glow: withGlow ? [] : null, idx: [], verts: 0 });
+  /** extra: city look (src/cityfar.js): glow + shine as one Uint8 x 4 attribute (aExtra). */
+  constructor(withGlow, extra = false) {
+    Object.assign(this, { pos: [], nrm: [], col: [], glow: withGlow && !extra ? [] : null, ext: extra ? [] : null, idx: [], verts: 0 });
   }
-  poly(pts, n, color, glow) {
+  poly(pts, n, color, glow, shine = 0) {
     const base = this.verts;
     for (const p of pts) {
       this.pos.push(p.x, p.y, p.z);
       this.nrm.push(Math.round(n.x * 127), Math.round(n.y * 127), Math.round(n.z * 127));
       this.col.push(Math.round(Math.min(1, color.r) * 65535), Math.round(Math.min(1, color.g) * 65535), Math.round(Math.min(1, color.b) * 65535));
       if (this.glow) this.glow.push(glow ? glow.r : 0, glow ? glow.g : 0, glow ? glow.b : 0);
+      if (this.ext) this.ext.push(...glowBytes(glow), shine);
     }
     for (let q = 1; q + 1 < pts.length; q++) this.idx.push(base, base + q, base + q + 1);
     this.verts += pts.length;
   }
-  geometry() {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
-    g.setAttribute('normal', new THREE.BufferAttribute(new Int8Array(this.nrm), 3, true));
-    g.setAttribute('color', new THREE.BufferAttribute(new Uint16Array(this.col), 3, true));
-    if (this.glow) g.setAttribute('aGlow', new THREE.Float32BufferAttribute(this.glow, 3));
-    g.setIndex(this.verts > 65535 ? new THREE.Uint32BufferAttribute(this.idx, 1) : new THREE.Uint16BufferAttribute(this.idx, 1));
-    g.computeBoundingBox();
-    g.computeBoundingSphere();
-    return g;
+  /** Plain typed arrays (transferable from a worker). */
+  arrays() {
+    const a = {
+      position: new Float32Array(this.pos), normal: new Int8Array(this.nrm), color: new Uint16Array(this.col),
+      index: this.verts > 65535 ? new Uint32Array(this.idx) : new Uint16Array(this.idx),
+    };
+    if (this.glow) a.glow = new Float32Array(this.glow);
+    if (this.ext) a.extra = new Uint8Array(this.ext);
+    return a;
   }
+  geometry() { return arraysToGeometry(this.arrays()); }
+}
+
+/** Glow colour (linear, up to ~2) -> 3 bytes at half scale (the shader doubles it). */
+export function glowBytes(glow) {
+  if (!glow) return [0, 0, 0];
+  const b = (v) => Math.max(0, Math.min(255, Math.round(v * 127.5)));
+  return [b(glow.r), b(glow.g), b(glow.b)];
+}
+
+/** BufferGeometry from Buffers.arrays() output. */
+export function arraysToGeometry(a) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(a.position, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(a.normal, 3, true));
+  g.setAttribute('color', new THREE.BufferAttribute(a.color, 3, true));
+  if (a.glow) g.setAttribute('aGlow', new THREE.BufferAttribute(a.glow, 3));
+  if (a.extra) g.setAttribute('aExtra', new THREE.BufferAttribute(a.extra, 4, true));
+  g.setIndex(new THREE.BufferAttribute(a.index, 1));
+  g.computeBoundingBox();
+  g.computeBoundingSphere();
+  return g;
 }
 
 const EPS = 1e-4;
@@ -156,11 +179,13 @@ const EPS = 1e-4;
  * `ranges` gives every list's { start, count } in it, for drawing a subset (geometry groups).
  *   code(I, J, K):  occupancy-grid cell code (src/exterior.js occupancyGrid().code)
  *   codeOf(n):      the code brick n writes into the grid
- *   style(n, part): { key, color, glow? } material key + linear colour for a body/glass part
+ *   style(n, part): { key, color, glow?, shine? } material key + linear colour for a body/glass part
+ *   extra:          every key gets aExtra (glow + shine bytes) instead of aGlow (city look)
+ *   raw:            return typed arrays (`arrays`: Map key -> Buffers.arrays()) instead of geometries
  * Returns { geometries: Map key -> BufferGeometry, ranges: Map key -> [{ start, count }],
  *           triangles, faces, culled, segmentTriangles: [per list] }.
  */
-export function buildFarGeometry(world, list, { code, codeOf, style, glowKeys = new Set() }) {
+export function buildFarGeometry(world, list, { code, codeOf, style, glowKeys = new Set(), extra = false, raw = false }) {
   const lists = list.length && typeof list[0] !== 'number' ? list : [list];
   const S = world.studM, Pm = world.plateM, K0 = world.bounds.K0;
   const bufs = new Map();
@@ -213,19 +238,19 @@ export function buildFarGeometry(world, list, { code, codeOf, style, glowKeys = 
       else if (nv.z < -0.999 && onPlane(2, z0)) side = 5;
       if (side >= 0 && sideHidden(side)) { culled++; continue; }
       const st = (looks[f.part] ||= style(n, f.part));
-      if (!bufs.has(st.key)) bufs.set(st.key, new Buffers(glowKeys.has(st.key)));
-      bufs.get(st.key).poly(p, nv, st.color, st.glow);
+      if (!bufs.has(st.key)) bufs.set(st.key, new Buffers(glowKeys.has(st.key), extra));
+      bufs.get(st.key).poly(p, nv, st.color, st.glow, st.shine);
     }
   } }
   mark();
-  const geometries = new Map(), ranges = new Map();
+  const geometries = new Map(), ranges = new Map(), arrays = new Map();
   let triangles = 0;
   for (const [key, b] of bufs) {
-    geometries.set(key, b.geometry());
+    if (raw) arrays.set(key, b.arrays()); else geometries.set(key, b.geometry());
     triangles += b.idx.length / 3;
     const at = (s) => starts[s].get(key) ?? 0;
     ranges.set(key, lists.map((_, s) => ({ start: at(s), count: at(s + 1) - at(s) })));
   }
   const segmentTriangles = lists.map((_, s) => [...bufs.keys()].reduce((a, k) => a + ((starts[s + 1].get(k) ?? 0) - (starts[s].get(k) ?? 0)) / 3, 0));
-  return { geometries, ranges, triangles, faces, culled, segmentTriangles };
+  return { geometries, arrays, ranges, triangles, faces, culled, segmentTriangles };
 }

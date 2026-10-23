@@ -94,9 +94,13 @@ export class World {
   }
 
   finish() {
-    this.buildCells();
     this.computeBounds();
   }
+
+  // The cell map is built on first use: streamed chunks drawn only in the far look never need
+  // it (it is the biggest per-chunk structure, ~1-2 MB per real chunk).
+  get cells() { if (!this._cells) this.buildCells(); return this._cells; }
+  get tops() { if (!this._tops) this.buildCells(); return this._tops; }
 
   typeOf(n) { return this.types.get(this.type[n]); }
   rot(n) { return this.rotFlags[n] & ROT_MASK; }
@@ -117,8 +121,8 @@ export class World {
           for (let k = 0; k < t.h; k++) cells.set(col + cellKey(0, 0, this.K[n] + k), n);
         }
     }
-    this.cells = cells;
-    this.tops = tops; // column -> first air level above its highest brick
+    this._cells = cells;
+    this._tops = tops; // column -> first air level above its highest brick
   }
 
   /** Brick number filling cell (I, J, K), or -1 for air. */

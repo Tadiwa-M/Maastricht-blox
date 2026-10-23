@@ -14,7 +14,7 @@
 // snaps down to the lower surface instead of hopping. Yaw turns toward the move direction.
 
 export const DEFAULTS = {
-  radius: 0.25, height: 1.9, walk: 1.4, run: 4.0, accel: 12, airAccel: 3,
+  radius: 0.35, height: 1.9, walk: 1.4, run: 4.0, accel: 12, airAccel: 3,
   gravity: 18, jumpSpeed: 4.4, stepMax: 0.42, turnRate: 12, maxFall: 30,
 };
 
@@ -55,8 +55,8 @@ export class CharacterController {
     return false;
   }
 
-  /** Body overlaps something (feet excluded by 1 cm so standing on a surface is free). */
-  bodyHits(x, y, z) { return this.hits(x, y, z, 0.01, this.o.height); }
+  /** Body overlaps something (the lowest 2 mm excluded so standing on a surface is free). */
+  bodyHits(x, y, z) { return this.hits(x, y, z, 0.002, this.o.height); }
 
   /** Something under the feet (within `depth` metres)? Uses the centre and an inner ring. */
   footSolid(x, y, z, depth = 0.03) {
@@ -177,7 +177,10 @@ export class CharacterController {
       }
     }
     this.grounded = this.vel[1] <= 0 && this.footSolid(x, this.pos[1], z);
-    if (this.grounded) this.vel[1] = 0;
+    if (this.grounded) { // rest exactly on the surface, not hovering within the foot tolerance
+      this.vel[1] = 0;
+      this.pos[1] = this.settle(x, z, this.pos[1] - 0.035, this.pos[1]);
+    }
     const travelled = Math.hypot(this.pos[0] - x0, this.pos[2] - z0);
     this.travelled += travelled;
     return { speed: travelled / dt, travelled };
