@@ -14,8 +14,17 @@ node build.mjs [worldDir]        # default ../build/testscene -> dist/{index.htm
 node screenshot.mjs [outDir] [views] [hashExtra]   # default ../build/shots, hero,map,facade
 npm test                         # chunk + island readers, rotation + island vectors, picking, movers, far LOD, quality tiers
 node tools/perf.mjs [views] [hashExtra]          # draw calls + triangles per frame from renderer.info
-node tools/tile-world.mjs <src> <out> [n=7]      # n x n copy of a world's chunks (perf test world)
+node tools/tile-world.mjs <src> <out> [n=7]      # n x n copy of a world's chunks and islands (perf test world)
+node build.mjs <world> --site <out>              # the playable city: static site that streams the world
+node tools/bake-far.mjs <world> <out>            # whole-city far meshes only (run by --site)
+node screenshot.mjs <outDir> city,street "" --site <out>   # screenshots/perf of a site build (also tools/perf.mjs)
 ```
+
+**Streamed city (site build):** for the full 2x2 km city. `scripts/site.sh [world] [out] [--serve]`
+builds it and prints how to serve it (`python3 -m http.server`; `file://` can't stream) and publish
+it (GitHub Pages / any static host). Chunks and islands stream around the camera, a baked
+silhouette keeps the whole city visible, and `src/city.js` is the query API the player and life
+code use. Views: `#view=city|hero|street|map|markt|...`. Details: `docs/guide/06-viewer.md`.
 
 Open `dist/index.html` directly (file:// works: `viewer.js` is a self-contained bundle) or
 through any static server, e.g. `npx http-server dist`.

@@ -20,7 +20,7 @@ import { readBody } from './bxc.js';
 import { PreparePool } from './workers.js';
 import { CityLoader } from './loader.js';
 import { CityView } from './cityview.js';
-import { CityCamera, tiltFor } from './citycam.js';
+import { CityCamera, tiltFor, zoomT } from './citycam.js';
 import { FACING_NAMES } from './rotation.js';
 import { bindUI, escapeHtml } from './ui.js';
 
@@ -176,7 +176,8 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const approxGround = groundGrid(farIndex, index);
   const centre = box.getCenter(new THREE.Vector3());
   const cityRadius = Math.hypot(box.max.x - box.min.x, box.max.z - box.min.z) / 2;
-  stage.setBounds(box, index.studM, { groundSize: 40000, groundY: approxGround(centre.x, centre.z) - 3 });
+  // the baseplate lies just under the lowest brick (river bed), so it never covers a street
+  stage.setBounds(box, index.studM, { groundSize: 40000, groundY: box.min.y - 0.3 });
   stage.initPost();
 
   let mode = opts.quality;
@@ -195,14 +196,25 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   city.box = box;
   city.focus = (x, z) => loader.focus(x, z, x === null ? null : approxGround(x, z) + 2);
 
-  let ui = null;
+  let ui = null, viewScale = -1;
+  /**
+   * Street level sees less (buildings block the view, haze): stream radius and baked-level
+   * distances shrink to 60 % with the camera near the ground, full size from ~100 m up.
+   */
+  function applyRadii(heightAboveGround) {
+    const f = Math.round(THREE.MathUtils.clamp((heightAboveGround + 40) / 140, 0.6, 1) * 20) / 20;
+    if (f === viewScale) return;
+    viewScale = f;
+    const tier = TIERS[tierName];
+    loader.setRadius(opts.stream ? tier.streamRadius * f : 0);
+    far.setShowDist(opts.farLevel ? [[0, 0], [Infinity, 0], [Infinity, Infinity]][opts.farLevel - 1] : tier.farDist.map((d) => d * f));
+  }
   function applyTier(name) {
     tierName = name;
     const tier = TIERS[name];
     stage.setQuality(tier);
     view.setTier(tier);
-    loader.setRadius(opts.stream ? tier.streamRadius : 0);
-    far.showDist = opts.farLevel ? [[0, 0], [Infinity, 0], [Infinity, Infinity]][opts.farLevel - 1] : tier.farDist;
+    viewScale = -1; // re-apply the height-scaled radii below
     ui?.tier(mode, name);
   }
   function setMode(m) { mode = m; governor = new FrameGovernor(initialTier(m, size)); applyTier(initialTier(m, size)); }
@@ -297,6 +309,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     stage.camera.updateMatrixWorld();
     pv.multiplyMatrices(stage.camera.projectionMatrix, stage.camera.matrixWorldInverse);
     frustum.setFromProjectionMatrix(pv);
+    applyRadii(stage.camera.position.y - approxGround(stage.camera.position.x, stage.camera.position.z));
     if (far.silhouetteReady()) loader.update(stage.camera.position, inView); // silhouette first
     if (times.silhouette === undefined && far.silhouetteReady()) times.silhouette = performance.now() - t0;
     if (streetWanted && loader.settled()) {
@@ -316,8 +329,9 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     const t = controls.target;
     const zoomed = THREE.MathUtils.clamp(dist, 10, 4000);
     // the baseplate beyond the city fades into the horizon haze, the city itself stays clear
-    stage.scene.fog.near = zoomed * 0.6 + 300;
-    stage.scene.fog.far = Math.max(stage.scene.fog.near + 900, zoomed + cityRadius * 1.25);
+    // (street level: haze from ~200 m, gone at ~1.1 km; whole city: the far edge is lightly hazed)
+    stage.scene.fog.near = zoomed + 200;
+    stage.scene.fog.far = stage.scene.fog.near + 900 + cityRadius * 2.4 * zoomT(zoomed);
     const sr = THREE.MathUtils.clamp(dist * 1.1, 45, 1600);
     shadowBox.min.set(t.x - sr, t.y - 10, t.z - sr); shadowBox.max.set(t.x + sr, t.y + Math.min(140, sr), t.z + sr);
     stage.setShadowFocus(shadowBox);

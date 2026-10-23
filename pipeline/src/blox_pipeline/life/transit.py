@@ -119,12 +119,13 @@ def build_transit(zip_path: Path, box: RDBox, start: dt.date, modes: tuple[str, 
         cal = read_calendar(zf)
         week = reference_week(cal, start)
         touching = _shapes_touching(zf, box)
-        routes: dict[str, tuple[str, str, str, str]] = {}  # id -> short, long, colour, mode
-        cols = ["route_id", "route_short_name", "route_long_name", "route_type", "route_color"]
-        for rid, short, long_, rtype, colour in iter_rows(zf, "routes.txt", cols, frozenset({"route_short_name", "route_long_name", "route_color"})):
+        routes: dict[str, tuple[str, str, str, str, str]] = {}  # id -> short, long, colour, mode, agency
+        cols = ["route_id", "route_short_name", "route_long_name", "route_type", "route_color", "agency_id"]
+        opt = frozenset({"route_short_name", "route_long_name", "route_color", "agency_id"})
+        for rid, short, long_, rtype, colour, agency in iter_rows(zf, "routes.txt", cols, opt):
             mode = mode_for_route_type(int(rtype))
             if mode in modes:
-                routes[rid] = (short or long_ or rid, long_, route_colour(colour, mode), mode)
+                routes[rid] = (short or long_ or rid, long_, route_colour(colour, mode), mode, agency)
         trips: dict[str, tuple[str, str, int, str]] = {}  # trip -> route, shape, mask, headsign
         tcols = ["trip_id", "route_id", "service_id", "shape_id", "trip_headsign"]
         masks: dict[str, int] = {}
@@ -231,8 +232,8 @@ def _assemble(routes: dict, trips: dict, shapes: dict[str, _Shape], calls: dict,
         "version": 1,
         "kind": "transit",
         "meta": {"tz": "Europe/Amsterdam", "week": [d.isoformat() for d in week], "units": "m, s"},
-        "routes": [{"short": routes[r][0], "long": routes[r][1], "colour": routes[r][2], "mode": routes[r][3]}
-                   for r in route_ids],
+        "routes": [{"short": routes[r][0], "long": routes[r][1], "colour": routes[r][2], "mode": routes[r][3],
+                    "agency": routes[r][4]} for r in route_ids],
         "shapes": shapes_doc,
         "patterns": [{"shape": shape_idx[k[0]], "route": route_idx[k[1]], "head": k[2], "st": list(k[3])}
                      for k in patterns],

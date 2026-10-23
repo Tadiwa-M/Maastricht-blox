@@ -1,7 +1,7 @@
 # 06: Browser viewer (three.js)
 
-Folder: `viewer/`. A second renderer for the same chunk files, used for look development and
-screenshots, since Unity can't run in the build container. It also checks data and rotations
+Folder: `viewer/`. The three.js engine: since phase 2 it is **the game** (the playable web city,
+streamed from a static site), and it stays the look-development renderer and screenshot tool. It also checks data and rotations
 independently of Unity. The full file table is in `viewer/README.md`.
 
 ## How to run
@@ -11,10 +11,17 @@ cd viewer
 npm i
 node build.mjs ../build/testscene     # bundles src/ + embeds the world and contract/models -> dist/
 open dist/index.html                  # file:// works (self-contained bundle)
-npm test                              # 44 tests (2026-10-19): bxc, bxi + islands, rotation, picking, movers, models, far LOD, quality
+npm test                              # 123 tests (2026-10-23, all tracks): readers, rotation, picking, movers, LOD, streaming, query API, far bake, camera, life, player
 node screenshot.mjs ../build/shots hero t=20.5   # headless Chromium (Playwright) -> hero_t_20_5.png
 node tools/perf.mjs hero,facade quality=low      # draw calls + triangles per frame (renderer.info)
-node tools/tile-world.mjs ../build/testscene ../build/tiled7 7   # 7x7 copy of the look-test chunk
+node tools/tile-world.mjs ../samples/markt_v3 ../build/tiled8 8  # 8x8 copies (chunks + islands): a synthetic city
+
+# the playable city: a static site that streams the world (see "Streamed city" below)
+node build.mjs ../build/world --site ../build/site    # or: scripts/site.sh [world] [out] [--serve [port]]
+python3 -m http.server 8000 --directory ../build/site # open http://localhost:8000/  (file:// can't stream)
+node screenshot.mjs ../build/shots city,hero,street --site ../build/site
+node tools/perf.mjs city,hero,street hooks=0 --site ../build/site   # + load times and memory
+node tools/bake-far.mjs <world> <out>                  # just the far bake (out/far/)
 ```
 
 Or from the repo root: `scripts/shots.sh` regenerates the models and the test scene, then
@@ -33,6 +40,18 @@ type, colour, cell and facing.
 
 ```
 build.mjs: world dir + contract/models -> dist/world.js (embedded data) + dist/viewer.js
+           --site: index.html, viewer.js, stream-worker.js, world/ (files, index.json, far/, life/)
+tools/bake-far.mjs -> far/l1..l3/r_X_Y.bin + far/index.json  (farbake.js)
+
+main.js ── boot: site build -> citymode.js (streamed city), else the embedded diorama below;
+   │       initHooks(ctx): [player hook] src/player/, [life hook] src/life/ (both modes)
+   │  citymode.js ── loader.js CityLoader ── stream.js StreamScheduler (priority, abort, unload)
+   │       │             ├─ source.js (HTTP / embedded bytes), workers.js -> stream-worker.js
+   │       │             │     -> prepare.js (parse, far look, solid map; no DOM)
+   │       │             └─ city.js CityQuery (query API) over solidmap.js bitsets
+   │       ├── cityview.js near (bricks.js) / mid (prepare.js output) / covers baked chunks
+   │       ├── farregion.js FarRegions: baked levels 1-3 by distance, per-chunk ranges
+   │       └── citycam.js   map camera: zoom to cursor, tilt by zoom, ground following
 
 main.js ── world.js (World: typed arrays, cell -> brick map, bounds)  <- bxc.js (chunk reader)
    │   island.js (one World per island, local cells; pose)                <- bxi.js (island reader)
@@ -58,6 +77,114 @@ main.js ── world.js (World: typed arrays, cell -> brick map, bounds)  <- bxc
 Coordinates: three.js `x = I·0.5`, `y = K·0.2`, `z = −J·0.5` (north is −z, so the scene isn't
 mirrored). All geometry is modelled with its front toward −z (+j). `placement.js: brickMatrix`
 rotates by `−rot·90°` about +y. See [guide 01](01-coordinates-and-rotation.md).
+
+## Streamed city (site build, phase 2)
+
+The whole 2x2 km city (4096 chunks + ~2500 islands, ~80 MB) can't be one embedded page. The
+site build serves the world as files and the viewer streams them around the camera; a pre-baked
+silhouette keeps the whole city visible from the first second.
+
+**Site layout** (`node build.mjs <world> --site <out>`, wrapped by `scripts/site.sh` / `.ps1`,
+defaults `build/world` -> `build/site`, which also print how to serve and publish):
+
+```
+<out>/index.html, viewer.js, stream-worker.js
+<out>/world.js            window.BLOX_SITE = { base: 'world/', life: true|false }
+<out>/world/              manifest, palette, catalogue, features (hard links, else copies)
+           chunks/, islands/   the world files, unchanged (hard links, else copies)
+           index.json     stream index: chunks [{cx, cy, file, minK, maxK, bytes}],
+                          islands [{id, file, cx, cy, rect: [x0, z0, x1, z1] Unity m, minK, maxK, bytes}]
+           far/index.json, far/l1|l2|l3/r_X_Y.bin   baked far regions
+           models.json    contract/models + contract catalogue/palette (gallery)
+           life/          the world's life export (Track L), when present
+```
+The embed mode (no `--site`) is unchanged: small worlds, samples, the artifact, `file://`.
+It embeds `<world>/life/` as `BLOX_WORLD.life` (null when absent).
+
+**Three rings around the camera** (`cityview.js`):
+- **near:** the full look (bevelled instanced bricks, studs) for the closest items, built on the
+  main thread from the item's records, one per frame, capped by count *and* triangles
+  (`nearTriCap`: one big island can be 30k bricks / 8M lite triangles; the closest item may use
+  2x the budget, beyond that it stays mid).
+- **mid:** every streamed chunk and island in the far look of `farmesh.js` (exact boxes, hidden
+  faces culled within the item), one mesh per family: all opaque classes share ONE material
+  (`materials.js: cityFar`) with per-vertex `aExtra` = glow rgb + shine (plastic/metal/glass), so
+  a chunk is usually one draw call.
+- **far:** the baked regions (`farregion.js`); a baked chunk's index range is hidden once the
+  streamed chunk and every island it owns are on screen (geometry groups, as `lod.js` clusters).
+
+**Streaming** (`stream.js` + `loader.js`): items = chunks and islands with three.js boxes.
+Wanted = within `streamRadius` (3D distance, so a camera high above wants nothing), nearest
+first, halved priority for boxes in the view frustum, `concurrency` fetches in flight, in-flight
+loads beyond 1.25x the radius are aborted (`AbortController`; a late result is dropped), loaded
+items beyond 1.5x are unloaded, `maxLoaded` caps the count, failures retry after 5 s. Several
+"eyes" are supported (`city.focus(x, z)`: the player while the camera is elsewhere). Streaming
+starts after the coarsest baked level is in (silhouette first). Radii shrink to 60 % with the
+camera at street level (`applyRadii`), where buildings block the view.
+
+**Workers** (`workers.js`): `stream-worker.js` runs `prepare.js` (inflate, decode, World,
+occupancy grid + flood fill, window glow, far geometry, solid map) and transfers typed arrays.
+On `samples/markt_v3` that is ~26 ms per chunk and ~54 ms per island (max 490 ms) of main-thread
+work saved; on the synthetic city the street view is ready in 14.2 s with workers vs 18.2 s
+without (headless, SwiftShader on the same CPU), and the main thread no longer hitches.
+`#worker=0` or `file://` prepare on the main thread.
+
+**Memory:** streamed and baked geometry drops its CPU arrays after GPU upload (`farmesh.js:
+releaseAfterUpload`; new meshes are drawn once unculled so they upload at once, `uploadSoon`);
+an item keeps its records (~13 B/brick) and a 1-bit solid map; a World with its cell map exists
+only for near items and picking; baked looks keep their compact quads until first shown.
+
+**Query API** (`city.js`, JSDoc there): `isSolid(x, y, z)`, `isWater`, `groundHeight(x, z,
+fromY?)` in three.js metres over chunks and islands (island cells through the inverse pose),
+`'unknown'` where a chunk or an island overlapping it is not loaded, plus `approxGround(x, z)`
+(baked per-chunk ground, always known), `box`, `focus(x, z)`. The embedded diorama offers the
+same API (`cityFromWorlds`).
+
+**Far bake** (`farbake.js`, `tools/bake-far.mjs`, run by the site build): per region of 8x8
+chunks and per level (1: 2x2 studs x 3 plates = 1 m x 0.6 m; 2: 4x4x5 = 2 m x 1 m; 3: 8x8x10 =
+4 m x 2 m) every brick cell (islands through their pose) votes for its coarse cell; any vote
+makes it solid (thin walls and roof shells survive), the colour is the majority, top faces use
+the highest fine cell's colour (paving over earth), windows vote glass. Faces into outside air
+(flood fill from the sky, not into the air under the terrain shell) or into water are kept and
+greedy-merged per (colour, owner chunk); glass stays per cell so windows glow individually.
+Neighbouring chunks/islands are rasterised for culling but not emitted. File `BXF1`: 40-byte
+header + owner table + 12-byte quads, raw-DEFLATE (format in `farbake.js`). Level 3 of every
+region is always resident; levels 2/1 stream in within `farDist` (medium: 280 / 900 m).
+
+**Camera** (`citycam.js`): MapControls + zoom to cursor; tilt allowed from 87° (street, 3° above
+the horizon so the sky shows) to 52° (whole city), and while zooming it eases toward a preferred
+tilt for that distance; the target rides on the ground (eye height when close), stays inside the
+city box, the camera never goes under the bricks; near/far planes scale with distance. Fog,
+shadow box (around the target, 45 m-1.6 km) and AO (`aoDist`) follow the zoom.
+
+**City presets** (`#view=`): `city` (whole city), `map` (top down), `hero` (3/4 over the Markt
+or the data centre), `street` (street level: once streamed, `findStreetSpot` picks open ground
+near the Markt and the side with the longest free line of sight), `markt|vrijthof|brug|station|
+bonnefanten` when present, and `#at=x,z&dist=m` (Unity metres). Debug: `#stream=0` (bake only),
+`#farlevel=1|2|3`, `#worker=0`, `#hooks=0` (no life/player).
+
+**Measured** (`tools/perf.mjs ... hooks=0`, headless Chromium + SwiftShader, 1600x1000, medium;
+calls/triangles over all passes: shadow, AO normals, main; memory after a forced GC: V8 heap +
+ArrayBuffers; "silhouette" = whole city drawable, "ready" = everything wanted streamed + near
+built (SwiftShader rendering dominates)):
+
+| world / view | draws | triangles | silhouette / ready | memory |
+|---|---|---|---|---|
+| `samples/markt_v3` embed (before), hero | 362 | 3.49 M | - / 6.1 s | 55 + 107 MB |
+| `samples/markt_v3` embed (before), facade | 524 | 6.26 M | - / 5.8 s | 55 + 108 MB |
+| `samples/markt_v3` site, city | 19 | 0.36 M | 0.55 / 2.2 s | 4 + 2 MB |
+| `samples/markt_v3` site, hero | 320 | 2.66 M | 0.32 / 8.1 s | 7 + 17 MB |
+| `samples/markt_v3` site, street | 318 | 5.18 M | 0.35 / 8.2 s | 11 + 25 MB |
+| town fixture site, city / street | 35 / 276 | 0.16 / 3.72 M | 0.48 / 1.6, 2.9 s | 4 + 2 / 8 + 7 MB |
+| synthetic city (8x8 markt_v3: 3136 chunks, 2560 islands, 18.5 M bricks, 58 MB), city | 131 | 1.44 M | 1.0-2.0 / 1.7-3.0 s | 8 + 1 MB |
+| synthetic city, hero | 315 | 5.72 M | 1-2 / 9-19 s | 10 + 74 MB |
+| synthetic city, street | 464 | 8.28 M | 1.4 / 14.8 s | 22 + 66 MB |
+
+Before this work the synthetic city could not be opened at all (embedding 58 MB as base64);
+street level on it first measured 28 M triangles and 538 MB (one giant island near, CPU copies
+of every vertex array). The synthetic city is the Markt centre repeated: denser than the real
+city everywhere, so it is the worst case. Bake: 93 s, level 1/2/3 = 8.7 M / 2.6 M / 0.72 M
+triangles, 17.5 / 5.4 / 1.5 MB.
 
 ### Notable choices
 
@@ -216,4 +343,8 @@ is meaningless; compare triangles and draw calls.
 | `test/models.test.mjs` | every `contract/models/*.json` builds with the right parts, size and pivot, facing forward |
 | `test/farmesh.test.mjs` | far LOD hidden-face counts: lone brick, neighbours, solid block, sealed interior, glass/water, slope caps, window glass |
 | `test/quality.test.mjs` | starting tier and LOD switch by world size, tier ordering, auto step-down, fps meter |
+| `test/stream.test.mjs` | scheduler: nearest first, frustum priority, concurrency, abort (late result dropped), unload radius + maxLoaded, retry, several eyes |
+| `test/city.test.mjs` | query API on the town fixture through the real path (bake index, CityLoader, prepare.js): unknown before load, chunk and island cells solid, groundHeight, an unloaded island makes its chunks unknown, nearest-first loading and unloading, floor under an overhang |
+| `test/farbake.test.mjs` | coarse block -> 6 merged quads, top colour, owners + context culling, water/glass rules, BXF1 round trip (raw + deflate) into geometry ranges, bad input, the bake tool on the town fixture |
+| `test/citycam.test.mjs` | tilt limits by distance, target clamping, street spot on open ground beside a tower |
 | `test/island.test.mjs` | `.bxi` golden file (compressed + raw), bad input, pose vs `islands.json` through a THREE.Group, island picking + nearest hit, LOD wiring on the town fixture, islands on their paved plots |

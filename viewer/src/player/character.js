@@ -1,40 +1,44 @@
-// The player's figure: the original blocky character (contract/models/character.json, built
-// at contract scale by src/models.js, never a minifigure shape), with the walk cycle from
-// src/mover.js, a longer stride and forward lean when running, and a small idle sway.
+// The player's figure: the same smooth toy figure as the city's people (src/figure/, an
+// original design, never a toy minifigure shape), drawn as a one-figure FigureCrowd and posed
+// by the shared rig: walk cycle driven by distance, a longer stride and forward lean when
+// running, idle sway when standing. #figure=<seed> picks another look.
 import * as THREE from 'three';
-import { buildModel } from '../models.js';
-import { WalkCycle } from '../mover.js';
-import { MaterialSet } from '../materials.js';
-import { placeholderModels } from '../placeholders.js';
+import { FigureCrowd } from '../figure/crowd.js';
+import { makeVariant } from '../figure/variants.js';
+import { MODE } from '../figure/rig.js';
+
+export const PLAYER_SEED = 52;
+
+function seedFromHash() {
+  if (typeof location === 'undefined') return PLAYER_SEED;
+  const v = new URLSearchParams(location.hash.replace(/^#/, '')).get('figure');
+  return v && /^\d+$/.test(v) ? +v : PLAYER_SEED;
+}
 
 export class Character {
-  /** models: { name: model JSON } (data.models); world: for palette + catalogue. */
-  constructor(models, world) {
-    const json = models?.character || placeholderModels().walker_a;
-    this.mats = new MaterialSet();
-    this.model = buildModel(json, { palette: world.palette, types: world.types, mats: this.mats, studM: world.studM, plateM: world.plateM });
-    this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    this.group = new THREE.Group(); // position + yaw
+  /** models/world are accepted for the old signature; the figure needs neither. */
+  constructor(models, world, { seed = seedFromHash() } = {}) {
+    void models; void world;
+    this.variant = makeVariant(seed, { kind: 'adult' });
+    this.variant.acc = this.variant.acc === 'bag' ? 'none' : this.variant.acc;
+    this.crowd = new FigureCrowd(1, { lod: false });
+    this.group = new THREE.Group(); // position + yaw live in the instance matrices; the group just holds the meshes
     this.group.name = 'player';
-    this.group.add(this.model); // lean
-    this.walk = new WalkCycle(this.model.userData.parts);
-    this.t = 0;
+    this.group.add(this.crowd.group);
+    this.phase = 0; this.t = 0; this.speed = 0;
+    this.pose = { x: 0, y: 0, z: 0, rotY: 0, mode: MODE.IDLE, phase: 0, speed: 0, t: 0 };
   }
 
   /** feet: [x, y, z] three.js; yaw: compass radians; speed m/s; travelled m this frame. */
   update(feet, yaw, speed, travelled, dt) {
     this.t += dt;
-    this.group.position.set(feet[0], feet[1], feet[2]);
-    this.group.rotation.set(0, -yaw, 0);
-    this.walk.stride = speed > 2.5 ? 1.1 : 0.7;
-    this.walk.update(travelled, speed);
-    const lean = -0.09 * Math.min(1, speed / 4);
-    this.model.rotation.x += (lean - this.model.rotation.x) * Math.min(1, dt * 8);
-    const idle = Math.max(0, 1 - speed / 0.3);
-    if (idle > 0) {
-      const p = this.model.userData.parts, s = Math.sin(this.t * 1.8) * 0.05 * idle;
-      if (p.arm_l) p.arm_l.rotation.x += s;
-      if (p.arm_r) p.arm_r.rotation.x -= s;
-    }
+    this.speed += (speed - this.speed) * Math.min(1, dt * 10);
+    const stride = speed > 2.5 ? 1.15 : 0.75;
+    this.phase += (travelled / (stride * this.variant.scale)) * Math.PI;
+    Object.assign(this.pose, { x: feet[0], y: feet[1], z: feet[2], rotY: -yaw,
+      mode: this.speed > 0.08 ? MODE.WALK : MODE.IDLE, phase: this.phase, speed: this.speed, t: this.t });
+    this.crowd.begin();
+    this.crowd.add(this.variant, this.pose);
+    this.crowd.end();
   }
 }

@@ -487,3 +487,52 @@ browser from a clock. Guide: `docs/guide/05-movers-and-models.md` (City life).
 - Walkers don't wait at crossings or stops, and buses don't yield to walkers (walkers are pushed
   aside). Trains (`--modes bus,rail`) are exported but would be drawn as buses.
 - The river fallback line is approximate (only used without OSM).
+
+## 2026-10-23: Streamed web city (phase 2, track S: streaming)
+
+The viewer can now run the whole city in the browser: a static site streams chunks and islands
+around the camera, and a pre-baked silhouette keeps all 2 km visible. Guide: 06 "Streamed city".
+
+- **Site build:** `node build.mjs <world> --site <out>` (`scripts/site.sh` / `site.ps1`, default
+  `build/world` -> `build/site`; they print how to serve locally and publish to GitHub Pages or any
+  static host). World files are hard-linked (copied as fallback); `index.json` holds chunk boxes
+  and island world boxes; `world/life/` is copied when the world has a life export (and embedded
+  as `BLOX_WORLD.life` in embed mode; `BLOX_SITE.life` says whether it exists). The embed mode is
+  unchanged (look-test chunk: same 380 draws / 4.89 M triangles).
+- **Streaming:** `StreamScheduler` (nearest first, frustum priority, concurrency, abort, unload,
+  retry, several eyes), `CityLoader` (fetch, Web Worker pool, query API), `CityView` (near / mid
+  / baked rings). The mid look puts every opaque class in one material (per-vertex glow + shine),
+  so a chunk is ~1 draw call. Workers: on the synthetic city the street view is ready 22 % sooner
+  and the main thread stops hitching (per item 26-490 ms of work moved off it).
+- **Query API** (`src/city.js`): `isSolid`, `isWater`, `groundHeight(x, z, fromY)` over chunks
+  and islands, `'unknown'` where a chunk or an island overlapping it is not loaded; the diorama
+  offers the same API. 1-bit solid maps (64 KB per real chunk).
+- **Far bake** (`tools/bake-far.mjs`, `src/farbake.js`, format `BXF1`): 3 levels of coarse voxels
+  (1 m / 2 m / 4 m), majority colours with top-face colours, flood-filled outside air, greedy
+  quads per owner chunk so baked chunks hide as the real ones stream in. Synthetic city (8x8 Markt
+  = 3136 chunks + 2560 islands): level 3 = 0.72 M triangles for everything, 93 s bake.
+- **Map camera** (`src/citycam.js`): zoom to cursor from the whole city to street level, tilt
+  allowance and preferred tilt follow the zoom (sky in frame near the ground), target on the
+  ground, inside the city, camera never under bricks; fog, shadow box and AO follow the zoom.
+  `street` preset looks for open ground and a free line of sight once the area is streamed.
+- **Hooks:** `main.js initHooks(ctx)` holds `// [player hook]` and `// [life hook]`, called by both
+  modes; missing modules are stubbed by an esbuild plugin.
+- **Numbers** (headless SwiftShader, all passes): synthetic city overview 131 draws / 1.44 M
+  triangles, silhouette 1-2 s, 9 MB; street level 464 / 8.3 M (was 28 M and 538 MB before the
+  triangle budget and buffer release), 88 MB. `samples/markt_v3`: embed hero 362 / 3.49 M ready
+  6.1 s, 162 MB -> site hero 320 / 2.66 M, silhouette 0.3 s, 24 MB. Tests: +19 (stream, city,
+  farbake, citycam).
+- Fixes found by screenshots: wrong winding on the mirrored region meshes, fog near > far at
+  street level, baked tops coloured by the earth under the paving, the baseplate covering streets
+  (now under the lowest brick), street preset on a roof.
+
+**Open decisions**
+- Not yet run on the real 4096-chunk city or on a laptop iGPU: the synthetic city is denser than
+  Maastricht everywhere, so real numbers should be lower; measure with `scripts/site.sh` +
+  `tools/perf.mjs` on the workstation.
+- Street level on the dense synthetic city is ~4.7 M triangles per pass; medium AO adds a full
+  geometry pass close up. `auto` steps down to low (no AO, 130 m stream radius) when slow.
+- Baked levels 2/3 glow little at night: glass rarely wins a 2-4 m cell's vote.
+- Life data fetch: `life/data.js` should skip fetching when `BLOX_SITE.life === false` or
+  `BLOX_WORLD.life === null` (no 404 noise); that's in Track L's file.
+- GitHub Pages limits (1 GB, 100 MB per file) fit the city (~100 MB in ~6,500 files).

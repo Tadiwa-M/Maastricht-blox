@@ -19,7 +19,7 @@ def test_life_command_writes_index_and_parts(tmp_path: Path) -> None:
     assert main(["life", "--out", str(out), "--data-dir", str(root), "--date", MONDAY]) == 0
     index = json.loads((out / "life" / "index.json").read_text())
     assert index["kind"] == "life" and index["version"] == 1
-    assert index["files"] == {"transit": "transit.json", "walkways": "walkways.json", "river": "river.json"}
+    assert index["files"] == {"transit": "transit.json", "walkways": "walkways.json", "streets": "streets.json", "river": "river.json"}
     for name, f in index["files"].items():
         doc = json.loads((out / "life" / f).read_text())
         assert doc["kind"] == name

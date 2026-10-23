@@ -39,6 +39,7 @@ def _trips(doc: dict, short: str) -> list[tuple[dict, int, int]]:
 def test_keeps_bus_routes_touching_the_slice(doc: dict) -> None:
     assert sorted(r["short"] for r in doc["routes"]) == ["30", "4"]  # not Heerlen-only 50, not the train
     r4 = doc["routes"][_route(doc, "4")]
+    assert r4["agency"] == "ARR"  # operator, for the bus livery (viewer life/livery.js)
     assert (r4["colour"], r4["mode"]) == ("#00A0E0", "bus")
     assert doc["routes"][_route(doc, "30")]["colour"] == "#1F6FB2"  # default bus colour
     assert doc["meta"]["week"][0] == MONDAY and len(doc["meta"]["week"]) == 7

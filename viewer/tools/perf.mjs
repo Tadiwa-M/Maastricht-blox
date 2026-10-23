@@ -5,7 +5,8 @@
 // SwiftShader fps means nothing; triangles, draw calls, load time and memory are what transfer.
 //   load    ms from page start to the whole-city silhouette (site) / first frame, and to
 //           "ready" (every wanted chunk/island streamed and near looks built)
-//   memory  JS heap (performance.memory, precise), GPU geometries/textures (renderer.info.memory)
+//   memory  after a forced full GC (CDP): V8 heap, ArrayBuffer backing stores (typed arrays:
+//           records, solid maps, vertex arrays not yet on the GPU), GPU geometries/textures
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -17,7 +18,7 @@ const views = (argv[0] || 'hero').split(',');
 const extra = argv[1] ? `&${argv[1]}` : '';
 const { server, url } = await serve(root);
 const browser = await chromium.launch({
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-gl=angle', '--enable-precise-memory-info', '--js-flags=--expose-gc'],
+  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-gl=angle', '--enable-precise-memory-info'],
 });
 try {
   for (const view of views) {
@@ -29,16 +30,19 @@ try {
     await page.waitForFunction(() => window.__bloxReady === true || window.__bloxError, null, { timeout: 1800000 });
     const err = await page.evaluate(() => window.__bloxError);
     if (err) throw new Error(err);
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('HeapProfiler.enable');
+    await cdp.send('HeapProfiler.collectGarbage');
+    const heap = await cdp.send('Runtime.getHeapUsage');
     const s = await page.evaluate(() => {
-      if (typeof window.gc === 'function') window.gc();
       const b = window.__blox;
       const info = b.stage.renderer.info;
-      const mem = performance.memory;
       return { calls: info.render.calls, triangles: info.render.triangles, studs: b.built.studs,
         tier: b.quality?.describe?.() ?? null, lod: b.lod?.stats?.() ?? null, times: window.__bloxTimes ?? null,
-        heapMiB: mem ? +(mem.usedJSHeapSize / 1048576).toFixed(1) : null,
         geometries: info.memory.geometries, textures: info.memory.textures };
     });
+    s.heapMiB = +(heap.usedSize / 1048576).toFixed(1);
+    s.buffersMiB = +(heap.backingStorageSize / 1048576).toFixed(1);
     console.log(`${view}${extra}: ${JSON.stringify(s)} (ready after ${((Date.now() - t0) / 1000).toFixed(1)} s)`);
     await page.close();
   }
