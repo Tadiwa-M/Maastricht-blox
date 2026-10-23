@@ -32,6 +32,12 @@ def export_sample(world: Path, out: Path, centre: tuple[int, int], radius: int) 
     (out / "chunks").mkdir(parents=True)
     for c in keep:
         shutil.copy2(world / c["file"], out / c["file"])
+    islands = [isl for isl in manifest.get("islands", [])
+               if abs(isl["cx"] - centre[0]) <= radius and abs(isl["cy"] - centre[1]) <= radius]
+    if islands:
+        (out / "islands").mkdir()
+        for isl in islands:
+            shutil.copy2(world / isl["file"], out / isl["file"])
     for key in ("palette", "catalogue"):
         shutil.copy2(world / manifest[key], out / manifest[key])
 
@@ -42,10 +48,12 @@ def export_sample(world: Path, out: Path, centre: tuple[int, int], radius: int) 
             and f["bboxIJ"][1] < j1 and f["bboxIJ"][3] >= j0]
     (out / manifest["features"]).write_text(json.dumps({"features": near}), encoding="utf-8")
 
-    manifest = {**manifest, "chunks": keep, "sample": {"centre": list(centre), "radius": radius}}
+    manifest = {**manifest, "chunks": keep, "islands": islands,
+                "sample": {"centre": list(centre), "radius": radius}}
     (out / "manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
-    return {"chunks": len(keep), "features": len(near),
-            "bytes": sum((out / c["file"]).stat().st_size for c in keep)}
+    files = [c["file"] for c in keep] + [i["file"] for i in islands]
+    return {"chunks": len(keep), "islands": len(islands), "features": len(near),
+            "bytes": sum((out / f).stat().st_size for f in files)}
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -57,7 +65,7 @@ def main(argv: list[str] | None = None) -> None:
     a = ap.parse_args(argv)
     out = repo_root() / "samples" / (a.name or a.around.replace(",", "_"))
     st = export_sample(a.world, out, resolve_place(a.around), a.radius)
-    print(f"wrote {out}: {st['chunks']} chunks, {st['features']} features, {st['bytes'] / 1024:.0f} KiB")
+    print(f"wrote {out}: {st['chunks']} chunks, {st['islands']} islands, {st['features']} features, {st['bytes'] / 1024:.0f} KiB")
 
 
 if __name__ == "__main__":

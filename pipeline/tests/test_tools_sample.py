@@ -17,3 +17,14 @@ def test_export_sample_roundtrip(tmp_path: Path) -> None:
     m = json.loads((tmp_path / "s" / "manifest.json").read_text())
     assert m["sample"] == {"centre": [22, 47], "radius": 1}
     assert (tmp_path / "s" / m["chunks"][0]["file"]).exists()
+
+
+def test_export_sample_copies_islands(tmp_path: Path) -> None:
+    town = Path(__file__).parent / "fixtures" / "town_world"
+    m = json.loads((town / "manifest.json").read_text())
+    c = m["islands"][0]
+    st = export_sample(town, tmp_path / "s", (c["cx"], c["cy"]), 2)
+    out = json.loads((tmp_path / "s" / "manifest.json").read_text())
+    assert st["islands"] >= 1 and len(out["islands"]) == st["islands"]
+    for isl in out["islands"]:
+        assert (tmp_path / "s" / isl["file"]).exists()
