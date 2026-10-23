@@ -157,6 +157,15 @@ export function glowBytes(glow) {
   return [b(glow.r), b(glow.g), b(glow.b)];
 }
 
+/** Free an attribute's CPU copy once it is on the GPU (streamed meshes are never edited). */
+export function releaseAfterUpload(g) {
+  const drop = function () { this.array = null; };
+  for (const a of Object.values(g.attributes)) a.onUpload(drop);
+  // the index stays: three.js reads it for wireframes and geometry groups only need offsets,
+  // but keeping it is cheap insurance (2-4 bytes per index)
+  return g;
+}
+
 /** BufferGeometry from Buffers.arrays() output. */
 export function arraysToGeometry(a) {
   const g = new THREE.BufferGeometry();

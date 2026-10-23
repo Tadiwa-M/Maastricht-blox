@@ -297,7 +297,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     stage.camera.updateMatrixWorld();
     pv.multiplyMatrices(stage.camera.projectionMatrix, stage.camera.matrixWorldInverse);
     frustum.setFromProjectionMatrix(pv);
-    loader.update(stage.camera.position, inView);
+    if (far.silhouetteReady()) loader.update(stage.camera.position, inView); // silhouette first
     if (times.silhouette === undefined && far.silhouetteReady()) times.silhouette = performance.now() - t0;
     if (streetWanted && loader.settled()) {
       const spot = findStreetSpot(city, streetWanted.target.x, streetWanted.target.z);
