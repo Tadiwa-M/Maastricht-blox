@@ -155,7 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     f = sub.add_parser("fetch", help="download AHN, 3D BAG, OSM (and optionally ortho) into data/raw")
     f.add_argument("--bbox", help=bbox_help)
-    f.add_argument("--only", help="comma list of ahn,bag3d,osm,ortho (default ahn,bag3d,osm)")
+    f.add_argument("--only", help="comma list of ahn,bag3d,osm,ortho,gtfs (default ahn,bag3d,osm)")
     f.add_argument("--data-dir", help="cache dir (default <repo>/data/raw or $BLOX_DATA_DIR)")
     f.set_defaults(func=cmd_fetch)
 
