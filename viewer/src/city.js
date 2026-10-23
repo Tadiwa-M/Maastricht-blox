@@ -135,3 +135,24 @@ export class CityQuery {
     return top === -Infinity ? null : (top + 1) * this.plateM;
   }
 }
+
+/**
+ * City over in-memory Worlds (embedded diorama build): one SolidMap for the chunk World in
+ * global cells, one per island. Everything outside the loaded data is air, never unknown.
+ * isWater(world, n) -> bool says which bricks are water.
+ */
+export function cityFromWorlds(world, islands, isWater = () => false, SolidMap) {
+  const q = new CityQuery({ studM: world.studM, plateM: world.plateM, chunkStuds: world.chunkStuds, hasChunk: () => false });
+  if (world.count) {
+    const map = SolidMap.fromWorld(world, (n) => isWater(world, n));
+    const { I0, J0, I1, J1 } = world.bounds, C = world.chunkStuds;
+    for (let cx = Math.floor(I0 / C); cx <= Math.floor((I1 - 1) / C); cx++)
+      for (let cy = Math.floor(J0 / C); cy <= Math.floor((J1 - 1) / C); cy++) q.setChunk(cx, cy, map);
+  }
+  for (const w of islands) q.setIsland(w.island, SolidMap.fromWorld(w, (n) => isWater(w, n)));
+  const S = world.studM, P = world.plateM, b = world.bounds;
+  q.box = { min: { x: b.I0 * S, y: b.K0 * P, z: -b.J1 * S }, max: { x: b.I1 * S, y: b.K1 * P, z: -b.J0 * S } };
+  q.approxGround = () => world.groundK * P;
+  q.focus = () => {};
+  return q;
+}

@@ -138,6 +138,7 @@ export async function initLife(ctx) {
     ui.update();
   }
   // a shot is one still frame: everything placed once at the URL's time
+  state.step = step; // screenshots: re-place everything after moving the camera
   step(0);
   if (state.walkers) for (let q = 0; q < 3; q++) state.walkers.update(0.4, target(), livingRadius()); // spread the walk cycles
   state.ready = true;
