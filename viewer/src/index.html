@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maastricht Blox Viewer</title>
+<style>
+  :root { --panel: rgba(18, 22, 30, 0.72); --text: #f3f1ea; --muted: #b9bcc4; --accent: #ffcf5a; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #cfd9e2; color: var(--text);
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #view { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; }
+  .panel { position: fixed; background: var(--panel); backdrop-filter: blur(8px); border-radius: 10px;
+    padding: 10px 14px; box-shadow: 0 4px 18px rgba(0,0,0,.25); }
+  #hud { top: 14px; left: 14px; display: grid; gap: 8px; min-width: 240px; }
+  #hud h1 { margin: 0; font-size: 15px; letter-spacing: .02em; }
+  #hud label { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  #hud input[type=range] { flex: 1; accent-color: var(--accent); }
+  #timeLabel { color: var(--text); font-variant-numeric: tabular-nums; min-width: 3em; text-align: right; }
+  #views a { color: var(--accent); margin-right: 10px; text-decoration: none; }
+  #stats { color: var(--muted); font-variant-numeric: tabular-nums; max-width: 300px; }
+  #hud select { background: rgba(255,255,255,.1); color: var(--text); border: 1px solid rgba(255,255,255,.25); border-radius: 5px; padding: 1px 4px; }
+  #hud select option { color: #111; }
+  #tierLabel { color: var(--muted); }
+  #info { top: 14px; right: 14px; max-width: 320px; display: grid; gap: 2px; }
+  #info b { font-size: 14px; } #info span { color: var(--accent); } #info small { color: var(--muted); }
+  #foot { bottom: 10px; right: 14px; padding: 5px 10px; color: var(--muted); font-size: 11px; }
+  body.shot .panel:not(#foot) { display: none; }
+  @media (max-width: 600px) { #hud { right: 14px; min-width: 0; } #info { top: auto; bottom: 44px; left: 14px; } }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="hud" class="panel">
+  <h1>Maastricht Blox</h1>
+  <label>Sun <input id="time" type="range" min="5" max="23" step="0.25" value="16.5"><span id="timeLabel">16:30</span></label>
+  <label><input id="tilt" type="checkbox" checked> Tilt-shift</label>
+  <label><input id="ao" type="checkbox" checked> Ambient occlusion</label>
+  <label><input id="anim" type="checkbox" checked> Animate (bus, boat, walkers)</label>
+  <label>Quality <select id="quality"><option value="auto">auto</option><option value="high">high</option><option value="medium">medium</option><option value="low">low</option></select><span id="tierLabel"></span></label>
+  <div id="views">View: <a href="#view=hero">hero</a><a href="#view=map">map</a><a href="#view=facade">facade</a><a href="#view=river">river</a><a href="#view=gallery">pieces</a></div>
+  <div id="stats">loading…</div>
+</div>
+<div id="info" class="panel" hidden></div>
+<div id="foot" class="panel">Not affiliated with the LEGO Group.</div>
+<script>if (/[?&]shot=1/.test(location.search)) document.body.classList.add('shot');</script>
+<script src="world.js"></script>
+<script defer src="viewer.js"></script>
+</body>
+</html>

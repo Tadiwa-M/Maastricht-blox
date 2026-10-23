@@ -1,6 +1,6 @@
 {
- "version": 1,
- "note": "ids are stable and append-only; w along +i, d along +j at rot 0; h in plates",
+ "version": 2,
+ "note": "ids are stable and append-only; w along +i, d along +j at rot 0; h in plates; directional pieces' front faces +j at rot 0",
  "types": [
   {
    "id": 1,
@@ -339,6 +339,97 @@
    "d": 1,
    "h": 1,
    "studs": "all"
+  },
+  {
+   "id": 38,
+   "name": "arch_1x4",
+   "kind": "arch",
+   "w": 4,
+   "d": 1,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 39,
+   "name": "arch_1x6",
+   "kind": "arch",
+   "w": 6,
+   "d": 1,
+   "h": 6,
+   "studs": "all"
+  },
+  {
+   "id": 40,
+   "name": "window_1x2x2",
+   "kind": "window",
+   "w": 2,
+   "d": 1,
+   "h": 6,
+   "studs": "all"
+  },
+  {
+   "id": 41,
+   "name": "window_1x2x3",
+   "kind": "window",
+   "w": 2,
+   "d": 1,
+   "h": 9,
+   "studs": "all"
+  },
+  {
+   "id": 42,
+   "name": "door_1x2x4",
+   "kind": "door",
+   "w": 2,
+   "d": 1,
+   "h": 12,
+   "studs": "all"
+  },
+  {
+   "id": 43,
+   "name": "fence_1x4",
+   "kind": "fence",
+   "w": 4,
+   "d": 1,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 44,
+   "name": "round_tile_1x1",
+   "kind": "round_tile",
+   "w": 1,
+   "d": 1,
+   "h": 1,
+   "studs": "none"
+  },
+  {
+   "id": 45,
+   "name": "jumper_1x2",
+   "kind": "jumper",
+   "w": 2,
+   "d": 1,
+   "h": 1,
+   "studs": "center"
+  },
+  {
+   "id": 46,
+   "name": "slope30_1x2",
+   "kind": "slope",
+   "w": 1,
+   "d": 2,
+   "h": 2,
+   "studs": "backRows",
+   "studRows": 0
+  },
+  {
+   "id": 47,
+   "name": "grille_1x2",
+   "kind": "tile_grille",
+   "w": 2,
+   "d": 1,
+   "h": 1,
+   "studs": "none"
   }
  ]
 }

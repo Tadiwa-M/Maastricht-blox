@@ -1,0 +1,70 @@
+// GPU stud culling for StudRenderer: one dispatch per CPU-visible chunk. Each thread tests
+// one stud (frustum sphere test + camera distance) and appends a copy to the near (16-seg)
+// or mid (8-seg) visible list, counting into that LOD's indirect draw args.
+// Beyond the mid distance no stud is drawn; Blox/BrickBody fakes them on top faces.
+
+#pragma kernel Cull
+
+struct StudInstance          // mirrors Blox.Meshing.Core.StudInstance (32 bytes)
+{
+    float3 position;
+    float3 color;
+    float  angleDeg;
+    float  materialClass;
+};
+
+StructuredBuffer<StudInstance>   _Source;
+uint                             _SourceCount;
+
+RWStructuredBuffer<StudInstance> _VisibleNear;
+RWStructuredBuffer<StudInstance> _VisibleMid;
+uint                             _NearCapacity;
+uint                             _MidCapacity;
+
+// IndirectDrawIndexedArgs (5 uints) per LOD; instanceCount is at byte offset 4.
+RWByteAddressBuffer              _ArgsNear;
+RWByteAddressBuffer              _ArgsMid;
+
+float4 _FrustumPlanes[6];   // xyz = inward normal, w = distance (UnityEngine.Plane)
+float4 _CameraPosition;     // xyz
+float  _NearDistance;       // metres
+float  _MidDistance;        // metres
+float  _StudRadius;         // bounding sphere radius (metres)
+
+bool InFrustum(float3 p, float r)
+{
+    [unroll] for (int n = 0; n < 6; n++)
+    {
+        if (dot(_FrustumPlanes[n].xyz, p) + _FrustumPlanes[n].w < -r) return false;
+    }
+    return true;
+}
+
+// Appending: every thread adds 1 to instanceCount; a thread whose slot is past the
+// capacity subtracts its 1 again, so the final count equals the capacity exactly.
+// (Written out per list: resources are not passed as function parameters.)
+
+[numthreads(64, 1, 1)]
+void Cull(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _SourceCount) return;
+    StudInstance s = _Source[id.x];
+    float3 centre = s.position + float3(0.0, 0.05, 0.0);
+    float dist = distance(centre, _CameraPosition.xyz);
+    if (dist >= _MidDistance) return;
+    if (!InFrustum(centre, _StudRadius)) return;
+
+    uint slot, ignored;
+    if (dist < _NearDistance)
+    {
+        _ArgsNear.InterlockedAdd(4, 1u, slot);
+        if (slot < _NearCapacity) _VisibleNear[slot] = s;
+        else _ArgsNear.InterlockedAdd(4, 0xFFFFFFFFu, ignored);
+    }
+    else
+    {
+        _ArgsMid.InterlockedAdd(4, 1u, slot);
+        if (slot < _MidCapacity) _VisibleMid[slot] = s;
+        else _ArgsMid.InterlockedAdd(4, 0xFFFFFFFFu, ignored);
+    }
+}

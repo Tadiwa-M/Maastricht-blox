@@ -1,0 +1,56 @@
+{
+ "name": "character",
+ "version": 1,
+ "size": [
+  4,
+  1,
+  10
+ ],
+ "pivot": [
+  2.0,
+  0.5,
+  0.0
+ ],
+ "forward": "+j",
+ "parts": {
+  "arm_l": {
+   "pivot": [
+    0.5,
+    0.5,
+    6.0
+   ]
+  },
+  "arm_r": {
+   "pivot": [
+    3.5,
+    0.5,
+    6.0
+   ]
+  },
+  "leg_l": {
+   "pivot": [
+    1.5,
+    0.5,
+    3.0
+   ]
+  },
+  "leg_r": {
+   "pivot": [
+    2.5,
+    0.5,
+    3.0
+   ]
+  }
+ },
+ "bricks": [
+  {"i": 1, "j": 0, "k": 0, "type": 1, "color": 21, "rot": 0, "part": "leg_l"},
+  {"i": 2, "j": 0, "k": 0, "type": 1, "color": 21, "rot": 0, "part": "leg_r"},
+  {"i": 0, "j": 0, "k": 2, "type": 12, "color": 18, "rot": 0, "part": "arm_l"},
+  {"i": 3, "j": 0, "k": 2, "type": 12, "color": 18, "rot": 0, "part": "arm_r"},
+  {"i": 0, "j": 0, "k": 3, "type": 1, "color": 44, "rot": 0, "part": "arm_l"},
+  {"i": 1, "j": 0, "k": 3, "type": 2, "color": 44, "rot": 1},
+  {"i": 3, "j": 0, "k": 3, "type": 1, "color": 44, "rot": 0, "part": "arm_r"},
+  {"i": 1, "j": 0, "k": 6, "type": 2, "color": 18, "rot": 1},
+  {"i": 1, "j": 0, "k": 9, "type": 13, "color": 7, "rot": 1}
+ ]
+}

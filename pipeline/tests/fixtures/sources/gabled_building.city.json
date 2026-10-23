@@ -1,0 +1,59 @@
+{
+  "type": "CityJSON",
+  "version": "2.0",
+  "transform": {"scale": [0.001, 0.001, 0.001], "translate": [176000.0, 317000.0, 0.0]},
+  "metadata": {"referenceSystem": "https://www.opengis.net/def/crs/EPSG/0/7415"},
+  "CityObjects": {
+    "NL.IMBAG.Pand.0935100000000001": {
+      "type": "Building",
+      "attributes": {
+        "identificatie": "NL.IMBAG.Pand.0935100000000001",
+        "oorspronkelijkbouwjaar": 1650,
+        "status": "Pand in gebruik",
+        "b3_h_maaiveld": 50.0,
+        "b3_h_dak_max": 60.0,
+        "b3_h_dak_50p": 58.0,
+        "b3_dak_type": "slanted"
+      },
+      "children": ["NL.IMBAG.Pand.0935100000000001-0"]
+    },
+    "NL.IMBAG.Pand.0935100000000001-0": {
+      "type": "BuildingPart",
+      "parents": ["NL.IMBAG.Pand.0935100000000001"],
+      "geometry": [
+        {
+          "type": "Solid",
+          "lod": "1.2",
+          "boundaries": [[[[0, 3, 2, 1]], [[0, 1, 11, 10]], [[1, 2, 12, 11]], [[2, 3, 13, 12]], [[3, 0, 10, 13]], [[10, 11, 12, 13]]]],
+          "semantics": {
+            "surfaces": [{"type": "GroundSurface"}, {"type": "WallSurface"}, {"type": "RoofSurface"}],
+            "values": [[0, 1, 1, 1, 1, 2]]
+          }
+        },
+        {
+          "type": "Solid",
+          "lod": "2.2",
+          "boundaries": [[
+            [[0, 3, 2, 1]],
+            [[0, 1, 5, 4]],
+            [[2, 3, 7, 6]],
+            [[3, 0, 4, 8, 7]],
+            [[1, 2, 6, 9, 5]],
+            [[4, 5, 9, 8]],
+            [[6, 7, 8, 9]]
+          ]],
+          "semantics": {
+            "surfaces": [{"type": "GroundSurface"}, {"type": "WallSurface"}, {"type": "RoofSurface"}],
+            "values": [[0, 1, 1, 1, 1, 2, 2]]
+          }
+        }
+      ]
+    }
+  },
+  "vertices": [
+    [0, 0, 50000], [10000, 0, 50000], [10000, 8000, 50000], [0, 8000, 50000],
+    [0, 0, 56000], [10000, 0, 56000], [10000, 8000, 56000], [0, 8000, 56000],
+    [0, 4000, 60000], [10000, 4000, 60000],
+    [0, 0, 58000], [10000, 0, 58000], [10000, 8000, 58000], [0, 8000, 58000]
+  ]
+}
