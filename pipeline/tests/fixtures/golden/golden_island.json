@@ -1,0 +1,178 @@
+{
+ "description": "Golden BXI1 island (CONTRACT section 5.1). Records in file order (k, j, i); i, j are local island cells. 'world' is the local min corner of each record turned into Unity metres by the island pose.",
+ "generator": "uv run python -m blox_pipeline.io.make_golden",
+ "files": {
+  "i_000001.bxi": {
+   "size": 118,
+   "sha1": "f6107504bcec2459d154d6d2da147c2293604d96",
+   "header": {
+    "magic": "BXI1",
+    "version": 1,
+    "flags": 1,
+    "islandId": 1,
+    "cx": 19,
+    "cy": 44,
+    "originX": 612.25,
+    "originZ": 1344.75,
+    "yawDeg": -33.5,
+    "brickCount": 7,
+    "bodyBytes": 78
+   },
+   "headerHex": "425849310100010001000000130000002c000000001019440018a844000006c2070000004e000000"
+  },
+  "i_000001_uncompressed.bxi": {
+   "size": 124,
+   "sha1": "20e1d0a3fed6ff973d387110a3813389c4afad57",
+   "header": {
+    "magic": "BXI1",
+    "version": 1,
+    "flags": 0,
+    "islandId": 1,
+    "cx": 19,
+    "cy": 44,
+    "originX": 612.25,
+    "originZ": 1344.75,
+    "yawDeg": -33.5,
+    "brickCount": 7,
+    "bodyBytes": 84
+   },
+   "headerHex": "425849310100000001000000130000002c000000001019440018a844000006c20700000054000000"
+  }
+ },
+ "bodyHex": "000078000901000007000000fc0078000904010007000000ffff79000c080400ffffffff80807d00292903000403020128fc82001c170a000300000064c82c011e0d0200701101000a14fcff0d1a0d0000000080",
+ "records": [
+  {
+   "i": 0,
+   "j": 0,
+   "k": 120,
+   "typeId": 9,
+   "typeName": "brick_2x4",
+   "colorIdx": 1,
+   "rot": 0,
+   "noVariation": false,
+   "hideStuds": false,
+   "rotFlags": 0,
+   "reserved": 0,
+   "featureId": 7,
+   "world": [
+    612.25,
+    24.0,
+    1344.75
+   ]
+  },
+  {
+   "i": 252,
+   "j": 0,
+   "k": 120,
+   "typeId": 9,
+   "typeName": "brick_2x4",
+   "colorIdx": 4,
+   "rot": 1,
+   "noVariation": false,
+   "hideStuds": false,
+   "rotFlags": 1,
+   "reserved": 0,
+   "featureId": 7,
+   "world": [
+    717.319614,
+    24.0,
+    1414.29406
+   ]
+  },
+  {
+   "i": 255,
+   "j": 255,
+   "k": 121,
+   "typeId": 12,
+   "typeName": "plate_1x1",
+   "colorIdx": 8,
+   "rot": 0,
+   "noVariation": true,
+   "hideStuds": false,
+   "rotFlags": 4,
+   "reserved": 0,
+   "featureId": 4294967295,
+   "world": [
+    648.198477,
+    24.2,
+    1521.442408
+   ]
+  },
+  {
+   "i": 128,
+   "j": 128,
+   "k": 125,
+   "typeId": 41,
+   "typeName": "window_1x2x3",
+   "colorIdx": 41,
+   "rot": 3,
+   "noVariation": false,
+   "hideStuds": false,
+   "rotFlags": 3,
+   "reserved": 0,
+   "featureId": 16909060,
+   "world": [
+    630.294726,
+    25.0,
+    1433.44266
+   ]
+  },
+  {
+   "i": 40,
+   "j": 252,
+   "k": 130,
+   "typeId": 28,
+   "typeName": "tile_2x4",
+   "colorIdx": 23,
+   "rot": 2,
+   "noVariation": false,
+   "hideStuds": true,
+   "rotFlags": 10,
+   "reserved": 0,
+   "featureId": 3,
+   "world": [
+    559.383656,
+    26.0,
+    1460.858353
+   ]
+  },
+  {
+   "i": 100,
+   "j": 200,
+   "k": 300,
+   "typeId": 30,
+   "typeName": "slope45_2x2",
+   "colorIdx": 13,
+   "rot": 2,
+   "noVariation": false,
+   "hideStuds": false,
+   "rotFlags": 2,
+   "reserved": 0,
+   "featureId": 70000,
+   "world": [
+    598.750593,
+    60.0,
+    1455.735431
+   ]
+  },
+  {
+   "i": 10,
+   "j": 20,
+   "k": 65532,
+   "typeId": 13,
+   "typeName": "plate_1x2",
+   "colorIdx": 26,
+   "rot": 1,
+   "noVariation": true,
+   "hideStuds": true,
+   "rotFlags": 13,
+   "reserved": 0,
+   "featureId": 2147483648,
+   "world": [
+    610.900059,
+    13106.4,
+    1355.848543
+   ]
+  }
+ ]
+}

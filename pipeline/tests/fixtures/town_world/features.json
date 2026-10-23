@@ -1,0 +1,226 @@
+{
+ "features": [
+  {
+   "id": 1,
+   "kind": "building",
+   "bagId": "NL.IMBAG.Pand.09351000000T0001",
+   "year": 1650,
+   "heightM": 15.7,
+   "centroid": [
+    1067,
+    2034
+   ],
+   "bboxIJ": [
+    1060,
+    2020,
+    1073,
+    2048
+   ]
+  },
+  {
+   "id": 2,
+   "kind": "building",
+   "bagId": "NL.IMBAG.Pand.09351000000T0002",
+   "year": 1780,
+   "heightM": 14.1,
+   "centroid": [
+    1080,
+    2034
+   ],
+   "bboxIJ": [
+    1074,
+    2020,
+    1085,
+    2048
+   ]
+  },
+  {
+   "id": 3,
+   "kind": "building",
+   "bagId": "NL.IMBAG.Pand.09351000000T0003",
+   "address": "Teststraat 3",
+   "year": 1890,
+   "heightM": 18.6,
+   "centroid": [
+    1094,
+    2034
+   ],
+   "bboxIJ": [
+    1086,
+    2020,
+    1101,
+    2048
+   ]
+  },
+  {
+   "id": 4,
+   "kind": "building",
+   "bagId": "NL.IMBAG.Pand.09351000000T0004",
+   "year": 1925,
+   "heightM": 12.0,
+   "centroid": [
+    1109,
+    2034
+   ],
+   "bboxIJ": [
+    1102,
+    2020,
+    1115,
+    2048
+   ]
+  },
+  {
+   "id": 5,
+   "kind": "building",
+   "bagId": "NL.IMBAG.Pand.09351000000T0005",
+   "year": 1962,
+   "heightM": 11.2,
+   "centroid": [
+    1180,
+    2060
+   ],
+   "bboxIJ": [
+    1165,
+    2044,
+    1194,
+    2075
+   ]
+  },
+  {
+   "id": 6,
+   "kind": "building",
+   "bagId": "NL.IMBAG.Pand.09351000000T0006",
+   "year": 1700,
+   "heightM": 13.6,
+   "centroid": [
+    1087,
+    2084
+   ],
+   "bboxIJ": [
+    1078,
+    2072,
+    1096,
+    2095
+   ]
+  },
+  {
+   "id": 7,
+   "kind": "building",
+   "bagId": "NL.IMBAG.Pand.09351000000T0007",
+   "year": 1850,
+   "heightM": 16.5,
+   "centroid": [
+    1100,
+    2080
+   ],
+   "bboxIJ": [
+    1090,
+    2068,
+    1109,
+    2091
+   ]
+  },
+  {
+   "id": 8,
+   "kind": "building",
+   "bagId": "NL.IMBAG.Pand.09351000000T0008",
+   "year": 1910,
+   "heightM": 13.0,
+   "centroid": [
+    1112,
+    2075
+   ],
+   "bboxIJ": [
+    1103,
+    2064,
+    1121,
+    2087
+   ]
+  },
+  {
+   "id": 9,
+   "kind": "building",
+   "bagId": "NL.IMBAG.Pand.09351000000T0009",
+   "year": 1935,
+   "heightM": 12.3,
+   "centroid": [
+    1148,
+    2076
+   ],
+   "bboxIJ": [
+    1139,
+    2065,
+    1156,
+    2086
+   ]
+  },
+  {
+   "id": 10,
+   "kind": "street",
+   "name": "Teststraat",
+   "osmId": "way/100",
+   "centroid": [
+    1000,
+    2010
+   ],
+   "bboxIJ": [
+    1000,
+    2009,
+    1240,
+    2010
+   ]
+  },
+  {
+   "id": 11,
+   "kind": "street",
+   "name": "Kleine Staat",
+   "osmId": "way/101",
+   "centroid": [
+    1050,
+    1960
+   ],
+   "bboxIJ": [
+    1050,
+    1960,
+    1050,
+    2089
+   ]
+  },
+  {
+   "id": 12,
+   "kind": "street",
+   "name": "Schuine Steeg",
+   "osmId": "way/102",
+   "centroid": [
+    1083,
+    2104
+   ],
+   "bboxIJ": [
+    1083,
+    2087,
+    1128,
+    2104
+   ]
+  },
+  {
+   "id": 13,
+   "kind": "poi",
+   "name": "Café De Hoek",
+   "osmId": "node/10",
+   "address": "Teststraat 3",
+   "centroid": [
+    1094,
+    2022
+   ],
+   "bboxIJ": [
+    1094,
+    2022,
+    1094,
+    2022
+   ],
+   "tags": {
+    "amenity": "cafe"
+   }
+  }
+ ]
+}

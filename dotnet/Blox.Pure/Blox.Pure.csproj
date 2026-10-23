@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Compiles the engine-free Unity sources (Blox.Data, Blox.Meshing.Core, Blox.Live pure parts)
+    exactly as Unity would: netstandard2.1, C# 9. Nothing is copied; files are linked from unity/.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Blox.Pure</AssemblyName>
+    <RootNamespace>Blox</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <UnityRuntime>$(MSBuildThisFileDirectory)../../unity/Assets/Blox/Runtime/</UnityRuntime>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(UnityRuntime)Data/**/*.cs" LinkBase="Data" />
+    <Compile Include="$(UnityRuntime)Meshing/Core/**/*.cs" LinkBase="Meshing/Core" />
+    <Compile Include="$(UnityRuntime)Live/**/*.cs" Exclude="$(UnityRuntime)Live/Unity/**" LinkBase="Live" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Blox.Tests" />
+  </ItemGroup>
+</Project>

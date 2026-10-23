@@ -1,0 +1,131 @@
+// Camera presets derived from the world bounds and building features (not hard-coded).
+// Azimuths are compass degrees (0 = north, 90 = east); three.js north is -z.
+import * as THREE from 'three';
+import { frontDir } from './rotation.js';
+import { localToWorld, mainFacing, islandWorldBox } from './island.js';
+
+function buildingsBox(world) {
+  const S = world.studM;
+  const b = new THREE.Box3();
+  const list = [];
+  for (const f of world.features.values()) {
+    if (!f.bboxIJ || !['building', 'landmark'].includes(f.kind)) continue;
+    const [I0, J0, I1, J1] = f.bboxIJ;
+    // features.json covers the whole build; a neighbourhood (build.mjs --around) has fewer chunks
+    const wb = world.bounds;
+    if (I0 < wb.I0 || J0 < wb.J0 || I1 >= wb.I1 || J1 >= wb.J1) continue;
+    list.push(f);
+    b.expandByPoint(new THREE.Vector3(I0 * S, 0, -(J1 + 1) * S));
+    b.expandByPoint(new THREE.Vector3((I1 + 1) * S, 0, -J0 * S));
+  }
+  return { box: b, list };
+}
+
+/** Direction from target to camera for a compass azimuth (0 = north) and elevation. */
+function offset(azDeg, elDeg, dist) {
+  const az = THREE.MathUtils.degToRad(azDeg), el = THREE.MathUtils.degToRad(elDeg);
+  return new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el))
+    .multiplyScalar(dist);
+}
+
+/** Building whose street-side corridor (south of its facade) is the least cluttered. */
+function clearestFacade(world, houses) {
+  let best = null, bestN = Infinity;
+  for (const f of houses) {
+    const [I0, J0, I1] = f.bboxIJ;
+    let n = 0;
+    for (let I = I0; I <= I1; I++)
+      for (let J = J0 - 16; J < J0; J++)
+        for (let K = world.groundK + 1; K < world.groundK + 20; K++) n += world.occupied(I, J, K) ? 1 : 0;
+    const score = n / (I1 - I0 + 1);
+    if (score < bestN) { bestN = score; best = f; }
+  }
+  return best;
+}
+
+/** Distance at which a sphere of radius r fills the view. */
+function fitDist(r, fovDeg, aspect) {
+  const v = THREE.MathUtils.degToRad(fovDeg) / 2;
+  const h = Math.atan(Math.tan(v) * aspect);
+  return r / Math.sin(Math.min(v, h));
+}
+
+const BIG_WORLD_M = 70; // half-diagonal above which the hero is a 3/4 view, not the whole world
+
+/**
+ * Island presets (CONTRACT 5.1): 'island' looks at the street facade of the biggest island
+ * (the side most of its windows and doors face, in its own frame) from 9 m, 18 degrees off
+ * square like 'facade'; 'islandmap' looks straight down on all islands (compare with the
+ * pipeline's preview.png).
+ */
+function islandPresets(islands, plateM) {
+  if (!islands.length) return {};
+  const w = islands.reduce((a, b) => (b.count > a.count ? b : a));
+  const { origin, yawDeg } = w.island;
+  const S = w.studM, { I0, J0, I1, J1, K0 } = w.bounds;
+  const rot = mainFacing(w);
+  const [di, dj] = frontDir(rot);
+  // centre of the facade in local metres: the bounds side the front faces
+  const u = di > 0 ? I1 * S : di < 0 ? I0 * S : ((I0 + I1) / 2) * S;
+  const v = dj > 0 ? J1 * S : dj < 0 ? J0 * S : ((J0 + J1) / 2) * S;
+  const [x, z] = localToWorld(origin, yawDeg, u, v);
+  const [fx, fz] = localToWorld([0, 0], yawDeg, di, dj); // front direction (east, north)
+  const az = THREE.MathUtils.radToDeg(Math.atan2(fx, fz));
+  const t = new THREE.Vector3(x, (K0 + 2) * plateM + 3.2, -z);
+  const out = { island: { target: t, cam: t.clone().add(offset(az + 18, 6, 9)), fov: 50 } };
+  const all = new THREE.Box3();
+  for (const iw of islands) all.union(islandWorldBox(iw));
+  const c = all.getCenter(new THREE.Vector3()), size = all.getSize(new THREE.Vector3());
+  const ct = new THREE.Vector3(c.x, all.max.y, c.z);
+  // narrow field of view from far up: nearly orthographic, so walls don't lean over the plot
+  const span = Math.max(size.x, size.z) * 1.3 + 8;
+  out.islandmap = { target: ct, cam: ct.clone().add(offset(180, 89.9, span / (2 * Math.tan(THREE.MathUtils.degToRad(10))))), fov: 20 };
+  return out;
+}
+
+export function makePresets(world, box, aspect = 1.6, islands = []) {
+  const S = world.studM;
+  const groundY = world.groundK * world.plateM;
+  const c = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const { box: bb, list } = buildingsBox(world);
+  const front = bb.isEmpty() ? c.z : bb.max.z; // south facades (largest z)
+  const houses = list.filter((f) => f.kind === 'building').sort((a, b) => a.centroid[0] - b.centroid[0]);
+  const pick = clearestFacade(world, houses) || list[0];
+  const r = Math.hypot(size.x, size.z) / 2;
+
+  // hero: the whole diorama from the south-southwest, a little toward the facades
+  const hero = new THREE.Vector3(c.x, groundY + Math.min(size.y * 0.25, 8), (c.z + front) / 2);
+  let heroView = { target: hero, cam: hero.clone().add(offset(206, 30, fitDist(r, 32, aspect) * 0.8)), fov: 32 };
+  if (r > BIG_WORLD_M) {
+    // neighbourhood (several chunks): a 3/4 view over the centre from medium height instead of
+    // fitting everything in, which put the camera hundreds of metres up looking down
+    const t = new THREE.Vector3(c.x, groundY + 4, c.z);
+    // 16° elevation leaves the top of the frame above the horizon, so the sky is in the shot
+    heroView = { target: t, cam: t.clone().add(offset(206, 16, THREE.MathUtils.clamp(r * 0.85, 90, 170))), fov: 40 };
+  }
+  const presets = {
+    hero: heroView,
+    map: (() => {
+      const t = new THREE.Vector3(c.x, groundY + (box.max.y - groundY) * 0.3, c.z);
+      const r3 = Math.hypot(size.x, size.z, box.max.y - groundY) / 2;
+      return { target: t, cam: t.clone().add(offset(180, 70, fitDist(r3, 28, aspect) * 0.8)), fov: 28 };
+    })(),
+  };
+  // river: low over the water looking north at the facades (shows water reflections)
+  {
+    const t = new THREE.Vector3(c.x, groundY + 2, c.z + size.z * 0.15);
+    presets.river = { target: t, cam: t.clone().add(offset(192, 9, size.z * 0.75)), fov: 40 };
+  }
+  // gallery / generic overview: from the south, steep enough to see every slot
+  presets.gallery = { target: c.clone(), cam: c.clone().add(offset(192, 55, fitDist(Math.hypot(size.x, size.z) / 2, 30, aspect) * 0.72)), fov: 30 };
+  if (pick) {
+    const [I0, J0, I1] = pick.bboxIJ;
+    const t = new THREE.Vector3((I0 + I1 + 1) / 2 * S, groundY + 3.2, -J0 * S + 0.5);
+    presets.facade = { target: t, cam: t.clone().add(offset(198, 6, 6.5)), fov: 50 };
+  } else {
+    presets.facade = presets.hero;
+  }
+  Object.assign(presets, islandPresets(islands, world.plateM));
+  return presets;
+}

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    dotnet tests for the engine-free parts of Blox.Rendering and Blox.Gameplay (Core/ folders).
+    The folder name ends in "~" so Unity ignores it. Sources are linked, not copied.
+    Run:  dotnet test unity/Assets/Blox/Editor/PureTests~/Blox.LookTests.csproj
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Runtime>$(MSBuildThisFileDirectory)../../Runtime/</Runtime>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(Runtime)Rendering/Core/**/*.cs" LinkBase="Rendering/Core" />
+    <Compile Include="$(Runtime)Gameplay/Core/**/*.cs" LinkBase="Gameplay/Core" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+</Project>

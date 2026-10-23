@@ -1,0 +1,435 @@
+{
+ "version": 2,
+ "note": "ids are stable and append-only; w along +i, d along +j at rot 0; h in plates; directional pieces' front faces +j at rot 0",
+ "types": [
+  {
+   "id": 1,
+   "name": "brick_1x1",
+   "kind": "brick",
+   "w": 1,
+   "d": 1,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 2,
+   "name": "brick_1x2",
+   "kind": "brick",
+   "w": 1,
+   "d": 2,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 3,
+   "name": "brick_1x3",
+   "kind": "brick",
+   "w": 1,
+   "d": 3,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 4,
+   "name": "brick_1x4",
+   "kind": "brick",
+   "w": 1,
+   "d": 4,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 5,
+   "name": "brick_1x6",
+   "kind": "brick",
+   "w": 1,
+   "d": 6,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 6,
+   "name": "brick_1x8",
+   "kind": "brick",
+   "w": 1,
+   "d": 8,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 7,
+   "name": "brick_2x2",
+   "kind": "brick",
+   "w": 2,
+   "d": 2,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 8,
+   "name": "brick_2x3",
+   "kind": "brick",
+   "w": 2,
+   "d": 3,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 9,
+   "name": "brick_2x4",
+   "kind": "brick",
+   "w": 2,
+   "d": 4,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 10,
+   "name": "brick_2x6",
+   "kind": "brick",
+   "w": 2,
+   "d": 6,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 11,
+   "name": "brick_2x8",
+   "kind": "brick",
+   "w": 2,
+   "d": 8,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 12,
+   "name": "plate_1x1",
+   "kind": "plate",
+   "w": 1,
+   "d": 1,
+   "h": 1,
+   "studs": "all"
+  },
+  {
+   "id": 13,
+   "name": "plate_1x2",
+   "kind": "plate",
+   "w": 1,
+   "d": 2,
+   "h": 1,
+   "studs": "all"
+  },
+  {
+   "id": 14,
+   "name": "plate_1x3",
+   "kind": "plate",
+   "w": 1,
+   "d": 3,
+   "h": 1,
+   "studs": "all"
+  },
+  {
+   "id": 15,
+   "name": "plate_1x4",
+   "kind": "plate",
+   "w": 1,
+   "d": 4,
+   "h": 1,
+   "studs": "all"
+  },
+  {
+   "id": 16,
+   "name": "plate_1x6",
+   "kind": "plate",
+   "w": 1,
+   "d": 6,
+   "h": 1,
+   "studs": "all"
+  },
+  {
+   "id": 17,
+   "name": "plate_1x8",
+   "kind": "plate",
+   "w": 1,
+   "d": 8,
+   "h": 1,
+   "studs": "all"
+  },
+  {
+   "id": 18,
+   "name": "plate_2x2",
+   "kind": "plate",
+   "w": 2,
+   "d": 2,
+   "h": 1,
+   "studs": "all"
+  },
+  {
+   "id": 19,
+   "name": "plate_2x3",
+   "kind": "plate",
+   "w": 2,
+   "d": 3,
+   "h": 1,
+   "studs": "all"
+  },
+  {
+   "id": 20,
+   "name": "plate_2x4",
+   "kind": "plate",
+   "w": 2,
+   "d": 4,
+   "h": 1,
+   "studs": "all"
+  },
+  {
+   "id": 21,
+   "name": "plate_2x6",
+   "kind": "plate",
+   "w": 2,
+   "d": 6,
+   "h": 1,
+   "studs": "all"
+  },
+  {
+   "id": 22,
+   "name": "plate_2x8",
+   "kind": "plate",
+   "w": 2,
+   "d": 8,
+   "h": 1,
+   "studs": "all"
+  },
+  {
+   "id": 23,
+   "name": "plate_4x4",
+   "kind": "plate",
+   "w": 4,
+   "d": 4,
+   "h": 1,
+   "studs": "all"
+  },
+  {
+   "id": 24,
+   "name": "tile_1x1",
+   "kind": "tile",
+   "w": 1,
+   "d": 1,
+   "h": 1,
+   "studs": "none"
+  },
+  {
+   "id": 25,
+   "name": "tile_1x2",
+   "kind": "tile",
+   "w": 1,
+   "d": 2,
+   "h": 1,
+   "studs": "none"
+  },
+  {
+   "id": 26,
+   "name": "tile_1x4",
+   "kind": "tile",
+   "w": 1,
+   "d": 4,
+   "h": 1,
+   "studs": "none"
+  },
+  {
+   "id": 27,
+   "name": "tile_2x2",
+   "kind": "tile",
+   "w": 2,
+   "d": 2,
+   "h": 1,
+   "studs": "none"
+  },
+  {
+   "id": 28,
+   "name": "tile_2x4",
+   "kind": "tile",
+   "w": 2,
+   "d": 4,
+   "h": 1,
+   "studs": "none"
+  },
+  {
+   "id": 29,
+   "name": "slope45_1x2",
+   "kind": "slope",
+   "w": 1,
+   "d": 2,
+   "h": 3,
+   "studs": "backRows",
+   "studRows": 1
+  },
+  {
+   "id": 30,
+   "name": "slope45_2x2",
+   "kind": "slope",
+   "w": 2,
+   "d": 2,
+   "h": 3,
+   "studs": "backRows",
+   "studRows": 1
+  },
+  {
+   "id": 31,
+   "name": "slope45_4x2",
+   "kind": "slope",
+   "w": 4,
+   "d": 2,
+   "h": 3,
+   "studs": "backRows",
+   "studRows": 1
+  },
+  {
+   "id": 32,
+   "name": "slope33_1x3",
+   "kind": "slope",
+   "w": 1,
+   "d": 3,
+   "h": 3,
+   "studs": "backRows",
+   "studRows": 1
+  },
+  {
+   "id": 33,
+   "name": "slope33_2x3",
+   "kind": "slope",
+   "w": 2,
+   "d": 3,
+   "h": 3,
+   "studs": "backRows",
+   "studRows": 1
+  },
+  {
+   "id": 34,
+   "name": "slope_double45_1x2",
+   "kind": "slope_double",
+   "w": 1,
+   "d": 2,
+   "h": 3,
+   "studs": "none"
+  },
+  {
+   "id": 35,
+   "name": "slope_double45_2x2",
+   "kind": "slope_double",
+   "w": 2,
+   "d": 2,
+   "h": 3,
+   "studs": "none"
+  },
+  {
+   "id": 36,
+   "name": "round_brick_1x1",
+   "kind": "round",
+   "w": 1,
+   "d": 1,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 37,
+   "name": "round_plate_1x1",
+   "kind": "round",
+   "w": 1,
+   "d": 1,
+   "h": 1,
+   "studs": "all"
+  },
+  {
+   "id": 38,
+   "name": "arch_1x4",
+   "kind": "arch",
+   "w": 4,
+   "d": 1,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 39,
+   "name": "arch_1x6",
+   "kind": "arch",
+   "w": 6,
+   "d": 1,
+   "h": 6,
+   "studs": "all"
+  },
+  {
+   "id": 40,
+   "name": "window_1x2x2",
+   "kind": "window",
+   "w": 2,
+   "d": 1,
+   "h": 6,
+   "studs": "all"
+  },
+  {
+   "id": 41,
+   "name": "window_1x2x3",
+   "kind": "window",
+   "w": 2,
+   "d": 1,
+   "h": 9,
+   "studs": "all"
+  },
+  {
+   "id": 42,
+   "name": "door_1x2x4",
+   "kind": "door",
+   "w": 2,
+   "d": 1,
+   "h": 12,
+   "studs": "all"
+  },
+  {
+   "id": 43,
+   "name": "fence_1x4",
+   "kind": "fence",
+   "w": 4,
+   "d": 1,
+   "h": 3,
+   "studs": "all"
+  },
+  {
+   "id": 44,
+   "name": "round_tile_1x1",
+   "kind": "round_tile",
+   "w": 1,
+   "d": 1,
+   "h": 1,
+   "studs": "none"
+  },
+  {
+   "id": 45,
+   "name": "jumper_1x2",
+   "kind": "jumper",
+   "w": 2,
+   "d": 1,
+   "h": 1,
+   "studs": "center"
+  },
+  {
+   "id": 46,
+   "name": "slope30_1x2",
+   "kind": "slope",
+   "w": 1,
+   "d": 2,
+   "h": 2,
+   "studs": "backRows",
+   "studRows": 0
+  },
+  {
+   "id": 47,
+   "name": "grille_1x2",
+   "kind": "tile_grille",
+   "w": 2,
+   "d": 1,
+   "h": 1,
+   "studs": "none"
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+[project]
+name = "blox-proxy"
+version = "0.1.0"
+description = "Maastricht Blox live-data proxy (OVapi GTFS/GTFS-RT, Buienradar, Rijkswaterstaat)"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+  "httpx>=0.27",
+  "gtfs-realtime-bindings>=1.0",
+  "protobuf>=5.0",
+  "pyproj>=3.6",
+  "tzdata>=2024.1",
+]
+
+[project.scripts]
+blox-proxy = "blox_proxy.main:main"
+blox-proxy-build-gtfs = "blox_proxy.main:build_gtfs_main"
+blox-proxy-rws-locations = "blox_proxy.water.locations:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.24"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/blox_proxy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

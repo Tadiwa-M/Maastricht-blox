@@ -1,0 +1,19 @@
+{
+    "name": "Blox.Meshing",
+    "rootNamespace": "Blox.Meshing",
+    "references": [
+        "Blox.Data",
+        "Unity.Burst",
+        "Unity.Collections",
+        "Unity.Mathematics"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
