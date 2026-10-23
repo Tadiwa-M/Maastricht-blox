@@ -1,0 +1,287 @@
+{
+ "version": 2,
+ "entries": [
+  {
+   "idx": 0,
+   "name": "air",
+   "srgb": null,
+   "material": "none"
+  },
+  {
+   "idx": 1,
+   "name": "mergel",
+   "srgb": "#D9C48A",
+   "material": "solid"
+  },
+  {
+   "idx": 2,
+   "name": "mergel_light",
+   "srgb": "#E6D7A8",
+   "material": "solid"
+  },
+  {
+   "idx": 3,
+   "name": "mergel_dark",
+   "srgb": "#B9A06A",
+   "material": "solid"
+  },
+  {
+   "idx": 4,
+   "name": "brick_red",
+   "srgb": "#A33A2B",
+   "material": "solid"
+  },
+  {
+   "idx": 5,
+   "name": "brick_dark_red",
+   "srgb": "#7A2A22",
+   "material": "solid"
+  },
+  {
+   "idx": 6,
+   "name": "brick_orange",
+   "srgb": "#C0643A",
+   "material": "solid"
+  },
+  {
+   "idx": 7,
+   "name": "brick_brown",
+   "srgb": "#6E4A33",
+   "material": "solid"
+  },
+  {
+   "idx": 8,
+   "name": "white",
+   "srgb": "#F2F0EA",
+   "material": "solid"
+  },
+  {
+   "idx": 9,
+   "name": "light_grey",
+   "srgb": "#A7AAA8",
+   "material": "solid"
+  },
+  {
+   "idx": 10,
+   "name": "dark_grey",
+   "srgb": "#5C6062",
+   "material": "solid"
+  },
+  {
+   "idx": 11,
+   "name": "black",
+   "srgb": "#1E1F21",
+   "material": "solid"
+  },
+  {
+   "idx": 12,
+   "name": "slate",
+   "srgb": "#4E5864",
+   "material": "solid"
+  },
+  {
+   "idx": 13,
+   "name": "roof_tile_red",
+   "srgb": "#8E3B2C",
+   "material": "solid"
+  },
+  {
+   "idx": 14,
+   "name": "roof_tile_dark",
+   "srgb": "#5E483D",
+   "material": "solid"
+  },
+  {
+   "idx": 15,
+   "name": "copper_green",
+   "srgb": "#5E9C8C",
+   "material": "solid"
+  },
+  {
+   "idx": 16,
+   "name": "tower_red",
+   "srgb": "#B8302A",
+   "material": "solid"
+  },
+  {
+   "idx": 17,
+   "name": "cream",
+   "srgb": "#EFE3C2",
+   "material": "solid"
+  },
+  {
+   "idx": 18,
+   "name": "tan",
+   "srgb": "#CDB48B",
+   "material": "solid"
+  },
+  {
+   "idx": 19,
+   "name": "dark_tan",
+   "srgb": "#8F7A57",
+   "material": "solid"
+  },
+  {
+   "idx": 20,
+   "name": "sand_blue",
+   "srgb": "#6E8798",
+   "material": "solid"
+  },
+  {
+   "idx": 21,
+   "name": "dark_blue",
+   "srgb": "#22385A",
+   "material": "solid"
+  },
+  {
+   "idx": 22,
+   "name": "cobble_grey",
+   "srgb": "#7D7A74",
+   "material": "solid"
+  },
+  {
+   "idx": 23,
+   "name": "asphalt",
+   "srgb": "#45474A",
+   "material": "solid"
+  },
+  {
+   "idx": 24,
+   "name": "pavement",
+   "srgb": "#B3AEA4",
+   "material": "solid"
+  },
+  {
+   "idx": 25,
+   "name": "rail_brown",
+   "srgb": "#5A4636",
+   "material": "solid"
+  },
+  {
+   "idx": 26,
+   "name": "grass",
+   "srgb": "#5E8E3E",
+   "material": "solid"
+  },
+  {
+   "idx": 27,
+   "name": "grass_dark",
+   "srgb": "#3F6B2E",
+   "material": "solid"
+  },
+  {
+   "idx": 28,
+   "name": "leaf",
+   "srgb": "#4C7F34",
+   "material": "solid"
+  },
+  {
+   "idx": 29,
+   "name": "leaf_light",
+   "srgb": "#7FA449",
+   "material": "solid"
+  },
+  {
+   "idx": 30,
+   "name": "trunk",
+   "srgb": "#5B3F2A",
+   "material": "solid"
+  },
+  {
+   "idx": 31,
+   "name": "soil",
+   "srgb": "#6B5640",
+   "material": "solid"
+  },
+  {
+   "idx": 32,
+   "name": "water",
+   "srgb": "#2F5F78",
+   "material": "trans"
+  },
+  {
+   "idx": 33,
+   "name": "water_shallow",
+   "srgb": "#4F8197",
+   "material": "trans"
+  },
+  {
+   "idx": 34,
+   "name": "glass",
+   "srgb": "#2B3A44",
+   "material": "glass"
+  },
+  {
+   "idx": 35,
+   "name": "glass_light",
+   "srgb": "#5A7686",
+   "material": "glass"
+  },
+  {
+   "idx": 36,
+   "name": "lamp_warm",
+   "srgb": "#FFD27A",
+   "material": "emissive"
+  },
+  {
+   "idx": 37,
+   "name": "signal_yellow",
+   "srgb": "#F2C230",
+   "material": "solid"
+  },
+  {
+   "idx": 38,
+   "name": "bus_red",
+   "srgb": "#C8102E",
+   "material": "solid"
+  },
+  {
+   "idx": 39,
+   "name": "metal",
+   "srgb": "#8C9196",
+   "material": "metal"
+  },
+  {
+   "idx": 40,
+   "name": "gold",
+   "srgb": "#C9A23A",
+   "material": "metal"
+  },
+  {
+   "idx": 41,
+   "name": "dark_green",
+   "srgb": "#2F5A3C",
+   "material": "solid"
+  },
+  {
+   "idx": 42,
+   "name": "sand_green",
+   "srgb": "#88A891",
+   "material": "solid"
+  },
+  {
+   "idx": 43,
+   "name": "ochre",
+   "srgb": "#D6A445",
+   "material": "solid"
+  },
+  {
+   "idx": 44,
+   "name": "medium_blue",
+   "srgb": "#5B8DB8",
+   "material": "solid"
+  },
+  {
+   "idx": 45,
+   "name": "flower_pink",
+   "srgb": "#D9607E",
+   "material": "solid"
+  },
+  {
+   "idx": 46,
+   "name": "sand_red",
+   "srgb": "#B5776A",
+   "material": "solid"
+  }
+ ]
+}

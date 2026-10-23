@@ -1,0 +1,810 @@
+{
+ "contractVersion": 3,
+ "crs": "EPSG:28992",
+ "originRD": [
+  175700,
+  316500
+ ],
+ "baseNapM": 30.0,
+ "studM": 0.5,
+ "plateM": 0.2,
+ "chunkStuds": 64,
+ "chunksX": 64,
+ "chunksY": 64,
+ "palette": "palette.json",
+ "catalogue": "brick_catalogue.json",
+ "features": "features.json",
+ "generated": "2026-10-23T07:48:26Z",
+ "sources": [
+  {
+   "name": "AHN",
+   "version": "AHN 0.5 m DTM/DSM",
+   "licence": "CC0 (AHN4 via PDOK) / CC BY 4.0 (AHN5, AHN6)",
+   "attribution": "AHN.nl"
+  },
+  {
+   "name": "3D BAG",
+   "version": "api.3dbag.nl",
+   "licence": "CC BY 4.0",
+   "attribution": "3D BAG by TU Delft 3D geoinformation"
+  },
+  {
+   "name": "OpenStreetMap",
+   "version": "Geofabrik limburg-latest",
+   "licence": "ODbL",
+   "attribution": "OpenStreetMap contributors"
+  }
+ ],
+ "chunks": [
+  {
+   "cx": 19,
+   "cy": 44,
+   "file": "chunks/c_19_44.bxc",
+   "bricks": 5872,
+   "minK": 86,
+   "maxK": 209,
+   "sha1": "73a9afdeef57943a73a09bc1adca6c598c2a01ba"
+  },
+  {
+   "cx": 19,
+   "cy": 45,
+   "file": "chunks/c_19_45.bxc",
+   "bricks": 1891,
+   "minK": 86,
+   "maxK": 128,
+   "sha1": "33bc10f268065c64a3e09d4a7bf5265f51078d93"
+  },
+  {
+   "cx": 19,
+   "cy": 46,
+   "file": "chunks/c_19_46.bxc",
+   "bricks": 4678,
+   "minK": 86,
+   "maxK": 183,
+   "sha1": "f279d8d3d7fa63e63d450816d47d19724ccf38a5"
+  },
+  {
+   "cx": 19,
+   "cy": 47,
+   "file": "chunks/c_19_47.bxc",
+   "bricks": 5699,
+   "minK": 85,
+   "maxK": 199,
+   "sha1": "79c98bb823581cab1a8a2beca0f15e08e129dacd"
+  },
+  {
+   "cx": 19,
+   "cy": 48,
+   "file": "chunks/c_19_48.bxc",
+   "bricks": 5246,
+   "minK": 84,
+   "maxK": 187,
+   "sha1": "e7a26aeec27d3ebef3883d41ec434fc430aef684"
+  },
+  {
+   "cx": 19,
+   "cy": 49,
+   "file": "chunks/c_19_49.bxc",
+   "bricks": 5228,
+   "minK": 83,
+   "maxK": 193,
+   "sha1": "911372b454606d5a93a53decd1266a8219bb916c"
+  },
+  {
+   "cx": 19,
+   "cy": 50,
+   "file": "chunks/c_19_50.bxc",
+   "bricks": 3456,
+   "minK": 83,
+   "maxK": 162,
+   "sha1": "def971076f8c59abf02f3eec6f353eaf32406a97"
+  },
+  {
+   "cx": 20,
+   "cy": 44,
+   "file": "chunks/c_20_44.bxc",
+   "bricks": 1643,
+   "minK": 87,
+   "maxK": 158,
+   "sha1": "c8649bbaf4fdcc33c64736c81901e6992a88eaa7"
+  },
+  {
+   "cx": 20,
+   "cy": 45,
+   "file": "chunks/c_20_45.bxc",
+   "bricks": 1240,
+   "minK": 86,
+   "maxK": 95,
+   "sha1": "4faa0ee3075c898cfc166093cd7c7709149a8017"
+  },
+  {
+   "cx": 20,
+   "cy": 46,
+   "file": "chunks/c_20_46.bxc",
+   "bricks": 1172,
+   "minK": 85,
+   "maxK": 130,
+   "sha1": "4864bd05ba13de492ece4a683a80a2a59ba1bc4e"
+  },
+  {
+   "cx": 20,
+   "cy": 47,
+   "file": "chunks/c_20_47.bxc",
+   "bricks": 1047,
+   "minK": 85,
+   "maxK": 91,
+   "sha1": "7c15d289f781a811f23fc6175ea30cff32a4ad47"
+  },
+  {
+   "cx": 20,
+   "cy": 48,
+   "file": "chunks/c_20_48.bxc",
+   "bricks": 1986,
+   "minK": 85,
+   "maxK": 137,
+   "sha1": "57eae9aabd344622c2b9bb7fd7469ed0aa312ade"
+  },
+  {
+   "cx": 20,
+   "cy": 49,
+   "file": "chunks/c_20_49.bxc",
+   "bricks": 2545,
+   "minK": 84,
+   "maxK": 154,
+   "sha1": "dabd8a7e7a25fb2243f9aff4e0837ffe57786e1e"
+  },
+  {
+   "cx": 20,
+   "cy": 50,
+   "file": "chunks/c_20_50.bxc",
+   "bricks": 1702,
+   "minK": 83,
+   "maxK": 147,
+   "sha1": "3dc55a800306b77fa5bc6cf57b49b5bb31c07c2d"
+  },
+  {
+   "cx": 21,
+   "cy": 44,
+   "file": "chunks/c_21_44.bxc",
+   "bricks": 1298,
+   "minK": 87,
+   "maxK": 94,
+   "sha1": "b1e475d842219eacdba7bb24de2d4fd7146d6b16"
+  },
+  {
+   "cx": 21,
+   "cy": 45,
+   "file": "chunks/c_21_45.bxc",
+   "bricks": 1215,
+   "minK": 87,
+   "maxK": 96,
+   "sha1": "e5cade793a0edda773dc9fa54251ba57b1b62224"
+  },
+  {
+   "cx": 21,
+   "cy": 46,
+   "file": "chunks/c_21_46.bxc",
+   "bricks": 1217,
+   "minK": 88,
+   "maxK": 98,
+   "sha1": "fdb7494210f6a6cb8ca8421460fa5ba3f8c31a6d"
+  },
+  {
+   "cx": 21,
+   "cy": 47,
+   "file": "chunks/c_21_47.bxc",
+   "bricks": 1210,
+   "minK": 87,
+   "maxK": 118,
+   "sha1": "0fee750f2cf53ed4523ca283ba9a826978fc3d22"
+  },
+  {
+   "cx": 21,
+   "cy": 48,
+   "file": "chunks/c_21_48.bxc",
+   "bricks": 2977,
+   "minK": 85,
+   "maxK": 177,
+   "sha1": "6646b7babb3250d29ad167626562eeff5f39fbf4"
+  },
+  {
+   "cx": 21,
+   "cy": 49,
+   "file": "chunks/c_21_49.bxc",
+   "bricks": 3609,
+   "minK": 85,
+   "maxK": 193,
+   "sha1": "c59556039fd6ed7bda138dd84b7764ebb31f9f2b"
+  },
+  {
+   "cx": 21,
+   "cy": 50,
+   "file": "chunks/c_21_50.bxc",
+   "bricks": 1487,
+   "minK": 85,
+   "maxK": 134,
+   "sha1": "e1cc99d7a098f461c4eb082bef064914a3c5b77a"
+  },
+  {
+   "cx": 22,
+   "cy": 44,
+   "file": "chunks/c_22_44.bxc",
+   "bricks": 1967,
+   "minK": 89,
+   "maxK": 144,
+   "sha1": "b150320e6314c0716b175171d9ac0272ea49bd0c"
+  },
+  {
+   "cx": 22,
+   "cy": 45,
+   "file": "chunks/c_22_45.bxc",
+   "bricks": 1122,
+   "minK": 88,
+   "maxK": 97,
+   "sha1": "6838b9f6c5ad55f85207aae5b6f11b874c731eae"
+  },
+  {
+   "cx": 22,
+   "cy": 46,
+   "file": "chunks/c_22_46.bxc",
+   "bricks": 1430,
+   "minK": 89,
+   "maxK": 98,
+   "sha1": "dccc7f4c5babc4f6fa345bd2ca0b1732fa7dc826"
+  },
+  {
+   "cx": 22,
+   "cy": 47,
+   "file": "chunks/c_22_47.bxc",
+   "bricks": 1049,
+   "minK": 87,
+   "maxK": 94,
+   "sha1": "4bd781079e2a1c3a983594b6e3f58beec36a8e5d"
+  },
+  {
+   "cx": 22,
+   "cy": 48,
+   "file": "chunks/c_22_48.bxc",
+   "bricks": 1807,
+   "minK": 84,
+   "maxK": 176,
+   "sha1": "62a26fdbf4e6612850fcb7c66fb41c3cef5e3cf9"
+  },
+  {
+   "cx": 22,
+   "cy": 49,
+   "file": "chunks/c_22_49.bxc",
+   "bricks": 1292,
+   "minK": 83,
+   "maxK": 89,
+   "sha1": "bc19279089d2c70676e23273eb6f1203f0e4eeaa"
+  },
+  {
+   "cx": 22,
+   "cy": 50,
+   "file": "chunks/c_22_50.bxc",
+   "bricks": 1285,
+   "minK": 84,
+   "maxK": 91,
+   "sha1": "6447d11c284c2549066891a3c281d58b514dd7a7"
+  },
+  {
+   "cx": 23,
+   "cy": 44,
+   "file": "chunks/c_23_44.bxc",
+   "bricks": 2336,
+   "minK": 88,
+   "maxK": 162,
+   "sha1": "8f154adbbd9f3430233c382d688c833a0af2e142"
+  },
+  {
+   "cx": 23,
+   "cy": 45,
+   "file": "chunks/c_23_45.bxc",
+   "bricks": 1162,
+   "minK": 86,
+   "maxK": 93,
+   "sha1": "dcb7da3afd746f1ab8cd4feae4fece7eec29d36f"
+  },
+  {
+   "cx": 23,
+   "cy": 46,
+   "file": "chunks/c_23_46.bxc",
+   "bricks": 1129,
+   "minK": 86,
+   "maxK": 93,
+   "sha1": "12f309bb8f91bc4ec575578b32a993882bdf6aa2"
+  },
+  {
+   "cx": 23,
+   "cy": 47,
+   "file": "chunks/c_23_47.bxc",
+   "bricks": 1047,
+   "minK": 86,
+   "maxK": 122,
+   "sha1": "0397a5e78de6a99e1b4372d01cc6b4512f598f9b"
+  },
+  {
+   "cx": 23,
+   "cy": 48,
+   "file": "chunks/c_23_48.bxc",
+   "bricks": 1660,
+   "minK": 85,
+   "maxK": 124,
+   "sha1": "d1dc3cf38bab42782262710503f3e87291cbd540"
+  },
+  {
+   "cx": 23,
+   "cy": 49,
+   "file": "chunks/c_23_49.bxc",
+   "bricks": 1714,
+   "minK": 83,
+   "maxK": 94,
+   "sha1": "fd8eef7a6921586af38a927636042cc791a47d92"
+  },
+  {
+   "cx": 23,
+   "cy": 50,
+   "file": "chunks/c_23_50.bxc",
+   "bricks": 1418,
+   "minK": 83,
+   "maxK": 92,
+   "sha1": "2cd2842661aae197f99c43bc0678c58c8bba2d7c"
+  },
+  {
+   "cx": 24,
+   "cy": 44,
+   "file": "chunks/c_24_44.bxc",
+   "bricks": 2538,
+   "minK": 87,
+   "maxK": 183,
+   "sha1": "17e7d22f38cca173d369c0c25d1f37e1249aefc4"
+  },
+  {
+   "cx": 24,
+   "cy": 45,
+   "file": "chunks/c_24_45.bxc",
+   "bricks": 1266,
+   "minK": 85,
+   "maxK": 126,
+   "sha1": "13823cfba4e4ae64a0de68133546da3a5e2695ed"
+  },
+  {
+   "cx": 24,
+   "cy": 46,
+   "file": "chunks/c_24_46.bxc",
+   "bricks": 1043,
+   "minK": 86,
+   "maxK": 125,
+   "sha1": "d4704af4c615554f280a4d4d9a0053551f7cdfc3"
+  },
+  {
+   "cx": 24,
+   "cy": 47,
+   "file": "chunks/c_24_47.bxc",
+   "bricks": 995,
+   "minK": 87,
+   "maxK": 92,
+   "sha1": "931bccc28a82b5ae84b536a5ec5df706c1976f0c"
+  },
+  {
+   "cx": 24,
+   "cy": 48,
+   "file": "chunks/c_24_48.bxc",
+   "bricks": 1098,
+   "minK": 88,
+   "maxK": 94,
+   "sha1": "c368b667e7d6464859da08a3937808f96cb3f40c"
+  },
+  {
+   "cx": 24,
+   "cy": 49,
+   "file": "chunks/c_24_49.bxc",
+   "bricks": 1218,
+   "minK": 85,
+   "maxK": 98,
+   "sha1": "f321eda011d09165ef27ca465480e34cca4c818f"
+  },
+  {
+   "cx": 24,
+   "cy": 50,
+   "file": "chunks/c_24_50.bxc",
+   "bricks": 1760,
+   "minK": 83,
+   "maxK": 99,
+   "sha1": "6365f83e2a9c7d671d846d695cb4a278ae340caf"
+  },
+  {
+   "cx": 25,
+   "cy": 44,
+   "file": "chunks/c_25_44.bxc",
+   "bricks": 1520,
+   "minK": 86,
+   "maxK": 152,
+   "sha1": "5ba4003916d1497a06247b8d22701fc0e996b18b"
+  },
+  {
+   "cx": 25,
+   "cy": 45,
+   "file": "chunks/c_25_45.bxc",
+   "bricks": 4151,
+   "minK": 85,
+   "maxK": 170,
+   "sha1": "08e6e425e53c76d8c7719befacd2864e7bee5128"
+  },
+  {
+   "cx": 25,
+   "cy": 46,
+   "file": "chunks/c_25_46.bxc",
+   "bricks": 1671,
+   "minK": 85,
+   "maxK": 159,
+   "sha1": "3449b3553b23bf0b197b80d47d6ec4c63436ddb8"
+  },
+  {
+   "cx": 25,
+   "cy": 47,
+   "file": "chunks/c_25_47.bxc",
+   "bricks": 1072,
+   "minK": 87,
+   "maxK": 92,
+   "sha1": "3cc14df77bb58792be69a521624ba65e18a19a1e"
+  },
+  {
+   "cx": 25,
+   "cy": 48,
+   "file": "chunks/c_25_48.bxc",
+   "bricks": 690,
+   "minK": 89,
+   "maxK": 93,
+   "sha1": "933070a6741dcf1da7ff515919d69716f2471629"
+  },
+  {
+   "cx": 25,
+   "cy": 49,
+   "file": "chunks/c_25_49.bxc",
+   "bricks": 941,
+   "minK": 89,
+   "maxK": 97,
+   "sha1": "1eb9e4acc2019ab6ab353020f8f7be1c8f144d81"
+  },
+  {
+   "cx": 25,
+   "cy": 50,
+   "file": "chunks/c_25_50.bxc",
+   "bricks": 1694,
+   "minK": 83,
+   "maxK": 98,
+   "sha1": "abf43a13d9da6c763f5429251d386a5d2d29d0e7"
+  }
+ ],
+ "islands": [
+  {
+   "id": 567,
+   "file": "islands/i_000567.bxi",
+   "cx": 19,
+   "cy": 46,
+   "bricks": 1768,
+   "sha1": "65dfe134d1e59cb4b802bb19f09c6549b8808431"
+  },
+  {
+   "id": 570,
+   "file": "islands/i_000570.bxi",
+   "cx": 19,
+   "cy": 45,
+   "bricks": 4639,
+   "sha1": "8bcbd62438b4ad56d5752c4fed68b1d401edd79b"
+  },
+  {
+   "id": 603,
+   "file": "islands/i_000603.bxi",
+   "cx": 19,
+   "cy": 45,
+   "bricks": 2227,
+   "sha1": "93d2ae05b69a04c359028e6c3fac388272408682"
+  },
+  {
+   "id": 604,
+   "file": "islands/i_000604.bxi",
+   "cx": 20,
+   "cy": 44,
+   "bricks": 3555,
+   "sha1": "39f8301d0984db0ffe21cd628d25469c75882809"
+  },
+  {
+   "id": 619,
+   "file": "islands/i_000619.bxi",
+   "cx": 20,
+   "cy": 50,
+   "bricks": 1390,
+   "sha1": "b06189802d3bb23a6cd55da6c78d8da11ab9eb9b"
+  },
+  {
+   "id": 620,
+   "file": "islands/i_000620.bxi",
+   "cx": 20,
+   "cy": 44,
+   "bricks": 979,
+   "sha1": "4b34644c68f83c2c52e8dd9e356a7e554bad71c4"
+  },
+  {
+   "id": 622,
+   "file": "islands/i_000622.bxi",
+   "cx": 21,
+   "cy": 50,
+   "bricks": 5946,
+   "sha1": "9a9877d2a1153f9be82a221f5590268660a4b5a8"
+  },
+  {
+   "id": 631,
+   "file": "islands/i_000631.bxi",
+   "cx": 21,
+   "cy": 49,
+   "bricks": 2541,
+   "sha1": "403d9716e134b1136f1511645058011744ef64c6"
+  },
+  {
+   "id": 633,
+   "file": "islands/i_000633.bxi",
+   "cx": 20,
+   "cy": 49,
+   "bricks": 2718,
+   "sha1": "5c6d4faa92000cb16645caff0b0f9413b317a3f9"
+  },
+  {
+   "id": 645,
+   "file": "islands/i_000645.bxi",
+   "cx": 21,
+   "cy": 44,
+   "bricks": 2359,
+   "sha1": "1b180d3d51a1619be4bfb35c941f1eea56ba108a"
+  },
+  {
+   "id": 650,
+   "file": "islands/i_000650.bxi",
+   "cx": 21,
+   "cy": 49,
+   "bricks": 1364,
+   "sha1": "a8e04353d43fda99c8834161f7f4c4b2fda2421c"
+  },
+  {
+   "id": 664,
+   "file": "islands/i_000664.bxi",
+   "cx": 21,
+   "cy": 50,
+   "bricks": 2618,
+   "sha1": "0b6a1e14d50d0ab83b56e3d37af179fca6ddd84f"
+  },
+  {
+   "id": 672,
+   "file": "islands/i_000672.bxi",
+   "cx": 22,
+   "cy": 49,
+   "bricks": 7262,
+   "sha1": "fe9182ddf8e65e0aba329445bd7643eef205e3e9"
+  },
+  {
+   "id": 686,
+   "file": "islands/i_000686.bxi",
+   "cx": 22,
+   "cy": 50,
+   "bricks": 1807,
+   "sha1": "f1ea1bc5a55083e363056b6694e1305082a56897"
+  },
+  {
+   "id": 697,
+   "file": "islands/i_000697.bxi",
+   "cx": 22,
+   "cy": 50,
+   "bricks": 4441,
+   "sha1": "0c530f3d1441fe9403c7549633e5deb75dc0bccf"
+  },
+  {
+   "id": 698,
+   "file": "islands/i_000698.bxi",
+   "cx": 22,
+   "cy": 49,
+   "bricks": 1218,
+   "sha1": "daaafeae9719d5b7abecef797bb223edcc3493a2"
+  },
+  {
+   "id": 699,
+   "file": "islands/i_000699.bxi",
+   "cx": 22,
+   "cy": 46,
+   "bricks": 4477,
+   "sha1": "88bb59ee88ad260242d86fef63116a8fff39f1e5"
+  },
+  {
+   "id": 701,
+   "file": "islands/i_000701.bxi",
+   "cx": 23,
+   "cy": 44,
+   "bricks": 9767,
+   "sha1": "c89942bb5922c69b7a8f551975cab214d7eecd54"
+  },
+  {
+   "id": 704,
+   "file": "islands/i_000704.bxi",
+   "cx": 23,
+   "cy": 44,
+   "bricks": 4613,
+   "sha1": "2a979cd7f2bed0c501a4132988aaac77e2969ec9"
+  },
+  {
+   "id": 715,
+   "file": "islands/i_000715.bxi",
+   "cx": 22,
+   "cy": 49,
+   "bricks": 3529,
+   "sha1": "cef3accd41e64056fec7f1c58a7ddc59ab0f662d"
+  },
+  {
+   "id": 723,
+   "file": "islands/i_000723.bxi",
+   "cx": 23,
+   "cy": 48,
+   "bricks": 8198,
+   "sha1": "1bb35192e3859155ccc87a3a62f94a49142345bf"
+  },
+  {
+   "id": 738,
+   "file": "islands/i_000738.bxi",
+   "cx": 23,
+   "cy": 50,
+   "bricks": 4602,
+   "sha1": "8a329702fb43d065a81acf725fac88150572f6c4"
+  },
+  {
+   "id": 753,
+   "file": "islands/i_000753.bxi",
+   "cx": 23,
+   "cy": 49,
+   "bricks": 1203,
+   "sha1": "beba4aa1318aeaac7a88b22dcdaa914e9ea069af"
+  },
+  {
+   "id": 757,
+   "file": "islands/i_000757.bxi",
+   "cx": 23,
+   "cy": 49,
+   "bricks": 523,
+   "sha1": "6f01636fe82ef50524f8f6528a917eb43e2bfe82"
+  },
+  {
+   "id": 764,
+   "file": "islands/i_000764.bxi",
+   "cx": 23,
+   "cy": 50,
+   "bricks": 1337,
+   "sha1": "2f72c630e774baa5558194918ce370424c1f1391"
+  },
+  {
+   "id": 767,
+   "file": "islands/i_000767.bxi",
+   "cx": 23,
+   "cy": 49,
+   "bricks": 418,
+   "sha1": "17cd421a9420bc5c3d3a94747960eace58821c9c"
+  },
+  {
+   "id": 768,
+   "file": "islands/i_000768.bxi",
+   "cx": 23,
+   "cy": 49,
+   "bricks": 2616,
+   "sha1": "a778fc5bfd8922c78ad440de1be3dda7a453a933"
+  },
+  {
+   "id": 770,
+   "file": "islands/i_000770.bxi",
+   "cx": 24,
+   "cy": 50,
+   "bricks": 775,
+   "sha1": "8c9ffcfbcf1ae6204612cce88fa08f17f0062edf"
+  },
+  {
+   "id": 771,
+   "file": "islands/i_000771.bxi",
+   "cx": 24,
+   "cy": 46,
+   "bricks": 5248,
+   "sha1": "004cabf06e6c86a97c023b50883e171d2f6db989"
+  },
+  {
+   "id": 776,
+   "file": "islands/i_000776.bxi",
+   "cx": 24,
+   "cy": 45,
+   "bricks": 973,
+   "sha1": "985a40b475cca89f988b82675e0fc954b4986ac2"
+  },
+  {
+   "id": 780,
+   "file": "islands/i_000780.bxi",
+   "cx": 24,
+   "cy": 44,
+   "bricks": 1684,
+   "sha1": "de6a0b57334661da3223c98aa8463109ad981343"
+  },
+  {
+   "id": 782,
+   "file": "islands/i_000782.bxi",
+   "cx": 25,
+   "cy": 49,
+   "bricks": 14350,
+   "sha1": "35d3644f35f8f66b3d8ba0fc519c66ae6e4386ff"
+  },
+  {
+   "id": 785,
+   "file": "islands/i_000785.bxi",
+   "cx": 24,
+   "cy": 50,
+   "bricks": 4160,
+   "sha1": "321fa754c61bf19f4971bdfafb7e9b20f5d86419"
+  },
+  {
+   "id": 798,
+   "file": "islands/i_000798.bxi",
+   "cx": 24,
+   "cy": 45,
+   "bricks": 2401,
+   "sha1": "5202ea3fd52674465399c5a9c8e6cc3079269ba0"
+  },
+  {
+   "id": 800,
+   "file": "islands/i_000800.bxi",
+   "cx": 24,
+   "cy": 45,
+   "bricks": 2729,
+   "sha1": "8f076261b50aa81990de495d099b3d5d8e70a263"
+  },
+  {
+   "id": 803,
+   "file": "islands/i_000803.bxi",
+   "cx": 25,
+   "cy": 44,
+   "bricks": 7142,
+   "sha1": "3608a00314a78325eaae86da37fff6cc12b5e9b0"
+  },
+  {
+   "id": 807,
+   "file": "islands/i_000807.bxi",
+   "cx": 25,
+   "cy": 44,
+   "bricks": 3892,
+   "sha1": "de5c0d4dbce2be371e11d1a70fcac8039a213033"
+  },
+  {
+   "id": 819,
+   "file": "islands/i_000819.bxi",
+   "cx": 25,
+   "cy": 47,
+   "bricks": 50251,
+   "sha1": "1e7fbfc569c6d6dcd8f0131bae007245651de3bf"
+  },
+  {
+   "id": 831,
+   "file": "islands/i_000831.bxi",
+   "cx": 25,
+   "cy": 50,
+   "bricks": 1532,
+   "sha1": "8efeec43840e93b29f0181d12f38b8e34bde089f"
+  },
+  {
+   "id": 839,
+   "file": "islands/i_000839.bxi",
+   "cx": 25,
+   "cy": 50,
+   "bricks": 7099,
+   "sha1": "2f5c90dc4f4a5165a9a88b740bca7a6d367157c5"
+  }
+ ],
+ "sample": {
+  "centre": [
+   22,
+   47
+  ],
+  "radius": 3
+ }
+}
