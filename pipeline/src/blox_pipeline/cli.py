@@ -146,6 +146,37 @@ def cmd_build(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------- life
+def cmd_life(args: argparse.Namespace) -> int:
+    """Timetable buses, walkways and the river for the web game (``<out>/life/``)."""
+    import datetime as dt
+
+    from .life import export_life
+    from .life.fetch import gtfs_path
+    from .sources import config
+    from .sources.osm import clip_path, load_osm
+
+    root = Path(args.data_dir) if args.data_dir else None
+    box = _bbox(args.bbox)
+    gtfs = None
+    if not args.no_transit:
+        gtfs = Path(args.gtfs) if args.gtfs else gtfs_path(root)
+        if not gtfs.exists():
+            raise FileNotFoundError(f"GTFS feed {gtfs} missing, run 'blox fetch --only gtfs' (or pass --no-transit)")
+    osm = None
+    if not args.no_walkways:
+        osm_file = clip_path(root)
+        if not osm_file.exists():
+            raise FileNotFoundError(f"OSM clip {osm_file} missing, run 'blox fetch --only osm' (or pass --no-walkways)")
+        osm = load_osm(osm_file, box)
+    start = dt.date.fromisoformat(args.date) if args.date else dt.date.today()
+    margin = config.GTFS_MARGIN_M if args.margin is None else args.margin
+    index = export_life(Path(args.out), box=box, gtfs_zip=gtfs, osm=osm, start=start, margin_m=margin,
+                        modes=tuple(m.strip() for m in args.modes.split(",")))
+    log.info("wrote %s/life/ (%s)", args.out, ", ".join(f"{k} {v / 1024:.0f} KiB" for k, v in index["bytes"].items()))
+    return 0
+
+
 # ---------------------------------------------------------------------------- main
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="blox", description="Maastricht Blox data pipeline")
@@ -170,6 +201,18 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--no-islands", action="store_true",
                    help="keep rotated buildings on the world grid (staircase walls, CONTRACT v2 behaviour)")
     b.set_defaults(func=cmd_build)
+
+    li = sub.add_parser("life", help="export buses (GTFS timetable), walkways and the river to <out>/life/")
+    li.add_argument("--out", default="build/world")
+    li.add_argument("--bbox", help=bbox_help)
+    li.add_argument("--data-dir")
+    li.add_argument("--gtfs", help="GTFS zip (default: the cached OVapi feed from 'blox fetch --only gtfs')")
+    li.add_argument("--date", help="first day of the reference week, YYYY-MM-DD (default: today)")
+    li.add_argument("--margin", type=float, help="metres around the bbox for routes (default 500)")
+    li.add_argument("--modes", default="bus", help="comma list of GTFS modes to keep (default bus)")
+    li.add_argument("--no-transit", action="store_true")
+    li.add_argument("--no-walkways", action="store_true")
+    li.set_defaults(func=cmd_life)
     return p
 
 

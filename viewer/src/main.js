@@ -212,6 +212,11 @@ async function main() {
     const url = canvas.toDataURL('image/png');
     return { url, ms: performance.now() - t0 };
   };
+  // [player hook] walk mode (src/player/): wraps stage.render to run each frame before drawing
+  if (!isGallery) {
+    import('./player/index.js').then((m) => m.initPlayer({ stage, camera: stage.camera, controls, city: window.__blox.city || null, // Track S: pass the src/city.js instance here
+      models: data.models, ui, world, islands, lod })).catch((e) => console.error('player', e));
+  }
   requestAnimationFrame(frame);
 }
 

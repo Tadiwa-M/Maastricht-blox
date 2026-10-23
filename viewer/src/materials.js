@@ -7,6 +7,7 @@
 //   metal    metallic plastic                      emissive  lamps (brighter at night)
 import * as THREE from 'three';
 import { rippleNormalTexture, addRipples } from './ripples.js';
+import { classOf } from './matkey.js';
 
 function plastic(extra = {}) {
   return new THREE.MeshPhysicalMaterial({
@@ -52,11 +53,7 @@ export class MaterialSet {
   all() { return [this.solid, this.glass, this.trans, this.water, this.metal, ...this.emissive.values()]; }
 
   /** Class name for a palette entry ('solid', 'glass', 'water', ...). */
-  classOf(entry) {
-    const cls = entry?.material || 'solid';
-    if (cls === 'trans' && /^water/.test(entry.name || '')) return 'water';
-    return ['glass', 'trans', 'metal', 'emissive'].includes(cls) ? cls : 'solid';
-  }
+  classOf(entry) { return classOf(entry); }
 
   /** { key, material, cls } for a palette entry. */
   forEntry(entry) {

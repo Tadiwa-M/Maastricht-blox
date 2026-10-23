@@ -9,23 +9,13 @@ import { bodyParts, studGeometry, INSET } from './geometry.js';
 import { typeExtent, typeCell, studCells, ROT_MASK, NO_VARIATION, HIDE_STUDS } from './world.js';
 import { brickMatrix, gridToThree } from './placement.js';
 import { hash3 } from './hash.js';
+import { brickColor } from './bricks-color.js';
 import { exteriorAir, occupancyGrid } from './exterior.js';
 import { cellCodeOf } from './farmesh.js';
 import { windowGlow } from './glow.js';
 
-export { hash3 };
-const VARIATION = 0.03; // +-3 % value
+export { hash3, brickColor };
 const BLACK = new THREE.Color(0, 0, 0);
-
-/** Linear colour of a palette entry, varied by a hash of the cell unless exact. */
-export function brickColor(entry, I, J, K, exact, out = new THREE.Color()) {
-  out.set(entry?.srgb || '#ff00ff');
-  if (!exact) {
-    const f = 1 + (hash3(I, J, K) * 2 - 1) * VARIATION;
-    out.convertLinearToSRGB().multiplyScalar(f).convertSRGBToLinear();
-  }
-  return out;
-}
 
 /**
  * Grid positions [I, J, K] (fractional, stud base centre) of the studs a brick shows.
