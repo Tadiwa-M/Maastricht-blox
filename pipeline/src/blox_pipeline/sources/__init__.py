@@ -38,7 +38,7 @@ class SourceData:
     ortho: RGBGrid | None
 
 
-ALL_SOURCES = ("ahn", "bag3d", "osm", "ortho")
+ALL_SOURCES = ("ahn", "bag3d", "osm", "ortho", "gtfs")
 
 
 def fetch_all(bbox: RDBox, only: tuple[str, ...] = ("ahn", "bag3d", "osm"), root: Path | None = None) -> None:
@@ -51,6 +51,10 @@ def fetch_all(bbox: RDBox, only: tuple[str, ...] = ("ahn", "bag3d", "osm"), root
         fetch_osm(root)
     if "ortho" in only:
         fetch_ortho(bbox, root)
+    if "gtfs" in only:
+        from ..life.fetch import fetch_gtfs
+
+        fetch_gtfs(root)
 
 
 def load_all(bbox: RDBox, root: Path | None = None) -> SourceData:

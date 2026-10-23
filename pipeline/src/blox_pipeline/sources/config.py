@@ -30,6 +30,11 @@ BAG3D_LICENCE = "CC BY 4.0"
 OSM_PBF_URL = "https://download.geofabrik.de/europe/netherlands/limburg-latest.osm.pbf"
 OSM_CLIP_MARGIN_M = 300.0  # keep a bit around the slice so ways at the edge are whole
 
+# ---------------------------------------------------------------- GTFS (OVapi, national feed)
+# The whole Dutch timetable (~240 MB zip). ``blox life`` filters it to the slice + margin.
+GTFS_URL = "https://gtfs.ovapi.nl/gtfs-nl.zip"
+GTFS_MARGIN_M = 500.0  # keep routes/stops this far around the slice
+
 # ---------------------------------------------------------------- PDOK aerial (WMS)
 ORTHO_WMS_URL = "https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0"
 ORTHO_LAYER = "Actueel_orthoHR"
