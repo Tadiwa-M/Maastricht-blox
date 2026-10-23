@@ -177,7 +177,7 @@ export function initPlayer(ctx) {
     if (frame.pressed.has('help')) hud.toggleHelp();
     if (mode === 'map') {
       if (frame.pressed.has('enter') && !tween) {
-        const byKey = input.codes.has('KeyF') && hover;
+        const byKey = frame.kbHeld.has('enter') && hover; // F aims at the cursor, gamepad A at the centre
         enterAt(byKey ? screenRay(...hover) : centreRay());
       } else if (!tween) mapPad(frame, dt);
     } else {

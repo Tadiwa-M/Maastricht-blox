@@ -97,9 +97,39 @@ export class MaterialSet {
     return m;
   }
 
+  /**
+   * City far look (streamed chunks/islands and baked regions, src/cityview.js): 'opaque' folds
+   * solid, glass, metal and lamps into ONE material; per vertex aExtra = (glow rgb at half
+   * scale, shine: 0 plastic, 128 metal, 255 glass), so a chunk is one draw call. 'water' and
+   * 'trans' reuse the far see-through materials.
+   */
+  cityFar(family) {
+    if (family !== 'opaque') return this.farFor(family);
+    if (this.cityOpaque) return this.cityOpaque;
+    const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0 });
+    const uGlow = { value: 0 };
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uGlow = uGlow;
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute vec4 aExtra;\nvarying vec4 vExtra;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvExtra = aExtra;');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec4 vExtra;\nuniform float uGlow;')
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = vExtra.a > 0.75 ? 0.06 : (vExtra.a > 0.25 ? 0.28 : roughnessFactor);')
+        .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = (vExtra.a > 0.25 && vExtra.a < 0.75) ? 0.8 : metalnessFactor;')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vExtra.rgb * 2.0 * uGlow;');
+    };
+    m.customProgramCacheKey = () => 'city-far-opaque';
+    m.userData.uGlow = uGlow;
+    this.cityOpaque = m;
+    this.setNight(this.night);
+    return m;
+  }
+
   /** night in [0, 1]: lamps and windows glow. */
   setNight(night) {
     this.night = night;
+    if (this.cityOpaque) this.cityOpaque.userData.uGlow.value = night * 1.6;
     for (const m of this.emissive.values()) m.emissiveIntensity = 0.8 + night * 3;
     for (const [key, m] of this.far) if (key.startsWith('emissive:')) m.emissiveIntensity = 0.8 + night * 3;
     for (const g of [this.glass, this.far.get('glass')]) {

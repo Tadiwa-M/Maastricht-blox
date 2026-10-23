@@ -99,7 +99,7 @@ export function combine({ kb, pads = [], touch = null, mouse = null, dt, prevHel
   if (held.has('zoomIn')) zoom -= b.zoom.keys * dt;
   if (held.has('zoomOut')) zoom += b.zoom.keys * dt;
   const run = held.has('run') || padRun;
-  return { move, speed01: Math.min(1, analog), run, look, zoom, held, pressed: pressedEdges(prevHeld, held) };
+  return { move, speed01: Math.min(1, analog), run, look, zoom, held, kbHeld: kb.held, pressed: pressedEdges(prevHeld, held) };
 }
 
 /** Speed in m/s for a frame: keyboard walk/run; analog sticks scale the walk speed, full tilt runs. */
@@ -112,6 +112,7 @@ export function frameSpeed(frame, walk, run) {
 export class Input {
   constructor(target, { onPad, touch } = {}) {
     this.codes = new Set();
+    this.taps = new Set();
     this.mouse = { look: [0, 0], wheel: 0 };
     this.prevHeld = new Set();
     this.touch = touch || null; // object with .read() -> { move, look, zoom }
@@ -121,6 +122,7 @@ export class Input {
     window.addEventListener('keydown', (e) => {
       if (typing(e)) return;
       this.codes.add(e.code);
+      if (!e.repeat) this.taps.add(e.code); // a tap shorter than a frame still counts once
       if (this.lookActive && /^(Space|Arrow)/.test(e.code)) e.preventDefault();
     });
     window.addEventListener('keyup', (e) => this.codes.delete(e.code));
@@ -146,10 +148,11 @@ export class Input {
   /** One frame of input (consumes accumulated mouse/touch deltas). */
   poll(dt) {
     const frame = combine({
-      kb: readKeys(this.codes), pads: this.pads().map((p) => readPad(p)), touch: this.touch?.read() || null,
+      kb: readKeys(new Set([...this.codes, ...this.taps])), pads: this.pads().map((p) => readPad(p)), touch: this.touch?.read() || null,
       mouse: this.mouse, dt, prevHeld: this.prevHeld,
     });
     this.prevHeld = frame.held;
+    this.taps.clear();
     this.mouse = { look: [0, 0], wheel: 0 };
     return frame;
   }

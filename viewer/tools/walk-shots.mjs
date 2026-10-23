@@ -16,8 +16,7 @@ const at = process.argv[3] || '700,1505';
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript' };
 const server = createServer(async (req, res) => {
   const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^([/\\])+/, '');
-  try { res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/octet-stream' }); res.end(await readFile(join(dist, path || 'index.html'))); }
-  catch { res.writeHead(404); res.end(); }
+  try { const body = await readFile(join(dist, path || 'index.html')); res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/octet-stream' }); res.end(body); } catch { res.writeHead(404); res.end(); }
 });
 await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-gl=angle'] });
@@ -65,12 +64,13 @@ try {
   });
   console.table(probe);
   // a few shots: walk toward the nearest island, turn the camera
-  const target = probe[0];
+  const target = probe.reduce((a, b) => (b.left < a.left ? b : a)); // the island the body got closest to
   await page.evaluate((t) => {
     const P = window.__bloxPlayer, c = P.ctrl;
     const heading = Math.atan2(t.x - c.pos[0], -(t.z - c.pos[2]));
     P.follow.yaw = heading;
-    for (let q = 0; q < 60 * 6; q++) c.update(1 / 60, { move: [0, 1], speed: 1.4 }, heading);
+    for (let q = 0; q < 60 * 40; q++) c.update(1 / 60, { move: [0, 1], speed: 4 }, heading);
+    P.follow.yaw = heading + 0.5; P.follow.pitch = 0.05;
   }, target);
   await page.evaluate(() => window.__bloxCapture()); // let the camera follow (one tick)
   await shot('walk_to_island');

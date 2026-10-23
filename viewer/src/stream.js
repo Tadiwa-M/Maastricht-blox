@@ -46,12 +46,17 @@ export class StreamScheduler {
   /** Is everything within loadRadius loaded (screenshots wait for this)? */
   settled() { return this.pending === 0 && this.inflight === 0; }
 
-  /** eye {x,y,z}; inView(box) -> bool (optional). Returns the number of loads started. */
+  /**
+   * eye {x,y,z} or an array of eyes (distance = to the nearest one; e.g. camera + player);
+   * inView(box) -> bool (optional). Returns the number of loads started.
+   */
   update(eye, inView = null) {
     const unloadR = this.unloadRadius ?? this.loadRadius * 1.5;
+    const eyes = Array.isArray(eye) ? eye : [eye];
     const wanted = [];
     for (const it of this.items) {
-      it.dist = boxDistance(it.box, eye);
+      it.dist = Infinity;
+      for (const e of eyes) it.dist = Math.min(it.dist, boxDistance(it.box, e));
       it.priority = it.dist * (inView && !inView(it.box) ? 2 : 1);
       if (it.state === LOADING && it.dist > this.loadRadius * this.abortFactor) this.abort(it);
       else if (it.state === READY && it.dist > unloadR) this.drop(it);
