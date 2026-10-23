@@ -241,6 +241,7 @@ async function main() {
  */
 async function initHooks(ctx) {
   const out = [];
+  if (/[#&]hooks=0\b/.test(location.hash)) return out; // debug: engine alone (perf, memory)
   // [player hook] walk mode (src/player/): wraps stage.render to run each frame before drawing
   try { out.push(await (await import('./player/index.js')).initPlayer?.(ctx)); } catch (e) { console.error('player', e); }
   // [life hook] timetable buses, pedestrians, river boats (src/life/)

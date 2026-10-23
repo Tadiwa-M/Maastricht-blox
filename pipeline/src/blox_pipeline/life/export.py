@@ -1,4 +1,4 @@
-"""``blox life``: write ``<out>/life/`` (index + transit + walkways + river JSON).
+"""``blox life``: write ``<out>/life/`` (index + transit + walkways + streets + river JSON).
 
 ``life/index.json`` is the only entry point the viewer reads; the world manifest
 (CONTRACT 5) is not touched. Each part is optional: a missing input is an error unless that
@@ -34,6 +34,7 @@ def export_life(out_dir: Path, *, box: RDBox, gtfs_zip: Path | None, osm: Any | 
     """Write the life files for RD ``box``. ``gtfs_zip`` None skips transit; ``osm`` None skips
     walkways and uses the fallback river line. Returns the index document."""
     from .river import build_river
+    from .streets import build_streets
     from .transit import build_transit
     from .walkways import build_walkways
 
@@ -55,6 +56,8 @@ def export_life(out_dir: Path, *, box: RDBox, gtfs_zip: Path | None, osm: Any | 
         doc = build_walkways(osm, box)
         index["files"]["walkways"] = "walkways.json"
         index["bytes"]["walkways"] = dump(doc, life / "walkways.json")
+        index["files"]["streets"] = "streets.json"
+        index["bytes"]["streets"] = dump(build_streets(osm, box), life / "streets.json")
         index["sources"].append({"name": "OpenStreetMap", "licence": "ODbL", "attribution": "OpenStreetMap contributors"})
     river = build_river(osm, box)
     index["files"]["river"] = "river.json"

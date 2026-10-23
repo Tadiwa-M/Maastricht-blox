@@ -161,9 +161,20 @@ export function glowBytes(glow) {
 export function releaseAfterUpload(g) {
   const drop = function () { this.array = null; };
   for (const a of Object.values(g.attributes)) a.onUpload(drop);
-  // the index stays: three.js reads it for wireframes and geometry groups only need offsets,
-  // but keeping it is cheap insurance (2-4 bytes per index)
+  // the index too: drawing and geometry groups use index.count (fixed at creation), only
+  // wireframe and raycasting read the array, and neither is used on streamed meshes
+  g.index?.onUpload(drop);
   return g;
+}
+
+/**
+ * Draw a mesh once even if it is off screen, so its buffers go to the GPU (and, with
+ * releaseAfterUpload, leave the CPU) right away instead of whenever it first comes into view.
+ */
+export function uploadSoon(mesh) {
+  mesh.frustumCulled = false;
+  mesh.onAfterRender = () => { mesh.frustumCulled = true; mesh.onAfterRender = () => {}; };
+  return mesh;
 }
 
 /** BufferGeometry from Buffers.arrays() output. */

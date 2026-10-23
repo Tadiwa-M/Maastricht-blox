@@ -28,6 +28,7 @@ export class WalkGraph {
     this.x = new Float32Array(n); this.z = new Float32Array(n);
     for (let q = 0; q < n; q++) { this.x[q] = doc.nodes[2 * q]; this.z[q] = doc.nodes[2 * q + 1]; }
     this.w = Float32Array.from({ length: n }, (_, q) => doc.weights?.[q] ?? 1);
+    this.base = this.w.slice(); // export weights; this.w may be boosted for the moment (density.js liveWeights)
     const deg = new Uint32Array(n + 1);
     for (let q = 0; q < doc.edges.length; q++) deg[doc.edges[q] + 1]++;
     for (let q = 0; q < n; q++) deg[q + 1] += deg[q];
@@ -98,8 +99,8 @@ const bezD = (p0, p1, p2, u) => 2 * (1 - u) * (p1 - p0) + 2 * u * (p2 - p1);
 
 /** One walker on the graph: edge a -> b at distance s, prev node p, next node c. */
 export class Walker {
-  constructor(graph, start, rand, { speed = 1.3, lateral = 0 } = {}) {
-    Object.assign(this, { g: graph, rand, speed, lateral, lateralGoal: lateral, slow: 1 });
+  constructor(graph, start, rand, { speed = 1.3, lateral = 0, corner = CORNER_M } = {}) {
+    Object.assign(this, { g: graph, rand, speed, lateral, lateralGoal: lateral, slow: 1, corner });
     this.p = -1;
     this.a = start;
     this.b = graph.pickNext(-1, start, rand);
@@ -110,7 +111,7 @@ export class Walker {
 
   cornerR(a, b, c) {
     if (a < 0 || c < 0 || a === c) return 0;
-    return Math.min(CORNER_M, this.g.dist(a, b) / 2, this.g.dist(b, c) / 2);
+    return Math.min(this.corner, this.g.dist(a, b) / 2, this.g.dist(b, c) / 2);
   }
 
   /** Advance dt seconds. Returns metres travelled. */

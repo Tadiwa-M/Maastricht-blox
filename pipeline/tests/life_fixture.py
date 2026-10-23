@@ -113,6 +113,10 @@ CYCLE = [(176200.0, 317600.0), (176400.0, 317600.0)]  # cycleway: not walked
 NOFOOT = [(176200.0, 317650.0), (176400.0, 317650.0)]  # footway with foot=no
 SQUARE = [(176420.0, 317880.0), (176460.0, 317880.0), (176460.0, 317920.0), (176420.0, 317920.0)]
 SHOP = (176320.0, 317905.0)
+CAFE = (176380.0, 317912.0)  # 12 m north of PED: terrace faces south
+SHOPS3 = [(176310.0, 317890.0), (176330.0, 317892.0), (176340.0, 317910.0)]
+ONEWAY = [(176450.0, 317700.0), (176550.0, 317700.0)]  # tertiary, oneway=yes, cycleway=lane
+PEDCAR = [(176450.0, 317750.0), (176550.0, 317750.0)]  # parking aisle: no cars
 MAAS = [(176700.0, 316400.0), (176750.0, 317500.0), (176800.0, 318700.0)]
 LIFE_BOX = geo.RDBox(176100.0, 317500.0, 176600.0, 318100.0)
 
@@ -143,11 +147,16 @@ def write_osm(path: Path) -> Path:
     way(5, NOFOOT, {"highway": "footway", "foot": "no"})
     way(6, SQUARE, {"place": "square", "name": "Markt"}, close=True)
     way(7, MAAS, {"waterway": "river", "name": "Maas"})
+    way(8, ONEWAY, {"highway": "tertiary", "oneway": "yes", "cycleway": "lane"})
+    way(9, PEDCAR, {"highway": "service", "service": "parking_aisle"})
     shop_id = len(nodes) + 1
     with osmium.SimpleWriter(str(path)) as w:
         for nid, p in sorted(nodes.items()):
             w.add_node(Node(id=nid, location=_lonlat(p)))
         w.add_node(Node(id=shop_id, location=_lonlat(SHOP), tags={"shop": "clothes", "name": "Winkel"}))
+        w.add_node(Node(id=shop_id + 1, location=_lonlat(CAFE), tags={"amenity": "cafe", "name": "Cafe"}))
+        for k, p in enumerate(SHOPS3):
+            w.add_node(Node(id=shop_id + 2 + k, location=_lonlat(p), tags={"shop": "shoes", "name": f"Shop {k}"}))
         for wid, ids, tags in ways:
             w.add_way(Way(id=wid, nodes=ids, tags=tags))
     return path

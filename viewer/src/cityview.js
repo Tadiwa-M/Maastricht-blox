@@ -8,7 +8,7 @@
 // Islands hang under a group at their pose (src/island.js), exactly as in src/lod.js.
 import * as THREE from 'three';
 import { buildWorldMeshes, worldContext } from './bricks.js';
-import { arraysToGeometry, releaseAfterUpload } from './farmesh.js';
+import { arraysToGeometry, releaseAfterUpload, uploadSoon } from './farmesh.js';
 import { applyIslandPose, worldToLocalThree } from './island.js';
 import { worldFromRecords } from './prepare.js';
 import { pickNearest } from './picking.js';
@@ -62,7 +62,7 @@ export class CityView {
       box: new THREE.Box3(new THREE.Vector3().copy(it.box.min), new THREE.Vector3().copy(it.box.max)) };
     for (const [fam, arrays] of Object.entries(p.far || {})) {
       const mat = this.mats.cityFar(fam);
-      const mesh = new THREE.Mesh(releaseAfterUpload(arraysToGeometry(arrays)), mat);
+      const mesh = uploadSoon(new THREE.Mesh(releaseAfterUpload(arraysToGeometry(arrays)), mat));
       mesh.castShadow = !mat.transparent;
       mesh.receiveShadow = true;
       mesh.name = `mid|${fam}`;
@@ -134,9 +134,10 @@ export class CityView {
     for (const v of views) {
       if (want.size >= maxNear) break;
       if (!(v.dist < (v.isNear ? nearDist * HYSTERESIS : nearDist))) continue;
-      // near cost ~ 25x the mid look (lite bevels); the closest item is always allowed
+      // near cost ~ 25x the mid look (lite bevels); the closest item may take up to twice the
+      // budget (a giant island right next to the camera stays in the mid look on weak tiers)
       const cost = v.nearTris ?? v.triangles * 25;
-      if (want.size && cost > budget) continue;
+      if (cost > (want.size ? budget : nearTriCap * 2)) continue;
       budget -= cost;
       want.add(v);
     }

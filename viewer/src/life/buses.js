@@ -3,13 +3,14 @@
 // Pose: the shared PathMover rule (src/mover.js: heading = rear -> front axle over
 // turnRadius, yaw clockwise from north), shifted LANE_M to the right of the shape so the two
 // directions of a street use their own lane. LOD (lodpick.js): the nearest `full` buses are
-// instanced brick models (contract/models/bus.json, body recoloured to the route colour,
+// instanced brick models (contract/models/bus.json, body in the operator's livery (livery.js),
 // wheels rolling with distance, route number sign on the nose and roof); farther ones are
 // coloured boxes; beyond farDist they are hidden.
 import * as THREE from 'three';
 import { PathMover } from '../mover.js';
 import { InstancedModel } from './instancer.js';
 import { assignLod } from './lodpick.js';
+import { liveryFor } from './livery.js';
 
 export const LANE_M = 1.6;
 const SIGNS = 8;
@@ -123,8 +124,9 @@ export class TimetableBuses {
     });
   }
 
+  /** Body colour of a route's buses: the operator's livery (livery.js; Arriva blue in Maastricht). */
   routeColour(route) {
-    if (route._body === undefined) route._body = nearestPalette(this.palette, route.colour || '#C8102E', this.bodyIdx);
+    if (route._body === undefined) route._body = new THREE.Color(liveryFor(route));
     return route._body;
   }
 
@@ -139,7 +141,7 @@ export class TimetableBuses {
       const b = list[q];
       if (this.slotRoute[slot] !== b.route) {
         this.slotRoute[slot] = b.route;
-        this.full.setColors(slot, b.route ? { 38: this.routeColour(b.route) } : null);
+        this.full.setColors(slot, { 38: b.route ? this.routeColour(b.route) : new THREE.Color(liveryFor(null)) });
       }
       const angles = {};
       for (const [n, r] of Object.entries(this.wheelR)) angles[n] = -b.dist / r;
@@ -153,7 +155,7 @@ export class TimetableBuses {
       const b = list[q];
       m.compose(at.set(b.x, b.y, -b.z), qt.setFromAxisAngle(up, (-b.yaw * Math.PI) / 180), one);
       this.boxes.setMatrixAt(n, m);
-      this.boxes.setColorAt(n, this.color.set(b.route?.colour || '#C8102E'));
+      this.boxes.setColorAt(n, b.route ? this.routeColour(b.route) : this.color.set(liveryFor(null)));
     });
     this.boxes.count = lod.box.length;
     this.boxes.instanceMatrix.needsUpdate = true;

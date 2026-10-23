@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { brickColor } from './bricks-color.js';
 import { windowColor } from './glow.js';
 import { keyOf, farFamily, shineOf } from './matkey.js';
-import { glowBytes, releaseAfterUpload } from './farmesh.js';
+import { glowBytes, releaseAfterUpload, uploadSoon } from './farmesh.js';
 import { StreamScheduler, READY } from './stream.js';
 
 // local mesh axes: X = i (east), Y = k (up), Z = j (north; mesh scale z < 0 turns it to -z)
@@ -130,7 +130,7 @@ export function regionMeshes(decoded, palette, mats, studM, plateM) {
   const parts = [];
   for (const [fam, { arrays, ranges }] of r.families) {
     const mat = mats.cityFar(fam);
-    const mesh = new THREE.Mesh(geometryOf(arrays), [mat]);
+    const mesh = uploadSoon(new THREE.Mesh(geometryOf(arrays), [mat]));
     mesh.castShadow = !mat.transparent;
     mesh.receiveShadow = true;
     mesh.name = `farbake|${fam}`;
@@ -189,20 +189,31 @@ export class FarRegions {
       const sched = new StreamScheduler(items, {
         loadRadius: coarsest ? Infinity : this.loadRadius(lv.level), unloadRadius: coarsest ? Infinity : this.loadRadius(lv.level) * 1.4,
         concurrency: coarsest ? 8 : 3,
-        load: async (it, signal) => {
-          const look = regionMeshes(await this.decode(await this.fetchBytes(it.file, signal)), this.palette, this.mats, index.studM, index.plateM);
-          return look;
-        },
+        // a loaded look keeps only its decoded quads (12 B each); meshes are built the first
+        // time it is shown, and their vertex arrays leave the CPU after upload
+        load: async (it, signal) => ({ decoded: await this.decode(await this.fetchBytes(it.file, signal)), level: it.level, built: null }),
         unload: (it, look) => {
           if (!look) return;
           if (it.region.looks.get(it.level) === look) it.region.looks.delete(it.level);
-          this.group.remove(look.group);
-          for (const p of look.parts) p.mesh.geometry.dispose();
+          if (look.built) {
+            this.group.remove(look.built.group);
+            for (const p of look.built.parts) p.mesh.geometry.dispose();
+          }
           if (it.region.shown === look) it.region.shown = null;
         },
       });
-      sched.onReady = (it) => { it.region.looks.set(it.level, it.payload); it.payload.level = it.level; this.group.add(it.payload.group); it.payload.group.visible = false; };
+      sched.onReady = (it) => { it.region.looks.set(it.level, it.payload); };
       this.schedulers.set(lv.level, sched);
+    }
+  }
+
+  /** Distances at which levels 1, 2 are shown (and loaded, x 1.3); see the constructor. */
+  setShowDist(d) {
+    if (d[0] === this.showDist[0] && d[1] === this.showDist[1]) return;
+    this.showDist = d;
+    for (const [level, s] of this.schedulers) {
+      if (level === this.coarsest) continue;
+      s.setRadius(this.loadRadius(level), this.loadRadius(level) * 1.4);
     }
   }
 
@@ -236,14 +247,20 @@ export class FarRegions {
       for (let l = want + 1; !look && l <= this.coarsest; l++) look = reg.looks.get(l) || null; // coarser fallback
       for (let l = want - 1; !look && l >= 1; l--) look = reg.looks.get(l) || null;
       if (look !== reg.shown) {
-        if (reg.shown) reg.shown.group.visible = false;
+        if (reg.shown?.built) reg.shown.built.group.visible = false;
         reg.shown = look;
         reg.sig = '';
       }
       if (!look) continue;
-      look.group.visible = true;
-      if (coverChanged || !reg.sig) { refreshGroups(look, this.covered); reg.sig = 'ok'; }
-      for (const p of look.parts) if (p.mesh.visible) { tris += p.mesh.userData.triangles; draws += p.mesh.geometry.groups.length; }
+      if (!look.built) {
+        look.built = regionMeshes(look.decoded, this.palette, this.mats, this.index.studM, this.index.plateM);
+        look.decoded = null;
+        this.group.add(look.built.group);
+      }
+      const b = look.built;
+      b.group.visible = true;
+      if (coverChanged || !reg.sig) { refreshGroups(b, this.covered); reg.sig = 'ok'; }
+      for (const p of b.parts) if (p.mesh.visible) { tris += p.mesh.userData.triangles; draws += p.mesh.geometry.groups.length; }
     }
     this.lastStats = { regions: this.regions.size, triangles: tris, groups: draws };
     return this.lastStats;

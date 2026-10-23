@@ -1,31 +1,21 @@
-// Pedestrians: N walkers on the walk graph around the camera, drawn as one InstancedModel of
-// the original blocky character (contract/models/character.json; not a toy minifigure).
-// Each walker gets palette colours (shirt, trousers, skin, hair), a speed, a lateral place on
-// the way and a walk cycle driven by distance (src/mover.js WalkCycle). Walkers that end up
-// far from the camera target are recycled to a busy node near it.
-import { WalkCycle } from '../mover.js';
-import { InstancedModel } from './instancer.js';
+// Pedestrians: people on the walk graph around the camera, drawn as smooth toy figures
+// (src/figure/: one shared FigureCrowd, ~25 draw calls for everyone).
+// A crowd should not look like noise, so people walk in groups (1-4 side by side, the group
+// at its slowest member's pace), at their own pace (kids quick, older people slow), and
+// sometimes stop to chat or look around. Groups that end up far from the camera target are
+// recycled to a busy node near it (spawn weights: walkways.json, boosted by density.js).
+import { MODE } from '../figure/rig.js';
+import { makeVariant } from '../figure/variants.js';
 import { Walker, avoid, rng, turnToward } from './walkgraph.js';
+import { crowdFactor as dayCrowd, FIGURES_BY_TIER } from './density.js';
 
-// character.json colours by role -> palette choices (indices in contract/palette.json)
-const ROLES = {
-  44: [44, 38, 8, 37, 41, 20, 45, 43, 4, 9, 42, 21, 17, 11], // shirt
-  21: [21, 11, 10, 19, 20, 18, 7, 12], // trousers
-  18: [18, 17, 19, 7, 46], // skin (hands, head)
-  7: [7, 11, 43, 10, 8, 19, 30], // hair
-};
-export const WALKERS_BY_TIER = { high: 360, medium: 200, low: 90 };
+export const WALKERS_BY_TIER = FIGURES_BY_TIER;
+/** Share of the crowd out at an hour (weekday curve; density.js has the day-aware one). */
+export const crowdFactor = (hours, day = 2) => Math.min(1, dayCrowd(hours, day));
 
-/** Share of the crowd out on the street at an hour of the day (0..24): busy afternoons, quiet nights. */
-export function crowdFactor(hours) {
-  const h = ((hours % 24) + 24) % 24;
-  const pts = [[0, 0.12], [5, 0.06], [7, 0.3], [9, 0.6], [12, 1], [17, 1], [19, 0.75], [22, 0.35], [24, 0.12]];
-  for (let q = 1; q < pts.length; q++) {
-    const [h0, v0] = pts[q - 1], [h1, v1] = pts[q];
-    if (h <= h1) return v0 + (v1 - v0) * ((h - h0) / (h1 - h0));
-  }
-  return pts[0][1];
-}
+const GROUP_SIZES = [[1, 0.5], [2, 0.34], [3, 0.12], [4, 0.04]];
+const SIDE = 0.62; // metres between people walking side by side
+const STRIDE = 0.78; // metres per step at scale 1
 
 /**
  * Step out of the way of vehicles: a walker inside a vehicle's footprint (+ margin) is moved
@@ -39,6 +29,7 @@ export function clearVehicles(walkers, vehicles, margin = 0.8) {
     const hw = v.halfW + margin, hl = v.halfL + margin;
     for (const w of walkers) {
       const dx = w.x - v.x, dz = w.z - v.z;
+      if (dx * dx + dz * dz > (hl + hw) * (hl + hw)) continue;
       const along = dx * fx + dz * fz, across = dx * fz - dz * fx;
       if (Math.abs(along) > hl || Math.abs(across) > hw) continue;
       const push = (across >= 0 ? hw : -hw) - across;
@@ -49,53 +40,61 @@ export function clearVehicles(walkers, vehicles, margin = 0.8) {
   return moved;
 }
 
+/** Group size from a random number (weights GROUP_SIZES). */
+export function groupSize(u) {
+  for (const [n, p] of GROUP_SIZES) { if (u < p) return n; u -= p; }
+  return 1;
+}
+
 export class Pedestrians {
-  /** graph: WalkGraph. model: character JSON. opts: buildModel opts. ground(x, z) -> y. */
-  constructor({ graph, model, opts, ground, cap = WALKERS_BY_TIER.high, seed = 7 }) {
+  /** graph: WalkGraph. ground(x, z) -> y (Unity metres). cap: most people. */
+  constructor({ graph, ground, cap = FIGURES_BY_TIER.high, seed = 7 }) {
     Object.assign(this, { graph, ground, cap });
     this.rand = rng(seed);
-    this.model = new InstancedModel(model, opts, cap);
-    this.group = this.model.group;
-    this.group.name = 'life:walkers';
-    this.walkers = [];
-    this.count = 0;
+    this.groups = [];
+    this.people = 0; // people in active groups
+    this.count = 0; // = people (old name)
     this.radius = 120;
+    this.nextId = 1;
+    this.t = 0;
   }
 
-  spawn(w, x, z, rMin) {
+  /** (Re)place group g on a node near (x, z), at least rMin away; new people each time. */
+  spawn(g, x, z, rMin) {
     const n = this.graph.spawnNear(x, z, this.radius, this.rand, rMin);
     if (n < 0) return false;
     const r = this.rand;
-    const lateral = (r() - 0.5) * 1.6;
-    const fresh = new Walker(this.graph, n, r, { speed: 0.9 + r() * 0.8, lateral });
-    fresh.baseLateral = lateral;
-    Object.assign(w, { walker: fresh, yaw: null });
-    w.walker.place();
+    const size = g.size || groupSize(r());
+    const members = [];
+    let speed = 9;
+    const family = size >= 3 && r() < 0.4;
+    for (let q = 0; q < size; q++) {
+      const kind = family ? (q < 2 ? 'adult' : 'kid') : undefined; // a family: two adults and kids
+      const v = makeVariant(this.nextId++ * 31 + 7, kind ? { kind } : {});
+      members.push({ v, phase: r() * Math.PI * 2, off: (q - (size - 1) / 2) * SIDE, back: (r() - 0.5) * 0.35, yaw: null, look: 0 });
+      speed = Math.min(speed, v.speed);
+    }
+    const lateral = (r() - 0.5) * 1.4;
+    const walker = new Walker(this.graph, n, r, { speed, lateral });
+    walker.baseLateral = lateral;
+    walker.place();
+    Object.assign(g, { walker, members, size, pause: 0, nextPause: 15 + r() * 60, chat: r() < 0.6 });
     return true;
   }
 
-  colours(slot) {
-    const pick = (a) => a[Math.floor(this.rand() * a.length)];
-    this.model.setColors(slot, Object.fromEntries(Object.entries(ROLES).map(([k, v]) => [k, pick(v)])));
-  }
-
-  /** Number of walkers wanted (quality tier); target: [x, z] Unity metres around which they live. */
+  /** Number of people wanted near target ([x, z] Unity metres). */
   setCount(n, target) {
     n = Math.min(n, this.cap);
-    while (this.walkers.length < n) {
-      const slot = this.walkers.length;
-      const w = { slot, cycle: new WalkCycle(this.fakeParts()), parts: null, walker: null };
-      w.parts = w.cycle.parts;
-      if (!this.spawn(w, target[0], target[1], 0)) break;
-      this.colours(slot);
-      this.walkers.push(w);
+    let people = 0, k = 0;
+    for (; k < this.groups.length && people < n; k++) people += this.groups[k].size;
+    while (people < n) {
+      const g = { size: 0 };
+      if (!this.spawn(g, target[0], target[1], 0)) break;
+      this.groups.push(g);
+      people += g.size; k++;
     }
-    this.count = Math.min(n, this.walkers.length);
-    this.model.setCount(this.count);
-  }
-
-  fakeParts() {
-    return { leg_l: { rotation: { x: 0 } }, leg_r: { rotation: { x: 0 } }, arm_l: { rotation: { x: 0 } }, arm_r: { rotation: { x: 0 } } };
+    this.active = k;
+    this.people = this.count = people;
   }
 
   /**
@@ -104,23 +103,50 @@ export class Pedestrians {
    */
   update(dt, target, radius = this.radius, vehicles = []) {
     this.radius = radius;
-    const active = this.walkers.slice(0, this.count);
-    avoid(active.map((w) => w.walker));
-    for (const w of active) {
-      const k = w.walker;
-      if (Math.hypot(k.x - target[0], k.z - target[1]) > radius * 1.25) {
-        this.spawn(w, target[0], target[1], radius * 0.5);
-        this.colours(w.slot);
+    this.t += dt;
+    this.dt = dt;
+    const active = this.groups.slice(0, this.active ?? 0);
+    avoid(active.map((g) => g.walker));
+    const r = this.rand;
+    for (const g of active) {
+      const k = g.walker;
+      if (Math.hypot(k.x - target[0], k.z - target[1]) > radius * 1.25) this.spawn(g, target[0], target[1], radius * 0.5);
+      if (g.pause > 0) {
+        g.pause -= dt;
+        g.travelled = 0;
+        k.place();
+      } else {
+        g.nextPause -= dt;
+        if (g.nextPause <= 0) { // stop for a chat / to look around, then walk on
+          g.pause = (g.size > 1 && g.chat ? 4 : 2) + r() * 8;
+          g.nextPause = 25 + r() * 70;
+        }
+        g.travelled = k.step(dt);
       }
-      const travelled = w.walker.step(dt);
-      if (vehicles.length) clearVehicles([w.walker], vehicles);
-      w.yaw = turnToward(w.yaw, w.walker.yaw, 540 * Math.max(dt, 1 / 60));
-      w.cycle.update(travelled, dt > 0 ? travelled / dt : 0);
-      const p = w.parts;
-      const y = this.ground(w.walker.x, w.walker.z);
-      this.model.setPose(w.slot, w.walker.x, y, -w.walker.z, (-w.yaw * Math.PI) / 180,
-        { leg_l: p.leg_l.rotation.x, leg_r: p.leg_r.rotation.x, arm_l: p.arm_l.rotation.x, arm_r: p.arm_r.rotation.x });
+      if (vehicles.length) clearVehicles([k], vehicles);
     }
-    this.model.commit();
   }
+
+  /** Add every visible person to the crowd (FigureCrowd). Ground from this.ground. */
+  draw(crowd) {
+    const t = this.t;
+    for (let q = 0; q < (this.active ?? 0); q++) {
+      const g = this.groups[q], k = g.walker;
+      const fx = k.dirX ?? 0, fz = k.dirZ ?? 1; // walking direction (Unity x/z)
+      const rx = fz, rz = -fx; // right
+      const walking = g.pause <= 0;
+      for (const m of g.members) {
+        const x = k.x + rx * m.off - fx * m.back, z = k.z + rz * m.off - fz * m.back;
+        let yaw = k.yaw;
+        if (!walking && g.size > 1 && g.chat) yaw = (k.yaw + (m.off < 0 ? 70 : -70) + 360) % 360; // turn to each other
+        m.yaw = turnToward(m.yaw, yaw, 400 * Math.max(this.dt || 0, 1 / 60));
+        if (walking) m.phase += (g.travelled / (STRIDE * m.v.scale)) * Math.PI;
+        crowd.add(m.v, { x, y: this.ground(x, z), z: -z, rotY: (-m.yaw * Math.PI) / 180,
+          mode: walking ? MODE.WALK : MODE.IDLE, phase: m.phase, speed: walking ? k.speed * k.slow : 0, t: t + m.phase });
+      }
+    }
+  }
+
+  /** Walker positions (for vehicles clearing, tests). */
+  positions() { return this.groups.slice(0, this.active ?? 0).map((g) => g.walker); }
 }
