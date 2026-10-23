@@ -1,5 +1,8 @@
-// Entry point: pick the world (embedded data or the piece gallery), build the brick
-// meshes, stage, camera presets, locomotion demo, picking and the render loop.
+// Entry point. Two modes:
+//   streamed city  build.mjs --site: src/citymode.js (files over HTTP, baked far regions)
+//   diorama        embedded world.js (small worlds, samples, the artifact) or the piece
+//                  gallery: build the brick meshes, stage, presets, demo, picking, render loop
+// Both call initHooks (below) where the life and player tracks plug in.
 //
 // URL hash: #view=hero|map|facade|gallery&t=16.5&tilt=0&ao=0&anim=0&ids=38-47&quality=auto&zoom=0.5
 // (zoom scales the preset's camera distance: < 1 moves in)
@@ -18,6 +21,10 @@ import { pickNearest } from './picking.js';
 import { loadIslands, islandWorldBox, worldToLocalThree } from './island.js';
 import { FACING_NAMES } from './rotation.js';
 import { bindUI, escapeHtml } from './ui.js';
+import { cityFromWorlds } from './city.js';
+import { SolidMap } from './solidmap.js';
+import { cityMain } from './citymode.js';
+import { httpSource } from './source.js';
 
 function parseHash() {
   const p = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -172,6 +179,7 @@ async function main() {
   // so anything slower than 2 s per frame showed "0 fps")
   const meter = new FpsMeter(1000);
   let frames = 0, t = 0, lastStats = 0;
+  const hooks = [];
   if (still) lod.settle(stage.camera); else lod.update(stage.camera, { all: true });
   // a hidden tab gets no frames: do not count the gap as one very slow frame
   document.addEventListener('visibilitychange', () => { meter.last = null; governor.reset(); });
@@ -179,6 +187,7 @@ async function main() {
     const dt = Math.min(clock.getDelta(), 0.1);
     const ms = meter.tick(now);
     controls.update();
+    for (const h of hooks) h.update?.(dt, now);
     lod.update(stage.camera);
     if (animate && !still) {
       t += dt;
@@ -212,21 +221,43 @@ async function main() {
     const url = canvas.toDataURL('image/png');
     return { url, ms: performance.now() - t0 };
   };
-  // [player hook] walk mode (src/player/): wraps stage.render to run each frame before drawing
+  const city = isGallery ? null : cityFromWorlds(world, islands, (w, n) => mats.classOf(w.palette.get(w.color[n])) === 'water', SolidMap);
+  window.__blox.city = city;
   if (!isGallery) {
-    import('./player/index.js').then((m) => m.initPlayer({ stage, camera: stage.camera, controls, city: window.__blox.city || null, // Track S: pass the src/city.js instance here
-      models: data.models, ui, world, islands, lod })).catch((e) => console.error('player', e));
-  }
-  // [life hook] timetable buses, pedestrians, river boats (src/life/)
-  if (!isGallery) {
-    import('./life/index.js').then((m) => m.initLife({ stage, camera: stage.camera, controls,
-      city: () => window.__blox.city || null, models: data.models, ui, world, box, demo,
-      quality: () => tierName, still })).catch((e) => console.error('life', e));
+    initHooks({ stage, camera: stage.camera, controls, city, models: data.models, ui, world, islands, lod, box, demo,
+      quality: () => tierName, still, features: world.features }).then((hs) => { hooks.push(...hs); });
   }
   requestAnimationFrame(frame);
 }
 
-main().catch((err) => {
+/**
+ * Other tracks plug in here (both the diorama and the streamed city call this once):
+ *   src/life/index.js    export initLife(ctx)
+ *   src/player/index.js  export initPlayer(ctx)
+ * ctx = { stage, camera, controls, city, models, ui, world, islands, lod, box, demo, quality,
+ *         still, features } (city: src/city.js API; world/islands/lod/demo are null or empty in
+ *         the streamed city). An init may return { update(dt, now) } to be called every frame
+ *         before drawing. A missing module (build.mjs stubs it) or a failing init only logs.
+ */
+async function initHooks(ctx) {
+  const out = [];
+  // [player hook] walk mode (src/player/): wraps stage.render to run each frame before drawing
+  try { out.push(await (await import('./player/index.js')).initPlayer?.(ctx)); } catch (e) { console.error('player', e); }
+  // [life hook] timetable buses, pedestrians, river boats (src/life/)
+  try { out.push(await (await import('./life/index.js')).initLife?.(ctx)); } catch (e) { console.error('life', e); }
+  return out.filter((h) => h && typeof h === 'object');
+}
+
+/** Streamed site (build.mjs --site sets window.BLOX_SITE) or the embedded diorama. */
+async function boot() {
+  const site = window.BLOX_SITE;
+  const view = new URLSearchParams(location.hash.replace(/^#/, '')).get('view');
+  if (site && view !== 'gallery') return cityMain({ source: httpSource(site.base) }, { initHooks });
+  if (site && !window.BLOX_WORLD) window.BLOX_WORLD = await httpSource(site.base).json('models.json'); // gallery only
+  return main();
+}
+
+boot().catch((err) => {
   console.error(err);
   document.getElementById('info').hidden = false;
   document.getElementById('info').textContent = `Error: ${err.message}`;
