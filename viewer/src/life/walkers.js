@@ -16,6 +16,39 @@ const ROLES = {
 };
 export const WALKERS_BY_TIER = { high: 360, medium: 200, low: 90 };
 
+/** Share of the crowd out on the street at an hour of the day (0..24): busy afternoons, quiet nights. */
+export function crowdFactor(hours) {
+  const h = ((hours % 24) + 24) % 24;
+  const pts = [[0, 0.12], [5, 0.06], [7, 0.3], [9, 0.6], [12, 1], [17, 1], [19, 0.75], [22, 0.35], [24, 0.12]];
+  for (let q = 1; q < pts.length; q++) {
+    const [h0, v0] = pts[q - 1], [h1, v1] = pts[q];
+    if (h <= h1) return v0 + (v1 - v0) * ((h - h0) / (h1 - h0));
+  }
+  return pts[0][1];
+}
+
+/**
+ * Step out of the way of vehicles: a walker inside a vehicle's footprint (+ margin) is moved
+ * sideways to the nearer long side. vehicles: [{ x, z, yaw, halfW, halfL }] (Unity metres).
+ * Returns how many walkers were moved.
+ */
+export function clearVehicles(walkers, vehicles, margin = 0.8) {
+  let moved = 0;
+  for (const v of vehicles) {
+    const r = (v.yaw * Math.PI) / 180, fx = Math.sin(r), fz = Math.cos(r); // forward; right = (fz, -fx)
+    const hw = v.halfW + margin, hl = v.halfL + margin;
+    for (const w of walkers) {
+      const dx = w.x - v.x, dz = w.z - v.z;
+      const along = dx * fx + dz * fz, across = dx * fz - dz * fx;
+      if (Math.abs(along) > hl || Math.abs(across) > hw) continue;
+      const push = (across >= 0 ? hw : -hw) - across;
+      w.x += fz * push; w.z -= fx * push;
+      moved++;
+    }
+  }
+  return moved;
+}
+
 export class Pedestrians {
   /** graph: WalkGraph. model: character JSON. opts: buildModel opts. ground(x, z) -> y. */
   constructor({ graph, model, opts, ground, cap = WALKERS_BY_TIER.high, seed = 7 }) {
@@ -65,8 +98,11 @@ export class Pedestrians {
     return { leg_l: { rotation: { x: 0 } }, leg_r: { rotation: { x: 0 } }, arm_l: { rotation: { x: 0 } }, arm_r: { rotation: { x: 0 } } };
   }
 
-  /** dt: real seconds. target: [x, z] Unity metres (camera focus). radius: living area. */
-  update(dt, target, radius = this.radius) {
+  /**
+   * dt: real seconds. target: [x, z] Unity metres (camera focus). radius: living area.
+   * vehicles: footprints to keep clear (clearVehicles).
+   */
+  update(dt, target, radius = this.radius, vehicles = []) {
     this.radius = radius;
     const active = this.walkers.slice(0, this.count);
     avoid(active.map((w) => w.walker));
@@ -77,6 +113,7 @@ export class Pedestrians {
         this.colours(w.slot);
       }
       const travelled = w.walker.step(dt);
+      if (vehicles.length) clearVehicles([w.walker], vehicles);
       w.yaw = turnToward(w.yaw, w.walker.yaw, 540 * Math.max(dt, 1 / 60));
       w.cycle.update(travelled, dt > 0 ? travelled / dt : 0);
       const p = w.parts;

@@ -104,3 +104,24 @@ test('fallback walkways from the paved cells of a world', () => {
   assert.equal(clipped.nodes.length / 2, 10);
   for (const e of clipped.edges) assert.ok(e < 10);
 });
+
+test('crowd thins out at night', async () => {
+  const { crowdFactor } = await import('../src/life/walkers.js');
+  assert.equal(crowdFactor(14), 1);
+  assert.ok(crowdFactor(3) < 0.15 && crowdFactor(21) < crowdFactor(18));
+  assert.equal(crowdFactor(24 + 14), 1);
+  for (let h = 0; h <= 24; h += 0.5) assert.ok(crowdFactor(h) > 0 && crowdFactor(h) <= 1);
+});
+
+test('walkers step out of a bus footprint to the nearer side', async () => {
+  const { clearVehicles } = await import('../src/life/walkers.js');
+  const bus = { x: 0, z: 0, yaw: 0, halfW: 1.25, halfL: 6 }; // northbound
+  const a = { x: 0.3, z: 2 }, b = { x: -0.5, z: -5 }, c = { x: 4, z: 0 };
+  assert.equal(clearVehicles([a, b, c], [bus]), 2);
+  assert.ok(Math.abs(a.x - 2.05) < 1e-9 && a.z === 2); // pushed east (right side)
+  assert.ok(Math.abs(b.x + 2.05) < 1e-9);
+  assert.equal(c.x, 4);
+  const east = { x: 2, z: 0.5 }; // eastbound bus: sides are north/south
+  clearVehicles([east], [{ ...bus, yaw: 90 }]);
+  assert.ok(Math.abs(east.z - 2.05) < 1e-9 && Math.abs(east.x - 2) < 1e-9);
+});

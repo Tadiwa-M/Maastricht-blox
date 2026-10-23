@@ -118,3 +118,9 @@ def test_reference_week_moves_into_feed(tmp_path: Path) -> None:
     cal.weekly["x"] = ((True,) * 7, dt.date(2026, 11, 2), dt.date(2026, 12, 31))
     week = reference_week(cal, dt.date(2026, 10, 1))
     assert week[0] == dt.date(2026, 11, 2) and sorted(d.weekday() for d in week) == list(range(7))
+
+
+def test_trips_split_over_services_are_merged() -> None:
+    from blox_pipeline.life.transit import merge_trips
+
+    assert merge_trips([(0, 600, 1), (1, 300, 4), (0, 600, 2), (0, 900, 1)]) == [[1, 300, 4], [0, 600, 3], [0, 900, 1]]

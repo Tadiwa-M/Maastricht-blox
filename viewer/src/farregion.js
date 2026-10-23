@@ -19,16 +19,19 @@ import { StreamScheduler, READY } from './stream.js';
 
 // local mesh axes: X = i (east), Y = k (up), Z = j (north; mesh scale z < 0 turns it to -z)
 const AXIS_TO_LOCAL = [0, 2, 1];
-/** Corner order per dir so triangles face outward after the mesh's (+, +, -) scale. */
+/**
+ * Corner order per dir so triangles face outward in LOCAL mesh space (three.js itself flips the
+ * front face for the mirroring (+, +, -) scale, so winding is decided before it).
+ */
 const ORDER = (() => {
   const out = [];
   for (let dir = 0; dir < 6; dir++) {
     const a = dir >> 1, sgn = dir & 1 ? -1 : 1, u = (a + 1) % 3, v = (a + 2) % 3;
-    const corner = (du, dv) => { const g = [0, 0, 0]; g[u] = du; g[v] = dv; return [g[0], g[2], -g[1]]; }; // final three axes
+    const corner = (du, dv) => { const g = [0, 0, 0]; g[u] = du; g[v] = dv; return [g[0], g[2], g[1]]; }; // local mesh axes
     const c = [corner(0, 0), corner(1, 0), corner(1, 1)];
     const e1 = c[1].map((x, q) => x - c[0][q]), e2 = c[2].map((x, q) => x - c[0][q]);
     const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
-    const want = [0, 0, 0]; want[AXIS_TO_LOCAL[a]] = sgn; want[2] = -want[2];
+    const want = [0, 0, 0]; want[AXIS_TO_LOCAL[a]] = sgn;
     out.push(n[0] * want[0] + n[1] * want[1] + n[2] * want[2] > 0 ? [0, 1, 2, 3] : [0, 3, 2, 1]);
   }
   return out;

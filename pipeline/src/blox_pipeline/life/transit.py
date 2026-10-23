@@ -183,6 +183,15 @@ def _project_calls(shape: _Shape, seq: list[tuple[int, int, int, str]], stops: d
     return [(c[1], c[2], d) for c, d in zip(seq, cache[key]) if d is not None]
 
 
+def merge_trips(trips: list[tuple[int, int, int]]) -> list[list[int]]:
+    """One row per (pattern, start) with the day masks OR-ed (feeds often split one timetable
+    over several services, e.g. one per date set), sorted by start time."""
+    merged: dict[tuple[int, int], int] = {}
+    for p, start, mask in trips:
+        merged[(p, start)] = merged.get((p, start), 0) | mask
+    return [[p, start, mask] for (p, start), mask in sorted(merged.items(), key=lambda kv: (kv[0][1], kv[0][0]))]
+
+
 def _assemble(routes: dict, trips: dict, shapes: dict[str, _Shape], calls: dict, stops: dict,
               week: list[dt.date]) -> dict:
     patterns: dict[tuple, int] = {}
@@ -227,5 +236,5 @@ def _assemble(routes: dict, trips: dict, shapes: dict[str, _Shape], calls: dict,
         "shapes": shapes_doc,
         "patterns": [{"shape": shape_idx[k[0]], "route": route_idx[k[1]], "head": k[2], "st": list(k[3])}
                      for k in patterns],
-        "trips": sorted([list(t) for t in raw_trips], key=lambda t: (t[1], t[0])),
+        "trips": merge_trips(raw_trips),
     }
