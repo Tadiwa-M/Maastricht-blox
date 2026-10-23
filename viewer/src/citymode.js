@@ -317,7 +317,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     const zoomed = THREE.MathUtils.clamp(dist, 10, 4000);
     // the baseplate beyond the city fades into the horizon haze, the city itself stays clear
     stage.scene.fog.near = zoomed * 0.6 + 300;
-    stage.scene.fog.far = zoomed + cityRadius * 1.25;
+    stage.scene.fog.far = Math.max(stage.scene.fog.near + 900, zoomed + cityRadius * 1.25);
     const sr = THREE.MathUtils.clamp(dist * 1.1, 45, 1600);
     shadowBox.min.set(t.x - sr, t.y - 10, t.z - sr); shadowBox.max.set(t.x + sr, t.y + Math.min(140, sr), t.z + sr);
     stage.setShadowFocus(shadowBox);

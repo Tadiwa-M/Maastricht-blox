@@ -11,7 +11,7 @@ import { LifeClock, zonedWeekTime, parseDay } from './clock.js';
 import { Timetable } from './schedule.js';
 import { WalkGraph } from './walkgraph.js';
 import { TimetableBuses } from './buses.js';
-import { Pedestrians, WALKERS_BY_TIER } from './walkers.js';
+import { Pedestrians, WALKERS_BY_TIER, crowdFactor } from './walkers.js';
 import { Boats } from './boats.js';
 import { makeGround, cityOf } from './ground.js';
 import { loadLifeData } from './data.js';
@@ -126,13 +126,16 @@ export async function initLife(ctx) {
     return Math.max(50, Math.min(220, h * 1.1));
   };
   let night = -1, statT = 0;
+  const busHalf = [models.bus.size[0] * world.studM / 2, models.bus.size[1] * world.studM / 2];
   function step(dt) {
     if (stage.night !== undefined && stage.night !== night) { night = stage.night; mats.setNight(night); }
     clock.advance(dt);
-    if (state.buses) state.buses.update(clock, camera);
+    const buses = state.buses ? state.buses.update(clock, camera) : [];
     if (state.walkers) {
-      state.walkers.setCount(WALKERS_BY_TIER[tier()] ?? WALKERS_BY_TIER.medium, target());
-      state.walkers.update(dt, target(), livingRadius());
+      const max = WALKERS_BY_TIER[tier()] ?? WALKERS_BY_TIER.medium;
+      state.walkers.setCount(Math.round(max * crowdFactor(clock.hours)), target());
+      const vehicles = buses.map((b) => ({ x: b.x, z: b.z, yaw: b.yaw, halfW: busHalf[0], halfL: busHalf[1] }));
+      state.walkers.update(dt, target(), livingRadius(), vehicles);
     }
     if (state.boats) state.boats.update(dt);
     ui.update();

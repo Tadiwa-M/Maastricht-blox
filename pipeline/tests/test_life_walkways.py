@@ -42,6 +42,9 @@ def test_tag_rules() -> None:
     assert sidewalk_sides({"sidewalk": "both"}) == [1, -1]
     assert sidewalk_sides({"sidewalk": "separate"}) == []
     assert sidewalk_sides({"sidewalk:right": "yes"}) == [-1]
+    assert sidewalk_sides({"highway": "residential"}) == [1, -1]  # untagged urban street: assumed
+    assert sidewalk_sides({"highway": "residential", "sidewalk": "no"}) == []
+    assert sidewalk_sides({"highway": "motorway"}) == []
     assert is_walk_area({"place": "square"}) and not is_walk_area({"amenity": "parking", "place": "square"})
 
 

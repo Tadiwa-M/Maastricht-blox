@@ -62,8 +62,16 @@ def way_kind(tags: dict[str, str]) -> str | None:
     return None
 
 
+ASSUMED_SIDEWALKS = {"primary", "secondary", "tertiary", "residential", "unclassified"}
+ASSUMED_FACTOR = 0.6  # weight of a sidewalk that is assumed, not tagged
+
+
 def sidewalk_sides(tags: dict[str, str]) -> list[int]:
-    """+1 = left, -1 = right of the way's direction, from ``sidewalk*`` tags."""
+    """+1 = left, -1 = right of the way's direction, from ``sidewalk*`` tags. Urban roads
+    without any sidewalk tag are assumed to have both (most Dutch streets are untagged);
+    ``no``/``none``/``separate`` (drawn as its own footway) give none."""
+    if not any(k.startswith("sidewalk") for k in tags):
+        return [1, -1] if tags.get("highway") in ASSUMED_SIDEWALKS else []
     v = tags.get("sidewalk", "")
     sides = {"both": [1, -1], "yes": [1, -1], "left": [1], "right": [-1]}.get(v, [])
     for key, s in (("sidewalk:left", 1), ("sidewalk:right", -1)):
@@ -245,11 +253,13 @@ def build_walkways(osm: OsmData, box: RDBox, min_component: int = 3) -> dict:
         sides = sidewalk_sides(f.tags) if not kind else []
         if sides:
             off = _width(f.tags, f.tags.get("highway", "")) / 2 + 1.0
+            tagged = any(k.startswith("sidewalk") for k in f.tags)
+            w = KIND_WEIGHT["sidewalk"] * (1.0 if tagged else ASSUMED_FACTOR)
             for line in _lines(f.geom):
                 for side in sides:
                     sw = shapely.offset_curve(line, side * off, join_style="round")
                     for part in _lines(sw.intersection(clip)):
-                        g.add_line(np.asarray(part.coords)[:, :2], KIND_WEIGHT["sidewalk"])
+                        g.add_line(np.asarray(part.coords)[:, :2], w)
     areas = 0
     for f in osm.road_areas:
         if not is_walk_area(f.tags):
