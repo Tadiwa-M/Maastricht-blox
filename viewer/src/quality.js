@@ -10,10 +10,17 @@
 // 'auto' starts at high for a single-chunk world and medium for anything bigger, then steps
 // down while the measured frame time stays high. It never steps back up by itself (that
 // oscillates on machines right at the edge); pick 'high' in the HUD to force it.
+//
+// City mode (streamed site build) adds: streamRadius (m: chunks/islands within it are loaded
+// in the mid look), farDist ([m, m]: baked far level 1 within the first, level 2 within the
+// second, level 3 beyond) and aoDist (m: AO only when the orbit target is closer).
 export const TIERS = Object.freeze({
-  high: { name: 'high', nearDetail: 'full', pixelRatio: 2, ao: 'full', bloom: 'always', shadowMap: 4096, nearDist: 70, maxNear: 9, studCap: 80000 },
-  medium: { name: 'medium', nearDetail: 'lite', pixelRatio: 1, ao: 'half', bloom: 'night', shadowMap: 2048, nearDist: 40, maxNear: 3, studCap: 20000 },
-  low: { name: 'low', nearDetail: 'lite', pixelRatio: 1, ao: 'off', bloom: 'night', shadowMap: 2048, nearDist: 22, maxNear: 2, studCap: 8000 },
+  high: { name: 'high', nearDetail: 'full', pixelRatio: 2, ao: 'full', bloom: 'always', shadowMap: 4096, nearDist: 70, maxNear: 9, studCap: 80000,
+    streamRadius: 300, farDist: [380, 1200], aoDist: 400 },
+  medium: { name: 'medium', nearDetail: 'lite', pixelRatio: 1, ao: 'half', bloom: 'night', shadowMap: 2048, nearDist: 40, maxNear: 3, studCap: 20000,
+    streamRadius: 200, farDist: [280, 900], aoDist: 250 },
+  low: { name: 'low', nearDetail: 'lite', pixelRatio: 1, ao: 'off', bloom: 'night', shadowMap: 2048, nearDist: 22, maxNear: 2, studCap: 8000,
+    streamRadius: 130, farDist: [200, 650], aoDist: 0 },
 });
 export const MODES = ['auto', 'high', 'medium', 'low'];
 const ORDER = ['high', 'medium', 'low'];
