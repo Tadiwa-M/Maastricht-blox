@@ -70,12 +70,21 @@ def strip_ground(tile: VoxelTile, L: Layers) -> None:
     tile.color[tile.feature == 0] = 0
     tile.shape[tile.color == 0] = 0
     g, t = L.ground_k.astype(np.int64), L.bld_top.astype(np.int64)
+    # Facade pieces (doors, steps) can sit at or below the local ground on sloping streets;
+    # the plinth must go around them, never into them (CONTRACT 7: placed cells stay air).
+    taken = np.zeros(tile.dims, bool)
+    if tile.placed is not None and len(tile.placed):
+        from ..catalogue import load_catalogue
+        from ..layout.placed import as_records, occupancy
+        cnt, _ = occupancy(as_records(tile.placed), tile.dims, tile.I0, tile.J0, tile.k0, load_catalogue())
+        taken = cnt > 0
     ii, jj = np.nonzero((t != NONE) & (g != NONE) & (t > g) & (L.bld_feat > 0))
     ni, nj, nk = tile.dims
     for d in range(PLINTH_BELOW):
         k = g[ii, jj] - d - tile.k0
         first = g[ii, jj] + 1 - tile.k0
         ok = (k >= 0) & (k < nk) & (first < nk)
+        ok[ok] &= ~taken[ii[ok], jj[ok], k[ok]]
         a, b, kk, ff = ii[ok], jj[ok], k[ok], first[ok]
         col = tile.color[a, b, ff]
         col = np.where(col != 0, col, L.bld_wall[a, b])
