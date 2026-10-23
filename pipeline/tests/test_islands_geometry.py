@@ -126,3 +126,33 @@ def test_slowly_curving_street_does_not_chain_into_one_island():
         yaws = [footprint_yaw(b.footprint)[0] for b in g.members]
         assert max(yaw_diff(p, q) for p in yaws for q in yaws) <= 3.0 + 1e-9
     assert len(groups) >= 2
+
+
+def test_plinth_never_overwrites_placed_pieces() -> None:
+    """Regression (real Maastricht build): on sloping ground a door piece sat where the plinth
+    goes, and layout rejected the tile ("placed cells are not air")."""
+    import numpy as np
+
+    from blox_pipeline.islands.build import strip_ground
+    from blox_pipeline.layout.placed import make_placed
+    from blox_pipeline.voxelise.grid import VoxelTile
+    from blox_pipeline.voxelise.layers import Layers
+    from blox_pipeline.geo import CellBox
+
+    box = CellBox(0, 0, 4, 4)
+    L = Layers.empty(box)
+    L.ground_k[:] = 5
+    L.bld_top[:] = 20
+    L.bld_feat[:] = 7
+    L.bld_wall[:] = 3
+    tile = VoxelTile.empty(0, 0, 0, 4, 4, 30)
+    tile.color[:, :, 6:20] = 3
+    tile.feature[:, :, 6:20] = 7
+    from blox_pipeline.catalogue import load_catalogue
+
+    tile.color[1:3, 1, 5:17] = 0                     # the door's cells, starting in the plinth layer
+    tile.feature[1:3, 1, 5:17] = 0
+    tile.placed = make_placed(load_catalogue(), "door_1x2x4", 1, 1, 5, "S", 3, 7)
+    strip_ground(tile, L)
+    assert tile.color[1, 1, 5] == 0 and tile.color[2, 1, 5] == 0   # door cells stay air
+    assert tile.color[0, 0, 5] == 3 and tile.color[0, 0, 4] == 3   # plinth elsewhere
