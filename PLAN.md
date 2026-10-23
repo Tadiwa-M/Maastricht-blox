@@ -23,7 +23,8 @@ A brick-built, game-quality miniature of Maastricht for PC.
 |---|---|---|
 | Data pipeline | Python 3.11+, uv, numpy/numba, shapely, rasterio, laspy, pyosmium, pyproj | in use |
 | Live data | FastAPI proxy, httpx, gtfs-realtime-bindings | in use (fixtures only) |
-| Game | Unity 6 LTS, URP 17, Burst/Collections/Mathematics, Input System | code written, not yet compiled |
+| Game (launch) | three.js web engine (`viewer/`), Gamepad API, static hosting | phase 2 |
+| Game (later) | Unity 6 LTS, URP 17, Burst/Collections/Mathematics, Input System | parked after launch; code in repo |
 | Fast preview | three.js viewer, esbuild, Playwright + headless Chromium | in use |
 | Engine-free C# tests | .NET 8 SDK, xUnit | in use |
 | Hero assets (later) | Blender, MagicaVoxel → pipeline importer | phase 3 |
@@ -38,25 +39,32 @@ A brick-built, game-quality miniature of Maastricht for PC.
 Each phase ends with a **quality gate**: `scripts/check.sh` green, screenshots reviewed, docs
 and DEVLOG updated, and everything pushed.
 
-### Phase 1: Foundation & look (current)
-Contract-first data formats; a pipeline that outputs chunks; a viewer that shows the look;
-facade grammar with custom pieces; movers (bus, boat, character); Unity code skeleton;
-docs.
-**Exit:** the look-test chunk looks like a detailed modular street in the viewer, all
-three languages pass the shared rotation vectors, and the docs explain every subsystem.
+### Phase 1: Foundation & look: done
+Contract-first data formats, pipeline, facade grammar with detail pieces, rotated building
+islands, movers, viewer with LOD, real 2×2 km Maastricht built (4096 chunks, 2448 islands),
+docs. Unity code is written but parked (see the decision below).
 
-### Phase 2: Real Maastricht in Unity
-Fetch real data on the PC; build the 2×2 km slice; compile and tune Unity until it matches
-the viewer; HLOD and chunk LOD at 60 fps / 1080p; Google Maps camera, building info and
-search; proxy against live OVapi, Buienradar and RWS; live buses, weather, time of day and
-water level; the first hero landmark (Sint-Janstoren).
-**Exit:** you can fly over the real centre at 60 fps with live buses moving smoothly.
+**Decision (2026-10-23): launch in the browser, not as a Unity download.** A LinkedIn audience
+clicks a link; it doesn't install an .exe. The three.js engine already renders real Maastricht
+with islands, LOD and movers, and it runs on phones too. Unity is parked until after launch (a
+later high-end desktop/AR version), and its code stays in the repo and in CI.
 
-### Phase 3: Play & launch
-Walk mode with the original character, photo mode, collectibles (only if time allows),
-polish, a Windows build, the demo video and the LinkedIn post. Cut order if time runs out:
-planes → collectibles → extra landmarks. Never cut visual quality or the character.
-**Exit:** a shipped build, a video and a post.
+### Phase 2: Playable web city (current)
+Three parallel tracks plus hosting:
+1. **Whole-city streaming:** the world is served as files and loaded around the camera.
+   Pre-baked far meshes keep the whole 2×2 km visible.
+2. **Life:** buses on real routes driven by the published GTFS timetable (no server needed),
+   pedestrians walking OSM footways and squares, boats on the Maas.
+3. **Player:** drop into third-person walk mode anywhere; keyboard, gamepad (Gamepad API)
+   and touch; collision with bricks and islands.
+4. **Hosting:** a static site (GitHub Pages or similar) built by one script.
+**Exit:** a link opens Maastricht in the browser at 30+ fps on a laptop, with buses and people
+moving, and you can walk the Markt with a controller.
+
+### Phase 3: Launch & after
+Polish, the demo video (captured from the web build), the LinkedIn post. Then: live GPS buses
+through a hosted proxy, weather, controller polish, the Unity desktop/AR version.
+**Exit:** a public link, a video and a post.
 
 ## 4. Process (how we work)
 
