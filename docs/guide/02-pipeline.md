@@ -77,6 +77,16 @@ fails when it is stale: regenerate with `BLOX_REGEN_FIXTURES=1 uv run pytest tes
 Cost: ~60 ms per island building. Full story: [guide 04](04-facades-and-pieces.md#rotated-buildings-islands-contract-51-pipelinesrcblox_pipelineislands);
 file format: [guide 03](03-chunk-format.md).
 
+### Buildings without 3D BAG (`sources/osm_buildings.py`)
+3D BAG is the primary building source. When it is down, or some blocks were never fetched,
+`load_all` fills the gaps: every OSM `building=*` footprint that no 3D BAG building covers
+(at least 30% overlap) becomes a synthetic building. Ground comes from the DTM median. The
+roof is a gable along the footprint's long axis (ridge at the DSM 90th percentile, eaves at the
+25th) when the rise is at least 1.5 m and the width is 3-18 m; otherwise it is flat. Ids are
+`osm-way/<id>`, there is no year, and the facade grammar and islands work unchanged.
+`blox fetch` keeps going after a failed source and lists the failures at the end, so OSM
+still downloads while 3D BAG is unreachable.
+
 ### Terrain smoothing (`voxelise/terrain_smooth.py`)
 
 Before anything is quantised, the AHN ground model gets a NaN-aware blur

@@ -700,3 +700,24 @@ it to feel like an open world environment."
   MapControls) gets them too.
 - Rotation smoothing (0.05 s) is light on purpose; if anyone wants raw, unsmoothed mouse look,
   add a "smoothing" slider.
+
+## 2026-10-24: buildings survive a 3D BAG outage
+
+The city fetch on the workstation stopped at 3D BAG: `api.3dbag.nl` timed out, and the whole
+`3dbag.nl` domain (site and docs) did not resolve from an independent network either, so this
+was an outage on their side. Because `fetch_all` stopped at the first failure, OSM was never
+fetched either.
+- `fetch_all` now runs every requested source and raises one `DownloadError` listing the
+  failures at the end.
+- New `sources/osm_buildings.py`: OSM footprints plus AHN DTM/DSM give synthetic buildings
+  (gabled or flat) wherever 3D BAG has no building. `load_all` uses them, and also when no 3D
+  BAG data is cached at all.
+- Verified on the town fixture with the 3D BAG tile hidden and its roofs burned into the DSM:
+  9/9 buildings, 2 islands, 100% facade runs, and the gables look right (screenshot reviewed).
+- Tests: `test_sources_osm_buildings.py` (gable axis, flat roof, covered footprints skipped,
+  fetch continues past a failure).
+
+**Open decisions**
+- Fallback houses have no construction year, so they get the default colour mix. If 3D BAG
+  comes back before launch, refetch (`blox --slice city fetch --only bag3d`) and rebuild for
+  the real roofs.
