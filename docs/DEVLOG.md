@@ -601,3 +601,64 @@ parked bikes under the trees, delivery vans on the square, umbrellas in the rain
 - The synthetic sample's roads cross the Markt (picked on the top map); real OSM keeps cars off
   pedestrian squares. Not yet run on a real `blox life` export (data hosts blocked here).
 - Bus model is still the brick bus (contract model); only its colour changed.
+
+## 2026-10-24: Look v2: the old centre from the owner's Markt photos (track: look)
+
+The owner's photos of the Markt (notes in `docs/reference/markt.md`; photos stay out of the repo)
+showed a different city than our heuristics drew: blue-grey limestone and grey/white/cream
+plaster under dark slate, tall many-paned white windows, iron balconies, white panelled doors,
+dark wet cobbles, plane and chestnut trees, and the Stadhuis. What changed:
+
+- **Contract (append-only, no `contractVersion` bump)**: palette v3 adds idx 47-53 `limestone`,
+  `limestone_dark`, `plaster_white`, `plaster_cream`, `plaster_grey`, `cobble_dark`, `lead_grey`
+  (slate a touch bluer); catalogue v3 adds ids 48-56 `window_1x2x4`, `shop_window_1x2x4`,
+  `balcony_2x4`, `railing_1x2`, `pediment_1x4`, `lamp_double_1x3`, `bollard_1x1`, `chain_1x4`,
+  `vent_1x2` (CONTRACT 2.1). They **reuse existing kinds** so Unity's catalogue parser still
+  loads them; the viewer picks their geometry by name (`viewer/src/details-look.js`, far
+  templates in `farmesh.js`). Unity's mesher draws them as the generic shape of their kind
+  until it learns them (Unity is parked). `dotnet` catalogue count test 47 -> 56.
+- **Old centre** (`voxelise/colours.py`): within 700 m of the Markt or the Vrijthof, or built
+  before 1900: limestone/plaster walls (one in twelve dark red brick, no ochre), slate roofs
+  (5 in 6). Elsewhere the era variety stays. Centre streets and squares are `cobble_dark` setts
+  in four tones; a dark stone **kerb** (0.6 m, `limestone_dark`) runs outside every car road.
+- **Facade grammar** (`facade/`): new `FacadeRun` fields (default off, so v2 houses are
+  unchanged): `stone` dressings, `door` colour, tall `window_1x2x4`, stone shop fronts with
+  `shop_window_1x2x4` between proud stone piers, flush stone jambs (only where >= 3 studs of
+  wall remain), pediments over first-floor windows, wrought-iron `balcony_2x4` before a french
+  window, `railing_1x2` french windows, cellar `vent_1x2` in the plinth, `pier` spacing. The
+  old-centre style (`facade_style._centre_style`) turns them on for real buildings, plus white
+  **dormers and a chimney on real pitched roofs** that fall toward the street
+  (`facade_runs.roof_details`, painted in `facade_paint.dormer`).
+- **Trees** (`voxelise/trees.py`): plane/chestnut style: a bare one-stud trunk of >= 4 m,
+  branch stubs, a large crown of 4-6 overlapping blobs with paler autumn leaves; default
+  height 8-15 m, crown up to 5.5 m (`TREE_MARGIN` 14).
+- **Street props** (`voxelise/street_props.py`): double-lantern lamps along squares and
+  pedestrian streets, bollard-chain-bollard groups along centre car streets, stone benches on
+  squares; planned once per world from OSM, kept clear of buildings/islands/water/trees/decks,
+  flat ground, never across a chunk border.
+- **Stadhuis hero** (`facade/stadhuis.py`, `voxelise/heroes.py`, `Landmark.model`): the
+  landmark match (BAG id, OSM `wikidata`, name "Stadhuis", or the Markt point; within 150 m of
+  it) replaces the 3D BAG shape by a hand-authored model on its footprint: banded grey
+  limestone, giant pilasters, cornices, the risalit with a 3-arch arcade on piers (balustrades
+  in the arches), the double stair with stepped parapets, the full-width balustraded balcony,
+  an attic storey with window pediments, a pediment with a carved relief and corner
+  cartouches, side pediments, iron railings with gilt tips and gate piers, a hipped slate
+  roof with lead hips, and the lead-grey tower (square base with a dormer, oculi row, tall
+  arched windows, clock stage with gold dials, gallery with balustrade and flags, open belfry
+  with bells, bell-shaped dome, lantern, gilded orb and vane). On the grid or as an island
+  (CONTRACT 5.1) as its footprint dictates; the front faces the side with most square.
+- **Look test** (`testscene`): now two chunks; chunk 23,47 is a photo-like Markt row (5
+  houses, every new piece, plane trees, lamps, bollards, benches). New synthetic
+  `pipeline/tests/markt_fixture.py` (Stadhuis + square + terraces + tree row + streets) runs
+  the real data path; `test_look_v2.py` covers it (also the Stadhuis as an island at 12°).
+- Committed `tests/fixtures/town_world` regenerated (`BLOX_REGEN_FIXTURES=1`): new palette and
+  catalogue copies, old-centre facades.
+- Screenshots: `build/shots/look_v2/` (before/after pairs, Stadhuis front/SW/tower, gallery).
+
+**Open decisions**
+- Unity: add the 9 pieces to `DetailMesher` (now the generic shape of their kind).
+- Real data not rebuilt here (data hosts blocked): the owner must rebuild the city
+  (`blox build`) to see it; the Stadhuis match there is by name/point (no BAG id or wikidata
+  id set yet: add them to `landmarks.py` once checked on the real data).
+- Lamps' glass does not glow at night (glow is for window/door kinds only).
+- Bench and chain heights are fixed; street props on slopes > 1 plate are skipped.

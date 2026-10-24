@@ -102,6 +102,21 @@ counts as occupied for stud-exposure tests. Geometry every renderer must reprodu
 | 45 | `jumper_1x2` | `jumper` | 2×1×1 | plate with a single stud centred on the footprint (`studs: center`) |
 | 46 | `slope30_1x2` | `slope` | 1×2×2 | shallow slope, no studs (`studRows: 0`); front lip 0.05 m |
 | 47 | `grille_1x2` | `tile_grille` | 2×1×1 | tile with 3 grooves along `w` on top |
+| 48 | `window_1x2x4` | `window` | 2×1×12 | tall sash window: frame, meeting stiles, transom at 0.78 H; each sash 2×3 panes (glazing bars), small-pane top lights; `glass` panes 0.1 m back |
+| 49 | `shop_window_1x2x4` | `window` | 2×1×12 | shop window: frame, mullion, heavy transom at 0.72 H; lower lights 1×3, upper lights with a round-headed arch and raised "lettering" blocks (record colour) |
+| 50 | `balcony_2x4` | `fence` | 4×2×5 | wrought-iron balcony: iron floor plate, ornate front (rings, rosettes, scrolls, bars between rails), vase posts at the front corners, side returns to the back face (the wall) |
+| 51 | `railing_1x2` | `fence` | 2×1×4 | french-window railing: rails and plain bars near the front, short returns to the back |
+| 52 | `pediment_1x4` | `arch` | 4×1×2 | classical pediment: cornice slab, recessed triangle, raking cornices |
+| 53 | `lamp_double_1x3` | `fence` | 3×1×22 | cast-iron lamp post: base, post, scrolled cross arm along `w`, two lanterns (`glass` part), finial |
+| 54 | `bollard_1x1` | `fence` | 1×1×5 | cast-iron bollard: flared foot, faceted shaft, collar with chain eyes along `w`, ball top |
+| 55 | `chain_1x4` | `fence` | 4×1×3 | chain hanging along `w` between bollards one stud beyond each end (links reach ~0.17 m past the box) |
+| 56 | `vent_1x2` | `tile_grille` | 2×1×2 | cellar vent: frame round a recess of vertical bars, front at +j |
+
+**Look-v2 pieces (ids 48-56, catalogue v3, 2026-10-24)** were appended without a
+`contractVersion` bump: they **reuse existing kinds**, so every reader still parses the
+catalogue, and a renderer that does not know a piece by name draws the generic shape of its
+kind. The viewer draws all of them (`viewer/src/details-look.js`); **Unity's mesher does not
+draw the new pieces yet** (it uses the generic shape of their kind; Unity is parked).
 
 `window`/`door` panes always render with the `glass` material (night glow included); the
 record colour is the frame.
@@ -114,7 +129,9 @@ Up to 64 entries, `idx` uint8 (0 = air/none). Each: `name`, `srgb` hex, `materia
 Hand-curated; data is **quantised to the palette**, never stored as raw colours.
 Entries are **append-only**: existing indices never change meaning, so appending colours
 bumps the palette file's `version` but not `contractVersion` (palette v2 added idx 41–46
-for facade detail).
+for facade detail; palette v3, look v2 from the owner's Markt photos, added idx 47–53
+`limestone`, `limestone_dark`, `plaster_white`, `plaster_cream`, `plaster_grey`,
+`cobble_dark`, `lead_grey` and nudged `slate` a touch bluer).
 
 ## 4. Chunk file: `chunks/c_{cx:02d}_{cy:02d}.bxc`
 

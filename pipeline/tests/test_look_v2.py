@@ -216,7 +216,7 @@ def test_stadhuis_is_matched_and_replaced_by_the_model(markt_world):
             top = max(top, int((own["K"] + np.array([CAT[int(x)].h for x in own["type"]])).max()))
     assert names["window_1x2x4"] >= 40 and names["window_1x2x2"] >= 40 and names["vent_1x2"] >= 10
     assert names["arch_1x6"] + 0 >= 1 and names["fence_1x4"] >= 4 and names["door_1x2x4"] >= 1
-    assert top >= h.top_k - 2 and h.top_k == h.base + model_height(h.w, h.d)
+    assert top == h.top_k and h.top_k == h.base + model_height(h.w, h.d)
     gold = palette.idx("gold")
     assert any(((t.color == gold) & (t.feature == h.fid)).any() for t, _ in tiles.values())  # clock + vane
 
