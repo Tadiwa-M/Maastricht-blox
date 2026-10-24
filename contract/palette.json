@@ -1,5 +1,6 @@
 {
- "version": 2,
+ "version": 3,
+ "note": "idx are stable and append-only. v3 (2026-10-24, look v2 from the owner's Markt photos): idx 47-53 limestone, limestone_dark, plaster_white, plaster_cream, plaster_grey, cobble_dark, lead_grey; slate shifted a touch bluer (#4E5864 -> #46546A).",
  "entries": [
   {
    "idx": 0,
@@ -76,7 +77,7 @@
   {
    "idx": 12,
    "name": "slate",
-   "srgb": "#4E5864",
+   "srgb": "#46546A",
    "material": "solid"
   },
   {
@@ -281,6 +282,48 @@
    "idx": 46,
    "name": "sand_red",
    "srgb": "#B5776A",
+   "material": "solid"
+  },
+  {
+   "idx": 47,
+   "name": "limestone",
+   "srgb": "#8E9294",
+   "material": "solid"
+  },
+  {
+   "idx": 48,
+   "name": "limestone_dark",
+   "srgb": "#6F7477",
+   "material": "solid"
+  },
+  {
+   "idx": 49,
+   "name": "plaster_white",
+   "srgb": "#E8E5DD",
+   "material": "solid"
+  },
+  {
+   "idx": 50,
+   "name": "plaster_cream",
+   "srgb": "#E2D5B4",
+   "material": "solid"
+  },
+  {
+   "idx": 51,
+   "name": "plaster_grey",
+   "srgb": "#B9B7B0",
+   "material": "solid"
+  },
+  {
+   "idx": 52,
+   "name": "cobble_dark",
+   "srgb": "#4E4943",
+   "material": "solid"
+  },
+  {
+   "idx": 53,
+   "name": "lead_grey",
+   "srgb": "#6A7480",
    "material": "solid"
   }
  ]
