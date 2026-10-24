@@ -3,6 +3,7 @@
 #   .\scripts\site.ps1                                  # build\world -> build\site
 #   .\scripts\site.ps1 samples\markt_v3 build\site_markt -Serve
 #   .\scripts\site.ps1 -Serve -Port 8080
+# Serving binds to 127.0.0.1 only: no Windows firewall prompt (no admin needed), not reachable from other machines.
 # Then serve the output folder with any static file server (it streams files over HTTP; file:// won't do).
 param([string]$World = '', [string]$Out = '', [switch]$Serve, [int]$Port = 8000)
 $ErrorActionPreference = 'Stop'
@@ -26,7 +27,7 @@ Write-Host "site size: $mb MB"
 Write-Host @"
 
 Serve it locally (any static server works):
-  python -m http.server $Port --directory "$Out"     then open http://localhost:$Port/
+  python -m http.server $Port --bind 127.0.0.1 --directory "$Out"     then open http://localhost:$Port/
   (or: .\scripts\site.ps1 "$World" "$Out" -Serve -Port $Port)
 
 Publish (static hosting, no server code):
@@ -40,5 +41,5 @@ Publish (static hosting, no server code):
 "@
 if ($Serve) {
     Write-Host "serving $Out at http://localhost:$Port/ (Ctrl+C stops)"
-    python -m http.server $Port --directory $Out
+    python -m http.server $Port --bind 127.0.0.1 --directory $Out
 }
