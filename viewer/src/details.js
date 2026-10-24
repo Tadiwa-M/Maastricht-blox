@@ -1,4 +1,5 @@
-// Geometry for the v2 detail pieces (CONTRACT section 2.1, ids 38+).
+// Geometry for the v2 detail pieces (CONTRACT section 2.1, ids 38+; the look-v2 pieces 48-56 are
+// built in src/details-look.js and picked by name).
 //
 // Same local frame as every piece (src/shapes.js): centred footprint, +x = +i, y up,
 // FRONT toward -z (= +j at rot 0). Each builder returns { body, glass? }: `body` uses the

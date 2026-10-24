@@ -374,7 +374,7 @@ TOWER = (("base", 11, 12), ("oculi", 9.5, 6), ("windows", 9.5, 28), ("trim", 9.5
 
 
 def tower_height() -> int:
-    return sum(h for _, _, h in TOWER) + 3  # + the gallery parapet over the next stage's foot
+    return sum(h for _, _, h in TOWER)  # the gallery parapet stands within the belfry's foot
 
 
 def tower(p: Painter, cx: int, cy: int, k: int, fid: int) -> int:

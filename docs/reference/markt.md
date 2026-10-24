@@ -29,3 +29,16 @@ The photos stay out of the repo (they show passers-by); these notes are what we 
   staircase, balustrade balcony, a pediment with carved relief, hipped dark roof.
 - Octagonal **bell tower** on the roof: lead-grey, open arcaded stages, a gold clock face, a small
   dome and lantern with a weather vane.
+
+**Stadhuis, close photo (2026-10-24)**: not a bland block. Grey limestone with darker stone
+courses and quoins, giant pilasters between the bays, strong cornices at the first floor and
+the eaves; a central risalit rising an attic storey above the wings with a triangular pediment
+holding a carved (yellowish) relief and carved ornaments on its upper corners; pediments on
+the side fronts too. Ground floor centre: three tall round arches on piers (a loggia) reached
+by a double external stair with stone balustrades; above it a full-width balustraded balcony.
+Tall white windows (2 x 3 small panes) in stone surrounds, small cellar windows. Wrought-iron
+railings with ornate gates at the front, lamp posts. Large hipped dark slate roof with lead
+ridges, a dormer on the tower's base. Tower in lead/blue-grey: square base, an octagonal stage
+with tall arched windows above a row of oval oculi, the clock stage with gold dials and small
+round windows, a projecting balustraded gallery with flags, the open belfry (bells visible), a
+bell-shaped dome, a small lantern, a gilded orb and a weathervane.

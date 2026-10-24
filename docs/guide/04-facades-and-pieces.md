@@ -1,6 +1,7 @@
 # 04: Facades and detail pieces
 
-Spec: CONTRACT 2.1 (pieces 38-47) and CONTRACT 7 ("Placed pieces").
+Spec: CONTRACT 2.1 (pieces 38-56) and CONTRACT 7 ("Placed pieces"). Look v2 (the owner's
+Markt photos, `docs/reference/markt.md`): see [Look v2](#look-v2-the-old-centre-from-the-photos).
 Code: `pipeline/src/blox_pipeline/facade/` (the grammar) and, for real buildings,
 `pipeline/src/blox_pipeline/voxelise/facade_*.py` + `streets.py`. Two callers share one
 painter: the look-test scene (`testscene/scene.py`) and every real 3D BAG building whose
@@ -246,11 +247,95 @@ cd ../viewer && node build.mjs ../build/fixture_world && node screenshot.mjs ../
   (free-standing houses have four detailed walls). Visible only from very close.
 - Party-wall stretches above a lower neighbour are not runs (glass rhythm).
 - Run ends are corner pilasters even where a run ends at a concave corner or a party wall.
-- One style per building, one ground-floor kind per run; no balconies, dormers or roof
-  details on real buildings (roofs stay the LoD2.2 voxelisation).
+- One style per building, one ground-floor kind per run. Since look v2, old-centre runs get
+  iron balconies, and runs facing a street get white dormers and a chimney where the roof
+  falls toward the street; otherwise roofs stay the LoD2.2 voxelisation.
 - Planning builds small layers per building: about 2 ms per building on synthetic data.
 
-## The detail pieces (ids 38-47)
+## Look v2: the old centre from the photos
+
+Code: `voxelise/colours.py`, `facade_style.py` (`_centre_style`), `facade/{run,windows,ground}.py`,
+`facade_runs.roof_details` + `facade_paint.dormer`, `trees.py`, `street_props.py`,
+`prepare_osm.py` (kerbs), `layers.py` (sett tones), `facade/stadhuis.py` + `heroes.py`.
+
+**Old centre** = within 700 m of the Markt or the Vrijthof, or built before 1900
+(`colours.old_centre`, decided in world RD before a building becomes an island):
+
+| | old centre (before 1945) | elsewhere |
+|---|---|---|
+| walls | limestone, white/cream/grey plaster; 1 in 12 dark red brick, mergel_light; no ochre | by era, as v2 |
+| roofs | slate 5 in 6 | by era |
+| dressings | limestone (limestone_dark on limestone walls): pilasters, bands, sills, lintels, cornice, plinth, flush jambs | trim colour |
+| windows | `window_1x2x4` white, pier 2; pediments on 1 in 5; french windows with `railing_1x2` on 1 in 3 | `window_1x2x3` |
+| ground | stone shop fronts (`shop_window_1x2x4` between proud piers, door + glass transom, fascia with lettering, no awning), white panelled doors (3 in 4), cellar `vent_1x2` | v2 fronts |
+| first floor | iron `balcony_2x4` in the middle bay on 2 in 5 street fronts >= 10 studs | none |
+| roof | white dormers + chimney on street fronts whose roof falls toward the street | none |
+
+`FacadeRun` fields: `stone`, `door`, `window`, `shop_window`, `surrounds`, `pediments`,
+`iron_balcony`, `french`, `vents`, `iron`, `pier`; all default to the v2 grammar, so the v2
+look-test houses are unchanged. `HouseSpec` passes them through and adds `dormer` (cheek colour).
+
+Rhythm with the tall window: sill `f..f+2`, window `f+2..f+14`, the next storey band is its
+lintel; under the eave cornice it needs `eave_extra >= 1` (else `window_1x2x3`). A pedimented
+first-floor window is `window_1x2x3` (`f+3..f+12`) under `pediment_1x4` (`f+12..f+14`);
+neighbouring pediments never overlap (a bay is skipped). The iron balcony: french window
+`f..f+12`, a stone slab and corbels one row out, `balcony_2x4` (2 deep: trim layer + slab row).
+
+**Dormers on real roofs** (`roof_details`): per window bay (>= 6 studs apart, off chunk cuts),
+the first row whose roof in front lies above the eave + 2 is the dormer front; the 4-wide,
+3-deep box needs the building's own roof sloping toward the street under it and must stay
+under the ridge. `RunPlan.reach` grows the run's paint box so every tile paints it.
+
+**Streets**: centre roads and squares are `cobble_dark` in four tones (dark_grey,
+limestone_dark, rail_brown speckle by cell hash); car roads (residential and up) get a 0.6 m
+`limestone_dark` kerb ring painted under the other car roads, over footways and squares.
+**Props** (`street_props.py`, planned once per world, painted per tile like runs): lamps every
+22 m along squares (2 m inside) and pedestrian streets (alternate sides), benches between the
+square lamps, bollard-chain-bollard groups every 18 m outside centre car streets. Dropped
+within 1.2 m of buildings/islands/heroes/water/decks/trunks, on car roads (lamps, benches), on
+uneven ground or across chunk borders. `VoxelConfig.street_props=False` switches them off.
+
+**Trees**: plane/chestnut (`trees.py`): one-stud trunk, bare for >= 4 m (45 % of the height),
+three branch stubs, crown of a core plus 3-5 blobs (seeded), noisy outline, paler leaves 1 in
+16. Default height 8-15 m (no DSM), crown 0.36 h in 2.5-5.5 m.
+
+### The Stadhuis (hero model)
+
+`Landmark.model = "stadhuis"`: the matched 3D BAG building (BAG id, OSM `wikidata`, name, or
+the Markt point; only within 150 m of it) is not voxelised; `heroes.plan_hero` takes the
+footprint's cell rectangle (>= 44 x 36 studs, else the BAG shape stays), turns the model so its
+front faces the side with most street/square (`StreetContext.area`), and puts the ground line
+on the highest ground under it. `layers` marks the rectangle as occupied (like an island). The
+model is painted per tile through a `TileCanvas` (a piece across a chunk border becomes voxels,
+`stadhuis.place_or`). A footprint turned > 3° makes it an island; the local world plans and
+paints it the same way (the island pads 14 cells for the perron).
+
+What `paint_stadhuis` builds (model frame: x along the front, y inward, front faces S):
+banded limestone shell with quoins and giant pilasters, a podium with cellar vents, two tall
+storeys of `window_1x2x4` + `window_1x2x2` top lights on all four sides, cornices; the risalit
+with three `arch_1x6` on piers (balustrades in the arches, keystones), the loggia (door with
+fanlight, windows), a full-width balustraded balcony on consoles, the first floor with window
+pediments, an attic storey, a pediment with a carved relief (`mergel`) and corner cartouches;
+the perron with the double stair and stepped parapets; side pediments; iron railings with
+gilt tips and gate piers; a hipped slate roof with lead hips; the tower (`TOWER` stages): square
+base with a dormer, oculi row, tall arched windows, clock stage (gold dials, round windows),
+gallery with balustrade and flags, open belfry with bells, bell-shaped dome, lantern, gilded
+orb and vane. About 15,000 bricks, 330 of them placed pieces (Markt fixture).
+
+### Fixtures and shots
+
+```bash
+cd pipeline
+uv run python -m blox_pipeline.testscene                       # 2 chunks: v2 look test + photo row
+uv run python tests/markt_fixture.py ../build/markt_data       # add 12 to turn the Stadhuis (island)
+uv run blox build --data-dir ../build/markt_data --bbox 176340,317890,176540,318090 \
+    --out ../build/markt_world --no-ortho
+cd ../viewer && node build.mjs ../build/markt_world && node screenshot.mjs ../build/shots hero quality=high
+```
+
+Before/after shots: `build/shots/look_v2/` (`before_*` from the pre-look-v2 commit).
+
+## The detail pieces (ids 38-56)
 
 All are **placed** (never inferred from voxels). Directional ones have their decorated
 front toward +j at rot 0. The whole bounding box counts as occupied for stud tests.
@@ -267,6 +352,19 @@ front toward +j at rot 0. The whole bounding box counts as occupied for stud tes
 | 45 | `jumper_1x2` | 2×1×1 | top of stepped gables | one centred stud (`studs: center`) |
 | 46 | `slope30_1x2` | 1×2×2 | window sills | shallow, no studs, 0.05 m lip |
 | 47 | `grille_1x2` | 2×1×1 | shop sign "lettering" | 3 grooves on top |
+| 48 | `window_1x2x4` | 2×1×12 | old-centre windows, Stadhuis | 2×3 panes per sash, small-pane top lights |
+| 49 | `shop_window_1x2x4` | 2×1×12 | stone shop fronts | lettering in the upper lights |
+| 50 | `balcony_2x4` | 4×2×5 | iron balconies (2 deep: trim layer + slab row) | black, ornate rings and scrolls |
+| 51 | `railing_1x2` | 2×1×4 | french-window railings | plain bars |
+| 52 | `pediment_1x4` | 4×1×2 | over first-floor windows, Stadhuis | stone colour |
+| 53 | `lamp_double_1x3` | 3×1×22 | street lamps (props) | two lanterns, arm along `w` |
+| 54 | `bollard_1x1` | 1×1×5 | bollards (props) | chain eyes along `w` |
+| 55 | `chain_1x4` | 4×1×3 | between two bollards, 2 plates up | links overhang the box |
+| 56 | `vent_1x2` | 2×1×2 | cellar vents in the plinth | |
+
+Ids 48-56 reuse existing kinds (CONTRACT 2.1); the viewer picks their geometry by name
+(`details-look.js`) and has cheap far templates for the thin ones (`farmesh.js: lookFar`).
+Unity draws them as the generic shape of their kind for now.
 
 Window and door panes always use the `glass` material, whatever the record colour; the record
 colour is the frame. At night each window glows on its own (viewer `glow.js`; Unity uses the
