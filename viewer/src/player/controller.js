@@ -11,23 +11,19 @@
 // along walls, also rotated island walls); a blocked axis tries to lift the body by up to
 // stepMax (kerbs, stairs: 1-2 plates) and refuses anything higher (walls). Then gravity: the
 // fall is sub-stepped too and lands exactly on the surface (bisection). Walking off a step
-// snaps down to the lower surface instead of hopping. Yaw turns toward the move direction.
+// snaps down to the lower surface instead of hopping. Yaw turns smoothly toward the
+// camera-relative move direction (look.js moveHeading: W walks where the camera looks).
+
+import { angleDelta, moveHeading, approach, TAU } from './look.js';
+
+export { angleDelta };
 
 export const DEFAULTS = {
   radius: 0.35, height: 1.9, walk: 1.4, run: 4.0, accel: 12, airAccel: 3,
-  gravity: 18, jumpSpeed: 4.4, stepMax: 0.42, turnRate: 12, maxFall: 30,
+  gravity: 18, jumpSpeed: 4.4, stepMax: 0.42, turnRate: 10, maxFall: 30,
 };
 
 const RING = Array.from({ length: 8 }, (_, q) => [Math.cos((q * Math.PI) / 4), Math.sin((q * Math.PI) / 4)]);
-const TAU = Math.PI * 2;
-
-/** Shortest signed angle from a to b (radians). */
-export function angleDelta(a, b) {
-  let d = (b - a) % TAU;
-  if (d > Math.PI) d -= TAU;
-  if (d < -Math.PI) d += TAU;
-  return d;
-}
 
 export class CharacterController {
   /** city: { isSolid(x, y, z) }. opts: see DEFAULTS. */
@@ -127,9 +123,9 @@ export class CharacterController {
     const m = Math.min(1, Math.hypot(move[0], move[1]));
     let wx = 0, wz = 0;
     if (m > 1e-3) {
-      const heading = camYaw + Math.atan2(move[0], move[1]);
+      const heading = moveHeading(camYaw, move);
       wx = Math.sin(heading) * speed * m; wz = -Math.cos(heading) * speed * m;
-      this.yaw += angleDelta(this.yaw, heading) * Math.min(1, o.turnRate * dt);
+      this.yaw += angleDelta(this.yaw, heading) * approach(o.turnRate, dt);
       this.yaw = ((this.yaw % TAU) + TAU) % TAU;
     }
     const a = (this.grounded ? o.accel : o.airAccel) * dt;
