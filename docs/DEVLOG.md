@@ -721,3 +721,7 @@ fetched either.
 - Fallback houses have no construction year, so they get the default colour mix. If 3D BAG
   comes back before launch, refetch (`blox --slice city fetch --only bag3d`) and rebuild for
   the real roofs.
+- `load_buildings` now finds cached 3D BAG block dirs by area (`cached_blocks`), not by
+  recomputing the block grid. The centre slice (origin 175700) and the city slice (origin
+  174700) use different 256 m grids, so the city build ignored the centre pages already
+  fetched. Now the centre keeps its real 3D BAG roofs and only the rest uses the fallback.

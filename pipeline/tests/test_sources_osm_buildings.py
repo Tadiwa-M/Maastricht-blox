@@ -73,3 +73,12 @@ def test_fetch_continues_after_a_failed_source(monkeypatch: pytest.MonkeyPatch) 
     with pytest.raises(http.DownloadError, match="bag3d"):
         fetch_all(geo.slice_box(), only=("bag3d", "osm"))
     assert calls == ["bag3d", "osm"]
+
+
+def test_cached_blocks_found_across_grids(tmp_path) -> None:
+    from blox_pipeline.sources.bag3d import cached_blocks
+
+    for name in ("175700_316500_256", "174700_314000_256", "180000_320000_256", "tiles"):
+        (tmp_path / "3dbag" / name).mkdir(parents=True)
+    got = [d.name for d in cached_blocks(geo.RDBox(175800, 316600, 175900, 316700), tmp_path)]
+    assert got == ["175700_316500_256"]
