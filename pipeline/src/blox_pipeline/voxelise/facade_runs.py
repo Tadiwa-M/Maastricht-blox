@@ -61,6 +61,9 @@ class RunPlan:
     lows: tuple[int, ...] = ()  # first building k of each cell (plinth reaches down to it)
     tops: tuple[int, ...] = ()  # wall top (exclusive) of each cell: above the eave = gable
     run: FacadeRun | None = None
+    dormers: tuple[tuple[int, int, int, int], ...] = ()  # (frame x, front row, window k, roof colour)
+    chimney: tuple[int, int, int, int] | None = None     # (frame x, row, k from, k to)
+    reach: int = PAINT_MARGIN  # rows inward that painting touches (dormers reach up the roof)
 
     @property
     def detail(self) -> bool:
@@ -90,6 +93,7 @@ class RunPlan:
 
     def bbox(self, margin: int = PAINT_MARGIN) -> tuple[int, int, int, int]:
         """Global half-open ``(i0, i1, j0, j1)`` its painting may touch."""
+        margin = max(margin, self.reach)
         (i0, j0), (i1, j1) = self.cell(self.a0, 0), self.cell(self.a1 - 1, 0)
         return min(i0, i1) - margin, max(i0, i1) + 1 + margin, min(j0, j1) - margin, max(j0, j1) + 1 + margin
 
@@ -146,7 +150,7 @@ def plan_building(world: PreparedWorld, b: PreparedBuilding, ctx: StreetContext)
         return []
     edges = axis_edges(b.footprint)
     wall_top = _wall_top(L)
-    style = facade_style(b.bag_id, b.year, palette.entries()[b.wall][1])
+    style = facade_style(b.bag_id, b.year, palette.entries()[b.wall][1], b.centre)
     plans = []
     open_ = (L.bld_top == NONE) & (L.island_k == NONE)  # an island next door is not a street
     for raw in extract_runs(own, open_, box, b.feature_id):
@@ -248,16 +252,86 @@ def _plan(raw: RunPlan, L: Layers, own: NDArray[np.bool_], wall_top: NDArray[np.
     if int(out_top.max()) > base + 2 or (at(L.water_k, -1) != NONE).any():
         return fallback("street")
     storeys = (eave - base - GROUND_H) // STOREY_H
+    ground = _ground_kind(raw, b, style, storeys, ctx)
+    street = ground is not GroundFloor.PLAIN
     run = FacadeRun(
         x0=0, x1=raw.length, y0=0, storeys=storeys, fid=b.feature_id, wall=b.wall,
         trim=style.trim, accent=style.accent, plinth=style.plinth,
-        ground=_ground_kind(raw, b, style, storeys, ctx), awning=style.awning,
+        ground=ground, awning=style.awning,
         quoins=style.quoins, shutters=style.shutters and raw.length >= FULL_FRONT,
         flowers=style.flowers, eave_extra=eave - base - GROUND_H - storeys * STOREY_H,
         cuts=_cuts(raw),
+        balcony=style.iron_balcony and street and raw.length >= 10,
+        stone=style.stone, door=style.door, window=style.window, shop_window=style.shop_window,
+        surrounds=style.surrounds, pediments=style.pediments, iron_balcony=style.iron_balcony,
+        french=style.french and street, vents=style.vents, pier=2 if style.surrounds else 1,
     )
+    dormers, chimney, reach = (), None, PAINT_MARGIN
+    if style.dormers and street:
+        dormers, chimney, reach = roof_details(raw, L, own, run, run.eave_k(base), at)
     return RunPlan(raw.fid, raw.normal, raw.ring, raw.a0, raw.a1, "", base, tuple(int(v) for v in lows),
-                   tuple(int(v) for v in at(wall_top, 0)), run)
+                   tuple(int(v) for v in at(wall_top, 0)), run, dormers, chimney, reach)
+
+
+SLOPE_TOWARD = {"N": 1, "E": 2, "S": 3, "W": 4}  # roof shape whose low edge faces the normal
+DORMER_DEPTH = 3   # rows of a dormer box behind its front
+DORMER_ROOF = 13   # plates from the window bottom to the top of the dormer's ridge
+
+
+def roof_details(raw: RunPlan, L: Layers, own: NDArray[np.bool_], run: FacadeRun, eave: int, at
+                 ) -> tuple[tuple[tuple[int, int, int, int], ...], tuple[int, int, int, int] | None, int]:
+    """White dormers on a pitched roof that falls toward the street, and a chimney.
+
+    A dormer is 4 studs wide (``x-1 .. x+3`` round a window bay), ``DORMER_DEPTH`` rows deep;
+    its front row is the first row whose roof in front of it lies above the eave, so the
+    window starts just above the roof surface. It needs the building's own sloped roof under
+    the whole box and must stay below the ridge. Returns (dormers, chimney, reach)."""
+    n = raw.length
+    forward = raw.normal in ("S", "E")
+    slope = SLOPE_TOWARD[raw.normal]
+
+    def col(x: int) -> int:  # frame x -> index along the run
+        return x if forward else n - 1 - x
+
+    depth_max = 0
+    rows = []
+    for d in range(1, 20):
+        cells = [raw.cell(a, d) for a in range(raw.a0, raw.a1)]
+        if not all(0 <= I - L.box.i0 < L.box.ni and 0 <= J - L.box.j0 < L.box.nj for I, J in cells):
+            break
+        rows.append((at(own, d), at(L.bld_top, d).astype(np.int64), at(L.roof_shape, d), at(L.bld_roof, d)))
+        depth_max = d
+    if depth_max < DORMER_DEPTH + 2:
+        return (), None, PAINT_MARGIN
+    ridge = max(int(r[1][r[0]].max()) if r[0].any() else 0 for r in rows)
+    out: list[tuple[int, int, int, int]] = []
+    last = -10
+    for x in run.bays():
+        if x - last < 6 or x - 1 < 1 or x + 3 > n - 1 or not run.free(x - 1, x + 3):
+            continue
+        cs = [col(c) for c in range(x - 1, x + 3)]
+        for df in range(2, depth_max - DORMER_DEPTH + 1):
+            front = rows[df - 2]  # row df - 1
+            box_rows = rows[df - 2: df - 1 + DORMER_DEPTH]
+            if not all(r[0][cs].all() and (r[2][cs] == slope).all() for r in box_rows):
+                break
+            kb = int(front[1][cs].max()) + 1
+            if kb < eave + 2:
+                continue
+            if kb + DORMER_ROOF <= ridge + 2:
+                out.append((x, df, kb, int(front[3][cs[1]])))
+                last = x
+            break
+    chimney = None
+    if out:
+        x = n - 3 if n >= 8 else 1
+        c = col(x)
+        best = max(range(1, depth_max + 1), key=lambda d: (int(rows[d - 1][1][c]) if rows[d - 1][0][c] else -1, -d))
+        top = int(rows[best - 1][1][c])
+        if rows[best - 1][0][c] and run.free(x, x + 2) and top > eave + 6:
+            chimney = (x, best, top - 6, top + 5)
+    reach = max([PAINT_MARGIN] + [df + DORMER_DEPTH + 1 for _, df, _, _ in out] + ([chimney[1] + 1] if chimney else []))
+    return tuple(out), chimney, reach
 
 
 def _cuts(raw: RunPlan) -> tuple[int, ...]:

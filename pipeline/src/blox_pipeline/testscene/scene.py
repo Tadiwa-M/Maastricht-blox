@@ -1,22 +1,36 @@
-"""Hand-authored "look test" chunk: a corner of the Markt by the Maas.
+"""Hand-authored "look test": two chunks of a corner of the Markt by the Maas.
 
-South -> north: the Maas with a stone quay, a road with pavements and lamp posts, the
-cobbled square with a cafe terrace, planters and trees, a row of four detailed
-townhouses (``facade`` grammar: stepped gables, dormers, shop fronts, an arcade with a
-balcony) and a tall tower with a stepped spire. Everything is painted into a voxel tile
-following CONTRACT section 7 (slopes as 3-cell stacks, tiles for paving, shape 8 for
-water); windows, doors, arches, fences and small round details are placed pieces
-(``Canvas.place``), which ``build`` passes to the layout next to the voxels.
+South -> north: the Maas with a stone quay, a road with pavements and lamp posts, a dark
+stone kerb, the dark cobbled square with a cafe terrace, planters and trees, then the
+houses. Chunk ``CX`` (the v2 look test): four detailed townhouses (``facade`` grammar:
+stepped gables, dormers, shop fronts, an arcade with a balcony) and a tall tower with a
+stepped spire. Chunk ``CX + 1`` (look v2, modelled on the owner's Markt photos,
+``docs/reference/markt.md``): a row of five old-centre townhouses in blue-grey limestone,
+white/cream/grey plaster and dark red brick with limestone dressings, tall many-paned white
+windows, stone shop fronts with lettered shop windows, wrought-iron balconies and
+french-window railings, pediments, white panelled doors, cellar vents, white dormers on
+slate roofs; in front double-lantern lamp posts, bollards with chains, stone benches and
+plane trees. Everything is painted into voxel tiles following CONTRACT section 7 (slopes as
+3-cell stacks, tiles for paving, shape 8 for water); windows, doors, arches, fences and the
+other detail pieces are placed pieces (``Canvas.place``), which ``build`` passes to the
+layout next to the voxels.
 """
 
 from __future__ import annotations
 
+import numpy as np
+
 from ..facade import GroundFloor, HouseSpec, RoofKind, paint_house
 from ..facade.props import bench, bollard, cafe_table, planter, street_lamp
 from ..layout.records import CHUNK
+from ..voxelise import palette
+from ..voxelise.raster import cell_hash
+from ..voxelise.trees import tree_cells
+from ..voxelise.world import TreeSpec
 from .canvas import Canvas
 
 CX, CY = 22, 47  # chunk holding the Markt (RD 176430, 318007 -> I 1460, J 3014)
+NCX = 2          # the look-v2 Markt row is chunk CX + 1
 GROUND_K = 90  # 48.0 m NAP
 K0 = GROUND_K - 9
 NZ = 150
@@ -39,6 +53,31 @@ HOUSES = [
               roof="roof_tile_red", roof_kind=RoofKind.STEPPED_GABLE, shutters=True,
               flowers="signal_yellow"),
 ]
+# look v2: the Markt row (chunk CX + 1), modelled on the owner's photos
+_OLD = dict(trim="white", window="window_1x2x4", shop_window="shop_window_1x2x4", surrounds=True,
+            vents=True, pier=2, roof="slate", roof_kind=RoofKind.EAVE_DORMERS, dormer="plaster_white")
+MARKT_ROW = [
+    HouseSpec(65, 45, 12, 16, 3, 14, "limestone", stone="limestone_dark", plinth="limestone_dark",
+              accent="black", door="white", ground=GroundFloor.SHOP, balcony=True, iron_balcony=True,
+              french=True, **_OLD),
+    HouseSpec(77, 45, 10, 16, 3, 15, "plaster_white", stone="limestone", plinth="limestone",
+              accent="dark_green", door="white", pediments=True, **_OLD),
+    HouseSpec(87, 45, 12, 16, 3, 16, "brick_dark_red", stone="limestone", plinth="limestone",
+              accent="dark_blue", door="white", ground=GroundFloor.SHOP, quoins=True, pediments=True, **_OLD),
+    HouseSpec(99, 45, 10, 16, 2, 17, "plaster_cream", stone="limestone", plinth="limestone",
+              accent="dark_green", door="white", balcony=True, iron_balcony=True,
+              **{**_OLD, "roof_kind": RoofKind.STEPPED_GABLE}),
+    HouseSpec(109, 45, 14, 16, 3, 18, "plaster_grey", stone="limestone", plinth="limestone_dark",
+              accent="brick_dark_red", door="white", ground=GroundFloor.SHOP, balcony=True,
+              iron_balcony=True, french=True, **_OLD),
+]
+PLANE_TREES = [(72, 33, 12.0, 4.6), (95, 31, 13.5, 5.2), (117, 34, 11.0, 4.4)]  # x, y, height m, crown m
+LAMPS2 = [(66, 27), (82, 27), (106, 27), (122, 27)]           # lamp_double_1x3 west cells (front N)
+BOLLARDS2 = [(68, 24), (87, 24), (101, 24), (114, 24)]        # first bollard of bollard-chain-bollard
+BENCHES2 = [(84, 36), (106, 38)]
+CAFE2 = [(70, 38, "dark_green"), (76, 40, "white")]
+F_ROW = 30  # feature id of the look-v2 square
+
 TOWER = (46, 48, 11, 90)  # x0, y0, size, wall height in plates
 TREES = [(42, 29), (60, 33)]
 CAFE = [(5, 36, "bus_red"), (12, 33, "white"), (27, 36, "medium_blue"), (20, 30, "dark_green")]
@@ -47,24 +86,26 @@ LAMPS_I = [6, 22, 38, 54]
 
 
 def _ground(cv: Canvas) -> None:
-    g = GROUND_K
-    cv.fill(0, CHUNK, 0, 9, K0, g - 6, "soil")  # river bed
-    cv.fill(0, CHUNK, 0, 9, g - 6, g - 5, "water", F_MAAS, WATER)
-    cv.fill(0, CHUNK, 9, 11, K0, g + 1, "mergel_dark", F_KADE)  # quay wall
-    cv.fill(0, CHUNK, 9, 11, g, g + 1, "light_grey", F_KADE)  # coping
-    cv.fill(0, CHUNK, 11, CHUNK, K0, g - 1, "soil")
-    cv.fill(0, CHUNK, 11, 13, g - 1, g, "pavement", F_KADE, TILE)
-    cv.fill(0, CHUNK, 13, 21, g - 1, g, "asphalt", F_KADE, TILE)
-    for i in range(0, CHUNK, 8):
+    g, W = GROUND_K, CHUNK * NCX
+    cv.fill(0, W, 0, 9, K0, g - 6, "soil")  # river bed
+    cv.fill(0, W, 0, 9, g - 6, g - 5, "water", F_MAAS, WATER)
+    cv.fill(0, W, 9, 11, K0, g + 1, "mergel_dark", F_KADE)  # quay wall
+    cv.fill(0, W, 9, 11, g, g + 1, "light_grey", F_KADE)  # coping
+    cv.fill(0, W, 11, CHUNK, K0, g - 1, "soil")
+    cv.fill(0, W, 11, 13, g - 1, g, "pavement", F_KADE, TILE)
+    cv.fill(0, W, 13, 21, g - 1, g, "asphalt", F_KADE, TILE)
+    for i in range(0, W, 8):
         cv.fill(i, i + 4, 16, 18, g - 1, g, "white", F_KADE, TILE)
-    cv.fill(0, CHUNK, 21, 23, g - 1, g, "pavement", F_KADE, TILE)
-    cv.fill(0, CHUNK, 23, CHUNK, g - 1, g, "cobble_grey", F_MARKT, TILE)
-    for i in range(CHUNK):
-        for j in range(23, CHUNK):
-            if (i * 3 + j * 5) % 11 == 0:
-                cv.cell(i, j, g - 1, "light_grey", F_MARKT, TILE)
-            elif (i * 7 + j * 2) % 13 == 0:
-                cv.cell(i, j, g - 1, "dark_grey", F_MARKT, TILE)
+    cv.fill(0, W, 21, 22, g - 1, g, "limestone_dark", F_KADE, TILE)  # dark stone kerb
+    cv.fill(0, W, 22, 23, g - 1, g, "pavement", F_KADE, TILE)
+    cv.fill(0, CHUNK, 23, CHUNK, g - 1, g, "cobble_dark", F_MARKT, TILE)
+    cv.fill(CHUNK, W, 23, CHUNK, g - 1, g, "cobble_dark", F_ROW, TILE)
+    ii, jj = np.meshgrid(np.arange(W), np.arange(23, CHUNK), indexing="ij")
+    tone = cell_hash(ii, jj, seed=7) % 100  # setts of a few tones, as on the real square
+    for (i, j), t in np.ndenumerate(tone):
+        if t < 19:
+            name = "dark_grey" if t < 9 else "limestone_dark" if t < 15 else "rail_brown"
+            cv.cell(i, j + 23, g - 1, name, F_MARKT if i < CHUNK else F_ROW, TILE)
 
 
 def _tower(cv: Canvas) -> None:
@@ -109,6 +150,33 @@ def _spire(cv: Canvas, x0: int, y0: int, n: int, top: int) -> None:
         cv.fill(a + 1, b, yb, yb + 1, k, k + 3, "slate", F_TOWER, N)
 
 
+def _plane_tree(cv: Canvas, x: int, y: int, height: float, crown: float, seed: int) -> None:
+    """A plane tree from the real pipeline's generator (voxelise.trees), into the air only."""
+    t = TreeSpec(x, y, height, crown, palette.idx("leaf"), palette.idx("leaf_light"), seed)
+    cells = tree_cells(t, GROUND_K - 1)
+    assert cells is not None
+    for i, j, k, c in zip(*cells):
+        if 0 <= i < CHUNK * NCX and 0 <= j < CHUNK and cv.color[i + 1, j + 1, k - cv.k0] == 0:
+            cv.cell(int(i), int(j), int(k), int(c))
+
+
+def _markt_row_props(cv: Canvas) -> None:
+    """Look v2 street furniture: lamps, bollards with chains, stone benches, plane trees."""
+    g = GROUND_K
+    for x, y in LAMPS2:
+        cv.place("lamp_double_1x3", x, y, g, "N", "black")
+    for x, y in BOLLARDS2:
+        cv.place("bollard_1x1", x, y, g, "N", "black")
+        cv.place("chain_1x4", x + 1, y, g + 2, "N", "black")
+        cv.place("bollard_1x1", x + 5, y, g, "N", "black")
+    for x, y in BENCHES2:
+        cv.fill(x, x + 1, y, y + 1, g, g + 1, "limestone_dark")
+        cv.fill(x + 3, x + 4, y, y + 1, g, g + 1, "limestone_dark")
+        cv.fill(x, x + 4, y, y + 1, g + 1, g + 2, "limestone_dark")
+    for n, (x, y, h, r) in enumerate(PLANE_TREES):
+        _plane_tree(cv, x, y, h, r, 1000 + n * 7919)
+
+
 def _tree(cv: Canvas, x: int, y: int) -> None:
     g = GROUND_K
     cv.fill(x, x + 1, y, y + 1, g, g + 12, "trunk")
@@ -123,9 +191,9 @@ def _tree(cv: Canvas, x: int, y: int) -> None:
 
 
 def make_scene() -> Canvas:
-    cv = Canvas(CX, CY, K0, NZ)
+    cv = Canvas(CX, CY, K0, NZ, ncx=NCX)
     _ground(cv)
-    for h in HOUSES:
+    for h in HOUSES + MARKT_ROW:
         paint_house(cv, h, GROUND_K)
     _tower(cv)
     for x, y in TREES:
@@ -139,7 +207,10 @@ def make_scene() -> Canvas:
         bollard(cv, i, 24, GROUND_K)
     for x in LAMPS_I:
         street_lamp(cv, x, 12, GROUND_K)
-        street_lamp(cv, x + 8, 21, GROUND_K)
+        street_lamp(cv, x + 8, 22, GROUND_K)
+    for i, j, canopy in CAFE2:
+        cafe_table(cv, i, j, GROUND_K, canopy)
+    _markt_row_props(cv)
     return cv
 
 
@@ -152,12 +223,14 @@ def scene_features() -> list[dict]:
                 "bboxIJ": [I0 + i0, J0 + j0, I0 + i1, J0 + j1], "heightM": height_m,
                 "tags": {"source": "look-test"}}
 
+    W = CHUNK * NCX - 1
     feats = [
         box("street", F_MARKT, "Markt (look test)", 0, 23, 63, 63, 0.0),
-        box("water", F_MAAS, "Maas (look test)", 0, 0, 63, 8, 0.0),
-        box("street", F_KADE, "Maaskade (look test)", 0, 9, 63, 22, 0.0),
+        box("street", F_ROW, "Markt, photo row (look v2)", 64, 23, W, 63, 0.0),
+        box("water", F_MAAS, "Maas (look test)", 0, 0, W, 8, 0.0),
+        box("street", F_KADE, "Maaskade (look test)", 0, 9, W, 22, 0.0),
     ]
-    for n, h in enumerate(HOUSES):
+    for n, h in enumerate(HOUSES + MARKT_ROW):
         feats.append(box("building", h.fid, f"Townhouse {chr(65 + n)} (look test)", h.x0, h.y0,
                          h.x1 - 1, h.y1 - 1, round((h.eave_k(0)) * 0.2, 1)))
     x0, y0, n, hgt = TOWER

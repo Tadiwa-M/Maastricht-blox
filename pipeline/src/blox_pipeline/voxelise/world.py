@@ -29,6 +29,8 @@ class VoxelConfig:
     use_ortho_ground: bool = True
     facade_detail: bool = True  # facade grammar on axis-aligned walls (False: glass cells only)
     islands: bool = True  # rotated buildings on their own grid (CONTRACT 5.1); False: staircases
+    heroes: bool = True   # hand-authored landmark models (heroes.py) instead of their 3D BAG shape
+    street_props: bool = True  # lamp posts, bollards with chains, benches (street_props.py)
     island_min_yaw_deg: float = 3.0  # buildings turned more than this become islands
 
 
@@ -72,6 +74,8 @@ class PreparedBuilding:
     year: int | None = None
     facade: bool = False  # gets the facade grammar (not a landmark, not a church)
     shop: bool = False    # an OSM shop/amenity POI lies inside
+    centre: bool = False  # old-centre look (colours.old_centre): limestone, plaster, slate
+    hero: str | None = None  # hand-authored landmark model replacing the 3D BAG shape (heroes.py)
 
 
 @dataclass
@@ -134,6 +138,8 @@ class PreparedWorld:
     streets: object | None = None  # streets.StreetContext
     facades: list = field(default_factory=list)  # facade_runs.RunPlan, sorted
     islands: list = field(default_factory=list)  # islands.IslandGroup: built apart, not in chunks
+    heroes: list = field(default_factory=list)   # heroes.HeroPlan: hand-authored landmark models
+    props: list = field(default_factory=list)    # street_props.Prop: lamps, bollards, benches
     _btree: STRtree | None = None
     _ptree: STRtree | None = None
     _wtree: STRtree | None = None

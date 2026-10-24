@@ -114,6 +114,34 @@ def paint_plan(cv: TileCanvas, plan: RunPlan) -> None:
     fp.clear(1, run.x1 - 1, 0, 1, base + PLINTH, eave)  # trim layer: air between the pilasters
     paint_run(fp, run, base)
     gable(fp, plan, eave)
+    for x, df, kb, roof in plan.dormers:
+        dormer(fp, run, x, df, kb, roof)
+    if plan.chimney is not None:
+        x, d, k0, k1 = plan.chimney
+        fp.fill(x, x + 2, d, d + 1, k0, k1, run.dress, run.fid)
+        fp.fill(x, x + 2, d, d + 1, k1, k1 + 1, "dark_grey", run.fid)
+
+
+DORMER_WALL = "plaster_white"
+
+
+def dormer(fp: FramePainter, run, x: int, df: int, kb: int, roof: int) -> None:
+    """A white dormer with a slate gable roof on a real pitched roof (rows ``df ..``, frame
+    coordinates; ``facade_runs.roof_details`` planned where it fits). Same shape as the
+    test-scene dormer (``facade.roofs``): 4 wide, window_1x2x2, slopes + ridge on top."""
+    from ..facade.painter import RIDGE_J, SLOPE_E, SLOPE_W
+    from .facade_runs import DORMER_DEPTH
+
+    h = load_catalogue()["window_1x2x2"].h
+    k1 = kb + h + 1
+    fp.fill(x - 1, x + 3, df, df + DORMER_DEPTH, kb - 1, k1, DORMER_WALL, run.fid)
+    fp.clear(x, x + 2, df, df + 1, kb, kb + h)
+    fp.place("window_1x2x2", x, df, kb, "S", run.trim, run.fid)
+    fp.fill(x, x + 2, df + 1, df + 2, kb, kb + h, "black", run.fid)
+    fp.fill(x - 1, x, df - 1, df + DORMER_DEPTH, k1, k1 + 3, roof, run.fid, SLOPE_W)
+    fp.fill(x + 2, x + 3, df - 1, df + DORMER_DEPTH, k1, k1 + 3, roof, run.fid, SLOPE_E)
+    fp.fill(x, x + 2, df - 1, df + DORMER_DEPTH, k1, k1 + 3, roof, run.fid)
+    fp.fill(x, x + 2, df - 1, df + DORMER_DEPTH, k1 + 3, k1 + 6, roof, run.fid, RIDGE_J)
 
 
 def gable(fp: FramePainter, plan: RunPlan, eave: int) -> None:
@@ -133,9 +161,11 @@ def gable(fp: FramePainter, plan: RunPlan, eave: int) -> None:
         fp.fill(mid, mid + 2, -1, 0, k - 1, k, run.trim, run.fid)     # sill
 
 
-def paint_facades(tile: VoxelTile, plans: list[RunPlan], border: int = 1) -> TileCanvas:
-    """Paint every detailed run reaching into ``tile``; sets ``tile.placed``."""
-    cv = TileCanvas(tile, border)
+def paint_facades(tile: VoxelTile, plans: list[RunPlan], border: int = 1,
+                  canvas: TileCanvas | None = None) -> TileCanvas:
+    """Paint every detailed run reaching into ``tile``; sets ``tile.placed``. A ``canvas``
+    already holding other placed pieces (hero models) is painted on and kept."""
+    cv = canvas if canvas is not None else TileCanvas(tile, border)
     ni, nj, _ = tile.dims
     for plan in plans:
         if not plan.detail:

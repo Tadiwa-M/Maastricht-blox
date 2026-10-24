@@ -47,6 +47,27 @@ class FacadeRun:
     balcony: bool = False
     eave_extra: int = 0       # plain wall plates between the last storey and the eave
     cuts: tuple[int, ...] = ()
+    # look v2 (owner's Markt photos); the defaults keep the v2 grammar unchanged
+    stone: str | None = None  # dressings (pilasters, bands, sills, lintels, cornice): None = trim
+    door: str | None = None   # front door colour: None = accent
+    window: str = "window_1x2x3"       # window piece of upper storeys and house ground floors
+    shop_window: str = "window_1x2x3"  # shop front window piece
+    surrounds: bool = False   # stone jambs flush with the wall round every window, stone lintel
+    pediments: bool = False   # pediments over the first-floor windows
+    iron_balcony: bool = False  # the balcony is a wrought-iron balcony_2x4 before a french window
+    french: bool = False      # the other first-floor windows are french windows with railings
+    vents: bool = False       # cellar vents in the plinth under ground-floor windows
+    iron: str = "black"       # balconies, railings
+    pier: int = 1             # least wall between window bays (2 on old-centre fronts)
+
+    @property
+    def dress(self) -> str | int:
+        """Colour of the stone dressings (falls back to the trim, as before look v2)."""
+        return self.stone if self.stone is not None else self.trim
+
+    @property
+    def door_colour(self) -> str | int:
+        return self.door if self.door is not None else self.accent
 
     PLINTH = PLINTH
     GROUND_H = GROUND_H
@@ -75,9 +96,10 @@ class FacadeRun:
         """True when no chunk border falls strictly inside ``[a, b)``."""
         return not any(a < c < b for c in self.cuts)
 
-    def bays(self, min_pier: int = 1) -> list[int]:
+    def bays(self, min_pier: int | None = None) -> list[int]:
         """Window bay starts, moved off chunk borders (a bay needs ``x-1 .. x+3`` free,
         room for shutters and an arch); a bay that cannot move is left out."""
+        min_pier = max(self.pier, min_pier or 1)
         starts = bay_starts(self.x0, self.x1, min_pier=min_pier)
         if not self.cuts:
             return starts
@@ -109,15 +131,18 @@ def paint_run(cv: Painter, r: FacadeRun, g: int) -> None:
 def pilasters(cv: Painter, r: FacadeRun, g: int) -> None:
     """Corner pilasters one cell proud of the wall; quoins alternate per brick course."""
     top = r.eave_k(g)
+    plain = r.stone if r.stone is not None else r.wall  # stone pilasters on dressed fronts
     for i in (r.x0, r.x1 - 1):
         for k in range(g + PLINTH, top, 3):
             course = (k - g) // 3
-            colour = r.trim if r.quoins and course % 2 == 0 else r.wall
+            colour = r.dress if r.quoins and course % 2 == 0 else plain
+            if r.quoins and r.stone is not None and course % 2:
+                colour = r.wall  # quoins on a dressed front: stone and wall courses
             cv.fill(i, i + 1, r.y0, r.wall_j, k, min(k + 3, top), colour, r.fid)
 
 
 def eave_cornice(cv: Painter, r: FacadeRun, eave: int) -> None:
-    cv.fill(r.x0, r.x1, r.y0, r.wall_j, eave - 2, eave, r.trim, r.fid)
-    cv.fill(r.x0, r.x1, r.y0 - 1, r.y0, eave - 1, eave, r.trim, r.fid)
+    cv.fill(r.x0, r.x1, r.y0, r.wall_j, eave - 2, eave, r.dress, r.fid)
+    cv.fill(r.x0, r.x1, r.y0 - 1, r.y0, eave - 1, eave, r.dress, r.fid)
     for i in range(r.x0, r.x1, 2):                                       # corbels
-        cv.fill(i, i + 1, r.y0 - 1, r.y0, eave - 2, eave - 1, r.trim, r.fid)
+        cv.fill(i, i + 1, r.y0 - 1, r.y0, eave - 2, eave - 1, r.dress, r.fid)

@@ -24,7 +24,8 @@ from blox_pipeline.voxelise.facade_runs import axis_edges, facade_stats
 import town_fixture as town
 
 CAT = load_catalogue()
-DETAIL = {CAT.id(n) for n in ("window_1x2x3", "window_1x2x2", "door_1x2x4", "arch_1x4")}
+DETAIL = {CAT.id(n) for n in ("window_1x2x3", "window_1x2x2", "door_1x2x4", "arch_1x4", "window_1x2x4",
+                             "shop_window_1x2x4")}
 
 
 def build_town(root, islands: bool = True):
@@ -63,8 +64,11 @@ def test_layout_verifies_with_placed_pieces(built):
     for (cx, cy), (t, rec) in chunks.items():
         assert verify_layout(t.color, t.feature, t.shape, rec, t.k0, t.I0, t.J0, border=1, placed=t.placed) == []
     names = Counter(CAT[int(x)].name for x in placed_all(chunks)["type"])
-    assert names["window_1x2x3"] >= 80 and names["door_1x2x4"] >= 4 and names["window_1x2x2"] >= 2
-    assert names["arch_1x4"] >= 2 and names["grille_1x2"] >= 4 and names["slope30_1x2"] >= 40
+    # the town lies in the old centre (look v2): tall sash windows, stone shop fronts, vents
+    assert names["window_1x2x3"] + names["window_1x2x4"] >= 80 and names["door_1x2x4"] >= 4
+    assert names["window_1x2x2"] >= 2 and names["window_1x2x4"] >= 40 and names["vent_1x2"] >= 4
+    # old-centre shops are stone fronts with lettered shop windows, not arcades
+    assert names["shop_window_1x2x4"] >= 4 and names["grille_1x2"] >= 4 and names["slope30_1x2"] >= 40
 
 
 def test_pieces_never_cross_chunk_borders(built):
@@ -88,7 +92,8 @@ def test_window_pieces_face_out_of_their_wall(built):
             km = (k0 + k1) // 2  # mid-height: below it may sit a flower box
             facing = rot_to_facing(int(row["rot"]) & 3).name
             owners = [r for r in world.facades if r.detail and r.fid == int(row["featureId"])
-                      and any(r.cell(a, d) == (i0, j0) for a in range(r.a0, r.a1) for d in (0, 1))]
+                      and any(r.cell(a, d) == (i0, j0) for a in range(r.a0, r.a1)
+                              for d in (0, 1, *(df for _, df, _, _ in r.dormers)))]
             assert owners, f"piece at {(i0, j0, k0)} belongs to no run"
             assert facing in {r.normal for r in owners}
             di, dj = DIRS[facing]

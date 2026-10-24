@@ -31,6 +31,11 @@ class StreetContext:
     street: BaseGeometry | None = None      # every street surface
     pedestrian: BaseGeometry | None = None  # pedestrian streets and squares in the centre
 
+    def area(self, probe: BaseGeometry) -> float:
+        """Street and square area (m²) inside ``probe``."""
+        geoms = [g for g in (self.street, self.pedestrian) if g is not None]
+        return float(shapely.union_all(geoms).intersection(probe).area) if geoms else 0.0
+
     def faces(self, probe: BaseGeometry) -> tuple[bool, bool]:
         """``(street, pedestrian)``: does the probe strip touch either area?"""
         st = self.street is not None and bool(shapely.intersects(self.street, probe))

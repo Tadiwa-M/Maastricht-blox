@@ -39,7 +39,8 @@ from blox_pipeline.voxelise.facade_runs import facade_stats
 import town_fixture as town
 
 CAT = load_catalogue()
-DETAIL = {CAT.id(n) for n in ("window_1x2x3", "window_1x2x2", "door_1x2x4", "arch_1x4")}
+DETAIL = {CAT.id(n) for n in ("window_1x2x3", "window_1x2x2", "door_1x2x4", "arch_1x4", "window_1x2x4",
+                             "shop_window_1x2x4")}
 
 
 def make_world(root, islands: bool = True):

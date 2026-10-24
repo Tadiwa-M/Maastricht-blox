@@ -16,7 +16,7 @@ from ..geo import CellBox
 from . import palette
 from .grid import FULL, RIDGE_I, RIDGE_J, SLOPE_E, SLOPE_N, SLOPE_S, SLOPE_W, SLOPE_STACK
 from .prepare_buildings import roof_pitch_ok
-from .raster import cover, sub
+from .raster import cell_hash, cover, sub
 from .world import PreparedBuilding, PreparedWorld, SurfacePatch
 
 NONE = -1
@@ -79,6 +79,7 @@ def build_layers(world: PreparedWorld, box: CellBox) -> Layers:
     for b in world.buildings_in(area):
         _building(world, b, L)
     _islands(world, L, area)
+    _heroes(world, L)
     _ridges(L)
     return L
 
@@ -118,7 +119,14 @@ def _patch(p: SurfacePatch, L: Layers) -> None:
         sub(L.deck_feat, L.box, win)[bridge] = p.feature_id
         mask = mask & ~bridge
     mask = mask & (sub(L.water_k, L.box, win) == NONE)  # no road/grass paint under water
-    sub(L.ground_color, L.box, win)[mask] = p.colour
+    colour = np.full(mask.shape, p.colour, np.uint8)
+    if p.colour == palette.idx("cobble_dark"):  # setts of a few tones, as in the owner's photos
+        ii, jj = np.meshgrid(np.arange(win.i0, win.i1), np.arange(win.j0, win.j1), indexing="ij")
+        h = cell_hash(ii, jj, seed=7) % 100
+        colour[h < 9] = palette.idx("dark_grey")
+        colour[(h >= 9) & (h < 15)] = palette.idx("limestone_dark")
+        colour[(h >= 15) & (h < 19)] = palette.idx("rail_brown")
+    sub(L.ground_color, L.box, win)[mask] = colour[mask]
     sub(L.ground_shape, L.box, win)[mask] = p.shape
     sub(L.ground_feat, L.box, win)[mask] = p.feature_id
 
@@ -156,6 +164,18 @@ def _islands(world: PreparedWorld, L: Layers, area) -> None:
             win, mask = hit
             cur = sub(L.island_k, L.box, win)
             cur[mask] = np.maximum(cur[mask], g.top_k(b))
+
+
+def _heroes(world: PreparedWorld, L: Layers) -> None:
+    """Hero models (heroes.py) are painted, not rasterised: their footprint rectangle is
+    occupied up to the model's top, like an island."""
+    for h in world.heroes:
+        i0, i1, j0, j1 = h.cells
+        a0, a1 = max(i0, L.box.i0), min(i1, L.box.i1)
+        b0, b1 = max(j0, L.box.j0), min(j1, L.box.j1)
+        if a0 < a1 and b0 < b1:
+            cur = L.island_k[a0 - L.box.i0: a1 - L.box.i0, b0 - L.box.j0: b1 - L.box.j0]
+            cur[:] = np.maximum(cur, h.top_k)
 
 
 def slope_shape(nx: float, ny: float) -> int:

@@ -97,7 +97,7 @@ def _dormer(cv: Painter, h: HouseSpec, x: int, eave: int) -> None:
     jf = h.wall_j + 1                       # dormer face sits one row up the slope
     k0 = eave + BRICK
     k1 = k0 + 9
-    cv.fill(x, x + 4, jf, jf + 5, k0, k1, h.wall, h.fid)
+    cv.fill(x, x + 4, jf, jf + 5, k0, k1, h.dormer or h.wall, h.fid)
     cv.fill(x, x + 4, jf, jf + 1, k0, k0 + 1, h.trim, h.fid)
     cv.clear(x + 1, x + 3, jf, jf + 1, k0 + 1, k0 + 1 + piece_h("window_1x2x2"))
     cv.place("window_1x2x2", x + 1, jf, k0 + 1, "S", h.trim, h.fid)

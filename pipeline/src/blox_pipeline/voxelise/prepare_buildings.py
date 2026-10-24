@@ -86,7 +86,14 @@ class _OsmIndex:
         return None
 
 
-def match_landmark(fp: BaseGeometry, named: list[OsmFeature]) -> Landmark | None:
+def match_landmark(fp: BaseGeometry, named: list[OsmFeature], bag_id: str = "") -> Landmark | None:
+    for lm in LANDMARKS:
+        if bag_id and bag_id in lm.bag_ids:
+            return lm
+    wikidata = {f.tags.get("wikidata") for f in named} - {None}
+    for lm in LANDMARKS:
+        if wikidata & set(lm.wikidata):
+            return lm
     names = [f.name or "" for f in named]
     for lm in LANDMARKS:
         if any(n.lower() in name.lower() for n in lm.names for name in names):
@@ -114,7 +121,7 @@ def prepare_buildings(buildings: list[Building], osm: OsmData, registry: Feature
         if fp is None or not planes:
             continue
         named = idx.overlapping_named(fp)
-        lm = match_landmark(fp, named)
+        lm = match_landmark(fp, named, b.bag_id)
         osm_b = idx.best_osm_building(fp)
         name = lm.display_name if lm else (osm_b.name if osm_b and osm_b.name else None)
         top, ground = b.roof_max_z, b.ground_z
@@ -140,9 +147,11 @@ def _wikidata(osm_b: OsmFeature | None) -> dict[str, str]:
 def _prepared(b: Building, fp: BaseGeometry, planes: list[RoofPlane], fid: int,
               lm: Landmark | None, church: bool) -> PreparedBuilding:
     year = b.year
-    wall = lm.wall if lm else colours.wall_colour(b.bag_id, year)
-    roof_p = lm.roof if lm else colours.roof_colour(b.bag_id, year, pitched=True)
-    roof_f = lm.roof if lm else colours.roof_colour(b.bag_id, year, pitched=False)
+    c = fp.representative_point()
+    centre = colours.old_centre(c.x, c.y, year)
+    wall = lm.wall if lm else colours.wall_colour(b.bag_id, year, centre)
+    roof_p = lm.roof if lm else colours.roof_colour(b.bag_id, year, pitched=True, centre=centre)
+    roof_f = lm.roof if lm else colours.roof_colour(b.bag_id, year, pitched=False, centre=centre)
     no_windows = (lm is not None and not lm.windows) or church
     accent = None
     if lm is not None and lm.accent is not None:
@@ -153,8 +162,18 @@ def _prepared(b: Building, fp: BaseGeometry, planes: list[RoofPlane], fid: int,
         wall=palette.idx(wall), roof_pitched=palette.idx(roof_p), roof_flat=palette.idx(roof_f),
         window_period=0 if no_windows else colours.window_period(b.bag_id),
         window_offset=stable_hash(b.bag_id) % 3, accent=accent,
-        year=year, facade=lm is None and not church,
+        year=year, facade=lm is None and not church, centre=centre,
+        hero=_hero(lm, fp),
     )
+
+
+def _hero(lm: Landmark | None, fp: BaseGeometry) -> str | None:
+    """The landmark's model name when it should replace this footprint's 3D BAG shape."""
+    if lm is None or lm.model is None:
+        return None
+    if lm.point is not None and fp.distance(Point(lm.point)) > lm.model_radius_m:
+        return None
+    return lm.model
 
 
 def roof_pitch_ok(plane: RoofPlane, flat_deg: float, steep_deg: float) -> bool:

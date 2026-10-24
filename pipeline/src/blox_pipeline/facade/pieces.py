@@ -46,10 +46,10 @@ def window(cv: Painter, h: "FacadeRun", x: int, k: int, piece: str = "window_1x2
 
 
 def door(cv: Painter, h: "FacadeRun", x: int, k: int) -> int:
-    """Panelled door (accent colour) in the wall plane; returns its top k."""
+    """Panelled door (``door_colour``: the accent unless set) in the wall plane; returns its top k."""
     top = k + piece_h("door_1x2x4")
     cv.clear(x, x + WINDOW_W, h.wall_j, h.wall_j + 1, k, top)
-    cv.place("door_1x2x4", x, h.wall_j, k, "S", h.accent, h.fid)
+    cv.place("door_1x2x4", x, h.wall_j, k, "S", h.door_colour, h.fid)
     cv.fill(x, x + WINDOW_W, h.glass_j, h.glass_j + 1, k, top, "dark_grey", h.fid)
     return top
 
@@ -62,7 +62,7 @@ def arch_over(cv: Painter, h: "FacadeRun", x: int, k: int) -> int:
     """
     top = k + piece_h("arch_1x4")
     cv.clear(x - 1, x + WINDOW_W + 1, h.wall_j, h.wall_j + 1, k, top)
-    cv.place("arch_1x4", x - 1, h.wall_j, k, "S", h.trim, h.fid)
+    cv.place("arch_1x4", x - 1, h.wall_j, k, "S", h.dress, h.fid)
     cv.fill(x, x + WINDOW_W, h.glass_j, h.glass_j + 1, k, top, "glass_light", h.fid)
     return top
 
@@ -72,7 +72,7 @@ def sloped_sill(cv: Painter, h: "FacadeRun", x: int, k_window: int) -> None:
     k = k_window - piece_h("slope30_1x2")
     cv.clear(x, x + WINDOW_W, h.y0, h.wall_j + 1, k, k_window)
     for i in range(x, x + WINDOW_W):
-        cv.place("slope30_1x2", i, h.y0, k, "S", h.trim, h.fid)
+        cv.place("slope30_1x2", i, h.y0, k, "S", h.dress, h.fid)
 
 
 def flower_box(cv: Painter, h: "FacadeRun", x: int, k_window: int, flowers: str) -> None:

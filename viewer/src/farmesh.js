@@ -91,11 +91,45 @@ function frontGlass(x0, x1, y0, y1, D) {
 
 const templates = new Map();
 
+/** Cheap shapes for the look-v2 pieces that are much smaller than their box (by name). */
+function lookFar(name, W, D, H) {
+  const zf = -D / 2;
+  switch (name) {
+    case 'balcony_2x4': // floor, front panel, two side panels (thin, iron reads dark from afar)
+      return [...box(-W / 2, W / 2, 0, 0.06, -D / 2, D / 2), ...box(-W / 2, W / 2, 0.06, H, zf, zf + 0.06),
+        ...box(-W / 2, -W / 2 + 0.05, 0.06, H, zf + 0.06, D / 2), ...box(W / 2 - 0.05, W / 2, 0.06, H, zf + 0.06, D / 2)];
+    case 'railing_1x2': return box(-W / 2, W / 2, 0.05, H, zf + 0.04, zf + 0.09);
+    case 'pediment_1x4': return [...box(-W / 2, W / 2, 0, 0.08, -D / 2, D / 2), ...frontTriangle(W, D, H)];
+    case 'lamp_double_1x3': {
+      const a = Math.min(W / 2 - 0.16, 0.55), y = H - 0.88;
+      return [...box(-0.07, 0.07, 0, y + 0.1, -0.07, 0.07), ...box(-a, a, y, y + 0.04, -0.03, 0.03),
+        ...box(-a - 0.12, -a + 0.12, y + 0.04, y + 0.62, -0.12, 0.12), ...box(a - 0.12, a + 0.12, y + 0.04, y + 0.62, -0.12, 0.12)];
+    }
+    case 'bollard_1x1': return box(-0.08, 0.08, 0, H * 0.95, -0.08, 0.08);
+    case 'chain_1x4': return box(-W / 2, W / 2, 0.12, 0.3, -0.02, 0.02);
+    default: return null;
+  }
+}
+
+/** Triangle (front view) from the cornice to the apex, extruded through the depth. */
+function frontTriangle(W, D, H) {
+  const b = 0.08, z0 = -D / 2, z1 = D / 2;
+  const L = [-W / 2, b], R = [W / 2, b], T = [0, H];
+  const at = (p, z) => [p[0], p[1], z];
+  return [
+    orient([at(L, z0), at(R, z0), at(T, z0)], 0, 0, -1),
+    orient([at(L, z1), at(T, z1), at(R, z1)], 0, 0, 1),
+    orient([at(L, z0), at(T, z0), at(T, z1), at(L, z1)], -H, W / 2, 0),
+    orient([at(R, z0), at(R, z1), at(T, z1), at(T, z0)], H, W / 2, 0),
+  ].map((f) => ({ ...f, part: 'body' }));
+}
+
 /** Cheap polygons of catalogue type t: [{ pts: [[x, y, z]...], n: [x, y, z], part }]. */
 export function farPiece(t, S, P) {
   if (templates.has(t.id)) return templates.get(t.id);
   const W = t.w * S, D = t.d * S, H = t.h * P;
-  let polys;
+  let polys = lookFar(t.name, W, D, H);
+  if (polys) { templates.set(t.id, polys); return polys; }
   switch (t.kind) {
     case 'slope': polys = prism(slopeProfile(t, S, P), W, D); break;
     case 'slope_double': polys = prism(ridgeProfile(t, S, P), W, D); break;
