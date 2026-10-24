@@ -1,5 +1,5 @@
 {
- "version": 2,
+ "version": 3,
  "note": "ids are stable and append-only; w along +i, d along +j at rot 0; h in plates; directional pieces' front faces +j at rot 0",
  "types": [
   {
@@ -429,6 +429,87 @@
    "w": 2,
    "d": 1,
    "h": 1,
+   "studs": "none"
+  },
+  {
+   "id": 48,
+   "name": "window_1x2x4",
+   "kind": "window",
+   "w": 2,
+   "d": 1,
+   "h": 12,
+   "studs": "all"
+  },
+  {
+   "id": 49,
+   "name": "shop_window_1x2x4",
+   "kind": "window",
+   "w": 2,
+   "d": 1,
+   "h": 12,
+   "studs": "all"
+  },
+  {
+   "id": 50,
+   "name": "balcony_2x4",
+   "kind": "fence",
+   "w": 4,
+   "d": 2,
+   "h": 5,
+   "studs": "none"
+  },
+  {
+   "id": 51,
+   "name": "railing_1x2",
+   "kind": "fence",
+   "w": 2,
+   "d": 1,
+   "h": 4,
+   "studs": "none"
+  },
+  {
+   "id": 52,
+   "name": "pediment_1x4",
+   "kind": "arch",
+   "w": 4,
+   "d": 1,
+   "h": 2,
+   "studs": "none"
+  },
+  {
+   "id": 53,
+   "name": "lamp_double_1x3",
+   "kind": "fence",
+   "w": 3,
+   "d": 1,
+   "h": 22,
+   "studs": "none"
+  },
+  {
+   "id": 54,
+   "name": "bollard_1x1",
+   "kind": "fence",
+   "w": 1,
+   "d": 1,
+   "h": 5,
+   "studs": "none"
+  },
+  {
+   "id": 55,
+   "name": "chain_1x4",
+   "kind": "fence",
+   "w": 4,
+   "d": 1,
+   "h": 3,
+   "studs": "none"
+  },
+  {
+   "id": 56,
+   "name": "vent_1x2",
+   "kind": "tile_grille",
+   "w": 2,
+   "d": 1,
+   "h": 2,
    "studs": "none"
   }
  ]
