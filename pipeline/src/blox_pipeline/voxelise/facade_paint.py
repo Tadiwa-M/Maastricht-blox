@@ -78,7 +78,7 @@ class TileCanvas:
                           flags=FLAG_NO_VARIATION if no_variation else 0)
         i0, i1, j0, j1, k0, k1 = placed_box(cat, rec[0])
         n = geo.CHUNK_STUDS
-        if i0 // n != (i1 - 1) // n or j0 // n != (j1 - 1) // n:
+        if i0 // n != (i1 - 1) // n or j0 // n != (j1 - 1) // n or not self._in_height(k0, k1):
             self.fill(i0, i1, j0, j1, k0, k1, STAND_IN.get(cat[piece].kind, c), feature)
             self.stand_ins += 1
             return i0, i1, j0, j1, k0, k1
@@ -98,6 +98,13 @@ class TileCanvas:
         t, b = self.tile, self.border
         ni, nj, _ = t.dims
         return t.I0 + b <= i0 and i1 <= t.I0 + ni - b and t.J0 + b <= j0 and j1 <= t.J0 + nj - b
+
+    def _in_height(self, k0: int, k1: int) -> bool:
+        """Box inside the tile's k range. The range comes from terrain and building tops, so a
+        piece can poke out (a step below a fallback building's ground, a pediment above a low
+        roof); it gets a voxel stand-in like a chunk-straddling piece instead."""
+        t = self.tile
+        return t.k0 <= k0 and k1 <= t.k0 + t.dims[2]
 
     def records(self) -> Records:
         return as_records(self.placed)

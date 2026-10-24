@@ -117,3 +117,18 @@ def test_tiles_never_get_hide_studs():
     rec = _lay(cv)
     tiles = rec[np.isin(rec["type"], [t.id for t in CAT.of_kind("tile")])]
     assert len(tiles) == 0 or not ((tiles["flags"] & FLAG_HIDE_STUDS) != 0).any()
+
+
+def test_canvas_stands_in_for_pieces_above_the_tile() -> None:
+    """City-build crash: a facade piece poking out of the tile's k range was kept as placed
+    and the layout rejected it ("placed pieces outside the tile")."""
+    from blox_pipeline.voxelise.facade_paint import TileCanvas
+    from blox_pipeline.voxelise.grid import VoxelTile
+
+    tile = VoxelTile.empty(-1, -1, 0, 66, 66, 4)  # one chunk plus its rim, only 4 plates tall
+    cv = TileCanvas(tile)
+    cv.place("window_1x2x4", 10, 10, 0, "N", "white")  # 4 bricks = 12 plates: too tall
+    assert len(cv.records()) == 0 and cv.stand_ins == 1
+    cv2 = TileCanvas(VoxelTile.empty(-1, -1, 0, 66, 66, 40))
+    cv2.place("window_1x2x4", 10, 10, 0, "N", "white")
+    assert len(cv2.records()) == 1
