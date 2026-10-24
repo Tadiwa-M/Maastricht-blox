@@ -89,7 +89,9 @@ def test_gabled_colours_and_features(gabled):
     roof_c = int(t.color[I - t.I0, J - t.J0, k_top - t.k0])
     wall_c = int(t.color[I - t.I0, J - t.J0, GROUND_K + 2 - t.k0])
     assert palette.entries()[roof_c][1] in ("slate", "roof_tile_red", "roof_tile_dark")
-    assert palette.entries()[wall_c][1] in ("mergel", "mergel_light", "mergel_dark", "brick_red")  # built 1650
+    # built 1650: the old-centre look (limestone and plaster, a little dark brick)
+    assert palette.entries()[wall_c][1] in ("limestone", "plaster_white", "plaster_cream", "plaster_grey",
+                                            "brick_dark_red", "mergel_light")
     fid = int(t.feature[I - t.I0, J - t.J0, k_top - t.k0])
     assert fid == 1 and int(t.feature[I - t.I0, J - t.J0, GROUND_K - t.k0]) == 0
     [feat] = build_features(world.registry)["features"]

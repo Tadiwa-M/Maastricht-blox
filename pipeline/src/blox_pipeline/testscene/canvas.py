@@ -1,4 +1,5 @@
-"""A small voxel-painting helper for hand-authored scenes (one chunk + 1-cell border).
+"""A small voxel-painting helper for hand-authored scenes (``ncx`` chunks in a row along i,
+plus a 1-cell border).
 
 Two ways to put things in the world:
 
@@ -6,7 +7,9 @@ Two ways to put things in the world:
 * ``place`` puts down one catalogue piece as-is (a window frame, an arch, a fence...),
   turned so its front faces ``facing``. Its cells must be air and stay air.
 
-All coordinates are *local* ``i, j`` (0..63 inside the chunk) and *global* ``k``.
+All coordinates are *local* ``i, j`` (``0 .. 64 * ncx`` along i, 0..63 along j) and
+*global* ``k``. A placed piece must lie inside one chunk (CONTRACT 4). ``chunk_view``
+cuts out one chunk (+ rim) for the layout.
 """
 
 from __future__ import annotations
@@ -25,12 +28,13 @@ from ..rotation import Facing
 
 @dataclass
 class Canvas:
-    """Voxel arrays for chunk ``(cx, cy)``; paint with *local* ``i, j`` (0..63) and global ``K``."""
+    """Voxel arrays for chunks ``(cx .. cx + ncx - 1, cy)``; paint with *local* ``i, j`` and global ``K``."""
 
     cx: int
     cy: int
     k0: int
     nz: int
+    ncx: int = 1
     palette: Palette = field(default_factory=load_palette)
     catalogue: Catalogue = field(default_factory=load_catalogue)
     placed: list[Records] = field(init=False, default_factory=list)
@@ -39,7 +43,7 @@ class Canvas:
     shape: NDArray[np.uint8] = field(init=False)
 
     def __post_init__(self) -> None:
-        dims = (CHUNK + 2, CHUNK + 2, self.nz)
+        dims = (CHUNK * self.ncx + 2, CHUNK + 2, self.nz)
         self.color = np.zeros(dims, np.uint8)
         self.feature = np.zeros(dims, np.uint32)
         self.shape = np.zeros(dims, np.uint8)
@@ -85,8 +89,10 @@ class Canvas:
                           flags=FLAG_NO_VARIATION if no_variation else 0)
         box = self._local_box(rec)
         i0, i1, j0, j1, k0, k1 = box
-        if i0 < 0 or j0 < 0 or i1 > CHUNK or j1 > CHUNK or k0 < self.k0 or k1 > self.k0 + self.nz:
+        if i0 < 0 or j0 < 0 or i1 > CHUNK * self.ncx or j1 > CHUNK or k0 < self.k0 or k1 > self.k0 + self.nz:
             raise ValueError(f"{piece} at ({i}, {j}, {k}) sticks out of the chunk")
+        if i0 // CHUNK != (i1 - 1) // CHUNK:
+            raise ValueError(f"{piece} at ({i}, {j}, {k}) straddles a chunk border")
         cells = self._box(*box)
         if self.color[cells].any():
             raise ValueError(f"{piece} at ({i}, {j}, {k}) facing {facing}: cells are not air")
@@ -104,6 +110,13 @@ class Canvas:
     def placed_records(self) -> Records:
         """All placed pieces as one record array (global coordinates)."""
         return as_records(self.placed)
+
+    def chunk_view(self, n: int) -> tuple[NDArray[np.uint8], NDArray[np.uint32], NDArray[np.uint8], int, int, Records]:
+        """``(color, feature, shape, I0, J0, placed)`` of chunk ``cx + n`` with its 1-cell rim."""
+        sl = slice(n * CHUNK, n * CHUNK + CHUNK + 2)
+        lo, hi = (self.cx + n) * CHUNK, (self.cx + n + 1) * CHUNK
+        own = [r for r in self.placed if lo <= int(r[0]["I"]) < hi]
+        return (self.color[sl], self.feature[sl], self.shape[sl], self.I0 + n * CHUNK, self.J0, as_records(own))
 
 
 def _overlap(a: tuple[int, ...], b: tuple[int, ...]) -> bool:

@@ -8,14 +8,16 @@ from numpy.typing import NDArray
 from .. import geo
 from ..geo import CellBox
 from . import palette
-from .facade_paint import paint_facades
+from .facade_paint import TileCanvas, paint_facades
+from .heroes import heroes_near, paint_heroes
+from .street_props import paint_props, props_near
 from .grid import FULL, SLOPE_STACK, TILE, WATER, VoxelTile
 from .layers import NONE, Layers, shifted
 from .trees import tree_cells
 from .world import PreparedWorld, TreeSpec
 
 NEIGHBOURS = ((1, 0), (-1, 0), (0, 1), (0, -1))
-TREE_MARGIN = 12  # cells; crowns are at most 5 m (10 studs) in radius
+TREE_MARGIN = 14  # cells; crowns are at most 5.5 m (11 studs) in radius, branch stubs 3
 
 
 def tile_box_for_chunk(cx: int, cy: int, border: int = 1) -> CellBox:
@@ -31,11 +33,17 @@ def voxelise_tile(world: PreparedWorld, layers: Layers, box: CellBox) -> VoxelTi
     tree_vox = [tree_cells(t, int(layers_ground(layers, t.I, t.J))) for t in trees]
     tree_vox = [tv for tv in tree_vox if tv is not None]
 
+    heroes = heroes_near(world, box.i0, box.j0, box.i1, box.j1)
+    props = props_near(world, box.i0, box.j0, box.i1, box.j1)
     bottom = _terrain_bottom(ext, cfg.terrain_depth_plates)
     tops = [L.ground_k, L.water_k, L.deck_k, L.bld_top]
     k_hi = int(max(int(a.max()) for a in tops))
     for cells in tree_vox:
         k_hi = max(k_hi, int(cells[2].max()))
+    for h in heroes:
+        k_hi = max(k_hi, h.top_k)
+    for p in props:
+        k_hi = max(k_hi, p.top_k)
     valid_bottom = bottom[L.ground_k != NONE]
     if k_hi < 0 or valid_bottom.size == 0:
         return VoxelTile.empty(box.i0, box.j0, 0, box.ni, box.nj, 0)
@@ -50,8 +58,12 @@ def voxelise_tile(world: PreparedWorld, layers: Layers, box: CellBox) -> VoxelTi
     _fill_decks(tile, L, kk)
     for cells in tree_vox:
         _fill_tree(tile, *cells)
-    if world.facades:  # last: facade pieces win over tree leaves and glass cells
-        paint_facades(tile, world.facades_near(box.i0, box.j0, box.i1, box.j1))
+    if world.facades or heroes or props:  # last: pieces win over tree leaves and glass cells
+        cv = TileCanvas(tile)
+        paint_heroes(cv, heroes)
+        paint_facades(tile, world.facades_near(box.i0, box.j0, box.i1, box.j1), canvas=cv)
+        paint_props(cv, props)
+        tile.placed = cv.records()
     return tile
 
 

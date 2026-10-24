@@ -8,6 +8,8 @@ from ..sources import SourceData
 from .features import FeatureRegistry
 from .prepare_buildings import prepare_buildings
 from .facade_runs import plan_facades
+from .heroes import take_heroes
+from .street_props import plan_props
 from .prepare_osm import island_paving, prepare_landuse, prepare_roads, prepare_trees, prepare_water, register_pois
 from .streets import street_context
 from .terrain_smooth import smooth_heights
@@ -37,6 +39,10 @@ def prepare_world(src: SourceData, cfg: VoxelConfig | None = None) -> PreparedWo
         streets=street_context(src.osm), islands=islands,
     )
     world.index()
+    if cfg.heroes:  # hand-authored landmark models replace their 3D BAG shape
+        take_heroes(world)
+    if cfg.street_props:
+        world.props = plan_props(world, src.osm)
     if cfg.facade_detail:
         world.facades = plan_facades(world)
     return world

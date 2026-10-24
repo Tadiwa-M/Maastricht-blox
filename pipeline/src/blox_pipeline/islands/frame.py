@@ -73,6 +73,11 @@ def _snap(line: float, lo: float) -> float:
 
 
 def island_frame(group: IslandGroup) -> IslandFrame:
+    pad = PAD
+    if any(b.hero for b in group.members):  # a hero model's perron reaches out on the square
+        from ..facade.stadhuis import FRONT_REACH
+
+        pad = max(PAD, FRONT_REACH + 4)
     probe = IslandPose((0.0, 0.0), group.yaw_deg)
     m = probe.local_affine()
     local = [affinity.affine_transform(b.footprint, m) for b in group.members]
@@ -92,10 +97,10 @@ def island_frame(group: IslandGroup) -> IslandFrame:
                     best_v, v_line = ln, (y0 + y1) / 2 - geo.Y0
                 elif abs(du) <= abs(dv) and ln > best_u:   # along local j: fixes u
                     best_u, u_line = ln, (x0 + x1) / 2 - geo.X0
-    u0 = _snap(u_line, umin - PAD * s)
-    v0 = _snap(v_line, vmin - PAD * s)
-    ni = math.ceil((umax - u0) / s) + PAD
-    nj = math.ceil((vmax - v0) / s) + PAD
+    u0 = _snap(u_line, umin - pad * s)
+    v0 = _snap(v_line, vmin - pad * s)
+    ni = math.ceil((umax - u0) / s) + pad
+    nj = math.ceil((vmax - v0) / s) + pad
     return IslandFrame(IslandPose(probe.to_world(u0, v0), group.yaw_deg), ni, nj)
 
 
@@ -109,6 +114,9 @@ class WorldStreets(StreetContext):
 
     def faces(self, probe: BaseGeometry) -> tuple[bool, bool]:
         return self.world_ctx.faces(affinity.affine_transform(probe, self.matrix))
+
+    def area(self, probe: BaseGeometry) -> float:
+        return self.world_ctx.area(affinity.affine_transform(probe, self.matrix))
 
 
 def _turn(pose: IslandPose, x: float, y: float) -> tuple[float, float]:
@@ -177,6 +185,10 @@ def local_world(world: PreparedWorld, group: IslandGroup, frame: IslandFrame) ->
         islands=local_neighbours(world, group, frame.pose),
     )
     lw.index()
+    if world.config.heroes:  # a hero model (heroes.py) on the island's own turned grid
+        from ..voxelise.heroes import take_heroes
+
+        take_heroes(lw)
     return lw
 
 

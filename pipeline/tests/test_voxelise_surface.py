@@ -60,8 +60,10 @@ def test_road_is_tile_layer_on_terrain():
     assert (c, s) == (palette.idx("asphalt"), TILE) and f >= 1
     assert t.column_top(I, J) == GK  # flush with the ground, not stacked on it
     assert cell(t, I, J, GK - 1)[0] == palette.idx("soil")
-    # 6 m wide: 12 cells across, grass beyond
-    Jn = geo.rd_to_grid(*rd(15, 19.25))[1]
+    # 6 m wide: 12 cells across, a dark stone kerb just outside (look v2), grass beyond
+    Jk = geo.rd_to_grid(*rd(15, 19.25))[1]
+    assert cell(t, I, Jk, GK)[0] == palette.idx("limestone_dark") and cell(t, I, Jk, GK)[2] == TILE
+    Jn = geo.rd_to_grid(*rd(15, 20.25))[1]
     assert cell(t, I, Jn, GK)[2] == FULL and cell(t, I, Jn, GK)[0] == palette.idx("grass")
     feats = build_features(world.registry)["features"]
     assert feats == [{"id": f, "kind": "street", "name": "Teststraat", "osmId": "way/1",
@@ -76,7 +78,7 @@ def test_pedestrian_in_centre_is_cobbled():
     b = CellBox(I - 32, J - 32, I + 32, J + 32)
     g = HeightGrid(b.i0 - 40, b.j0 - 40, np.full((b.ni + 80, b.nj + 80), GROUND, np.float32))
     t = tile_for(world_for(osm, g), b)
-    assert cell(t, I, J, GK)[:3:2] == (palette.idx("cobble_grey"), TILE)
+    assert cell(t, I, J, GK)[:3:2] == (palette.idx("cobble_dark"), TILE)  # dark wet setts (look v2)
 
 
 def test_water_surface_and_bed():

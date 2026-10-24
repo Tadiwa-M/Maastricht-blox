@@ -34,6 +34,11 @@ ROAD_RANK = {  # paint order: higher ranks drawn later (on top)
 WATERWAY_WIDTH_M = {"river": 12.0, "canal": 10.0, "stream": 2.5, "ditch": 1.5, "drain": 1.5}
 BRIDGE_VALUES = frozenset({"yes", "viaduct", "movable", "aqueduct", "cantilever", "covered", "trestle"})
 P_LANDUSE, P_ROAD_AREA, P_ROAD, P_RAIL, P_ISLAND = 10, 20, 30, 50, 60
+# Kerbs (look v2): a dark stone line just outside every car road, painted above footways,
+# pedestrian streets and squares but below the other car roads (so junctions stay open).
+KERB_ROADS = frozenset({"residential", "unclassified", "tertiary", "secondary", "primary", "trunk",
+                        "tertiary_link", "secondary_link", "primary_link"})
+P_KERB, KERB_M, KERB_COLOUR = P_ROAD + 3.5, 0.6, "limestone_dark"
 RAIL_BED_M, RAIL_GAUGE_M = 3.0, 1.435
 
 
@@ -127,8 +132,12 @@ def prepare_roads(osm: OsmData, dtm: HeightGrid, water: list[WaterBody], cfg: Vo
         hw = f.tags.get("highway", "")
         width = parse_width(f.tags) or ROAD_WIDTH_M.get(hw, 4.0)
         colour = palette.idx(colours.road_colour(f.tags, in_centre(f.geom)))
-        out.append(SurfacePatch(f.geom.buffer(width / 2), colour, TILE, P_ROAD + ROAD_RANK.get(hw, 4),
-                                _street_feature(f, reg), _deck(f, dtm, water, cfg)))
+        surface = f.geom.buffer(width / 2)
+        deck = _deck(f, dtm, water, cfg)
+        out.append(SurfacePatch(surface, colour, TILE, P_ROAD + ROAD_RANK.get(hw, 4), _street_feature(f, reg), deck))
+        if hw in KERB_ROADS and deck is None:
+            kerb = surface.buffer(KERB_M, cap_style="flat").difference(surface)
+            out.append(SurfacePatch(kerb, palette.idx(KERB_COLOUR), TILE, P_KERB))
     for f in sorted(osm.road_areas, key=lambda f: f.osm_id):
         tags = f.tags if "highway" in f.tags else {**f.tags, "highway": "pedestrian"}
         name = "asphalt" if f.tags.get("amenity") == "parking" else colours.road_colour(tags, in_centre(f.geom))
@@ -177,8 +186,8 @@ def prepare_trees(osm: OsmData, dtm: HeightGrid, dsm: HeightGrid | None) -> list
     for key, p in sorted(points, key=lambda t: t[0]):
         h = stable_hash(key)
         I, J = geo.rd_to_grid(p.x, p.y)
-        height = _dsm_height(I, J, dtm, dsm) or (6.0 + (h % 600) / 100.0)
-        crown = float(np.clip(0.32 * height, 1.5, 5.0))
+        height = _dsm_height(I, J, dtm, dsm) or (8.0 + (h % 700) / 100.0)  # plane/chestnut: 8-15 m
+        crown = float(np.clip(0.36 * height, 2.5, 5.5))
         main, alt = (leaf, leaf_light) if h & 1 else (leaf_light, leaf)
         out.append(TreeSpec(I, J, height, crown, main, alt, h))
     return out
