@@ -32,6 +32,7 @@ FRONT_REACH = 10      # rows the model reaches out in front of the footprint
 MIN_W, MIN_D = 44, 36  # smallest footprint (studs) the model fits
 WALL, STONE, PLINTH = "limestone_dark", "limestone", "dark_grey"
 FRAME, ROOF, LEAD, GOLD = "white", "slate", "lead_grey", "gold"
+BAND, CARVING, IRON, BRONZE = "dark_grey", "mergel", "black", "dark_tan"
 G_FLOOR = 9            # raised ground floor above the ground line (plates)
 STOREY = 28            # plates per storey (5.6 m)
 CHUNK = 64
@@ -108,8 +109,9 @@ def side(p: Painter, length: int, g: int, fid: int, skip: tuple[int, int] = (0, 
 
 
 def _arcade(p: Painter, xa: int, g: int, fid: int) -> None:
-    """3 arches over 4-stud openings at row -5, the loggia behind (rows -4, -3), the
-    balcony on top with a balustrade, and the loggia's back wall (door, two windows)."""
+    """3 round arches on piers at row -5 (a low balustrade in each opening), the loggia
+    behind (rows -4, -3), the full-width balustraded balcony on top, and the loggia's back
+    wall (a door and two windows)."""
     G = g + G_FLOOR
     top = G + 15                                       # springing of the arches
     p.fill(xa, xa + 22, -5, 0, g - 2, G, PLINTH, fid)    # podium under the arcade
@@ -123,58 +125,136 @@ def _arcade(p: Painter, xa: int, g: int, fid: int) -> None:
             p.fill(x, x + 6, -5, -4, top, top + 6, STONE, fid)
             p.clear(x + 1, x + 5, -5, -4, top, top + 3)
             p.clear(x + 2, x + 4, -5, -4, top + 3, top + 5)
-        place_or(p, "window_1x2x4", x + 2, -2, G + 2, FRAME, fid, "glass") if q != 1 else \
+        place_or(p, "fence_1x4", x + 1, -5, G, STONE, fid, STONE)      # balustrade in the arch
+        for xx in (x, x + 5):                                          # piers with impost blocks
+            p.fill(xx, xx + 1, -6, -5, G, top, STONE, fid)
+            p.fill(xx, xx + 1, -6, -5, top - 1, top + 1, WALL, fid)
+        if q != 1:
+            place_or(p, "window_1x2x4", x + 2, -2, G + 2, FRAME, fid, "glass")
+        else:
             place_or(p, "door_1x2x4", x + 2, -2, G, FRAME, fid, "black")
-        p.fill(x + 2, x + 4, -1, 0, G, G + 14, "black", fid)
+            place_or(p, "window_1x2x2", x + 2, -2, G + 12, FRAME, fid, "glass")  # fanlight
+        p.fill(x + 2, x + 4, -1, 0, G, G + 18, "black", fid)
+        p.fill(x + 2, x + 4, -6, -5, top + 5, top + 7, STONE, fid)     # keystone
     F1 = G + STOREY + 1
-    p.fill(xa, xa + 22, -5, -4, F1 - 2, F1, STONE, fid)                 # balcony cornice
-    p.fill(xa, xa + 22, -6, -5, F1 - 1, F1, STONE, fid)
-    for x in (xa, xa + 21):
-        p.fill(x, x + 1, -5, -4, F1, F1 + 4, STONE, fid)                # balustrade posts
-    for x in range(xa + 1, xa + 21 - 3, 5):
-        place_or(p, "fence_1x4", x, -5, F1, STONE, fid, STONE)
-        if x + 4 < xa + 21:
-            p.fill(x + 4, x + 5, -5, -4, F1, F1 + 4, STONE, fid)
-    p.fill(xa, xa + 22, -5, -4, F1 + 3, F1 + 4, STONE, fid)             # top rail
+    p.fill(xa - 1, xa + 23, -6, -4, F1 - 3, F1, STONE, fid)            # balcony slab and cornice
+    p.fill(xa - 1, xa + 23, -7, -6, F1 - 1, F1, STONE, fid)
+    for x in range(xa, xa + 22, 3):
+        p.fill(x, x + 1, -7, -6, F1 - 3, F1 - 1, STONE, fid)           # consoles
+    _balustrade(p, xa - 1, xa + 23, -6, F1, fid)
+
+
+def _balustrade(p: Painter, x0: int, x1: int, y: int, k: int, fid: int, colour: str = STONE) -> None:
+    """Posts, ``fence_1x4`` balusters between them and a top rail, along row ``y``."""
+    x = x0
+    p.fill(x0, x0 + 1, y, y + 1, k, k + 4, colour, fid)
+    x = x0 + 1
+    while x + 5 <= x1:
+        place_or(p, "fence_1x4", x, y, k, colour, fid, colour)
+        p.fill(x + 4, x + 5, y, y + 1, k, k + 4, colour, fid)
+        x += 5
+    if x < x1:
+        p.fill(x, x1, y, y + 1, k, k + 4, colour, fid)
+    p.fill(x0, x1, y, y + 1, k + 3, k + 4, colour, fid)
 
 
 def _perron(p: Painter, xa: int, g: int, fid: int) -> None:
-    """Landing in front of the arcade (rows -9..-6) with a balustrade, and a flight of steps
-    down each side (the double stair)."""
+    """Landing in front of the arcade (rows -9..-6) with a balustrade, and the double stair:
+    a flight down each side, its outer edge a stone parapet that steps down with it."""
     G = g + G_FLOOR
     p.fill(xa, xa + 22, -9, -5, g - 2, G, PLINTH, fid)
     p.fill(xa, xa + 22, -9, -5, G - 1, G, STONE, fid, TILE)
-    for x in range(xa + 1, xa + 21 - 3, 5):
-        place_or(p, "fence_1x4", x, -9, G, STONE, fid, STONE)
-    for x in range(xa, xa + 22, 5):
-        p.fill(x, x + 1, -9, -8, G, G + 4, STONE, fid)
+    _balustrade(p, xa, xa + 22, -9, G, fid)
     for s in range(1, G_FLOOR + 1):                # steps: one stud out, one plate down
         for x in (xa - s, xa + 21 + s):
             p.fill(x, x + 1, -9, -5, g - 2, G - 1 - s, PLINTH, fid)
             p.fill(x, x + 1, -9, -5, G - 1 - s, G - s, STONE, fid, TILE)
+            p.fill(x, x + 1, -10, -9, g - 2, G + 3 - s, STONE, fid)     # parapet
+    for x in (xa - G_FLOOR - 1, xa + 22 + G_FLOOR):                  # newel posts
+        p.fill(x, x + 1, -10, -9, g - 2, g + 6, STONE, fid)
+        p.place("round_tile_1x1", x, -10, g + 6, "N", STONE, fid) if fits(p, "round_tile_1x1", x, -10) else None
+
+
+def _fence(p: Painter, x0: int, x1: int, y: int, g: int, fid: int) -> None:
+    """Wrought-iron railing (black ``fence_1x4`` under a rail, on a stone kerb) with gilt
+    post tips, and a gate between two tall stone piers in the middle."""
+    p.fill(x0, x1, y, y + 1, g - 2, g, PLINTH, fid)
+    n = (x1 - x0 - 1) // 5
+    gate = n // 2
+    for q in range(n):
+        x = x0 + 5 * q
+        if q in (gate, gate + 1):
+            p.fill(x, x + 1, y, y + 1, g, g + 9, STONE, fid)                # gate pier
+            p.fill(x, x + 1, y, y + 1, g + 9, g + 10, PLINTH, fid)
+        else:
+            p.fill(x, x + 1, y, y + 1, g, g + 5, IRON, fid)
+            if fits(p, "round_tile_1x1", x, y):
+                p.place("round_tile_1x1", x, y, g + 5, "N", GOLD, fid)
+        place_or(p, "fence_1x4", x + 1, y, g, IRON, fid, None)
+        p.fill(x + 1, x + 5, y, y + 1, g + 3, g + 4, IRON, fid)               # top rail
+        if q == gate:
+            p.fill(x + 1, x + 5, y, y + 1, g + 5, g + 6, IRON, fid)           # gate overthrow
+    x = x0 + 5 * n
+    p.fill(x, x + 1, y, y + 1, g, g + 9 if n in (gate, gate + 1) else g + 5, STONE if n == gate + 1 else IRON, fid)
 
 
 def _avant_corps(p: Painter, xa: int, g: int, fid: int) -> None:
+    """The risalit above the arcade: first floor with three tall windows behind the balcony,
+    an attic storey that rises above the wings' cornice, a pediment with a carved relief
+    and carved ornaments on its corners."""
     G = g + G_FLOOR
     F1, C = G + STOREY + 1, G + 2 * STOREY + 1
-    p.fill(xa, xa + 22, -2, 1, F1, C, WALL, fid)
+    A = C + 4                                      # attic floor
+    T = A + 20                                     # attic cornice
+    p.fill(xa, xa + 22, -2, 6, F1, T, WALL, fid)
     for q in range(3):
         x = xa + 4 + 6 * q
-        p.clear(x, x + 2, -2, -1, F1 + 4, F1 + 22)
         place_or(p, "window_1x2x4", x, -2, F1 + 4, FRAME, fid, "glass")
         place_or(p, "window_1x2x2", x, -2, F1 + 16, FRAME, fid, "glass")
         p.fill(x, x + 2, -1, 0, F1 + 4, F1 + 22, "black", fid)
         p.fill(x - 1, x + 3, -3, -2, F1 + 22, F1 + 23, STONE, fid)
-    for x in (xa + 1, xa + 7, xa + 8, xa + 13, xa + 14, xa + 20):
-        p.fill(x, x + 1, -3, -2, F1 + 4, C, STONE, fid)                # paired pilasters
-    _cornice(p, xa, xa + 22, -3, C, fid)
-    for s in range(12):                               # stepped pediment, 1 plate per 2 studs
-        a, b = xa - 1 + s * 2, xa + 23 - s * 2
+        place_or(p, "pediment_1x4", x - 1, -3, F1 + 23, STONE, fid, STONE)  # window pediments
+        place_or(p, "window_1x2x3", x, -2, A + 5, FRAME, fid, "glass")      # attic windows
+        p.fill(x, x + 2, -1, 0, A + 5, A + 14, "black", fid)
+        p.fill(x - 1, x + 3, -3, -2, A + 4, A + 5, STONE, fid)
+    for x in (xa, xa + 7, xa + 8, xa + 13, xa + 14, xa + 21):
+        p.fill(x, x + 1, -3, -2, F1, T, STONE, fid)                    # paired giant pilasters
+    for k in range(F1, T, 6):                                          # rusticated quoins
+        p.fill(xa - 1, xa, -2, 0, k, k + 3, STONE, fid)
+        p.fill(xa + 22, xa + 23, -2, 0, k, k + 3, STONE, fid)
+    _cornice(p, xa, xa + 22, -3, C, fid)                               # band at the wings' eaves
+    _cornice(p, xa, xa + 22, -3, T, fid)
+    p.fill(xa - 1, xa + 23, -2, 6, T + 3, T + 4, ROOF, fid, TILE)      # roof behind the pediment
+    top = T + 4
+    for s in range(13):                               # pediment, 1 plate per stud
+        a, b = xa - 1 + s, xa + 23 - s
         if b - a < 2:
             break
-        p.fill(a, b, -4, 1, C + 4 + s, C + 5 + s, STONE if s == 0 else WALL, fid)
-    p.fill(xa + 7, xa + 15, -4, -3, C + 6, C + 9, PLINTH, fid)            # carved tympanum
-    p.fill(xa + 10, xa + 12, -4, -3, C + 9, C + 11, PLINTH, fid)
+        p.fill(a, b, -4, -2, top + s, top + s + 1, STONE if s == 0 else WALL, fid)
+        p.fill(a, a + 1, -5, -4, top + s, top + s + 1, STONE, fid)    # raking cornice
+        p.fill(b - 1, b, -5, -4, top + s, top + s + 1, STONE, fid)
+    for dx, dk, w, h in ((-6, 2, 3, 2), (3, 2, 3, 2), (-3, 2, 6, 3), (-2, 5, 4, 2), (-1, 7, 2, 2)):
+        p.fill(xa + 11 + dx, xa + 11 + dx + w, -5, -4, top + dk, top + dk + h, CARVING, fid)  # relief
+    for x in (xa - 1, xa + 21):                        # carved corner ornaments (cartouches)
+        p.fill(x, x + 2, -4, -2, top, top + 7, CARVING, fid)
+        p.fill(x, x + 2, -5, -4, top + 2, top + 5, CARVING, fid)
+        p.place("round_tile_1x1", x, -4, top + 7, "N", CARVING, fid) if fits(p, "round_tile_1x1", x, -4) else None
+
+
+def _side_pediment(p: Painter, length: int, C: int, fid: int) -> None:
+    """A low pediment over the middle of a side front (side frame, row 0 proud)."""
+    w = min(30, length - 12)
+    a0 = (length - w) // 2
+    for s in range(w // 2):
+        a, b = a0 + s, a0 + w - s
+        if b - a < 2:
+            break
+        p.fill(a, b, 0, 3, C + 4 + s, C + 5 + s, STONE if s == 0 else WALL, fid)
+        p.fill(a, a + 1, -1, 0, C + 4 + s, C + 5 + s, STONE, fid)
+        p.fill(b - 1, b, -1, 0, C + 4 + s, C + 5 + s, STONE, fid)
+    m = length // 2
+    p.fill(m - 3, m + 3, -1, 0, C + 6, C + 8, CARVING, fid)
+    p.fill(m - 1, m + 1, -1, 0, C + 8, C + 10, CARVING, fid)
 
 
 def _cornice(p: Painter, x0: int, x1: int, y: int, C: int, fid: int) -> None:
@@ -185,8 +265,8 @@ def _cornice(p: Painter, x0: int, x1: int, y: int, C: int, fid: int) -> None:
 
 
 def _hip_roof(p: Painter, W: int, D: int, k0: int, levels: int, fid: int) -> int:
-    """Hipped slate roof: per level a ring of slope stacks with a full ring behind; returns
-    the k of the flat deck on top."""
+    """Hipped slate roof: per level a ring of slope stacks with a full ring behind, lead on
+    the hips; returns the k of the flat deck on top."""
     for t in range(levels):
         a0, a1, b0, b1, k = t, W - t, t, D - t, k0 + 3 * t
         p.fill(a0, a1, b0 + 1, b1 - 1, k, k + 3, ROOF, fid)
@@ -195,6 +275,8 @@ def _hip_roof(p: Painter, W: int, D: int, k0: int, levels: int, fid: int) -> int
         p.fill(a0, a1, b1 - 1, b1, k, k + 3, ROOF, fid, SLOPE_N)
         p.fill(a0, a0 + 1, b0 + 1, b1 - 1, k, k + 3, ROOF, fid, SLOPE_W)
         p.fill(a1 - 1, a1, b0 + 1, b1 - 1, k, k + 3, ROOF, fid, SLOPE_E)
+        for x, y, sh in ((a0, b0, SLOPE_S), (a1 - 1, b0, SLOPE_S), (a0, b1 - 1, SLOPE_N), (a1 - 1, b1 - 1, SLOPE_N)):
+            p.fill(x, x + 1, y, y + 1, k, k + 3, LEAD, fid, sh)          # lead-covered hips
     t = levels
     deck = k0 + 3 * t
     p.fill(t, W - t, t, D - t, deck, deck + 1, LEAD, fid, TILE)
@@ -222,85 +304,146 @@ def _ring(p: Painter, cx: int, cy: int, r: float, k0: int, k1: int, colour: str,
             p.fill(cx + dx, cx + dx + 1, cy + dy, cy + dy + 1, k0, k1, colour, fid)
 
 
-def _open_stage(p: Painter, cx: int, cy: int, r: float, k0: int, h: int, fid: int) -> None:
-    """Octagonal stage with an arched opening in each cardinal face (white jambs and round
-    heads) and a round window in each diagonal face, a dark core so the openings read deep."""
+def _faces(n: int):
+    """Cell of each cardinal face of an octagon (outer row ``n``) at offset ``t`` along it."""
+    return [lambda t: (t, -n), lambda t: (t, n - 1), lambda t: (-n, t), lambda t: (n - 1, t)]
+
+
+def _diagonal_windows(p: Painter, cx: int, cy: int, r: float, k: int, fid: int, h: int = 3) -> None:
+    """Small round windows (glass with a white rim) on the four diagonal faces."""
+    d = int(r * 0.7)
+    for sx, sy in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
+        x, y = cx + (d if sx > 0 else -d - 1), cy + (d if sy > 0 else -d - 1)
+        p.fill(x, x + 1, y, y + 1, k - 1, k + h + 1, FRAME, fid)
+        p.fill(x, x + 1, y, y + 1, k, k + h, "glass", fid)
+
+
+def _arched_stage(p: Painter, cx: int, cy: int, r: float, k0: int, h: int, fid: int, glazed: bool,
+                  bells: bool = False) -> None:
+    """Octagonal stage with a tall round-headed arch in each cardinal face, white columns at
+    the jambs and a white arch band; ``glazed`` fills the arches with a window (glass and
+    a white mullion), else they are open on a dark room (with bronze bells)."""
     _ring(p, cx, cy, r, k0, k0 + h, LEAD, fid, inner=r - 1)
-    _ring(p, cx, cy, r - 3, k0, k0 + h, "dark_grey", fid)   # the bells' room, in shadow
+    _ring(p, cx, cy, r - 3, k0, k0 + h, "dark_grey", fid)
     n = int(math.ceil(r))
     w = max(1, int(r * 0.3))
-    faces = [lambda t: (t, -n), lambda t: (t, n - 1), lambda t: (-n, t), lambda t: (n - 1, t)]
-    for face in faces:
+    for face in _faces(n):
         for t in range(-w, w):
             ax, ay = face(t)
-            p.clear(cx + ax, cx + ax + 1, cy + ay, cy + ay + 1, k0 + 2, k0 + h - 3)
+            c = (cx + ax, cx + ax + 1, cy + ay, cy + ay + 1)
+            p.clear(*c, k0 + 2, k0 + h - 3)
+            if glazed:
+                p.fill(*c, k0 + 2, k0 + h - 3, FRAME if t == 0 else "glass", fid)
             if t in (-w, w - 1):  # round head: the outer columns close lower
-                p.fill(cx + ax, cx + ax + 1, cy + ay, cy + ay + 1, k0 + h - 6, k0 + h - 3, FRAME, fid)
-        for t in (-w - 1, w):     # white jambs either side of the opening
+                p.fill(*c, k0 + h - 6, k0 + h - 3, FRAME, fid)
+        for t in (-w - 1, w):     # white columns either side of the arch
             ax, ay = face(t)
             p.fill(cx + ax, cx + ax + 1, cy + ay, cy + ay + 1, k0 + 2, k0 + h - 3, FRAME, fid)
         for t in range(-w - 1, w + 1):
             ax, ay = face(t)
             p.fill(cx + ax, cx + ax + 1, cy + ay, cy + ay + 1, k0 + h - 3, k0 + h - 2, FRAME, fid)
-    d = int(r * 0.7)
-    for sx, sy in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
-        x, y = cx + (d if sx > 0 else -d - 1), cy + (d if sy > 0 else -d - 1)
-        p.fill(x, x + 1, y, y + 1, k0 + h // 2 - 2, k0 + h // 2 + 2, FRAME, fid)
+            p.fill(cx + ax, cx + ax + 1, cy + ay, cy + ay + 1, k0, k0 + 2, FRAME, fid)  # sill band
+    if bells:
+        m = int(math.ceil(r - 3))
+        for face in _faces(m):
+            ax, ay = face(-1)
+            bx, by = face(0)
+            p.fill(min(cx + ax, cx + bx), max(cx + ax, cx + bx) + 1, min(cy + ay, cy + by),
+                   max(cy + ay, cy + by) + 1, k0 + h // 2 - 2, k0 + h // 2 + 3, BRONZE, fid)
+    _diagonal_windows(p, cx, cy, r, k0 + h // 2, fid)
 
 
-# tower stages, bottom to top: (kind, radius, plates)
-TOWER = (("base", 10.5, 12), ("trim", 10.5, 1), ("open", 9.5, 30), ("gallery", 10.5, 2),
-         ("clock", 8.5, 16), ("trim", 8.5, 1), ("open", 7.5, 18), ("dome", 0, 15), ("lantern", 1.5, 6),
-         ("vane", 0, 12))
+def _square_base(p: Painter, cx: int, cy: int, r: int, k: int, h: int, fid: int) -> None:
+    """Square lead-grey plinth stage on the roof with a dormer facing the front."""
+    p.fill(cx - r, cx + r, cy - r, cy + r, k, k + h, LEAD, fid)
+    p.fill(cx - r - 1, cx + r + 1, cy - r - 1, cy + r + 1, k + h - 1, k + h, FRAME, fid)
+    x, y = cx - 2, cy - r - 2
+    p.fill(x - 1, x + 5, y, y + 3, k, k + 8, LEAD, fid)                     # dormer
+    place_or(p, "window_1x2x2", x + 1, y, k + 1, FRAME, fid, "glass")
+    p.fill(x + 1, x + 3, y + 1, y + 2, k + 1, k + 7, "black", fid)
+    p.fill(x - 1, x, y - 1, y + 3, k + 8, k + 11, LEAD, fid, SLOPE_W)
+    p.fill(x + 4, x + 5, y - 1, y + 3, k + 8, k + 11, LEAD, fid, SLOPE_E)
+    p.fill(x, x + 4, y - 1, y + 3, k + 8, k + 11, LEAD, fid)
+    p.fill(x + 1, x + 3, y - 1, y + 3, k + 11, k + 14, LEAD, fid)
+
+
+# tower stages, bottom to top: (kind, radius, plates), as in the owner's close photo
+TOWER = (("base", 11, 12), ("oculi", 9.5, 6), ("windows", 9.5, 28), ("trim", 9.5, 1), ("clock", 8.5, 16),
+         ("gallery", 10.5, 2), ("belfry", 7.5, 20), ("trim", 7.5, 1), ("dome", 0, 16), ("lantern", 2.0, 7),
+         ("vane", 0, 14))
 
 
 def tower_height() -> int:
-    return sum(h for _, _, h in TOWER)
+    return sum(h for _, _, h in TOWER) + 3  # + the gallery parapet over the next stage's foot
 
 
 def tower(p: Painter, cx: int, cy: int, k: int, fid: int) -> int:
-    """The octagonal, lead-grey bell tower standing on the roof deck at ``k``; returns its top."""
+    """The lead-grey bell tower standing on the roof deck at ``k``; returns its top: a square
+    base with a dormer, a row of oval oculi, an octagon of tall arched windows, the clock
+    stage (gold dials, round windows), a projecting balustraded gallery with flags, the open
+    belfry with its bells, a bell-shaped dome, a lantern, a gilded orb and the vane."""
     for kind, r, h in TOWER:
         n = int(math.ceil(r))
         if kind == "base":
-            _ring(p, cx, cy, r, k, k + h, LEAD, fid)
-            for ax, ay, wx, wy in ((cx - 1, cy - n, 2, 1), (cx - 1, cy + n - 1, 2, 1),
-                                   (cx - n, cy - 1, 1, 2), (cx + n - 1, cy - 1, 1, 2)):
-                p.fill(ax, ax + wx, ay, ay + wy, k + 4, k + 8, FRAME, fid)        # oculi
-                p.fill(ax + (wx > 1) * 0, ax + wx, ay, ay + wy, k + 5, k + 7, "glass", fid)
-        elif kind == "trim":
+            _square_base(p, cx, cy, int(r), k, h, fid)
+        elif kind == "oculi":
             _ring(p, cx, cy, r, k, k + h, FRAME, fid)
-        elif kind == "open":
-            _open_stage(p, cx, cy, r, k, h, fid)
+            for dx, dy in _octagon(r):
+                if (dx, dy) not in set(_octagon(r - 1)) and (dx + dy) % 3 == 0:
+                    p.fill(cx + dx, cx + dx + 1, cy + dy, cy + dy + 1, k + 2, k + 4, "glass", fid)
+        elif kind == "windows":
+            _arched_stage(p, cx, cy, r, k, h, fid, glazed=True)
+        elif kind == "trim":
+            _ring(p, cx, cy, r + 0.5, k, k + h, FRAME, fid)
+        elif kind == "clock":
+            _ring(p, cx, cy, r, k, k + h, LEAD, fid)
+            for ax, ay, wx, wy in ((cx - 2, cy - n, 4, 1), (cx - 2, cy + n - 1, 4, 1),
+                                   (cx - n, cy - 2, 1, 4), (cx + n - 1, cy - 2, 1, 4)):
+                p.fill(ax, ax + wx, ay, ay + wy, k + 3, k + 13, "black", fid)      # dial ring
+                if wx > 1:
+                    p.fill(ax + 1, ax + 3, ay, ay + 1, k + 4, k + 12, GOLD, fid)
+                    p.fill(ax, ax + 4, ay, ay + 1, k + 6, k + 10, GOLD, fid)
+                    p.fill(ax + 2, ax + 3, ay, ay + 1, k + 7, k + 11, "black", fid)  # hands
+                    p.fill(ax + 1, ax + 3, ay, ay + 1, k + 7, k + 8, "black", fid)
+                else:
+                    p.fill(ax, ax + 1, ay + 1, ay + 3, k + 4, k + 12, GOLD, fid)
+                    p.fill(ax, ax + 1, ay, ay + 4, k + 6, k + 10, GOLD, fid)
+                    p.fill(ax, ax + 1, ay + 2, ay + 3, k + 7, k + 11, "black", fid)
+                    p.fill(ax, ax + 1, ay + 1, ay + 3, k + 7, k + 8, "black", fid)
+            _diagonal_windows(p, cx, cy, r, k + 6, fid)
         elif kind == "gallery":
             _ring(p, cx, cy, r, k, k + h, FRAME, fid)
             _ring(p, cx, cy, r, k + h, k + h + 3, LEAD, fid, inner=r - 1)   # parapet
             for x0, y0, face in ((cx - 2, cy - n, "S"), (cx - 2, cy + n - 1, "N")):
                 p.clear(x0, x0 + 4, y0, y0 + 1, k + h, k + h + 3)
-                place_or(p, "fence_1x4", x0, y0, k + h, FRAME, fid, FRAME, face)
+                place_or(p, "fence_1x4", x0, y0, k + h, LEAD, fid, LEAD, face)
             for x0, y0, face in ((cx - n, cy - 2, "W"), (cx + n - 1, cy - 2, "E")):
                 p.clear(x0, x0 + 1, y0, y0 + 4, k + h, k + h + 3)
-                place_or(p, "fence_1x4", x0, y0, k + h, FRAME, fid, FRAME, face)
-        elif kind == "clock":
-            _ring(p, cx, cy, r, k, k + h, LEAD, fid)
-            for ax, ay, wx, wy in ((cx - 2, cy - n, 4, 1), (cx - 2, cy + n - 1, 4, 1),
-                                   (cx - n, cy - 2, 1, 4), (cx + n - 1, cy - 2, 1, 4)):
-                p.fill(ax, ax + wx, ay, ay + wy, k + 4, k + 12, GOLD, fid)        # gold dials
-                if wx > 1:
-                    p.fill(ax + 1, ax + 3, ay, ay + 1, k + 7, k + 9, "black", fid)  # hands
-                else:
-                    p.fill(ax, ax + 1, ay + 1, ay + 3, k + 7, k + 9, "black", fid)
+                place_or(p, "fence_1x4", x0, y0, k + h, LEAD, fid, LEAD, face)
+            for fx, fy, flag in ((cx - 5, cy - n + 2, ("bus_red", "white", "dark_blue")),
+                                 (cx + 4, cy - n + 2, ("dark_blue", "dark_blue", "signal_yellow"))):
+                p.fill(fx, fx + 1, fy, fy + 1, k + h + 3, k + h + 15, "black", fid)  # flag pole
+                for q, c in enumerate(flag):                                       # the flag
+                    p.fill(fx, fx + 1, fy - 3, fy, k + h + 14 - 2 * q, k + h + 15 - 2 * q + 1, c, fid)
+        elif kind == "belfry":
+            _arched_stage(p, cx, cy, r, k + 3, h - 3, fid, glazed=False, bells=True)
+            _ring(p, cx, cy, r, k, k + 3, LEAD, fid)
         elif kind == "dome":
             kk = k
-            for rr, hh in ((8.0, 2), (7.0, 3), (6.0, 3), (4.5, 3), (3.0, 2), (2.0, 2)):
-                _ring(p, cx, cy, rr, kk, kk + hh, LEAD, fid)
+            for rr, hh in ((8.5, 2), (8.0, 2), (7.0, 3), (6.0, 3), (4.5, 2), (3.0, 2), (2.0, 2)):
+                _ring(p, cx, cy, rr, kk, kk + hh, LEAD, fid)                    # bell-shaped dome
                 kk += hh
         elif kind == "lantern":
             _ring(p, cx, cy, r, k, k + h, LEAD, fid)
+            for face in _faces(2):
+                ax, ay = face(0)
+                p.fill(cx + ax, cx + ax + 1, cy + ay, cy + ay + 1, k + 2, k + 5, "dark_grey", fid)
+            _ring(p, cx, cy, r + 0.5, k + h - 1, k + h, LEAD, fid)
         elif kind == "vane":
-            p.fill(cx - 1, cx + 1, cy - 1, cy + 1, k, k + 3, GOLD, fid)     # ball
-            p.fill(cx, cx + 1, cy - 1, cy, k + 3, k + h, GOLD, fid)         # rod
-            p.fill(cx, cx + 2, cy - 1, cy, k + h - 3, k + h - 2, GOLD, fid)  # vane
+            p.fill(cx - 1, cx + 1, cy - 1, cy + 1, k, k + 4, GOLD, fid)     # gilded orb
+            p.fill(cx, cx + 1, cy - 1, cy, k + 4, k + h, IRON, fid)         # rod
+            p.fill(cx - 1, cx + 2, cy - 1, cy, k + h - 7, k + h - 6, IRON, fid)  # cross arms
+            p.fill(cx, cx + 3, cy - 1, cy, k + h - 4, k + h - 2, GOLD, fid)  # the vane
         k += h
     return k
 
@@ -313,20 +456,27 @@ def paint_stadhuis(p: Painter, W: int, D: int, g: int, fid: int, ground_low: int
     G = g + G_FLOOR
     C = G + 2 * STOREY + 1
     p.fill(0, W, 0, D, low, C, WALL, fid)                         # shell
+    for k in range(G + 4, C, 6):                                   # darker stone courses
+        p.fill(0, W, 0, D, k, k + 2, BAND, fid)
     p.clear(3, W - 3, 3, D - 3, g, C)
+    for x, y in ((0, 0), (W - 1, 0), (0, D - 1), (W - 1, D - 1)):  # quoins
+        for k in range(G, C, 6):
+            p.fill(x, x + 1, y, y + 1, k, k + 3, STONE, fid)
     p.fill(0, W, 0, 1, low, G, PLINTH, fid)                       # podium courses (all sides)
     p.fill(0, W, D - 1, D, low, G, PLINTH, fid)
     p.fill(0, 1, 0, D, low, G, PLINTH, fid)
     p.fill(W - 1, W, 0, D, low, G, PLINTH, fid)
     xa = W // 2 - 11
     side(p, W, g, fid, skip=(xa - 1, xa + 23))
-    for frame, length in ((Frame("E", W - 1, 0), D), (Frame("N", W - 1, D - 1), W), (Frame("W", 0, D - 1), D)):
+    sides = ((Frame("E", W - 1, 0), D), (Frame("N", W - 1, D - 1), W), (Frame("W", 0, D - 1), D))
+    for frame, length in sides:
         side(FramePainter(p, frame), length, g, fid)
     _arcade(p, xa, g, fid)
     _perron(p, xa, g, fid)
-    _avant_corps(p, xa, g, fid)
-    for frame, length in ((Frame("S", 0, 0), W), (Frame("E", W - 1, 0), D), (Frame("N", W - 1, D - 1), W),
-                          (Frame("W", 0, D - 1), D)):
+    for x0, x1 in ((3, xa - G_FLOOR - 3), (xa + 22 + G_FLOOR + 3, W - 3)):
+        if x1 - x0 >= 10:
+            _fence(p, x0, x1, -7, g, fid)                          # railings and gates
+    for frame, length in ((Frame("S", 0, 0), W), *sides):
         fp = FramePainter(p, frame)
         if frame.normal == "S":
             _cornice(fp, 0, xa - 1, 0, C, fid)
@@ -334,6 +484,9 @@ def paint_stadhuis(p: Painter, W: int, D: int, g: int, fid: int, ground_low: int
         else:
             _cornice(fp, 0, length, 0, C, fid)
     deck = _hip_roof(p, W, D, C + 4, roof_levels(W, D), fid)
+    for frame, length in sides[0::2]:                               # side pediments (E, W)
+        _side_pediment(FramePainter(p, frame), length, C, fid)
+    _avant_corps(p, xa, g, fid)
     return tower(p, W // 2, D // 2, deck, fid)
 
 
