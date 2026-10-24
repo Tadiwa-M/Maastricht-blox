@@ -112,13 +112,13 @@ namespace Blox.Tests
         }
 
         [Fact]
-        public void ManifestAcceptsV1ToV3AndRejectsOthers()
+        public void ManifestAcceptsV1ToV4AndRejectsOthers()
         {
-            Assert.Equal(3, WorldSpec.ContractVersion);
+            Assert.Equal(4, WorldSpec.ContractVersion);
             Assert.Equal(1, Manifest.Parse(ManifestJson).ContractVersion);
             Assert.Equal(2, Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 2")).ContractVersion);
             Assert.Equal(3, Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 3")).ContractVersion);
-            Assert.Throws<FormatException>(() => Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 4")));
+            Assert.Throws<FormatException>(() => Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 5")));
             Assert.Throws<FormatException>(() => Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 0")));
         }
 

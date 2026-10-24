@@ -25,7 +25,7 @@ from .world_meta import features_document, manifest_document
 
 log = logging.getLogger("blox")
 
-CONTRACT_VERSION = 3  # manifest contractVersion (v3: islands); chunk binary itself is still BXC1 v1
+CONTRACT_VERSION = 4  # manifest contractVersion (v3: islands, v4: slice from manifest); chunk binary itself is still BXC1 v1
 
 
 @dataclass(frozen=True)

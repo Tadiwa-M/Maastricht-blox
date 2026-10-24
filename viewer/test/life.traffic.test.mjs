@@ -125,6 +125,8 @@ test('terraces face the street; stalls fit the square; parked bikes line up; bus
   assert.ok(stalls.length > 10, `${stalls.length} stalls`);
   for (const s of stalls) assert.ok(inPoly(market.poly, s.x, s.z));
   assert.ok(stallLayout(market, { keep: (x) => x < 30 }).every((s) => s.x < 30));
+  assert.ok(stalls.vans.length >= 2, 'delivery vans at the heads of the rows');
+  for (const v of stalls.vans) for (const st of stalls) assert.ok(Math.hypot(v.x - st.x, v.z - st.z) > 3, 'vans do not stand in a stall');
   const { bikes, racks } = parkedBikes([[0, 0, 1, 0]]);
   assert.ok(bikes.length >= 4 && racks.length >= 1);
   for (const b of bikes) assert.ok(Math.abs(b.z) < 1e-9 && [0, 180].some((y) => Math.abs(((b.yaw - y + 540) % 360) - 180) < 5));

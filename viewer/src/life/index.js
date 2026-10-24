@@ -195,6 +195,9 @@ export async function initLife(ctx) {
   let night = -1, statT = 0, t = 0;
   const busHalf = [models.bus.size[0] * world.studM / 2, models.bus.size[1] * world.studM / 2];
   const by = (table) => table[tier()] ?? table.medium;
+  // weather: ctx.weather?.rain (0..1) when a weather source exists, else #rain=0..1 in the URL
+  const hashRain = typeof location !== 'undefined' ? +(new URLSearchParams(location.hash.replace(/^#/, '')).get('rain') || 0) : 0;
+  const rainNow = () => Math.max(0, Math.min(1, ctx.weather?.rain ?? hashRain));
   function step(dt) {
     if (stage.night !== undefined && stage.night !== night) { night = stage.night; mats.setNight(night); }
     clock.advance(dt);
@@ -212,6 +215,7 @@ export async function initLife(ctx) {
     }
     if (state.walkers) {
       reweigh();
+      state.walkers.setRain(rainNow());
       state.walkers.setCount(Math.round(by(FIGURES_BY_TIER) * crowdFactor(clock.hours, clock.day)), at);
       const vehicles = buses.map((b) => ({ x: b.x, z: b.z, yaw: b.yaw, halfW: busHalf[0], halfL: busHalf[1] }));
       if (state.cars) vehicles.push(...state.cars.footprints(at, 30));
@@ -222,10 +226,11 @@ export async function initLife(ctx) {
     if (dirty || !props.built) { rebuildProps(); props.built = true; }
     crowd.begin(camera.position); fleet.begin();
     state.walkers?.draw(crowd);
-    state.terraces?.draw(crowd, clock, t);
+    state.terraces?.draw(crowd, clock, t, rainNow());
     state.market?.draw(crowd, t);
     state.cyclists?.draw(crowd, fleet);
     state.cars?.draw(fleet);
+    state.market?.drawVans(fleet);
     for (const b of parked.bikes) fleet.addBike(b.x, ground(b.x, b.z), -b.z, (-b.yaw * Math.PI) / 180, { colour: b.colour });
     crowd.end(); fleet.end();
     if (state.boats) state.boats.update(dt);

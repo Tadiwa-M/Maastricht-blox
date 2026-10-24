@@ -66,14 +66,14 @@ export class Cyclists {
 }
 
 /**
- * Parked bikes at spots [[x, z, dx, dz], ...] (street direction (dx, dz)): a row of 6-14
+ * Parked bikes at spots [[x, z, dx, dz, len?], ...] (row direction (dx, dz)): a row of 6-14 (or len / 0.7)
  * bikes side by side at right angles to the street, with racks. Returns
  * { bikes: [{ x, z, yaw, colour }], racks: [{ x, z, yaw }] } (Unity metres, yaw degrees).
  */
 export function parkedBikes(spots, seed = 5) {
   const r = rng(seed), bikes = [], racks = [];
-  for (const [x, z, dx, dz] of spots) {
-    const n = 6 + Math.floor(r() * 9);
+  for (const [x, z, dx, dz, len] of spots) {
+    const n = len ? Math.max(2, Math.floor(len / 0.7)) : 6 + Math.floor(r() * 9); // tree rows: fill the gap between the trees
     const yaw = ((Math.atan2(-dz, dx) * 180) / Math.PI + 360) % 360; // bikes point across the street (right angle)
     const along = (q) => (q - (n - 1) / 2) * 0.7;
     for (let q = 0; q < n; q++) {

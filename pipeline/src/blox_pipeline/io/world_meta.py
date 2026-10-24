@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from .. import geo
+
 from collections.abc import Iterable, Mapping
 from typing import Any
 
 FEATURE_KINDS = frozenset({"building", "landmark", "poi", "street", "water", "park", "station", "stop"})
-ORIGIN_RD = [175700, 316500]
 
 
 def features_document(features: Any) -> dict[str, Any]:
@@ -41,13 +42,14 @@ def manifest_document(contract_version: int, generated: str, sources: Iterable[M
     return {
         "contractVersion": contract_version,
         "crs": "EPSG:28992",
-        "originRD": ORIGIN_RD,
+        "originRD": [geo.X0, geo.Y0],
+        "slice": geo.SLICE_NAME,
         "baseNapM": 30.0,
         "studM": 0.5,
         "plateM": 0.2,
-        "chunkStuds": 64,
-        "chunksX": 64,
-        "chunksY": 64,
+        "chunkStuds": geo.CHUNK_STUDS,
+        "chunksX": geo.CHUNKS_X,
+        "chunksY": geo.CHUNKS_Y,
         "palette": "palette.json",
         "catalogue": "brick_catalogue.json",
         "features": "features.json",

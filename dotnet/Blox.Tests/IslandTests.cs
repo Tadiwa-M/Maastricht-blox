@@ -211,7 +211,7 @@ namespace Blox.Tests
             // v1/v2 manifests have no islands key.
             var v2 = Manifest.Parse((ManifestHead + "}").Replace("\"contractVersion\": 3", "\"contractVersion\": 2"));
             Assert.Empty(v2.Islands);
-            Assert.Throws<FormatException>(() => Manifest.Parse(ManifestV3.Replace("\"contractVersion\": 3", "\"contractVersion\": 4")));
+            Assert.Throws<FormatException>(() => Manifest.Parse(ManifestV3.Replace("\"contractVersion\": 3", "\"contractVersion\": 5")));
             Assert.Throws<FormatException>(() => Manifest.Parse(ManifestV3.Replace("\"id\": 7", "\"id\": 0")));
         }
 

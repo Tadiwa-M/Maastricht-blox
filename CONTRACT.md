@@ -1,4 +1,4 @@
-# Maastricht Blox: Interface Contract (v3)
+# Maastricht Blox: Interface Contract (v4)
 
 This file is the single source of truth shared by every component. Parallel work streams
 (pipeline, proxy, Unity data/meshing, Unity rendering) code against **this** file, not
@@ -11,6 +11,14 @@ Machine-readable parts live next to it:
 ---
 
 ## 1. World, units, coordinates
+
+**v4: the slice comes from the manifest.** `originRD`, `chunksX` and `chunksY` in `manifest.json`
+are authoritative, and renderers must read them rather than assume the defaults below. The
+pipeline has named slices (`blox --slice centre|city`): **centre** is the table below (the
+default, used by tests and fixtures); **city** is origin RD (174700, 314000), 128 × 176 chunks
+(4.1 × 5.6 km: from Sint-Pietersberg/ENCI in the south to Bosscherweg in the north). Unity
+metres are always relative to the manifest's origin. Chunk file names grow to 3 digits when
+needed (`c_100_37.bxc`).
 
 | Item | Value |
 |---|---|
@@ -151,7 +159,7 @@ Rules:
 
 ```json
 {
-  "contractVersion": 3,
+  "contractVersion": 4,
   "crs": "EPSG:28992",
   "originRD": [175700, 316500],
   "baseNapM": 30.0,

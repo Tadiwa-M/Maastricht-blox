@@ -293,7 +293,7 @@ def test_blox_build_writes_islands_and_preview(town_world, tmp_path):
     bbox = ",".join(str(v) for v in town.BBOX.as_tuple())
     assert cli.main(["build", "--data-dir", str(root), "--bbox", bbox, "--out", str(out), "--no-ortho"]) == 0
     m = read_manifest(out)
-    assert m["contractVersion"] == 3 and len(m["islands"]) == 2
+    assert m["contractVersion"] == 4 and len(m["islands"]) == 2
     isl = {e["id"]: d for e, d in read_world_islands(out)}
     assert sorted(isl) == [1, 2] and all(len(d.records) > 500 for d in isl.values())
     assert {round(d.yaw_deg) for d in isl.values()} == {-30, 20}

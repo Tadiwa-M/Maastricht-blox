@@ -30,8 +30,28 @@ BASE_NAP_M: float = 30.0
 CHUNK_STUDS: int = 64
 CHUNKS_X: int = 64
 CHUNKS_Y: int = 64
-SLICE_STUDS: int = CHUNK_STUDS * CHUNKS_X  # 4096
-SLICE_M: float = SLICE_STUDS * STUD_M  # 2048 m
+SLICE_STUDS: int = CHUNK_STUDS * CHUNKS_X  # 4096 (x extent)
+SLICE_M: float = SLICE_STUDS * STUD_M  # 2048 m (x extent)
+SLICE_NAME: str = "centre"
+
+# Named slices (CONTRACT 1, v4). The manifest records the slice that was built, and renderers
+# read origin and size from it. "centre" is the original 2x2 km slice and the default (tests and
+# fixtures use it); "city" (4.1 x 5.6 km) adds the north (Bosscherweg) and Sint-Pietersberg.
+SLICES: dict[str, tuple[float, float, int, int]] = {
+    "centre": (175700.0, 316500.0, 64, 64),
+    "city": (174700.0, 314000.0, 128, 176),
+}
+
+
+def configure(name: str) -> None:
+    """Switch the module-wide slice. Call once, before anything is computed (the CLI does)."""
+    global X0, Y0, CHUNKS_X, CHUNKS_Y, SLICE_STUDS, SLICE_M, SLICE_NAME
+    if name not in SLICES:
+        raise ValueError(f"unknown slice {name!r}; known: {', '.join(SLICES)}")
+    X0, Y0, CHUNKS_X, CHUNKS_Y = SLICES[name]
+    SLICE_STUDS = CHUNK_STUDS * CHUNKS_X
+    SLICE_M = SLICE_STUDS * STUD_M
+    SLICE_NAME = name
 
 CRS_RD = "EPSG:28992"
 CRS_WGS84 = "EPSG:4326"
@@ -170,7 +190,7 @@ class RDBox:
 
 
 def slice_box() -> RDBox:
-    return RDBox(X0, Y0, X0 + SLICE_M, Y0 + SLICE_M)
+    return RDBox(X0, Y0, X0 + CHUNKS_X * CHUNK_STUDS * STUD_M, Y0 + CHUNKS_Y * CHUNK_STUDS * STUD_M)
 
 
 @dataclass(frozen=True)

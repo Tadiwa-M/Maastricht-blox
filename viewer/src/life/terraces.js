@@ -83,9 +83,9 @@ export class Terraces {
     }
   }
 
-  /** Seated people into the crowd; share of chairs taken from the clock. */
-  draw(crowd, clock, t) {
-    const share = terraceFactor(clock.hours, clock.day);
+  /** Seated people into the crowd; share of chairs taken from the clock (and the rain). */
+  draw(crowd, clock, t, rain = 0) {
+    const share = terraceFactor(clock.hours, clock.day) * (1 - 0.85 * rain); // rain empties the terraces (bar the parasols)
     let n = 0;
     for (const { poi, layout, ok } of this.active) {
       layout.chairs.forEach((c, q) => {
