@@ -99,7 +99,7 @@ def test_write_world_lists_islands(tmp_path):
     (tmp_path / "islands" / "i_000099.bxi").write_bytes(b"stale")
     write_world(tmp_path, [], [], [], islands=[a, b], generated="2026-10-19T12:00:00Z")
     m = read_manifest(tmp_path)
-    assert m["contractVersion"] == 3
+    assert m["contractVersion"] == 4
     assert [(e["id"], e["file"], e["cx"], e["cy"], e["bricks"]) for e in m["islands"]] == [
         (1, "islands/i_000001.bxi", 18, 31, 1), (3, "islands/i_000003.bxi", 15, 38, 3)]
     for e in m["islands"]:

@@ -35,7 +35,7 @@ namespace Blox.Data
     public sealed class WorldSpec
     {
         /// <summary>Contract version this code implements (CONTRACT.md title).</summary>
-        public const int ContractVersion = 3;
+        public const int ContractVersion = 4;
         /// <summary>
         /// Oldest manifest contractVersion still readable: v2 only added things (detail pieces,
         /// hide_studs, models) and v3 only added islands (a v1/v2 manifest simply has none).

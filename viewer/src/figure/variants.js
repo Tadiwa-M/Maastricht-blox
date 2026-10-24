@@ -42,7 +42,8 @@ const hex = (i) => PALETTE_HEX[i];
  *   speed (m/s walking), stoop (rad) }.
  */
 export function makeVariant(seed, opts = {}) {
-  const r = rng(seed * 7919 + 13);
+  let h = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35) ^ (h >>> 16); // scramble: neighbouring seeds look unrelated
+  const r = rng(h);
   const u = r();
   const kind = opts.kind || (u < 0.12 ? 'kid' : u < 0.3 ? 'older' : 'adult');
   const fem = r() < 0.5;
@@ -83,15 +84,16 @@ export function makeVariant(seed, opts = {}) {
 export function sheetVariants(n = 12) {
   const out = [];
   const want = [...HAIR_STYLES];
-  let seed = 1;
-  while (out.length < n && seed < 5000) {
-    const kind = out.length === 3 || out.length === 9 ? 'kid' : out.length === 6 || out.length === 11 ? 'older' : 'adult';
-    const v = makeVariant(seed++, { kind });
+  const kinds = { kid: 2, older: 2 };
+  for (let seed = 1; out.length < n && seed < 20000; seed++) {
+    const v = makeVariant(seed);
     const k = want.indexOf(v.hair);
-    if (want.length) { // first every hair style once
-      if (k < 0) continue;
+    if (want.length) { // first every hair style once, with at least 2 kids and 2 older people among them
+      const left = want.length - 1, needKinds = Math.max(0, kinds.kid) + Math.max(0, kinds.older);
+      if (k < 0 || (v.kind === 'adult' && left < needKinds)) continue;
       want.splice(k, 1);
     } else if (!TOP_STYLES.every((t) => out.some((o) => o.top === t)) && out.some((o) => o.top === v.top)) continue; // then missing tops
+    if (v.kind in kinds) kinds[v.kind]--;
     out.push(v);
   }
   return out;

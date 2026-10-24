@@ -130,7 +130,7 @@ function keys(v) {
  * 'thigh', 'shin', 'shoe', 'acc:<kind>'. colourKey: which of v.colours paints it.
  * pose: { x, y, z (three.js), rotY, ...the jointAngles pose }. A dress or coat is drawn as a
  * shirt (same colour) when sitting or cycling, so the skirt does not cut through the seat.
- * lo: far level of detail ('lo:*' keys; no separate hands, shoes or bags).
+ * lo: far level of detail ('lo:*' keys; no separate hands, shoes or bags; umbrellas stay).
  */
 export function poseFigure(v, pose, emit, J = jointAngles(v, pose), lo = false) {
   const s = v.scale, w = v.width, K = keys(v), mode = pose.mode ?? MODE.WALK;
@@ -154,13 +154,12 @@ export function poseFigure(v, pose, emit, J = jointAngles(v, pose), lo = false) 
     emit(lo ? 'lo:upperArm' : 'upperArm', arm, 'top');
     const fore = rx(tr(copy(M[7], arm), 0, -BODY.upperArm, 0), el);
     emit(lo ? 'lo:foreArm' : 'foreArm', fore, 'top');
-    if (!lo) {
-      const hand = tr(copy(M[8], fore), 0, -BODY.foreArm, 0);
-      emit('hand', hand, 'skin');
-      if (q === 1 && (v.acc === 'bag' || v.acc === 'umbrella') && !seated) {
-        // hangs straight down (bag) / stands straight up (umbrella) from the hand, turned like the body
-        emit(K.acc, root(M[9], hand[12], hand[13], hand[14], pose.rotY || 0, s), 'acc');
-      }
+    const hand = tr(copy(M[8], fore), 0, -BODY.foreArm, 0);
+    if (!lo) emit('hand', hand, 'skin');
+    if (q === 1 && ((v.acc === 'bag' && !lo) || v.acc === 'umbrella') && !seated) {
+      // hangs straight down (bag) / stands straight up (umbrella) from the hand, turned like the body;
+      // umbrellas show at any distance (rain is visible from afar), bags only near
+      emit(K.acc, root(M[9], hand[12], hand[13], hand[14], pose.rotY || 0, s), 'acc');
     }
     const thigh = rx(tr(copy(M[6], pelvis), sg * BODY.hipX * w, 0, 0), J.hip[q]);
     emit(lo ? 'lo:thigh' : 'thigh', thigh, 'bottom');

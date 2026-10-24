@@ -26,7 +26,10 @@ def source_path(root: Path | None = None) -> Path:
 
 def clip_path(root: Path | None = None) -> Path:
     """The clip always covers the whole slice (+ margin); sub-bboxes filter at load."""
-    return (root or config.data_dir()) / "osm" / "slice_clip.osm.pbf"
+    from .. import geo  # the clip depends on the active slice (CONTRACT 1, v4)
+
+    name = "slice_clip.osm.pbf" if geo.SLICE_NAME == "centre" else f"slice_clip_{geo.SLICE_NAME}.osm.pbf"
+    return (root or config.data_dir()) / "osm" / name
 
 
 def fetch_osm(root: Path | None = None) -> Path:

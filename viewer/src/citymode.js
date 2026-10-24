@@ -25,8 +25,7 @@ import { FACING_NAMES } from './rotation.js';
 import { bindUI, escapeHtml } from './ui.js';
 
 const DEG = Math.PI / 180;
-// Places in chunk coordinates (as build.mjs --around): chunk = floor((RD - origin) / 32 m)
-export const PLACES = { markt: [22, 47], vrijthof: [15, 38], brug: [32, 40], station: [53, 40], bonnefanten: [41, 18] };
+import { PLACES_RD, placeChunk } from './places.js';
 
 function parseHash() {
   const p = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -93,7 +92,11 @@ export function cityPresets(index, box, approxGround) {
   const have = new Set(index.chunks.map((e) => `${e.cx},${e.cy}`));
   const at = (x, z, lift = 0) => new THREE.Vector3(x, approxGround(x, z) + lift, z);
   const places = {};
-  for (const [name, [cx, cy]] of Object.entries(PLACES)) if (have.has(`${cx},${cy}`)) places[name] = at((cx + 0.5) * CM, -(cy + 0.5) * CM);
+  const origin = index.originRD || [175700, 316500];
+  for (const name of Object.keys(PLACES_RD)) {
+    const [cx, cy] = placeChunk(name, origin, CM);
+    if (have.has(`${cx},${cy}`)) places[name] = at(PLACES_RD[name][0] - origin[0], -(PLACES_RD[name][1] - origin[1]));
+  }
   const focus = places.markt || at(c.x, c.z);
   const out = {
     city: (() => { const t = at(c.x, c.z); return { target: t, cam: t.clone().add(offset(200, 42, Math.max(150, r * 1.55))), fov: 40 }; })(),

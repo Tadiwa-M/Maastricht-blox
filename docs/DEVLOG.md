@@ -536,3 +536,18 @@ around the camera, and a pre-baked silhouette keeps all 2 km visible. Guide: 06 
 - Life data fetch: `life/data.js` should skip fetching when `BLOX_SITE.life === false` or
   `BLOX_WORLD.life === null` (no 404 noise); that's in Track L's file.
 - GitHub Pages limits (1 GB, 100 MB per file) fit the city (~100 MB in ~6,500 files).
+
+## 2026-10-24: contract v4, the slice comes from the manifest
+
+- The owner's street (Bosscherweg, RD 176197 319239) is 691 m north of the 2×2 km slice, and
+  Sint-Pietersberg is south of it. New named slice **city**: origin RD (174700, 314000),
+  128 × 176 chunks (4.1 × 5.6 km). Build it with `blox --slice city ...` or `BLOX_SLICE=city`.
+- Contract v4: `originRD`/`chunksX`/`chunksY` in the manifest are authoritative. Pipeline
+  (`geo.configure`), viewer (site index carries `originRD`; places are RD points in
+  `viewer/src/places.js`) and Unity (`WorldSpec.FromManifest`) read them. Readers accept v1–v4.
+- The OSM clip is per slice (`slice_clip_city.osm.pbf`), so switching slices never reuses the
+  wrong clip.
+- Owner photos of the Markt (2026-10-24): grey limestone and white/cream plaster facades, tall
+  many-paned white windows, wrought-iron balconies, dark slate roofs with white dormers, dark
+  cobbles, long rows of parked bikes under plane trees, double-lantern lamp posts, delivery vans.
+  Notes are in `docs/reference/markt.md`.

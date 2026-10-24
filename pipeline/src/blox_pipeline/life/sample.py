@@ -8,7 +8,7 @@ writes ``<out>/life/`` from the sample's own bricks:
 * walkways: the paved ground cells (cobbles, pavement), 2 m lattice, 8-connected, not under
   buildings (on-grid or rotated islands); the Markt busiest;
 * streets: roads + cycle graph along the bus streets, cafe terraces at facades facing open
-  paving round the Markt, bike spots, and the market square.
+  paving round the Markt, bike spots (facades and rows between the trees), and the market square.
 
 The street lines are picked by hand on the sample's top-colour map (image pixels, x right,
 y down; 1 px = 1 stud), so this only fits ``samples/markt_v3``; other worlds get walkways and
@@ -220,6 +220,47 @@ def facades(m: dict, centre: tuple[float, float], radius: float, spacing: float,
     return out
 
 
+def tree_centres(m: dict) -> list[tuple[float, float]]:
+    """Centres of tree crowns (leaf-coloured tops above the ground), by flood fill on a 1 m grid."""
+    leaf = np.isin(m["col"], [28, 29]) & (m["top"] > m["ground"] + 6)
+    g = leaf[::2, ::2]
+    seen = np.zeros_like(g)
+    out = []
+    for i0, j0 in zip(*np.nonzero(g)):
+        if seen[i0, j0]:
+            continue
+        stack, cells = [(i0, j0)], []
+        seen[i0, j0] = True
+        while stack:
+            i, j = stack.pop()
+            cells.append((i, j))
+            for a, b in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
+                if 0 <= a < g.shape[0] and 0 <= b < g.shape[1] and g[a, b] and not seen[a, b]:
+                    seen[a, b] = True
+                    stack.append((a, b))
+        if len(cells) >= 6:
+            ci = sum(c[0] for c in cells) / len(cells) * 2 + 1
+            cj = sum(c[1] for c in cells) / len(cells) * 2 + 1
+            out.append(((m["I0"] + ci) * m["S"], (m["J0"] + cj) * m["S"]))
+    return out
+
+
+def tree_rows(trees: list[tuple[float, float]], centre: tuple[float, float], radius: float, gap: float = 16.0) -> list[list[float]]:
+    """Bike rows between neighbouring trees (same layout as streets.tree_row_bikes)."""
+    out, seen = [], set()
+    for i, (x, z) in enumerate(trees):
+        if math.hypot(x - centre[0], z - centre[1]) > radius:
+            continue
+        d = [math.hypot(x - u, z - w) if k != i else math.inf for k, (u, w) in enumerate(trees)]
+        j = int(np.argmin(d))
+        if d[j] > gap or (min(i, j), max(i, j)) in seen:
+            continue
+        seen.add((min(i, j), max(i, j)))
+        u, w = trees[j]
+        out.append([round((x + u) / 2, 1), round((z + w) / 2, 1), round((u - x) / d[j], 3), round((w - z) / d[j], 3), round(d[j] - 2.5, 1)])
+    return out
+
+
 def write_sample_life(world: Path, out: Path) -> dict:
     from ..cli import main as blox
 
@@ -244,6 +285,7 @@ def write_sample_life(world: Path, out: Path) -> dict:
     pois = [{"kind": ["cafe", "bar", "restaurant"][q % 3], "name": f"Terras {q}", "x": round(x - f0 * 1.5, 1), "z": round(z - f1 * 1.5, 1),
              "f": [round(f0, 3), round(f1, 3)], "d": 10.0} for q, (x, z, f0, f1) in enumerate(facades(m, centre, 130, 14, rng)[:22])]
     bikes = [[round(x + f0 * 3, 1), round(z + f1 * 3, 1), round(-f1, 3), round(f0, 3)] for x, z, f0, f1 in facades(m, centre, 160, 40, rng)[:7]]
+    bikes += tree_rows(tree_centres(m), centre, 200)
     streets = {"version": 1, "kind": "streets", "meta": {"source": "synthetic"},
                "cycle": {"version": 1, "kind": "cycle", "nodes": cn, "weights": [2] * (len(cn) // 2), "edges": ce},
                "roads": {"nodes": rn, "edges": re, "flags": [cls] * (len(re) // 2), "classes": ROAD_CLASSES},

@@ -17,6 +17,7 @@ import { mkdir, readFile, readdir, writeFile, copyFile, link, rm } from 'node:fs
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { placeChunk } from './src/places.js';
 import { bakeFar } from './tools/bake-far.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -27,13 +28,12 @@ const site = opt('--site');
 const radius = Number(opt('--radius') ?? 3);
 const worldDir = resolve(args[0] || join(here, '..', 'build', 'testscene'));
 
-// Places in chunk coordinates: chunk = floor((RD - origin) / 32 m), origin RD (175700, 316500).
-const PLACES = { markt: [22, 47], vrijthof: [15, 38], brug: [32, 40], station: [53, 40], bonnefanten: [41, 18] };
-
-/** Chunk filter for --around, or null to embed everything. */
-function chunkFilter() {
+/** Chunk filter for --around, or null to embed everything. Places are RD points converted with
+ * the world's own origin (src/places.js), so they work for any slice. */
+function chunkFilter(manifest) {
   if (!around) return null;
-  const c = PLACES[around.toLowerCase()] ?? around.split(',').map(Number);
+  const chunkM = (manifest.chunkStuds || 64) * (manifest.studM || 0.5);
+  const c = placeChunk(around, manifest.originRD || [175700, 316500], chunkM) ?? around.split(',').map(Number);
   if (c.length !== 2 || c.some(Number.isNaN)) throw new Error(`--around: unknown place '${around}'`);
   return (cx, cy) => Math.abs(cx - c[0]) <= radius && Math.abs(cy - c[1]) <= radius;
 }
@@ -79,7 +79,7 @@ async function embedWorld() {
   let files = manifest.chunks?.length
     ? manifest.chunks.map((c) => c.file)
     : (await readdir(join(worldDir, 'chunks'))).filter((f) => f.endsWith('.bxc')).map((f) => `chunks/${f}`);
-  const keep = chunkFilter();
+  const keep = chunkFilter(manifest);
   if (keep) {
     files = files.filter((f) => { const m = /c_(\d+)_(\d+)\.bxc$/.exec(f); return m && keep(+m[1], +m[2]); });
     if (manifest.chunks) manifest.chunks = manifest.chunks.filter((c) => keep(c.cx, c.cy));
@@ -167,6 +167,7 @@ async function buildSite(outDir) {
   const index = {
     version: 1, studM: manifest.studM || 0.5, plateM: manifest.plateM || 0.2, chunkStuds: manifest.chunkStuds || 64,
     chunksX: manifest.chunksX || 64, chunksY: manifest.chunksY || 64,
+    originRD: manifest.originRD || [175700, 316500],
     chunks: baked.chunks.map(({ cx, cy, file, minK, maxK, bytes: b }) => ({ cx, cy, file, minK, maxK, bytes: b })),
     islands: baked.islands.map(({ id, file, cx, cy, rect, minK, maxK, bytes: b }) => ({ id, file, cx, cy, rect: rect.map((v) => +v.toFixed(2)), minK, maxK, bytes: b })),
   };

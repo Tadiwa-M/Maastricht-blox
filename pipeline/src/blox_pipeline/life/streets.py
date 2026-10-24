@@ -8,8 +8,8 @@
   streets, footways, cycleways, paths, steps, tracks, bus-only ways or parking aisles.
 * ``pois``: cafes, bars and restaurants (terraces): position + unit vector to the nearest
   street (``f``), so tables go on the pavement in front.
-* ``bikes``: spots for parked-bike clusters (stations, squares, busy shopping blocks):
-  position + street direction.
+* ``bikes``: spots for parked-bike rows (stations, squares, busy shopping blocks, and between
+  the trees of tree lines round squares): [x, z, dx, dz] (+ row length between trees).
 * ``market``: the market square polygon (``amenity=marketplace`` or the square named Markt)
   and its schedule (Maastricht: Wednesday and Friday 08:00-13:00).
 """
@@ -194,7 +194,7 @@ def build_pois(osm: OsmData, box: RDBox) -> tuple[list[dict], list[list[float]]]
             g = f.geom.intersection(clip)
             if not g.is_empty:
                 spots.append([g.representative_point().x, g.representative_point().y])
-    bikes: list[list[float]] = []
+    bikes: list[list[float]] = tree_row_bikes(osm, clip)
     for x, y in spots:  # move each spot to the kerb of the nearest street, along it
         near = _nearest(lines, tree, Point(x, y), 60.0)
         if near is None:
@@ -204,6 +204,32 @@ def build_pois(osm: OsmData, box: RDBox) -> tuple[list[dict], list[list[float]]]
         bx, by = qx + dy * side * 4.0, qy - dx * side * 4.0
         bikes.append([round(bx - geo.X0, 1), round(by - geo.Y0, 1), round(dx, 3), round(dy, 3)])
     return pois, bikes
+
+
+def tree_row_bikes(osm: OsmData, clip: Polygon, near_m: float = 40.0, gap_m: float = 15.0) -> list[list[float]]:
+    """Bike rows along tree lines on and around squares (Maastricht parks its bikes between the
+    trees): one spot halfway between each tree and its nearest neighbour, direction along the row."""
+    squares = [f.geom for f in osm.road_areas if f.tags.get("place") == "square" or f.tags.get("amenity") == "marketplace"]
+    if not squares:
+        return []
+    zone = shapely.union_all([g.buffer(near_m) for g in squares]).intersection(clip)
+    pts = np.array([[t.geom.x, t.geom.y] for t in osm.trees if t.geom.geom_type == "Point" and zone.contains(t.geom)])
+    out: list[list[float]] = []
+    seen: set[tuple[int, int]] = set()
+    for i, (x, y) in enumerate(pts):
+        d = np.hypot(pts[:, 0] - x, pts[:, 1] - y)
+        d[i] = np.inf
+        j = int(np.argmin(d)) if len(pts) > 1 else -1
+        if j < 0 or d[j] > gap_m:
+            continue
+        key = (min(i, j), max(i, j))
+        if key in seen:
+            continue
+        seen.add(key)
+        mx, my = (x + pts[j, 0]) / 2, (y + pts[j, 1]) / 2
+        dx, dy = (pts[j, 0] - x) / d[j], (pts[j, 1] - y) / d[j]
+        out.append([round(mx - geo.X0, 1), round(my - geo.Y0, 1), round(float(dx), 3), round(float(dy), 3), round(float(d[j]) - 2.0, 1)])
+    return out
 
 
 def build_market(osm: OsmData, box: RDBox) -> dict | None:

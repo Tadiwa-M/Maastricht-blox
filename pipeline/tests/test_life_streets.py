@@ -10,7 +10,7 @@ import pytest
 from blox_pipeline import geo
 from blox_pipeline.life.streets import (ROAD_CLASSES, build_streets, cycle_kind, drive_class, oneway)
 from blox_pipeline.sources.osm import load_osm
-from life_fixture import CAFE, LIFE_BOX, ONEWAY, ROAD, SQUARE, write_osm
+from life_fixture import CAFE, LIFE_BOX, ONEWAY, ROAD, SQUARE, TREES, write_osm
 
 
 @pytest.fixture(scope="module")
@@ -77,7 +77,10 @@ def test_terraces_face_the_street(streets: dict) -> None:
 
 def test_bike_spots_and_market(streets: dict) -> None:
     assert streets["bikes"], "a cluster of 3 shops makes a bike spot"
-    for x, z, dx, dz in streets["bikes"]:
+    rows = [b for b in streets["bikes"] if abs(b[0] - _u(TREES[0])[0]) < 0.2]
+    assert len(rows) == 2, "bike rows between the trees beside the square"
+    assert all(abs(b[2]) < 0.01 and abs(abs(b[3]) - 1) < 0.01 and b[4] == 8.0 for b in rows), "along the tree line, 8 m rows"
+    for x, z, dx, dz, *_ in streets["bikes"]:
         assert abs(dx * dx + dz * dz - 1) < 0.01
     m = streets["market"]
     assert m["name"] == "Markt" and m["days"] == [2, 4] and m["open"] == 8 * 3600 and m["close"] == 13 * 3600

@@ -46,6 +46,11 @@ export function groupSize(u) {
   return 1;
 }
 
+/** In the rain a share of the grown-ups walk under an umbrella (instead of their bag). */
+function umbrella(m, share) {
+  m.v.acc = share > 0 && m.v.kind !== 'kid' && m.u < share ? 'umbrella' : m.v.baseAcc;
+}
+
 export class Pedestrians {
   /** graph: WalkGraph. ground(x, z) -> y (Unity metres). cap: most people. */
   constructor({ graph, ground, cap = FIGURES_BY_TIER.high, seed = 7 }) {
@@ -57,6 +62,7 @@ export class Pedestrians {
     this.radius = 120;
     this.nextId = 1;
     this.t = 0;
+    this.rain = 0;
   }
 
   /** (Re)place group g on a node near (x, z), at least rMin away; new people each time. */
@@ -71,7 +77,9 @@ export class Pedestrians {
     for (let q = 0; q < size; q++) {
       const kind = family ? (q < 2 ? 'adult' : 'kid') : undefined; // a family: two adults and kids
       const v = makeVariant(this.nextId++ * 31 + 7, kind ? { kind } : {});
-      members.push({ v, phase: r() * Math.PI * 2, off: (q - (size - 1) / 2) * SIDE, back: (r() - 0.5) * 0.35, yaw: null, look: 0 });
+      v.baseAcc = v.acc;
+      members.push({ v, phase: r() * Math.PI * 2, off: (q - (size - 1) / 2) * SIDE, back: (r() - 0.5) * 0.35, yaw: null, look: 0, u: r() });
+      if (this.rain > 0) umbrella(members[members.length - 1], this.rain);
       speed = Math.min(speed, v.speed);
     }
     const lateral = (r() - 0.5) * 1.4;
@@ -80,6 +88,14 @@ export class Pedestrians {
     walker.place();
     Object.assign(g, { walker, members, size, pause: 0, nextPause: 15 + r() * 60, chat: r() < 0.6 });
     return true;
+  }
+
+  /** Rain: 0 (dry) .. 1 (pouring); share of grown-ups with an umbrella. */
+  setRain(rain) {
+    const share = Math.max(0, Math.min(1, rain)) * 0.75;
+    if (share === this.rain) return;
+    this.rain = share;
+    for (const g of this.groups) for (const m of g.members || []) umbrella(m, share);
   }
 
   /** Number of people wanted near target ([x, z] Unity metres). */

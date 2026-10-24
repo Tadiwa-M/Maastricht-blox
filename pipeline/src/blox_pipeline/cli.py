@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import logging
 import sys
 import time
@@ -181,6 +182,9 @@ def cmd_life(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="blox", description="Maastricht Blox data pipeline")
     p.add_argument("-v", "--verbose", action="store_true")
+    p.add_argument("--slice", default=os.environ.get("BLOX_SLICE", "centre"), choices=sorted(geo.SLICES),
+                   help="city area: 'centre' (2x2 km, default) or 'city' (4.1x5.6 km incl. Bosscherweg and "
+                        "Sint-Pietersberg); also via env BLOX_SLICE")
     sub = p.add_subparsers(dest="command", required=True)
     bbox_help = "RD bbox xmin,ymin,xmax,ymax (default: the whole slice)"
 
@@ -218,6 +222,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    geo.configure(args.slice)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     from .sources.http import DownloadError

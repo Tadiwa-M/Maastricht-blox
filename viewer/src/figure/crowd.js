@@ -37,7 +37,7 @@ export class FigureCrowd {
     }
     this.meshes = new Map();
     for (const [key, geo] of Object.entries(geos)) {
-      const n = (key.startsWith('lo:') || !lod ? cap : Math.min(cap, hiCap)) * (LIMBS[key] || 1);
+      const n = (key.startsWith('lo:') || key === 'acc:umbrella' || !lod ? cap : Math.min(cap, hiCap)) * (LIMBS[key] || 1);
       const mesh = new THREE.InstancedMesh(geo, this.material, n);
       mesh.name = `figure:${key}`;
       mesh.count = 0;

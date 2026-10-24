@@ -1,10 +1,11 @@
 {
- "contractVersion": 3,
+ "contractVersion": 4,
  "crs": "EPSG:28992",
  "originRD": [
-  175700,
-  316500
+  175700.0,
+  316500.0
  ],
+ "slice": "centre",
  "baseNapM": 30.0,
  "studM": 0.5,
  "plateM": 0.2,
@@ -14,7 +15,7 @@
  "palette": "palette.json",
  "catalogue": "brick_catalogue.json",
  "features": "features.json",
- "generated": "2026-10-19T18:44:37Z",
+ "generated": "2026-10-24T00:05:19Z",
  "sources": [
   {
    "name": "AHN",

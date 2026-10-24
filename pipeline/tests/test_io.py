@@ -97,7 +97,7 @@ def test_write_world(tmp_path):
     (tmp_path / "chunks" / "c_00_00.bxc").write_bytes(b"stale")
     mpath = write_world(tmp_path, [a, b[:1], b[1:]], features, sources, generated="2026-10-17T12:00:00Z")
     m = json.loads(mpath.read_text())
-    assert m["contractVersion"] == 3 and m["islands"] == [] and m["originRD"] == [175700, 316500] and m["chunkStuds"] == 64
+    assert m["contractVersion"] == 4 and m["islands"] == [] and m["originRD"] == [175700, 316500] and m["chunkStuds"] == 64
     assert m["generated"] == "2026-10-17T12:00:00Z" and m["sources"] == sources
     assert [(c["cx"], c["cy"], c["bricks"]) for c in m["chunks"]] == [(3, 5, 3), (4, 5, 3)]
     for c in m["chunks"]:
