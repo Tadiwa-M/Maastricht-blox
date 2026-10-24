@@ -5,17 +5,30 @@ with keyboard + mouse, a gamepad or touch. Phase 2 track P (see `PLAN.md`).
 
 ## How to use
 
+Walk mode plays like an open-world third-person game: **click the world to capture the mouse**
+(Pointer Lock), then just move the mouse to look around, no button held. Esc frees the mouse
+(the browser's rule), Esc again opens the menu, M goes back to the map.
+
 | Action | Keyboard + mouse | Gamepad (standard mapping) | Touch |
 |---|---|---|---|
 | Walk here (from the map) | F (point under the cursor) / double-click / "Walk here" button (screen centre) | A (screen centre) | double-tap |
-| Move | W A S D / arrows | left stick | joystick (left half) |
+| Look (walk) | click once to capture the mouse, then move it; Q E turn | right stick (curve + turn boost) | drag on the right half |
+| Free the mouse | Esc | | |
+| Move (camera-relative) | W A S D / arrows | left stick | joystick (left half) |
 | Run | Shift | push the stick fully / LB | push the joystick fully |
 | Jump | Space | A | JUMP button |
-| Look (orbit camera) | drag the mouse / Q E | right stick | drag on the right half |
 | Zoom | wheel / + - | LT (out) / RT (in) | pinch |
-| Back to the map | Esc / "Map" button | B | "Map" button |
-| Help overlay | H | Select | |
-| Map mode with a gamepad | | left stick pans, right stick orbits, LT/RT zoom | |
+| Back to the map | M / "Map" button | B | "Map" button |
+| Menu: controls + camera settings | H, or Esc while the mouse is free | Start / Select | |
+| Rotate the map | right drag / Ctrl or Alt + left drag / Q E (hold) | right stick | two-finger drag |
+| Tilt the map | middle drag / right drag up-down | right stick up-down | two-finger drag up-down |
+| Face north | click the compass (bottom right) | | tap the compass |
+| Pan / zoom the map | left drag / wheel | left stick / LT RT | one finger / pinch |
+
+**Camera settings** (in the menu, saved per browser in `localStorage` under
+`blox.player.settings.v1`; storage failures fall back to the defaults): mouse/touch
+sensitivity (0.2-3×), invert Y (mouse/touch), controller sensitivity (0.3-2.5×), invert Y
+(controller), and "camera eases behind you while walking" (auto-recenter, on by default).
 
 Walking is 1.4 m/s, running 4 m/s; an analog stick between scales the walk speed. Plugging in
 a controller shows "Controller connected" and switches the hints to gamepad buttons.
@@ -38,10 +51,15 @@ main.js  [player hook] -> player/index.js initPlayer(ctx)   ctx = { stage, camer
   index.js        modes (map <-> walk), camera tweens, per-frame tick (wraps stage.render), URL hash, window.__bloxPlayer
   city-adapter.js city query API from the in-memory World + islands (used until/unless ctx.city is given)
   controller.js   CharacterController: kinematic cylinder against city.isSolid
-  camera.js       FollowCamera + pullIn (collision-aware third-person orbit)
-  input.js        BINDINGS table, deadzones, keyboard/gamepad/touch -> one frame of actions
+  camera.js       FollowCamera (aim + damped shown values) + pullIn (collision-aware orbit)
+  look.js         rotation math: yaw wrap, pitch clamp, mouse sensitivity/invert, camera-relative
+                  heading, smoothDamp, gamepad StickLook curve, auto-recenter, map spin damping
+  input.js        BINDINGS table, deadzones, pointer lock, keyboard/gamepad/touch -> one frame of actions
+  settings.js     camera settings: defaults, sanitize, localStorage load/save (try/catch)
+  maporbit.js     map mode extras: Ctrl/Alt-drag orbit, middle-drag tilt, damped Q/E/stick turn, north()
   character.js    contract/models/character.json + WalkCycle (mover.js), run lean, idle sway
-  hud.js          Walk/Map button, hints, street name, help overlay, toasts, touch joystick
+  hud.js          Walk/Map button, hints (follow the mouse lock), street name, menu with the
+                  settings form, compass, toasts, touch joystick
   ray.js          raycastCity (screen point -> ground) + spawn point
   streets.js      nearest street name from features.json
   hash.js         #mode=walk parser
@@ -70,19 +88,47 @@ collide like any other brick.
 - **Step up** to 0.42 m (1-2 plates: kerbs, steps); a 3-plate (0.6 m) brick is a wall. Walking
   off a step of up to 0.42 m snaps down instead of hopping. Higher drops fall with gravity
   (18 m/s²) and land exactly on the surface (bisection). Jump: 4.4 m/s, a ~0.5 m hop.
-- The figure turns toward the move direction (12 rad/s); movement is camera-relative.
+- Movement is camera-relative (`look.js moveHeading`: W walks where the camera looks, S toward
+  it); the figure turns smoothly toward the move direction (exponential, 10 /s, frame-rate
+  independent).
 - Spawned inside geometry (a click on a wall or roof), the body is lifted up to 4 m to free
   space, then falls.
 
 ### Camera
 
-Orbit around the shoulder (1.6 m above the feet): yaw, pitch (−26° to 72°), distance 1.2-14 m
-(default 5 m, pitch 13°, so the sky is visible behind the city). Each frame `pullIn` marches
+Orbit around the shoulder (1.6 m above the feet): yaw (unlimited, wrapped to ±180°), pitch
+(−35° to 70°), distance 1.2-14 m (default 5 m, pitch 13°, so the sky is visible behind the
+city). Input moves an *aim* (`aimYaw`, `aimPitch`, `aimDist`); the shown values follow it with
+a critically damped spring (`smoothDamp`, 0.05 s for rotation, 0.14 s for zoom), stable and
+overshoot-free at 10 fps, so mouse, stick and touch input never jitter. Assigning
+`follow.yaw/pitch/want` (URL hash, scripts) snaps aim and view together.
+
+Look sources: pointer-lock mouse 0.003 rad/px × sensitivity (raw input via
+`unadjustedMovement` where the browser supports it; the first events after locking and lone
+jumps over 2000 px are dropped, a Chrome-on-Windows quirk); unlocked mouse drag uses the same
+rate (only one path feeds an event, so deltas are never applied twice); touch 0.006 rad/px ×
+sensitivity; right stick |v|^1.8 × 3.2 rad/s yaw / 2.1 rad/s pitch, +70% after 0.25 s at
+full tilt (ramped over 0.5 s); Q/E 1.8 rad/s.
+
+Auto-recenter: after 2 s without look input while walking forward-ish (move within 50° of
+straight ahead), the aim yaw eases behind the figure (rate 0.9 /s, at most 1.2 rad/s, faded in
+over a second). Walking toward the camera or sideways never recenters (that would chase the
+player in circles). Off in the menu. Each frame `pullIn` marches
 5 parallel rays (centre and ±0.18 m around it, the size of the near plane) from the shoulder
 toward the wanted camera point and stops 0.3 m before the first solid sample; pulling in is
 instant, easing back out is smooth. Unknown space does not block the camera. When the camera is
 squeezed closer than 0.9 m the figure is hidden. Walk mode uses a 55° field of view and a 0.1 m
 near plane (restored on exit). Entering and leaving walk mode tweens the camera over 1.1 s.
+
+### Map mode camera
+
+`MapControls` keeps left-drag pan, right-drag orbit and wheel zoom (with `CityCamera`'s tilt
+rules in the streamed city). `maporbit.js` adds, in a capture-phase `pointerdown` so it runs
+before MapControls: Ctrl/Alt (or Cmd) + left drag orbits, middle drag tilts. Q/E and the
+gamepad right stick queue rotation on the same pending spin, applied each frame with
+exponential damping (rate 14 /s) around `controls.target`, with the polar angle kept inside the
+controls' (zoom-dependent) limits. The compass (bottom right, both modes) points north on
+screen; a click turns the map view (or the walk camera) to face north.
 
 ### Input
 
@@ -100,7 +146,10 @@ win over a long diagonal road whose box covers half the map.
 
 ## Tests
 
-`viewer/test/player-input.test.mjs`, `player-controller.test.mjs`, `player-camera.test.mjs`
+`viewer/test/player-look.test.mjs` (yaw wrap, pitch clamp, sensitivity, invert Y,
+camera-relative heading, smoothDamp at 144/60/10/4 fps, stick curve + boost, auto-recenter,
+settings load/save with a throwing storage, map orbit + spin damping, map drag mapping, HUD
+hints), `viewer/test/player-input.test.mjs`, `player-controller.test.mjs`, `player-camera.test.mjs`
 (+ `player-city.mjs`, a synthetic cell grid with rotated boxes and an unknown region):
 deadzones, key/gamepad mapping, edges, speeds; walk/run speed, step-up of 1 and 2 plates,
 3-plate wall stop, sliding, step-down snap, fall and exact landing, no tunnelling at 10 fps,
@@ -118,3 +167,9 @@ street names and the URL hash.
   door. A slimmer character model (pipeline `blox_pipeline.models`) would fix both.
 - Water is solid (you can walk on the Maas). The city API has no material query yet.
 - Map-mode "Walk here" with a gamepad uses the screen centre (no cursor).
+- Pointer lock cannot be exercised in headless Chromium: the lock path (`movementX/Y`, spike
+  filter, Esc handling) is unit-tested as pure functions but only hand-tested in a real browser.
+- Browsers refuse a new pointer lock for about a second after Esc released it; a click right
+  away does nothing (click again).
+- Entering walk mode via the "Walk here" button or F captures the mouse at once; via the
+  gamepad (no user gesture) the hint asks for a click.

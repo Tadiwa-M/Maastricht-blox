@@ -45,11 +45,53 @@ test('FollowCamera: snaps in at once, eases back out, clamps zoom and pitch', ()
   r = cam.update(city, feet, 0.016);
   assert.ok(r.position[2] < -3, `pulled in at once: ${r.position[2]}`);
   cam.input([0, 5], 100);
-  assert.equal(cam.pitch, cam.o.maxPitch);
-  assert.equal(cam.want, cam.o.maxDist);
+  assert.equal(cam.aimPitch, cam.o.maxPitch);
+  assert.equal(cam.aimDist, cam.o.maxDist);
+  assert.ok(cam.pitch < cam.o.maxPitch, 'shown pitch eases, it does not jump');
+  for (let q = 0; q < 60; q++) cam.update(city, feet, 1 / 60);
+  assert.ok(Math.abs(cam.pitch - cam.o.maxPitch) < 1e-3 && Math.abs(cam.want - cam.o.maxDist) < 0.05);
   cam.input([0, -10], -100);
-  assert.equal(cam.pitch, cam.o.minPitch);
-  assert.equal(cam.want, cam.o.minDist);
+  assert.equal(cam.aimPitch, cam.o.minPitch);
+  assert.equal(cam.aimDist, cam.o.minDist);
+  cam.pitch = 0.3; // direct assignment (URL hash) snaps aim and shown value
+  assert.equal(cam.aimPitch, 0.3);
+});
+
+test('FollowCamera: damped turn is smooth at 60 fps and 10 fps, never overshoots, wraps yaw', () => {
+  const city = synthCity();
+  const feet = [5, city.floorY, -5];
+  for (const dt of [1 / 60, 1 / 10]) {
+    const cam = new FollowCamera();
+    cam.input([1, 0], 0);
+    let last = cam.yaw, steps = 0;
+    for (let t = 0; t < 1; t += dt) {
+      cam.update(city, feet, dt);
+      assert.ok(cam.yaw >= last - 1e-12 && cam.yaw <= 1 + 1e-12, `monotonic, no overshoot at dt ${dt}: ${cam.yaw}`);
+      last = cam.yaw; steps++;
+    }
+    assert.ok(Math.abs(cam.yaw - 1) < 1e-3, `settled at dt ${dt}`);
+  }
+  const cam = new FollowCamera();
+  cam.yaw = 3.1;
+  cam.input([0.2, 0], 0); // across +PI: the aim wraps, the shown yaw takes the short way
+  assert.ok(cam.aimYaw < 0);
+  cam.update(city, feet, 1 / 60);
+  assert.ok(Math.abs(cam.yaw) > 3, `short way round: ${cam.yaw}`);
+});
+
+test('FollowCamera: collision pull-in still works on the damped values', () => {
+  const city = synthCity();
+  const feet = [5, city.floorY, -5];
+  const cam = new FollowCamera();
+  cam.yaw = Math.PI; // looking south: the camera sits north (-z) of the player
+  cam.update(city, feet, 1 / 60);
+  assert.ok(Math.abs(cam.dist - 5) < 1e-9);
+  cam.input([Math.PI, 0], 0); // turn round to look north: the camera swings south, free
+  for (let q = 0; q < 60; q++) cam.update(city, feet, 1 / 60);
+  assert.ok(Math.abs(cam.dist - 5) < 0.05);
+  city.fill(0, 4, 5, 39, 5, 30); // wall between player and camera (south)
+  const r = cam.update(city, feet, 1 / 60);
+  assert.ok(r.position[2] < -3, `pulled in at once: ${r.position[2]}`);
 });
 
 test('raycast finds the first solid point and the spawn point is backed off toward the viewer', () => {

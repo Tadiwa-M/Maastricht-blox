@@ -662,3 +662,41 @@ dark wet cobbles, plane and chestnut trees, and the Stadhuis. What changed:
   id set yet: add them to `landmarks.py` once checked on the real data).
 - Lamps' glass does not glow at night (glow is for window/door kinds only).
 - Bench and chain heights are fixed; street props on slopes > 1 plate are skipped.
+
+## 2026-10-24: Open-world camera (phase 2, track P)
+
+Owner feedback after playing on Windows: "just need to make rotating the camera easier, I want
+it to feel like an open world environment."
+
+**What changed** (`viewer/src/player/`, guide `docs/guide/09-player.md`)
+- Walk mode: click the world to capture the mouse (Pointer Lock, raw input where supported);
+  mouse movement turns the camera with no button held. Yaw unlimited (wrapped), pitch −35°..70°.
+  Esc frees the mouse, Esc with a free mouse (or H, gamepad Start/Select) opens the menu, M (or
+  B) goes back to the map. This is the usual open-world split (Esc = pause menu, M = map) and
+  fits the browser rule that Esc always releases a pointer lock; the Esc press that released
+  the lock is swallowed so it does not also open the menu.
+- Camera rotation and zoom go through a critically damped spring (aim -> shown values), so
+  pointer-lock deltas, stick and touch input are smooth and overshoot-free at any frame rate;
+  collision pull-in runs on the damped values as before.
+- Movement stays camera-relative (shared `look.js moveHeading`); the figure turns with a
+  frame-rate independent exponential (10 /s).
+- Auto-recenter: after 2 s without look input while walking forward-ish, the camera eases
+  behind the figure (gentle, faded in; never when walking toward the camera or sideways).
+- Gamepad right stick: response curve |v|^1.8, 3.2 rad/s yaw, +70% turn boost after holding
+  full tilt for 0.25 s; own sensitivity and invert Y.
+- Menu has camera settings (mouse/touch sensitivity, invert Y, controller sensitivity, invert
+  Y, auto-recenter) saved in `localStorage` with try/catch fallbacks (`settings.js`).
+- Map mode (`maporbit.js`): Ctrl/Alt + left drag orbits, middle drag tilts, Q/E and the right
+  stick turn through a damped spin (smooth start/stop); a compass (bottom right, both modes)
+  shows north and turns the view north on click.
+- New `test/player-look.test.mjs` (11 tests); input/camera tests updated and extended
+  (bindings `exit` -> `map` + `menu`, pointer-lock spike filter, sensitivity/invert, damped turn
+  at 60 and 10 fps, pull-in on damped values).
+
+**Open decisions**
+- Pointer lock is not testable in headless Chromium; the owner should try it on Windows
+  (Chrome/Edge) and tune the default mouse sensitivity (0.003 rad/px × 1.0) if needed.
+- `citycam.js` is unchanged: the map extras live in the player track so the diorama (plain
+  MapControls) gets them too.
+- Rotation smoothing (0.05 s) is light on purpose; if anyone wants raw, unsmoothed mouse look,
+  add a "smoothing" slider.

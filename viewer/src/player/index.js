@@ -7,6 +7,13 @@
 // The player runs inside stage.render (wrapped here), i.e. after main's controls.update()
 // and right before drawing, so the walk camera is never one frame behind or overridden.
 //
+// Walk mode is an open-world third-person camera: clicking the canvas captures the mouse
+// (pointer lock) and mouse movement turns the camera with no button held; Esc frees the
+// mouse, Esc again (or H) opens the menu with the camera settings, M goes back to the map.
+// Movement is camera-relative and the camera eases back behind the player after ~2 s of
+// walking without look input (setting). Map mode adds Ctrl/Alt-drag orbit, middle-drag tilt,
+// smooth Q/E turning and a compass (maporbit.js, hud.js).
+//
 // URL hash: #mode=walk&at=x,z[&yaw=deg][&camyaw=deg][&pitch=deg][&dist=m]
 //   at = Unity metres (x east, z north; CONTRACT 1), yaw = compass degrees the player faces,
 //   camyaw = compass degrees the camera looks toward (default: same as yaw).
@@ -16,7 +23,9 @@ import { CharacterController } from './controller.js';
 import { FollowCamera } from './camera.js';
 import { Input, frameSpeed } from './input.js';
 import { Character } from './character.js';
-import { Hud, TouchControls } from './hud.js';
+import { Hud, TouchControls, isTouchDevice } from './hud.js';
+import { MapOrbit } from './maporbit.js';
+import { loadSettings, saveSettings } from './settings.js';
 import { streetFinder } from './streets.js';
 import { raycastCity, spawnPoint } from './ray.js';
 import { parseWalkHash } from './hash.js';
@@ -39,13 +48,20 @@ export function initPlayer(ctx) {
   const still = /[?&]shot=1/.test(location.search);
 
   let mode = 'map', tween = null, mapView = null, jumpQueued = false, hover = null, streetT = 0;
-  let padCount = 0;
+  let padCount = 0, lookIdle = 0;
   const focusVec = new THREE.Vector3(), smoothFeet = [0, 0, 0];
+  const settings = loadSettings();
 
-  const hud = new Hud({ onWalk: () => enterAt(centreRay()), onExit: exitWalk });
+  const orbit = new MapOrbit(canvas, controls, camera);
+  const hud = new Hud({
+    onWalk: () => enterAt(centreRay()), onExit: exitWalk, settings,
+    onSettings: (s) => saveSettings(s),
+    onNorth: () => { if (mode === 'walk') follow.aimYaw = 0; else orbit.north(); },
+  });
   const touch = new TouchControls(canvas, () => { jumpQueued = true; }, (x, y) => mode === 'map' && enterAt(screenRay(x, y)));
   const input = new Input(canvas, {
-    touch,
+    touch, settings,
+    onLock: (locked) => hud.setLocked(locked),
     onPad: (name, on) => {
       padCount = Math.max(0, padCount + (on ? 1 : -1));
       hud.toast(on ? `Controller connected: ${name.replace(/\s*\(.*$/, '').slice(0, 40)}` : 'Controller disconnected');
@@ -54,6 +70,11 @@ export function initPlayer(ctx) {
   });
   canvas.addEventListener('pointermove', (e) => { hover = [e.clientX, e.clientY]; });
   canvas.addEventListener('dblclick', (e) => { if (mode === 'map' && !tween) enterAt(screenRay(e.clientX, e.clientY)); });
+  // walk mode: a click on the world captures the mouse (open-world look)
+  canvas.addEventListener('click', (e) => {
+    if (mode === 'walk' && e.pointerType !== 'touch' && !isTouchDevice()) { hud.toggleHelp(false); input.requestLock(); }
+  });
+  const lockable = () => !still && !isTouchDevice();
 
   // ---- rays from the screen -------------------------------------------------------------
   const rc = new THREE.Raycaster();
@@ -88,12 +109,16 @@ export function initPlayer(ctx) {
     if (mode === 'map') mapView = { pos: camera.position.clone(), target: controls.target.clone(), fov: camera.fov, near: camera.near };
     ctrl.spawn(feet[0], feet[1], feet[2], yaw);
     smoothFeet.splice(0, 3, ...ctrl.pos);
-    follow.yaw = camYaw;
+    follow.yaw = camYaw; // snaps (no easing from the last walk's yaw)
+    follow.snap();
     follow.dist = follow.want;
+    lookIdle = 0;
     character.group.visible = true;
     character.update(ctrl.pos, ctrl.yaw, 0, 0, 0);
     controls.enabled = false;
+    orbit.enabled = false;
     input.lookActive = true;
+    if (lockable()) input.requestLock(); // works when entered by a click or key; else the hint says click
     camera.near = 0.1;
     mode = 'walk';
     hud.setMode('walk', padCount > 0);
@@ -107,6 +132,7 @@ export function initPlayer(ctx) {
     if (mode !== 'walk') return;
     mode = 'map';
     input.lookActive = false;
+    input.releaseLock();
     touch.show(false);
     hud.setMode('map', padCount > 0);
     const t = new THREE.Vector3(...ctrl.pos);
@@ -142,6 +168,7 @@ export function initPlayer(ctx) {
       camera.updateProjectionMatrix();
       controls.target.copy(look);
       controls.enabled = true;
+      orbit.enabled = true;
       controls.update();
     }
     tween = null;
@@ -158,14 +185,19 @@ export function initPlayer(ctx) {
       const d = fwd.multiplyScalar(my).add(right.multiplyScalar(mx)).multiplyScalar(dist * 0.9 * dt);
       controls.target.add(d); camera.position.add(d);
     }
-    if (frame.look[0] || frame.look[1] || frame.zoom) {
+    // Q/E and the right stick: queued on the damped map orbit (smooth start and stop)
+    if (frame.look[0] || frame.look[1]) orbit.add(-frame.look[0], frame.look[1]);
+    if (frame.zoom) {
       const sph = new THREE.Spherical().setFromVector3(off);
-      sph.theta -= frame.look[0];
-      sph.phi = THREE.MathUtils.clamp(sph.phi + frame.look[1], 0.05, controls.maxPolarAngle);
       sph.radius = THREE.MathUtils.clamp(sph.radius * Math.exp(frame.zoom * 0.15), controls.minDistance, controls.maxDistance);
       camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
       camera.lookAt(controls.target);
     }
+  }
+
+  function toggleMenu(on = hud.help.hidden) {
+    hud.toggleHelp(on);
+    if (on) input.releaseLock(); // the sliders need a cursor
   }
 
   let last = performance.now();
@@ -174,17 +206,26 @@ export function initPlayer(ctx) {
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
     last = now;
     const frame = input.poll(dt);
-    if (frame.pressed.has('help')) hud.toggleHelp();
+    if (frame.pressed.has('help')) toggleMenu();
     if (mode === 'map') {
+      if (frame.pressed.has('menu')) toggleMenu(false);
       if (frame.pressed.has('enter') && !tween) {
         const byKey = frame.kbHeld.has('enter') && hover; // F aims at the cursor, gamepad A at the centre
         enterAt(byKey ? screenRay(...hover) : centreRay());
       } else if (!tween) mapPad(frame, dt);
+      if (!tween) orbit.step(dt);
     } else {
-      if (frame.pressed.has('exit')) { if (!hud.help.hidden) hud.toggleHelp(false); else exitWalk(); }
+      // Esc with a free mouse (the locked one only frees it) / Start: menu; M / B: map
+      if (frame.pressed.has('menu')) toggleMenu();
+      if (frame.pressed.has('map')) { hud.toggleHelp(false); exitWalk(); }
     }
     if (mode === 'walk' || (tween && tween.to === 'walk')) {
       if (!tween) follow.input(frame.look, frame.zoom);
+      const moving = Math.hypot(...frame.move) > 0.2;
+      lookIdle = frame.lookInput ? 0 : lookIdle + dt;
+      if (!tween && settings.recenter && ctrl.grounded) {
+        follow.recenter(ctrl.yaw, { idle: lookIdle, moving, moveAngle: Math.atan2(frame.move[0], frame.move[1]), dt });
+      }
       const jump = jumpQueued || frame.pressed.has('jump');
       jumpQueued = false;
       const speed = frameSpeed(frame, ctrl.o.walk, ctrl.o.run);
@@ -205,6 +246,7 @@ export function initPlayer(ctx) {
       }
     }
     if (tween) stepTween(dt);
+    hud.setHeading(mode === 'walk' && !tween ? follow.yaw : orbit.yaw());
   }
 
   const render = stage.render.bind(stage);
@@ -228,7 +270,7 @@ export function initPlayer(ctx) {
     get mode() { return mode; },
     state: () => ({ mode, pos: [...ctrl.pos], yaw: ctrl.yaw, grounded: ctrl.grounded, frozen: ctrl.frozen,
       cam: camera.position.toArray(), camDist: follow.dist, street: hud.street.textContent }),
-    enterAtUnity, exitWalk, enterAt, ctrl, follow, city,
+    enterAtUnity, exitWalk, enterAt, ctrl, follow, city, orbit, input, settings,
   };
   window.__bloxPlayer = api;
   return api;
