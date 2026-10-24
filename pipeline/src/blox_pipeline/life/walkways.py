@@ -212,6 +212,8 @@ def _snap_dead_ends(g: Graph, radius: float = SNAP_M) -> int:
         else:
             x, y = pts[a] + (pts[b] - pts[a]) * t
             m = g.node(float(x), float(y), min(g.weight[a], g.weight[b]))
+            if m >= len(pts):  # a split node: later dead ends may reach it through ``nbr``
+                pts = np.vstack([pts, np.asarray(g.xy[len(pts):], float)])
             g.edges.discard((min(a, b), max(a, b)))
             g.edge(a, m)
             g.edge(m, b)

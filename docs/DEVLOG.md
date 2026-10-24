@@ -725,3 +725,16 @@ fetched either.
   recomputing the block grid. The centre slice (origin 175700) and the city slice (origin
   174700) use different 256 m grids, so the city build ignored the centre pages already
   fetched. Now the centre keeps its real 3D BAG roofs and only the rest uses the fallback.
+
+## 2026-10-24: two city-build crashes fixed
+
+The first full `--slice city` build exposed two bugs the 2×2 km centre never hit.
+- `blox build` failed with "placed pieces rejected: 1 placed pieces outside the tile". A facade
+  piece reached past the tile's k range, which comes only from terrain, building tops, trees,
+  heroes and props. `TileCanvas.place` now gives such a piece a voxel stand-in, the same as a
+  piece straddling a chunk border, instead of emitting it.
+- `blox life` failed with an IndexError in `_snap_dead_ends`. Splitting an edge added a node
+  that a later dead end reached through the neighbour map, but the point array was a snapshot.
+  The array now grows with each split.
+- Regression tests: `test_canvas_stands_in_for_pieces_above_the_tile` and
+  `test_snap_reaches_nodes_split_earlier_in_the_same_pass`.
