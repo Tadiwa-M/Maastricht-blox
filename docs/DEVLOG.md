@@ -551,3 +551,53 @@ around the camera, and a pre-baked silhouette keeps all 2 km visible. Guide: 06 
   many-paned white windows, wrought-iron balconies, dark slate roofs with white dormers, dark
   cobbles, long rows of parked bikes under plane trees, double-lantern lamp posts, delivery vans.
   Notes are in `docs/reference/markt.md`.
+
+## 2026-10-24: Life v2: a busy city and a new toy figure (phase 2, track L)
+
+Owner feedback: the Markt is busier (bikes, people, buses, cars), Maastricht's buses are blue,
+and the brick-built character was too blocky (a head of 2 bricks). Later photos: long rows of
+parked bikes under the trees, delivery vans on the square, umbrellas in the rain, stall frames.
+
+- **New figure** (`viewer/src/figure/`): an original smooth toy figure built in code (rounded
+  boxes, capsules, lathe) in the city's glossy plastic: rounded-rectangle head on a neck, dot
+  eyes and a smile, separate hair/hats (10 styles), shirts/jackets/coats/dresses, mitten hands,
+  knees, shoes, backpacks/bags/umbrellas; adults 1.70-1.90 m with ~0.45 m shoulders, kids ~1.2 m,
+  older people slower and stooped. Not a minifigure shape (no cylinder head/stud, trapezoid
+  torso, C-hands, hip block). Poses: walk, run, idle, sit, cycle (leg IK on the pedals), browse.
+  The player uses it too. Design sheets: `tools/figure-sheet.mjs` -> `build/shots/figures/`.
+- **Rendering**: one InstancedMesh per part geometry, two LODs (detailed within 32 m, ~4.5k
+  triangles; far ~1.5k). 1000 people = 12-15 draw calls far away, up to ~37 at street level
+  (the < 30 target holds only when the nearest 160 are not all close; see open decisions).
+  Posing uses in-place affine maths: ~4 ms per 1000 figures.
+- **Busy city** (`life/density.js`): people 900/500/200 by tier, day curve, Saturday boost,
+  quiet Sunday mornings; groups of 1-4 at the slowest pace, stops to chat; busiest nodes x1.6 by
+  day and the market square x3 while it is on. Cafe **terraces** from OSM POIs (tables, chairs,
+  parasols, people sitting and sipping), the **Wednesday/Friday market** (striped stalls in
+  back-to-back rows, vendors, browsing shoppers, frames during setup/packing, parked delivery
+  vans), **cyclists** on a cycle graph and **parked bike rows** (stations, squares, shops, and
+  between the trees of tree lines), **cars and vans** on a directed road graph (right-hand
+  traffic, one-way streets, IDM car following, slowing into junctions, no cars on pedestrian
+  streets), **rain**: umbrellas and empty terraces (`#rain=1` until a weather source exists).
+- **Buses blue**: `life/livery.js` colours buses by GTFS operator (Arriva `#0B5FA5`); route
+  colours stay on the signs. Movers may use non-palette colours (skin/hair tones, cars,
+  liveries); documented in the guide.
+- **Pipeline**: `blox life` writes `streets.json` (cycle graph, road graph with one-way + class
+  flags, terraces with the direction to the street, bike spots incl. tree rows, the market
+  polygon + schedule); routes carry `agency`. `python -m blox_pipeline.life.sample` makes a
+  synthetic export for `samples/markt_v3` (bus routes, walkways, streets, terraces at facades,
+  tree rows) for screenshots without data hosts.
+- Tests: `viewer/test/figure.test.mjs`, `life.traffic.test.mjs`, `pipeline/tests/test_life_streets.py`.
+- Screenshots: `build/shots/figures/{sheet,poses,vehicles}.png`,
+  `build/shots/life/{market_street,market_high,bus_terrace,bike_rows,overview,rain_market,thursday_high}.png`.
+
+**Open decisions**
+- Draw calls at street level are ~37 for people (24 detailed meshes: 10 hair styles, 4 tops,
+  3 accessories, 7 body parts + 13 far meshes); getting under 30 needs `BatchedMesh` (several
+  geometries per call) or fewer hair styles near the camera.
+- Triangles: life adds 7-11 M per frame over all passes on the sample (shadow + AO + main);
+  parked bikes (~400) are a big share. Next: a far bike/car LOD, no shadows for far figures.
+- JS: a life step is 5-14 ms under headless software GL (~4 ms of it posing ~850 figures). Next:
+  pose far figures every other frame.
+- The synthetic sample's roads cross the Markt (picked on the top map); real OSM keeps cars off
+  pedestrian squares. Not yet run on a real `blox life` export (data hosts blocked here).
+- Bus model is still the brick bus (contract model); only its colour changed.
