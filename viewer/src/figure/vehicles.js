@@ -4,13 +4,14 @@
 // Origins: ground. Bike: under the saddle (the rider's root, see rig.js SADDLE); car: centre.
 // Front = -z. Wheels spin about their axle (local x).
 import * as THREE from 'three';
-import { rbox, sphere, cyl, torus, tube, place, merge } from './geom.js';
+import { rbox, sphere, cyl, torus, tube as tubeN, place, merge } from './geom.js';
 import { figureMaterial } from './parts.js';
 
 export const BIKE = { wheelR: 0.34, rear: 0.25, front: -0.84, bb: -0.17 };
 const HUB_Y = BIKE.wheelR;
 
 function bikeFrame() {
+  const tube = (a, b, r, c = 1) => tubeN(a, b, r, c, 4); // thin: 4 sides are enough
   const BB = [0, 0.3, BIKE.bb], seatTop = [0, 0.86, 0.02], head0 = [0, 0.6, -0.71], head1 = [0, 0.9, -0.66];
   const rearAx = [0, HUB_Y, BIKE.rear], frontAx = [0, HUB_Y, BIKE.front], r = 0.02;
   const D = 0.08;
@@ -37,13 +38,13 @@ function bikeFrame() {
 function bikeWheel() {
   const R = BIKE.wheelR;
   const parts = [
-    place(torus(R - 0.025, 0.026, 0.13, Math.PI * 2, 6, 20), { rot: [0, Math.PI / 2, 0] }),
-    place(torus(R - 0.055, 0.009, 0.85, Math.PI * 2, 3, 18), { rot: [0, Math.PI / 2, 0] }),
+    place(torus(R - 0.025, 0.026, 0.13, Math.PI * 2, 4, 16), { rot: [0, Math.PI / 2, 0] }),
+    place(torus(R - 0.055, 0.009, 0.85, Math.PI * 2, 3, 14), { rot: [0, Math.PI / 2, 0] }),
     place(cyl(0.03, 0.03, 0.08, 0.7, 10), { rot: [0, 0, Math.PI / 2] }),
   ];
-  for (let q = 0; q < 8; q++) {
-    const a = (q / 8) * Math.PI * 2;
-    parts.push(tube([0, 0, 0], [0, Math.cos(a) * (R - 0.06), Math.sin(a) * (R - 0.06)], 0.004, 0.75, 3));
+  for (let q = 0; q < 6; q++) {
+    const a = (q / 6) * Math.PI * 2;
+    parts.push(tubeN([0, 0, 0], [0, Math.cos(a) * (R - 0.06), Math.sin(a) * (R - 0.06)], 0.004, 0.75, 3));
   }
   return merge(parts);
 }
