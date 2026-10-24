@@ -25,7 +25,7 @@ du -sh "$out" | awk '{print "site size: " $1}'
 cat <<MSG
 
 Serve it locally (any static server works):
-  python3 -m http.server $port --directory "$out"     then open http://localhost:$port/
+  python3 -m http.server $port --bind 127.0.0.1 --directory "$out"     then open http://localhost:$port/
   (or: scripts/site.sh $world $out --serve $port)
 
 Publish (static hosting, no server code):
@@ -39,5 +39,5 @@ Publish (static hosting, no server code):
 MSG
 if [ -n "$serve" ]; then
   echo; echo "serving $out at http://localhost:$port/ (Ctrl+C stops)"
-  exec python3 -m http.server "$port" --directory "$out"
+  exec python3 -m http.server "$port" --bind 127.0.0.1 --directory "$out"
 fi
