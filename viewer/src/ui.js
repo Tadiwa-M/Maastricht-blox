@@ -23,6 +23,7 @@ export function bindUI({ time, tilt, ao, anim, quality, onTime, onTilt, onAO, on
   }
   $('quality').value = quality;
   $('quality').addEventListener('change', (e) => onQuality(e.target.value));
+  bindHudToggle();
   return {
     set(o) {
       slider.value = o.time; label.textContent = fmtHours(o.time);
@@ -51,4 +52,24 @@ export function bindUI({ time, tilt, ao, anim, quality, onTime, onTilt, onAO, on
 
 export function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+}
+
+/** Collapse the panel to its title (button or U key). Starts collapsed on phones; remembered per browser. */
+export function bindHudToggle(doc = document) {
+  const hud = doc.getElementById('hud'), btn = doc.getElementById('hudToggle');
+  if (!hud || !btn) return;
+  let saved = null;
+  try { saved = localStorage.getItem('blox.hud'); } catch { /* storage blocked: use the default */ }
+  const small = typeof matchMedia === 'function' && matchMedia('(max-width: 600px)').matches;
+  const set = (collapsed) => {
+    hud.classList.toggle('collapsed', collapsed);
+    btn.textContent = collapsed ? 'show' : 'hide';
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    try { localStorage.setItem('blox.hud', collapsed ? 'collapsed' : 'open'); } catch { /* ignore */ }
+  };
+  set(saved ? saved === 'collapsed' : small);
+  btn.addEventListener('click', () => set(!hud.classList.contains('collapsed')));
+  doc.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyU' && !e.repeat && !/^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName || '')) set(!hud.classList.contains('collapsed'));
+  });
 }

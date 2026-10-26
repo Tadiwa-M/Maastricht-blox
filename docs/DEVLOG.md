@@ -792,3 +792,14 @@ on the Markt sample (orbit and dive frames reviewed); `shotPose` has unit tests.
   recording; the film covers the cinematic part.
 - The shots use the presets' camera angles; if one frames badly on the full city, tweak `deg`
   or `zoom` in `SHOTS`.
+
+## 2026-10-26: collapsible panel, viewer-only deploy
+
+The owner's phone screenshots showed the HUD covering about a third of the screen, with no way
+to hide it. It now has a hide/show button and the U key, starts collapsed on phones, and the
+choice is remembered. Checked at phone and desktop sizes. The owner had set quality to
+`high`, which runs at 5-7 fps on the phone; `auto` picks a lighter tier.
+The workstation was unavailable, so the loading screen and this toggle were deployed by
+updating only `index.html`, `viewer.js` and `stream-worker.js` in the site repo (a blobless
+clone plus one normal commit; the world data is unchanged). The next `publish.ps1` run replaces
+it with a fresh single commit as usual.
