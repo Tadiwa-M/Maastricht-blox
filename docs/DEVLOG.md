@@ -775,3 +775,20 @@ scene after it).
 - The stutter is hidden, not removed. If people still notice hitches right after the cover
   lifts, warm the shaders explicitly (`renderer.compileAsync`) or spread the uploads of the
   first ring across frames.
+
+## 2026-10-26: film tool (demo video + stills)
+
+The owner asked whether the video and screenshots could be made for them. A live screen
+recording needs a GPU and steady hands. Instead there's now `viewer/tools/film.mjs` (wrapped by
+`scripts/film.ps1|sh`). The city page gets a `?film=1` mode with no render loop and a stepping API,
+and the tool flies 8 scripted shots: city orbit, a dive onto the Markt, the Markt on market day,
+street level, the station at rush hour, Bosscherweg, Sint-Pietersberg/ENCI, and a sunset-to-night
+time-lapse. Each frame advances life by 1/fps, waits for streaming, and is captured as a PNG;
+ffmpeg encodes the MP4, and the middle frame of each shot is saved as a still. Tested headless
+on the Markt sample (orbit and dive frames reviewed); `shotPose` has unit tests.
+
+**Open decisions**
+- Hands-on shots (walking with the PS5 controller, the phone, the TV) still need a real
+  recording; the film covers the cinematic part.
+- The shots use the presets' camera angles; if one frames badly on the full city, tweak `deg`
+  or `zoom` in `SHOTS`.
