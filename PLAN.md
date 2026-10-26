@@ -64,12 +64,14 @@ moving, and you can walk the Markt with a controller.
 ### Phase 3: Launch & after (current)
 Status 2026-10-26: the whole `city` slice is built (22,355 chunks, 8,050 islands, 265 MB site)
 and published with `scripts/publish.ps1` to https://tadiwa-m.github.io/Maastricht_larper/.
-Next: laptop performance check on the city, the demo video and the LinkedIn post. After that:
+Live and verified by the owner on a laptop and a phone (smooth after a stutter on first load). Next: the demo video and the LinkedIn post. After that:
 real 3D BAG roofs for the outskirts (refetch when the API is reachable), shopfronts from OSM,
 fake interiors, cross-border transit.
 
 **Post-launch backlog (owner, 2026-10-26)**, in rough priority order:
-1. Bugs: NPC behaviour (walkers), cars disappearing.
+1. Bugs: NPC behaviour (walkers go in random directions and vanish), cars vanish mid-street,
+   water is walkable. Startup stutter: show a loading screen until the far silhouettes, shader
+   warm-up and first streaming ring are done.
 2. Real-time buses: positions from OVapi GTFS-RT through a small hosted relay (e.g. a Cloudflare
    Worker), because the browser can't call the feed directly; falls back to the timetable.
    Today the buses follow the published GTFS timetable.
