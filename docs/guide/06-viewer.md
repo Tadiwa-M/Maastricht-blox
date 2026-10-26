@@ -209,6 +209,20 @@ at 90% loaded, when the loader settles, or after 8 s at most. Progress never mov
 Load errors show on the cover. It is skipped for `?shot=1` and automation (`navigator.webdriver`),
 so screenshots and perf runs are unchanged. `window.__bloxTimes.cover` records when it lifted.
 
+### Filming (`tools/film.mjs`, `scripts/film.ps1|sh`)
+`.\scripts\film.ps1 -Site build\site_city` renders the demo video frame by frame and writes
+`build/film/maastricht-blox.mp4` (1080p, 30 fps) plus a still of each shot in `build/film/stills/`.
+The page opens with `?film=1`: the render loop is off, and the tool drives
+`window.__bloxFilm` (`step(dt)`, `pose(cam, target, fov)`, `time(h)`, `settled()`, `presets()`).
+Every frame advances life by exactly 1/fps and is captured only after its area has streamed in,
+so the video is smooth and free of pop-in however slow the GPU is. A browser window opens
+(the real GPU renders); `--headless` uses software rendering, which is very slow (cloud tests).
+Shots live in `SHOTS` at the top of `film.mjs`: `orbit` (turn around a preset at a zoom) or
+`move` (fly from one preset to another, rising in the middle), each with a scene hash (`t`, `day`)
+and an optional sun time-lapse (`hours`). Edit that list to re-cut the film. `-Quick` makes a 10 fps
+quarter-length test cut. ffmpeg comes from PATH or is installed on the spot as `ffmpeg-static`
+(an npm package; no admin needed).
+
 ## Publishing (GitHub Pages)
 
 The live site is the separate repo `Tadiwa-M/Maastricht_larper`, served at

@@ -298,6 +298,8 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const r = stage.renderer;
   r.info.autoReset = false;
   const still = /[?&]shot=1/.test(location.search);
+  // ?film=1 (tools/film.mjs): no render loop; the tool steps frames with a fixed dt and moves the camera
+  const film = /[?&]film=1/.test(location.search);
   const clock = new THREE.Clock();
   const meter = new FpsMeter(1000);
   const frustum = new THREE.Frustum(), pv = new THREE.Matrix4(), tmpBox = new THREE.Box3();
@@ -309,8 +311,8 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const times = { start: t0 };
   window.__bloxTimes = times;
 
-  function frame(now) {
-    const dt = Math.min(clock.getDelta(), 0.1);
+  function frame(now, fixedDt) {
+    const dt = fixedDt ?? Math.min(clock.getDelta(), 0.1);
     const ms = meter.tick(now);
     controls.update();
     const dist = cam.update();
@@ -330,7 +332,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
         cam.update();
       }
       streetWanted = null;
-      return requestAnimationFrame(frame);
+      return film ? undefined : requestAnimationFrame(frame);
     }
     const ready = still && !streetWanted && far.silhouetteReady() && loader.settled() && far.settled();
     view.update(stage.camera, { all: ready });
@@ -372,7 +374,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     if (draw && (!still || ready)) settleFrames++;
     if (settleFrames === 4) { window.__bloxReady = true; readyAt = performance.now(); times.ready = readyAt - t0; }
     if (still && settleFrames >= 4) return;
-    requestAnimationFrame(frame);
+    if (!film) requestAnimationFrame(frame);
   }
   const built = { bricks: 0, get studs() { return view.studsShown; } };
   window.__blox = { stage, controls, presets, built, city, loader, view, far, pool, cam,
@@ -390,7 +392,23 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const ctx = { stage, camera: stage.camera, controls, city, models: extras.models || {}, ui, world: metaWorld, islands: [],
     lod: null, box, demo: null, quality: () => tierName, still, features };
   hooks.push(...(await initHooks(ctx)).filter(Boolean));
-  requestAnimationFrame(frame);
+  if (!film) { requestAnimationFrame(frame); return; }
+  controls.enableDamping = false;
+  let filmNow = performance.now();
+  window.__bloxFilm = {
+    /** Advance one frame by dt seconds (life, water, streaming) and draw it. */
+    step(dt) { filmNow += dt * 1000; frame(filmNow, dt); },
+    /** Move the camera; three.js coords. */
+    pose(cam, target, fov) {
+      stage.camera.position.set(...cam); controls.target.set(...target);
+      if (fov) { stage.camera.fov = fov; stage.camera.updateProjectionMatrix(); }
+      stage.camera.lookAt(controls.target);
+    },
+    time(h) { applyTime(h); },
+    settled: () => far.silhouetteReady() && loader.settled() && far.settled(),
+    presets: () => Object.fromEntries(Object.entries(presets).map(([k, p]) => [k, { cam: p.cam.toArray(), target: p.target.toArray(), fov: p.fov }])),
+  };
+  window.__bloxReady = true;
 }
 
 export { tiltFor };

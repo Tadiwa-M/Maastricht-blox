@@ -46,8 +46,9 @@ uv run blox --slice city life  --out ../build/world_city   # buses, walkways, st
 cd ..
 scripts/site.sh build/world_city build/site_city --serve   # static site at http://localhost:8000/
 scripts/publish.sh build/site_city                 # deploy to GitHub Pages (one fresh commit)
+scripts/film.sh build/site_city                    # demo video + stills, frame by frame (build/film/)
 ```
-Windows (PowerShell): `.\scripts\check.ps1`, `.\scripts\site.ps1`, `.\scripts\publish.ps1`. New
+Windows (PowerShell): `.\scripts\check.ps1`, `.\scripts\site.ps1`, `.\scripts\publish.ps1`, `.\scripts\film.ps1`. New
 machine: `scripts/setup-workstation.ps1` (or `.sh`), then `docs/guide/00-workstation-setup.md`.
 `--slice centre` builds the smaller 2 × 2 km old town; `samples/markt_v3` is a ready-made sample
 (`scripts/site.sh samples/markt_v3 build/site_markt --serve`).
