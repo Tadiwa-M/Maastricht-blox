@@ -5,7 +5,7 @@ Living plan. Update it when scope, tools or phase status change; log the change 
 
 ## 1. What we're building (outline)
 
-A brick-built, game-quality miniature of Maastricht for PC.
+A brick-built, game-quality miniature of Maastricht, playable in the browser.
 - **World:** real terrain, buildings and roads from open data (AHN, 3D BAG, OSM), turned
   into brick chunks by a Python pipeline. Detailed townhouses come from a facade grammar
   with custom pieces.
@@ -15,7 +15,7 @@ A brick-built, game-quality miniature of Maastricht for PC.
 - **Alive:** live buses on real routes, real weather, time of day and the Maas water level.
 - **Play:** a third-person walk mode with an original blocky character, a photo mode, and
   collectibles.
-- **Launch:** a Windows build, a demo video and a LinkedIn post.
+- **Launch:** a public web link, a demo video and a LinkedIn post.
 
 ## 2. Tools
 
@@ -23,7 +23,7 @@ A brick-built, game-quality miniature of Maastricht for PC.
 |---|---|---|
 | Data pipeline | Python 3.11+, uv, numpy/numba, shapely, rasterio, laspy, pyosmium, pyproj | in use |
 | Live data | FastAPI proxy, httpx, gtfs-realtime-bindings | in use (fixtures only) |
-| Game (launch) | three.js web engine (`viewer/`), Gamepad API, static hosting | phase 2 |
+| Game (launch) | three.js web engine (`viewer/`), Gamepad API, GitHub Pages (`scripts/publish.*`) | in use |
 | Game (later) | Unity 6 LTS, URP 17, Burst/Collections/Mathematics, Input System | parked after launch; code in repo |
 | Fast preview | three.js viewer, esbuild, Playwright + headless Chromium | in use |
 | Engine-free C# tests | .NET 8 SDK, xUnit | in use |
@@ -49,7 +49,7 @@ clicks a link; it doesn't install an .exe. The three.js engine already renders r
 with islands, LOD and movers, and it runs on phones too. Unity is parked until after launch (a
 later high-end desktop/AR version), and its code stays in the repo and in CI.
 
-### Phase 2: Playable web city (current)
+### Phase 2: Playable web city: done (2026-10-26)
 Three parallel tracks plus hosting:
 1. **Whole-city streaming:** the world is served as files and loaded around the camera.
    Pre-baked far meshes keep the whole 2×2 km visible.
@@ -61,7 +61,12 @@ Three parallel tracks plus hosting:
 **Exit:** a link opens Maastricht in the browser at 30+ fps on a laptop, with buses and people
 moving, and you can walk the Markt with a controller.
 
-### Phase 3: Launch & after
+### Phase 3: Launch & after (current)
+Status 2026-10-26: the whole `city` slice is built (22,355 chunks, 8,050 islands, 265 MB site)
+and published with `scripts/publish.ps1` to https://tadiwa-m.github.io/Maastricht_larper/.
+Next: laptop performance check on the city, the demo video and the LinkedIn post. After that:
+real 3D BAG roofs for the outskirts (refetch when the API is reachable), shopfronts from OSM,
+fake interiors, cross-border transit.
 Polish, the demo video (captured from the web build), the LinkedIn post. Then: live GPS buses
 through a hosted proxy, weather, controller polish, the Unity desktop/AR version.
 **Exit:** a public link, a video and a post.
