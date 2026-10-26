@@ -24,6 +24,7 @@ import { bindUI, escapeHtml } from './ui.js';
 import { cityFromWorlds } from './city.js';
 import { SolidMap } from './solidmap.js';
 import { cityMain } from './citymode.js';
+import { loadingScreen } from './loading.js';
 import { httpSource } from './source.js';
 
 function parseHash() {
@@ -206,7 +207,7 @@ async function main() {
       ui.stats({ bricks: totalBricks, studs: ls.studs, near: ls.near, chunks: ls.chunks, calls: r.info.render.calls,
         triangles: r.info.render.triangles, fps: meter.label(), actors: demo?.actors.length || 0 });
     }
-    if (++frames === 4) window.__bloxReady = true;
+    if (++frames === 4) { window.__bloxReady = true; loadingScreen().hide(); }
     if (still && frames >= 4) return; // screenshot mode: freeze so capture is cheap
     requestAnimationFrame(frame);
   }
@@ -260,6 +261,7 @@ async function boot() {
 
 boot().catch((err) => {
   console.error(err);
+  loadingScreen().error(`Could not load the city: ${err.message}`);
   document.getElementById('info').hidden = false;
   document.getElementById('info').textContent = `Error: ${err.message}`;
   window.__bloxError = String(err.stack || err);

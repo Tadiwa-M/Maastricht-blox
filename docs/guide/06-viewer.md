@@ -201,6 +201,14 @@ triangles, 17.5 / 5.4 / 1.5 MB.
 - **Picking** steps cell by cell along the ray (Amanatides & Woo), so the cost depends on ray
   length, not brick count (`picking.js`, tested in `test/picking.test.mjs`).
 
+### Loading screen (`src/loading.js`)
+A cover (`#loading` in `index.html`) hides the first seconds: city index -> baked silhouette ->
+first streaming ring -> 8 drawn frames (the shaders compile on the first ones), then it fades
+out. The phase logic is the pure `loadState()`, which is tested. The first ring counts as done
+at 90% loaded, when the loader settles, or after 8 s at most. Progress never moves backwards.
+Load errors show on the cover. It is skipped for `?shot=1` and automation (`navigator.webdriver`),
+so screenshots and perf runs are unchanged. `window.__bloxTimes.cover` records when it lifted.
+
 ## Publishing (GitHub Pages)
 
 The live site is the separate repo `Tadiwa-M/Maastricht_larper`, served at

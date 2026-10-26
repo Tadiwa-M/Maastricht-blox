@@ -26,6 +26,7 @@ import { bindUI, escapeHtml } from './ui.js';
 
 const DEG = Math.PI / 180;
 import { PLACES_RD, placeChunk } from './places.js';
+import { loadingScreen, loadState } from './loading.js';
 
 function parseHash() {
   const p = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -163,10 +164,15 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const t0 = performance.now();
   const opts = parseHash();
   const src = site.source;
+  const cover = loadingScreen();
+  const boot = { index: false, silhouette: false, frames: 0, since: 0 };
+  cover.update(loadState(boot).frac, loadState(boot).msg);
   const [index, farIndex, palette, catalogue, extras] = await Promise.all([
     src.json('index.json'), src.json('far/index.json'), src.json('palette.json'), src.json('brick_catalogue.json'),
     src.json('models.json').catch(() => ({ models: {} })),
   ]);
+  boot.index = true;
+  cover.update(loadState(boot).frac, loadState(boot).msg);
   const meta = { manifest: { chunkStuds: index.chunkStuds, studM: index.studM, plateM: index.plateM }, palette, catalogue };
   const features = new Map();
   src.json('features.json').then((f) => { for (const e of f.features || []) features.set(e.id, e); }).catch(() => {});
@@ -353,6 +359,15 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
       ui.stats({ text: `${ls.loaded}/${ls.items} streamed (${ls.inflight} loading, ${ls.mib.toFixed(1)} MiB) · ${vs.near} near · `
         + `${vs.studs.toLocaleString()} studs · far l1/l2/l3 ${vs.l1 ?? 0}/${vs.l2 ?? 0}/${vs.l3 ?? 0} · ${r.info.render.calls} draws · `
         + `${(r.info.render.triangles / 1e6).toFixed(2)} M tris · ${meter.label()}` });
+    }
+    if (!cover.done) {
+      if (!boot.silhouette && far.silhouetteReady()) { boot.silhouette = true; boot.since = now; }
+      if (draw) boot.frames++;
+      const ls = loader.stats();
+      const st = loadState({ ...boot, loaded: ls.loaded, inflight: ls.inflight, pending: ls.pending,
+        settled: loader.settled(), frames: boot.frames, streamMs: boot.silhouette ? now - boot.since : 0 });
+      cover.update(st.frac, st.msg);
+      if (st.done) { cover.hide(); times.cover = performance.now() - t0; }
     }
     if (draw && (!still || ready)) settleFrames++;
     if (settleFrames === 4) { window.__bloxReady = true; readyAt = performance.now(); times.ready = readyAt - t0; }
