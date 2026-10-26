@@ -760,3 +760,18 @@ The first full `--slice city` build exposed two bugs the 2×2 km centre never hi
 **Open decisions**
 - Laptop performance on the full city is not measured yet; the far L1 bake is 24.5 M triangles.
   If the overview stutters, cap the L1 distance in the viewer (no rebuild needed).
+
+## 2026-10-26: loading screen
+
+The owner saw a stutter on first load (city index, silhouette bake upload, first streaming
+ring and shader compile all land at once). New `viewer/src/loading.js` plus a `#loading` cover in
+`index.html`: animated bricks, a progress bar with phase messages, and a controls tip. It lifts
+after the first ring (90% loaded, settled, or 8 s at most) and 8 drawn frames, then fades.
+Load errors show on it. Skipped under `?shot=1`/webdriver, so the screenshot tools are unchanged.
+4 new tests (147 total). Checked in headless Chromium on the Markt sample (cover screenshot and
+scene after it).
+
+**Open decisions**
+- The stutter is hidden, not removed. If people still notice hitches right after the cover
+  lifts, warm the shaders explicitly (`renderer.compileAsync`) or spread the uploads of the
+  first ring across frames.

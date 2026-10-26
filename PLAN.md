@@ -70,8 +70,8 @@ fake interiors, cross-border transit.
 
 **Post-launch backlog (owner, 2026-10-26)**, in rough priority order:
 1. Bugs: NPC behaviour (walkers go in random directions and vanish), cars vanish mid-street,
-   water is walkable. Startup stutter: show a loading screen until the far silhouettes, shader
-   warm-up and first streaming ring are done.
+   water is walkable. (Startup stutter: done 2026-10-26, a loading
+   screen.)
 2. Real-time buses: positions from OVapi GTFS-RT through a small hosted relay (e.g. a Cloudflare
    Worker), because the browser can't call the feed directly; falls back to the timetable.
    Today the buses follow the published GTFS timetable.
