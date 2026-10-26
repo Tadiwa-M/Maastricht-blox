@@ -30,14 +30,9 @@ Serve it locally (any static server works):
   python -m http.server $Port --bind 127.0.0.1 --directory "$Out"     then open http://localhost:$Port/
   (or: .\scripts\site.ps1 "$World" "$Out" -Serve -Port $Port)
 
-Publish (static hosting, no server code):
-  GitHub Pages: put the contents of $Out on a gh-pages branch, e.g.
-    git worktree add -b gh-pages ..\gh-pages        (later: git worktree add ..\gh-pages gh-pages)
-    robocopy "$Out" ..\gh-pages /MIR /XD .git ; New-Item ..\gh-pages\.nojekyll -Force
-    cd ..\gh-pages ; git add -A ; git commit -m site ; git push origin gh-pages
-  then enable Pages for the gh-pages branch in the repository settings.
-  Any other static host (Netlify, Cloudflare Pages, S3) works the same: upload $Out.
-  Note: GitHub Pages has a 1 GB site limit and files must stay under 100 MB (the full city is ~100 MB in ~6,500 files).
+Publish to GitHub Pages (one fresh commit in the site repo, no history):
+  .\scripts\publish.ps1 -Site "$Out"
+  Other static hosts work too (upload $Out), but Cloudflare Pages' free plan caps a site at 20,000 files and the full city has ~30,000.
 "@
 if ($Serve) {
     Write-Host "serving $Out at http://localhost:$Port/ (Ctrl+C stops)"

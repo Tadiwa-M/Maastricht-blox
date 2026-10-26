@@ -738,3 +738,25 @@ The first full `--slice city` build exposed two bugs the 2×2 km centre never hi
   The array now grows with each split.
 - Regression tests: `test_canvas_stands_in_for_pieces_above_the_tile` and
   `test_snap_reaches_nodes_split_earlier_in_the_same_pass`.
+
+## 2026-10-26: launch: audit, licence, publish script
+
+- The city slice built on the workstation: 22,355 chunks, 8,050 islands, 30,807 features in
+  2 h 20 min; the site is 265 MB in ~30,400 files.
+- Hosting: the code repo `Tadiwa-M/Maastricht-blox` (public, for the owner's CV) plus a separate
+  site repo `Tadiwa-M/Maastricht_larper` on GitHub Pages. Cloudflare Pages was ruled out because
+  its free plan caps a site at 20,000 files.
+- New `scripts/publish.ps1` / `publish.sh`: copy the site, add `.nojekyll` and a README, and
+  force-push one commit, so the site repo never accumulates builds. Tested against a local bare
+  repo (two publishes leave one commit). The site was verified under a sub-path, since all URLs
+  are relative.
+- Public-repo audit: no keys or tokens in the history, no images ever committed (the owner's
+  Markt photos never were), no blobs over 2 MB, the "not affiliated" line present. One commit
+  carries the owner's university email as its author; it's left as is, because rewriting public
+  history isn't worth it. A GitHub noreply address is suggested for new commits.
+- Added an MIT `LICENSE`, and rewrote `README.md` for the launch (play link, what it is, how it
+  works, how to build).
+
+**Open decisions**
+- Laptop performance on the full city is not measured yet; the far L1 bake is 24.5 M triangles.
+  If the overview stutters, cap the L1 distance in the viewer (no rebuild needed).

@@ -80,7 +80,7 @@ rotates by `−rot·90°` about +y. See [guide 01](01-coordinates-and-rotation.m
 
 ## Streamed city (site build, phase 2)
 
-The whole 2x2 km city (4096 chunks + ~2500 islands, ~80 MB) can't be one embedded page. The
+The world (the 2x2 km centre: 4096 chunks + ~2500 islands, ~80 MB; the 4.1x5.6 km `city` slice: 22,355 chunks + 8,050 islands, 265 MB as a site) can't be one embedded page. The
 site build serves the world as files and the viewer streams them around the camera; a pre-baked
 silhouette keeps the whole city visible from the first second.
 
@@ -200,6 +200,19 @@ triangles, 17.5 / 5.4 / 1.5 MB.
 - **Performance (LOD and quality tiers):** see the next section.
 - **Picking** steps cell by cell along the ray (Amanatides & Woo), so the cost depends on ray
   length, not brick count (`picking.js`, tested in `test/picking.test.mjs`).
+
+## Publishing (GitHub Pages)
+
+The live site is the separate repo `Tadiwa-M/Maastricht_larper`, served at
+https://tadiwa-m.github.io/Maastricht_larper/. It holds only the built site.
+`scripts/publish.ps1 -Site build\site_city` (or `scripts/publish.sh build/site_city`) copies the
+site to a temp dir, adds `.nojekyll` and a README, and force-pushes ONE commit to `main`. Each
+release replaces the last, so the repo never grows with old builds, and the code repo never
+carries the 250+ MB of city files. Pages setting (once): Settings -> Pages -> Deploy from a
+branch -> `main` / root. All site URLs are relative, so it works under the `/Maastricht_larper/`
+sub-path; this was verified by serving a site from a sub-folder.
+Hosting limits: GitHub Pages allows a 1 GB site and 100 MB per file. The city is 265 MB, ~30,400
+files, the biggest well under 1 MB. Cloudflare Pages' free plan (20,000 files) does not fit.
 
 ## Islands (rotated buildings, CONTRACT 5.1)
 
