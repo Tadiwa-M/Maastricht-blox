@@ -209,6 +209,11 @@ at 90% loaded, when the loader settles, or after 8 s at most. Progress never mov
 Load errors show on the cover. It is skipped for `?shot=1` and automation (`navigator.webdriver`),
 so screenshots and perf runs are unchanged. `window.__bloxTimes.cover` records when it lifted.
 
+### Panel (HUD) toggle
+The top-left panel collapses to its title with the **hide/show** button or the **U** key
+(`bindHudToggle` in `ui.js`). It starts collapsed on screens up to 600 px wide, and the choice is
+kept in `localStorage`. This is for clean recordings and phone play.
+
 ### Filming (`tools/film.mjs`, `scripts/film.ps1|sh`)
 `.\scripts\film.ps1 -Site build\site_city` renders the demo video frame by frame and writes
 `build/film/maastricht-blox.mp4` (1080p, 30 fps) plus a still of each shot in `build/film/stills/`.

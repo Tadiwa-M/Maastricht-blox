@@ -12,7 +12,11 @@
   .panel { position: fixed; background: var(--panel); backdrop-filter: blur(8px); border-radius: 10px;
     padding: 10px 14px; box-shadow: 0 4px 18px rgba(0,0,0,.25); }
   #hud { top: 14px; left: 14px; display: grid; gap: 8px; min-width: 240px; }
-  #hud h1 { margin: 0; font-size: 15px; letter-spacing: .02em; }
+  #hud h1 { margin: 0; font-size: 15px; letter-spacing: .02em; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  #hudToggle { font: inherit; font-size: 11px; font-weight: 400; color: var(--muted); background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.25); border-radius: 5px; padding: 1px 8px; cursor: pointer; }
+  #hud.collapsed { min-width: 0; padding: 6px 10px; }
+  #hud.collapsed > :not(h1) { display: none !important; }
   #hud label { display: flex; align-items: center; gap: 8px; color: var(--muted); }
   #hud input[type=range] { flex: 1; accent-color: var(--accent); }
   #timeLabel { color: var(--text); font-variant-numeric: tabular-nums; min-width: 3em; text-align: right; }
@@ -56,7 +60,7 @@
   <div class="tip">Fly like a map · F or double-click to walk there · controllers work too</div>
 </div>
 <div id="hud" class="panel">
-  <h1>Maastricht Blox</h1>
+  <h1>Maastricht Blox <button id="hudToggle" type="button" aria-expanded="true" title="Hide or show this panel (U)">hide</button></h1>
   <label>Sun <input id="time" type="range" min="5" max="23" step="0.25" value="16.5"><span id="timeLabel">16:30</span></label>
   <label><input id="tilt" type="checkbox" checked> Tilt-shift</label>
   <label><input id="ao" type="checkbox" checked> Ambient occlusion</label>
