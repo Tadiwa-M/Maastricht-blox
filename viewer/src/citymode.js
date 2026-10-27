@@ -198,7 +198,8 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const size = { chunks: index.chunks.length, bricks: Infinity };
   const gpu = gpuInfo(stage.renderer);
   const gpuTier = autoTierFor(gpu.cls);
-  let tierName = initialTier(mode, size, gpuTier), governor = new FrameGovernor(tierName);
+  const floor = gpu.cls === 'software' ? 'lite' : 'low';
+  let tierName = initialTier(mode, size, gpuTier), governor = new FrameGovernor(tierName, { floor });
   if (gpu.cls === 'software' && !still && !film) {
     showNotice('Your browser is drawing without the graphics card (hardware acceleration is off), so the city will be slow. '
       + 'Turn on "Use graphics acceleration when available" in the browser settings and restart it.');
@@ -237,7 +238,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     viewScale = -1; // re-apply the height-scaled radii below
     ui?.tier(mode, name);
   }
-  function setMode(m) { mode = m; governor = new FrameGovernor(initialTier(m, size, gpuTier)); applyTier(initialTier(m, size, gpuTier)); }
+  function setMode(m) { mode = m; governor = new FrameGovernor(initialTier(m, size, gpuTier), { floor }); applyTier(initialTier(m, size, gpuTier)); }
   applyTier(tierName);
 
   const controls = new MapControls(stage.camera, canvas);

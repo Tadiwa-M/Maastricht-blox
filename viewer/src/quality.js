@@ -6,8 +6,9 @@
 //   medium  per-chunk LOD (bevelled + studs only near the camera, one bevel segment
 //           instead of two), half-res AO, pixel ratio 1, bloom only at night, 2048 shadows
 //   low     LOD with a small near zone, AO off, pixel ratio 1, bloom only at night, 1024 shadows
-//   lite    the floor for weak or software GPUs: renders at 0.75 resolution, no shadows, no
-//           bloom, a short detail range and fewer people and vehicles
+//   lite    for software rendering (no GPU) or by hand: 0.75 resolution, no shadows, no bloom,
+//           a short detail range and fewer people and vehicles. 'auto' never steps down to it
+//           on a real GPU (the governor's floor is low there)
 //
 // 'auto' starts at high for a single-chunk world; a bigger world starts by GPU class (gpu.js:
 // software -> lite, integrated -> low, else medium), then steps
@@ -54,8 +55,9 @@ export function useLod(tierName, world) {
  * sample(ms) returns the new tier name, or null to stay.
  */
 export class FrameGovernor {
-  constructor(tier, { slowMs = 40, windowMs = 1500, settleMs = 1500 } = {}) {
-    Object.assign(this, { tier, slowMs, windowMs, settleMs });
+  /** floor: the cheapest tier auto may reach ('low' normally; 'lite' only for software GPUs). */
+  constructor(tier, { slowMs = 40, windowMs = 1500, settleMs = 1500, floor = 'low' } = {}) {
+    Object.assign(this, { tier, slowMs, windowMs, settleMs, floor });
     this.reset();
   }
 
@@ -68,7 +70,7 @@ export class FrameGovernor {
     const avg = this.sum / this.n;
     this.sum = 0; this.n = 0; this.span = 0;
     const i = ORDER.indexOf(this.tier);
-    if (avg > this.slowMs && i < ORDER.length - 1) {
+    if (avg > this.slowMs && i < ORDER.indexOf(this.floor)) {
       this.tier = ORDER[i + 1];
       this.reset();
       return this.tier;
