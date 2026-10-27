@@ -841,3 +841,6 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   73 / 3.9 M (was 1,509 / 7.9 M), Markt 588 / 7.8 M (796 / 11.9 M), street 628 / 9.2 M
   (1,310 / 12.8 M). The images look unchanged (overview, Markt and street reviewed).
   Tests: `farblock.test.mjs` (vertices land where the region meshes put them; grouping).
+- The owner asked for the optimisations to be toggleable: a **Performance mode** checkbox
+  (`#perf=0|1`, saved per browser) turns the merged far blocks and the life budget on or off.
+  Rule from the owner (2026-10-27): no commits, pushes or deploys without their approval.
