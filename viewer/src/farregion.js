@@ -141,6 +141,79 @@ export function regionMeshes(decoded, palette, mats, studM, plateM) {
   return { group, parts, owners: decoded.owners, triangles: r.triangles };
 }
 
+/**
+ * One mesh per family for a block of regions of the same level (same cell size): the regions'
+ * arrays are concatenated with their offsets folded into the Uint16 positions, and each region
+ * is an index range. Cuts the overview's ~1,050 draw calls (352 regions x families) to a few
+ * dozen. items: [{ reg, arrays: regionArrays() }]. -> { group, parts: [{ mesh, ranges: Map key -> range }] }
+ */
+export function blockMeshes(items, mats) {
+  const sc = items[0].arrays.scale;
+  const cell = (r) => [Math.round(r.position[0] / sc[0]), Math.round(r.position[1] / sc[1]), Math.round(r.position[2] / sc[2])]; // gi0, gk0, gj0
+  const cells = items.map((it) => cell(it.arrays));
+  const base = [0, 1, 2].map((a) => Math.min(...cells.map((c) => c[a])));
+  const group = new THREE.Group();
+  group.position.set(base[0] * sc[0], base[1] * sc[1], base[2] * sc[2]);
+  group.scale.fromArray(sc);
+  group.name = 'far block';
+  const fams = new Map();
+  items.forEach((it, q) => {
+    for (const [fam, { arrays }] of it.arrays.families) {
+      if (!fams.has(fam)) fams.set(fam, []);
+      fams.get(fam).push({ key: it.reg.key, a: arrays, off: cells[q].map((c, k) => c - base[k]) });
+    }
+  });
+  const parts = [];
+  for (const [fam, list] of fams) {
+    const verts = list.reduce((n, e) => n + e.a.position.length / 3, 0), idx = list.reduce((n, e) => n + e.a.index.length, 0);
+    const out = { position: new Uint16Array(verts * 3), normal: new Int8Array(verts * 3), color: new Uint16Array(verts * 3),
+      extra: new Uint8Array(verts * 4), index: new Uint32Array(idx) };
+    const ranges = new Map();
+    let v = 0, i = 0;
+    for (const { key, a, off } of list) {
+      const n = a.position.length / 3;
+      for (let q = 0; q < n; q++) { // position = (i, k, j) in cells; off = (di, dk, dj)
+        out.position[(v + q) * 3] = a.position[q * 3] + off[0];
+        out.position[(v + q) * 3 + 1] = a.position[q * 3 + 1] + off[1];
+        out.position[(v + q) * 3 + 2] = a.position[q * 3 + 2] + off[2];
+      }
+      out.normal.set(a.normal, v * 3); out.color.set(a.color, v * 3); out.extra.set(a.extra, v * 4);
+      for (let q = 0; q < a.index.length; q++) out.index[i + q] = a.index[q] + v;
+      ranges.set(key, { start: i, count: a.index.length });
+      v += n; i += a.index.length;
+    }
+    const mat = mats.cityFar(fam);
+    const mesh = uploadSoon(new THREE.Mesh(geometryOf(out), [mat]));
+    mesh.castShadow = !mat.transparent;
+    mesh.receiveShadow = true;
+    mesh.name = `farblock|${fam}`;
+    group.add(mesh);
+    parts.push({ mesh, order: list.map((e) => e.key), ranges });
+  }
+  group.updateMatrixWorld(true);
+  return { group, parts };
+}
+
+/** Draw the regions in `show` (keys) of a block, contiguous ones as one group. */
+export function showBlock(built, show) {
+  let triangles = 0, groups = 0;
+  for (const { mesh, order, ranges } of built.parts) {
+    const g = mesh.geometry;
+    g.clearGroups();
+    let run = null;
+    for (const key of order) {
+      const r = ranges.get(key);
+      if (!show.has(key)) { run = null; continue; }
+      triangles += r.count / 3;
+      if (run && run.start + run.count === r.start) run.count += r.count;
+      else { run = { start: r.start, count: r.count, materialIndex: 0 }; g.groups.push(run); }
+    }
+    mesh.visible = g.groups.length > 0;
+    groups += g.groups.length;
+  }
+  return { triangles, groups };
+}
+
 /** Index ranges of the owners not hidden, merged into geometry groups. */
 export function refreshGroups(look, hidden) {
   for (const { mesh, ranges } of look.parts) {
@@ -165,8 +238,9 @@ export function refreshGroups(look, hidden) {
  * showDist: [d1, d2]: level 1 within d1 m of the camera, level 2 within d2, else level 3.
  */
 export class FarRegions {
-  constructor(index, { palette, mats, fetchBytes, decode, covered, showDist = [260, 900] }) {
-    Object.assign(this, { index, palette, mats, fetchBytes, decode, covered, showDist });
+  constructor(index, { palette, mats, fetchBytes, decode, covered, showDist = [260, 900], blockRegions = 0 }) {
+    Object.assign(this, { index, palette, mats, fetchBytes, decode, covered, showDist, blockRegions });
+    this.blocks = new Map(); // blockRegions > 0: the coarsest level merged per block of regions
     this.group = new THREE.Group();
     this.group.name = 'far regions';
     this.regions = new Map();
@@ -202,9 +276,36 @@ export class FarRegions {
           if (it.region.shown === look) it.region.shown = null;
         },
       });
-      sched.onReady = (it) => { it.region.looks.set(it.level, it.payload); };
+      sched.onReady = (it) => {
+        it.region.looks.set(it.level, it.payload);
+        if (coarsest && this.blockRegions) this.addToBlock(it.region, it.payload);
+      };
+      if (coarsest && this.blockRegions) {
+        for (const r of lv.regions) this.blockOf(r.rx, r.ry).expected++;
+      }
       this.schedulers.set(lv.level, sched);
     }
+  }
+
+  blockOf(rx, ry) {
+    const B = this.blockRegions, key = `${Math.floor(rx / B)},${Math.floor(ry / B)}`;
+    if (!this.blocks.has(key)) this.blocks.set(key, { key, expected: 0, items: [], built: null, show: new Set() });
+    return this.blocks.get(key);
+  }
+
+  /** Coarsest look of a region arrived: keep its arrays until its whole block can be merged. */
+  addToBlock(reg, look) {
+    const block = this.blockOf(reg.rx, reg.ry);
+    look.block = block;
+    block.items.push({ reg, arrays: regionArrays(look.decoded, this.palette, this.index.studM, this.index.plateM) });
+    look.decoded = null;
+    if (block.items.length === block.expected) this.buildBlock(block);
+  }
+
+  buildBlock(block) {
+    block.built = blockMeshes(block.items, this.mats);
+    block.items = [];
+    this.group.add(block.built.group);
   }
 
   /** Distances at which levels 1, 2 are shown (and loaded, x 1.3); see the constructor. */
@@ -233,13 +334,19 @@ export class FarRegions {
     return this.coarsest;
   }
 
-  /** eye: camera position; dirty: something changed what is covered. */
-  update(eye, coverChanged = false) {
+  /** eye: camera position; dirty: something changed what is covered; inView(box) (optional):
+   * regions of a merged block outside it are left out of the block's draw. */
+  update(eye, coverChanged = false, inView = null) {
     // the whole silhouette first, then the finer levels
     const base = this.schedulers.get(this.coarsest);
     base.update(eye);
     if (base.settled()) for (const [l, s] of this.schedulers) if (l !== this.coarsest) s.update(eye);
     let tris = 0, draws = 0;
+    for (const block of this.blocks.values()) {
+      block.show.clear();
+      // a region file that never arrived must not keep its block (and 15 neighbours) hidden
+      if (!block.built && block.items.length && base.settled()) this.buildBlock(block);
+    }
     for (const reg of this.regions.values()) {
       const dx = Math.max(reg.box.min.x - eye.x, 0, eye.x - reg.box.max.x), dz = Math.max(reg.box.min.z - eye.z, 0, eye.z - reg.box.max.z);
       const want = this.levelFor(Math.hypot(dx, Math.max(0, eye.y - reg.box.max.y), dz));
@@ -252,6 +359,7 @@ export class FarRegions {
         reg.sig = '';
       }
       if (!look) continue;
+      if (look.block) { if (!inView || inView(reg.box)) look.block.show.add(reg.key); continue; } // drawn by its merged block
       if (!look.built) {
         look.built = regionMeshes(look.decoded, this.palette, this.mats, this.index.studM, this.index.plateM);
         look.decoded = null;
@@ -261,6 +369,11 @@ export class FarRegions {
       b.group.visible = true;
       if (coverChanged || !reg.sig) { refreshGroups(b, this.covered); reg.sig = 'ok'; }
       for (const p of b.parts) if (p.mesh.visible) { tris += p.mesh.userData.triangles; draws += p.mesh.geometry.groups.length; }
+    }
+    for (const block of this.blocks.values()) {
+      if (!block.built) continue;
+      const t = showBlock(block.built, block.show);
+      tris += t.triangles; draws += t.groups;
     }
     this.lastStats = { regions: this.regions.size, triangles: tris, groups: draws };
     return this.lastStats;

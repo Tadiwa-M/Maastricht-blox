@@ -162,7 +162,12 @@ export class CityView {
     for (const v of cached.slice(maxNear + 4)) { this.freeNear(v); v.world = null; v.ctx = null; }
     // keep the World (cell map) of near items only: it is the biggest per-item structure
     for (const v of views) if (!v.near && v.world && v.dist > nearDist * 3) { v.world = null; v.ctx = null; }
-    this.far.update(eye, this.coverDirty);
+    // merged far blocks draw only their regions in view (a block is drawn as one or a few groups)
+    camera.updateMatrixWorld();
+    this._pv ??= new THREE.Matrix4(); this._frustum ??= new THREE.Frustum(); this._box ??= new THREE.Box3();
+    this._frustum.setFromProjectionMatrix(this._pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    const inView = (b) => this._frustum.intersectsBox(this._box.set(b.min, b.max));
+    this.far.update(eye, this.coverDirty, inView);
     this.coverDirty = false;
     return pending;
   }
