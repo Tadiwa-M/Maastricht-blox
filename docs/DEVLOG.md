@@ -825,3 +825,6 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   (BatchedMesh or per-block merges of L3) is the next big CPU win.
 - The new-tier numbers on the real city are being measured; the lite and low looks still need
   a review on the full city.
+- Owner feedback: the lite look is not acceptable as the normal experience. `auto` now never
+  steps below `low` on a real GPU (`FrameGovernor` `floor`); lite is reserved for software
+  rendering or a manual pick in the Quality menu.

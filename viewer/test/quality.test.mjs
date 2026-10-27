@@ -45,9 +45,10 @@ test('governor steps down after a slow window, ignores the settle period, never 
   const g = new FrameGovernor('medium', { slowMs: 40, windowMs: 1000, settleMs: 500 });
   for (let q = 0; q < 14; q++) assert.equal(g.sample(100), null); // 500 ms settle + 900 ms of window
   assert.equal(g.sample(100), 'low'); // window full (1000 ms) at 100 ms/frame
-  for (let q = 0; q < 14; q++) assert.equal(g.sample(100), null);
-  assert.equal(g.sample(100), 'lite'); // and once more to the floor
-  for (let q = 0; q < 50; q++) assert.equal(g.sample(100), null); // already at the bottom
+  for (let q = 0; q < 50; q++) assert.equal(g.sample(100), null); // low is the floor on a real GPU
+  const sw = new FrameGovernor('low', { slowMs: 40, windowMs: 1000, settleMs: 0, floor: 'lite' });
+  for (let q = 0; q < 9; q++) assert.equal(sw.sample(100), null);
+  assert.equal(sw.sample(100), 'lite'); // software rendering may go all the way down
   const fast = new FrameGovernor('high', { slowMs: 40, windowMs: 1000, settleMs: 0 });
   for (let q = 0; q < 200; q++) assert.equal(fast.sample(10), null);
   assert.equal(fast.tier, 'high');
