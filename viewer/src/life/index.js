@@ -17,7 +17,7 @@ import { Cyclists, parkedBikes } from './cyclists.js';
 import { Cars } from './cars.js';
 import { Terraces } from './terraces.js';
 import { Market } from './market.js';
-import { FIGURES_BY_TIER, CYCLISTS_BY_TIER, CARS_BY_TIER, crowdFactor, trafficFactor, liveWeights, marketState } from './density.js';
+import { FIGURES_BY_TIER, CYCLISTS_BY_TIER, CARS_BY_TIER, PARKED_BIKES_BY_TIER, nearestWithin, crowdFactor, trafficFactor, liveWeights, marketState } from './density.js';
 import { FigureCrowd } from '../figure/crowd.js';
 import { VehicleFleet } from '../figure/vehicles.js';
 import { PropSet } from '../figure/props.js';
@@ -93,6 +93,9 @@ function waterLevel(world, river, ctx) {
   }
   return 44.1 - 30.0;
 }
+
+const LIFE_VIEW_M = 650; // camera farther than this from its target: no people or vehicles drawn
+const FIGURE_CULL_M = 320; // single figures farther than this from the camera are skipped
 
 /** Returns { update(dt) } for the render loop (main.js initHooks). */
 export async function initLife(ctx) {
@@ -198,7 +201,27 @@ export async function initLife(ctx) {
   // weather: ctx.weather?.rain (0..1) when a weather source exists, else #rain=0..1 in the URL
   const hashRain = typeof location !== 'undefined' ? +(new URLSearchParams(location.hash.replace(/^#/, '')).get('rain') || 0) : 0;
   const rainNow = () => Math.max(0, Math.min(1, ctx.weather?.rain ?? hashRain));
+  // From far away people and vehicles are a pixel or less, yet they were half of all triangles
+  // drawn on the overview (and again in the shadow pass): hide them beyond LIFE_VIEW_M, cull
+  // single figures beyond FIGURE_CULL_M, and let only the higher tiers' life cast shadows.
+  let shadowTier = null;
+  function budget() {
+    const t = ctx.controls?.target, d = t ? camera.position.distanceTo(t) : 0;
+    group.visible = d < LIFE_VIEW_M;
+    crowd.cullDist2 = FIGURE_CULL_M * FIGURE_CULL_M;
+    const tierNow = tier();
+    if (tierNow !== shadowTier) {
+      shadowTier = tierNow;
+      const cast = tierNow === 'high' || tierNow === 'medium';
+      group.traverse((o) => {
+        if (!o.isMesh) return;
+        o.userData.castShadow0 ??= o.castShadow;
+        o.castShadow = cast && o.userData.castShadow0;
+      });
+    }
+  }
   function step(dt) {
+    budget();
     if (stage.night !== undefined && stage.night !== night) { night = stage.night; mats.setNight(night); }
     clock.advance(dt);
     t += dt;
@@ -231,7 +254,10 @@ export async function initLife(ctx) {
     state.cyclists?.draw(crowd, fleet);
     state.cars?.draw(fleet);
     state.market?.drawVans(fleet);
-    for (const b of parked.bikes) fleet.addBike(b.x, ground(b.x, b.z), -b.z, (-b.yaw * Math.PI) / 180, { colour: b.colour });
+    const pb = by(PARKED_BIKES_BY_TIER);
+    for (const b of nearestWithin(parked.bikes, camera.position.x, -camera.position.z, pb.r, pb.cap)) {
+      fleet.addBike(b.x, ground(b.x, b.z), -b.z, (-b.yaw * Math.PI) / 180, { colour: b.colour });
+    }
     crowd.end(); fleet.end();
     if (state.boats) state.boats.update(dt);
     ui.update();
