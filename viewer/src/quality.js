@@ -5,36 +5,43 @@
 //           ratio up to 2; with one chunk every brick is drawn bevelled with studs (no LOD)
 //   medium  per-chunk LOD (bevelled + studs only near the camera, one bevel segment
 //           instead of two), half-res AO, pixel ratio 1, bloom only at night, 2048 shadows
-//   low     LOD with a small near zone, AO off, pixel ratio 1, bloom only at night
+//   low     LOD with a small near zone, AO off, pixel ratio 1, bloom only at night, 1024 shadows
+//   lite    the floor for weak or software GPUs: renders at 0.75 resolution, no shadows, no
+//           bloom, a short detail range and fewer people and vehicles
 //
-// 'auto' starts at high for a single-chunk world and medium for anything bigger, then steps
+// 'auto' starts at high for a single-chunk world; a bigger world starts by GPU class (gpu.js:
+// software -> lite, integrated -> low, else medium), then steps
 // down while the measured frame time stays high. It never steps back up by itself (that
 // oscillates on machines right at the edge); pick 'high' in the HUD to force it.
 //
 // City mode (streamed site build) adds: streamRadius (m: chunks/islands within it are loaded
 // in the mid look), farDist ([m, m]: baked far level 1 within the first, level 2 within the
 // second, level 3 beyond), aoDist (m: AO only when the orbit target is closer) and nearTriCap
-// (triangles of near looks: one big island can hold 30k bricks, so items alone are no budget).
+// (triangles of near looks: one big island can hold 30k bricks, so items alone are no budget),
+// shadowRange (m: the sun's shadow box never grows past this around the orbit target; the shadow
+// pass draws everything inside it a second time, so on the overview it doubled the city's cost).
 export const TIERS = Object.freeze({
   high: { name: 'high', nearDetail: 'full', pixelRatio: 2, ao: 'full', bloom: 'always', shadowMap: 4096, nearDist: 70, maxNear: 9, studCap: 80000,
-    streamRadius: 300, farDist: [380, 1200], aoDist: 400, nearTriCap: 8e6 },
+    streamRadius: 300, farDist: [380, 1200], aoDist: 400, nearTriCap: 8e6, shadowRange: 1600 },
   medium: { name: 'medium', nearDetail: 'lite', pixelRatio: 1, ao: 'half', bloom: 'night', shadowMap: 2048, nearDist: 40, maxNear: 3, studCap: 20000,
-    streamRadius: 200, farDist: [280, 900], aoDist: 250, nearTriCap: 2.5e6 },
-  low: { name: 'low', nearDetail: 'lite', pixelRatio: 1, ao: 'off', bloom: 'night', shadowMap: 2048, nearDist: 22, maxNear: 2, studCap: 8000,
-    streamRadius: 130, farDist: [200, 650], aoDist: 0, nearTriCap: 1.2e6 },
+    streamRadius: 200, farDist: [280, 900], aoDist: 250, nearTriCap: 2.5e6, shadowRange: 1000 },
+  low: { name: 'low', nearDetail: 'lite', pixelRatio: 1, ao: 'off', bloom: 'night', shadowMap: 1024, nearDist: 22, maxNear: 2, studCap: 8000,
+    streamRadius: 130, farDist: [200, 650], aoDist: 0, nearTriCap: 1.2e6, shadowRange: 450 },
+  lite: { name: 'lite', nearDetail: 'lite', pixelRatio: 0.75, ao: 'off', bloom: 'off', shadowMap: 1024, shadows: false, nearDist: 16, maxNear: 1,
+    studCap: 4000, streamRadius: 110, farDist: [140, 450], aoDist: 0, nearTriCap: 0.6e6, shadowRange: 0 },
 });
-export const MODES = ['auto', 'high', 'medium', 'low'];
-const ORDER = ['high', 'medium', 'low'];
+export const MODES = ['auto', 'high', 'medium', 'low', 'lite'];
+const ORDER = ['high', 'medium', 'low', 'lite'];
 
 /** Small worlds (one chunk) are drawn without LOD at high quality. */
 export function isSmallWorld({ chunks, bricks }) {
   return chunks <= 1 && bricks <= 20000;
 }
 
-/** Starting tier name for a mode ('auto' | tier name) and world size. */
-export function initialTier(mode, world) {
+/** Starting tier name for a mode ('auto' | tier name), world size and (auto) the GPU's tier. */
+export function initialTier(mode, world, gpuTier = 'medium') {
   if (TIERS[mode]) return mode;
-  return isSmallWorld(world) ? 'high' : 'medium';
+  return isSmallWorld(world) ? 'high' : gpuTier;
 }
 
 /** LOD switch for a tier: all near (no LOD) only for a small world at high quality. */
@@ -47,7 +54,7 @@ export function useLod(tierName, world) {
  * sample(ms) returns the new tier name, or null to stay.
  */
 export class FrameGovernor {
-  constructor(tier, { slowMs = 40, windowMs = 2000, settleMs = 3000 } = {}) {
+  constructor(tier, { slowMs = 40, windowMs = 1500, settleMs = 1500 } = {}) {
     Object.assign(this, { tier, slowMs, windowMs, settleMs });
     this.reset();
   }

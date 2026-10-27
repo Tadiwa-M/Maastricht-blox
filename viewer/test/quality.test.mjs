@@ -28,12 +28,25 @@ test('tiers get cheaper from high to low', () => {
   assert.ok(h.studCap > m.studCap && m.studCap > l.studCap);
   assert.equal(h.bloom, 'always');
   assert.equal(m.bloom, 'night');
+  assert.ok(h.shadowRange > m.shadowRange && m.shadowRange > l.shadowRange);
+  const lite = TIERS.lite; // the floor: below 1x resolution, no shadows, no bloom
+  assert.ok(lite.pixelRatio < 1 && lite.shadows === false && lite.bloom === 'off');
+  assert.ok(lite.farDist[1] < l.farDist[1] && lite.streamRadius < l.streamRadius && lite.nearTriCap < l.nearTriCap);
+});
+
+test('auto picks the start tier from the GPU class for big worlds only', () => {
+  const town = { chunks: 64, bricks: 1e6 }, one = { chunks: 1, bricks: 5000 };
+  assert.equal(initialTier('auto', town, 'lite'), 'lite');
+  assert.equal(initialTier('auto', one, 'lite'), 'high');
+  assert.equal(initialTier('medium', town, 'lite'), 'medium');
 });
 
 test('governor steps down after a slow window, ignores the settle period, never steps up', () => {
   const g = new FrameGovernor('medium', { slowMs: 40, windowMs: 1000, settleMs: 500 });
   for (let q = 0; q < 14; q++) assert.equal(g.sample(100), null); // 500 ms settle + 900 ms of window
   assert.equal(g.sample(100), 'low'); // window full (1000 ms) at 100 ms/frame
+  for (let q = 0; q < 14; q++) assert.equal(g.sample(100), null);
+  assert.equal(g.sample(100), 'lite'); // and once more to the floor
   for (let q = 0; q < 50; q++) assert.equal(g.sample(100), null); // already at the bottom
   const fast = new FrameGovernor('high', { slowMs: 40, windowMs: 1000, settleMs: 0 });
   for (let q = 0; q < 200; q++) assert.equal(fast.sample(10), null);

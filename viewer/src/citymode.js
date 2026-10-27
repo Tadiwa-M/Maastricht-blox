@@ -27,6 +27,8 @@ import { bindUI, escapeHtml } from './ui.js';
 const DEG = Math.PI / 180;
 import { PLACES_RD, placeChunk } from './places.js';
 import { loadingScreen, loadState } from './loading.js';
+import { gpuInfo, autoTierFor } from './gpu.js';
+import { showNotice } from './ui.js';
 
 function parseHash() {
   const p = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -164,6 +166,9 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const t0 = performance.now();
   const opts = parseHash();
   const src = site.source;
+  const still = /[?&]shot=1/.test(location.search);
+  // ?film=1 (tools/film.mjs): no render loop; the tool steps frames with a fixed dt and moves the camera
+  const film = /[?&]film=1/.test(location.search);
   const cover = loadingScreen();
   const boot = { index: false, silhouette: false, frames: 0, since: 0 };
   cover.update(loadState(boot).frac, loadState(boot).msg);
@@ -191,7 +196,13 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
 
   let mode = opts.quality;
   const size = { chunks: index.chunks.length, bricks: Infinity };
-  let tierName = initialTier(mode, size), governor = new FrameGovernor(tierName);
+  const gpu = gpuInfo(stage.renderer);
+  const gpuTier = autoTierFor(gpu.cls);
+  let tierName = initialTier(mode, size, gpuTier), governor = new FrameGovernor(tierName);
+  if (gpu.cls === 'software' && !still && !film) {
+    showNotice('Your browser is drawing without the graphics card (hardware acceleration is off), so the city will be slow. '
+      + 'Turn on "Use graphics acceleration when available" in the browser settings and restart it.');
+  }
   const inflate = (b) => readBody(b, 0, b.byteLength, 1);
   const far = new FarRegions(farIndex, { palette: new Map(palette.entries.map((e) => [e.idx, e])), mats,
     fetchBytes: (p, signal) => src.bytes(p, signal), decode: (b) => decodeBxf(b, inflate), covered: () => false });
@@ -226,7 +237,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     viewScale = -1; // re-apply the height-scaled radii below
     ui?.tier(mode, name);
   }
-  function setMode(m) { mode = m; governor = new FrameGovernor(initialTier(m, size)); applyTier(initialTier(m, size)); }
+  function setMode(m) { mode = m; governor = new FrameGovernor(initialTier(m, size, gpuTier)); applyTier(initialTier(m, size, gpuTier)); }
   applyTier(tierName);
 
   const controls = new MapControls(stage.camera, canvas);
@@ -297,9 +308,6 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
 
   const r = stage.renderer;
   r.info.autoReset = false;
-  const still = /[?&]shot=1/.test(location.search);
-  // ?film=1 (tools/film.mjs): no render loop; the tool steps frames with a fixed dt and moves the camera
-  const film = /[?&]film=1/.test(location.search);
   const clock = new THREE.Clock();
   const meter = new FpsMeter(1000);
   const frustum = new THREE.Frustum(), pv = new THREE.Matrix4(), tmpBox = new THREE.Box3();
@@ -343,7 +351,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     // (street level: haze from ~200 m, gone at ~1.1 km; whole city: the far edge is lightly hazed)
     stage.scene.fog.near = zoomed + 200;
     stage.scene.fog.far = stage.scene.fog.near + 900 + cityRadius * 2.4 * zoomT(zoomed);
-    const sr = THREE.MathUtils.clamp(dist * 1.1, 45, 1600);
+    const sr = THREE.MathUtils.clamp(dist * 1.1, 45, Math.max(45, TIERS[tierName].shadowRange ?? 1600));
     shadowBox.min.set(t.x - sr, t.y - 10, t.z - sr); shadowBox.max.set(t.x + sr, t.y + Math.min(140, sr), t.z + sr);
     stage.setShadowFocus(shadowBox);
     stage.post.setAOInRange(dist < TIERS[tierName].aoDist);

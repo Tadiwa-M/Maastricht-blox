@@ -73,7 +73,7 @@ test('density: day curve, weekend boost, terraces, tier counts', () => {
   assert.ok(trafficFactor(8, 1) > trafficFactor(11, 1) && trafficFactor(17.5, 1) > trafficFactor(21, 1), 'rush hours');
   assert.ok(trafficFactor(8, 6) < trafficFactor(8, 1));
   assert.ok(terraceFactor(13, 2) > 0.7 && terraceFactor(4, 2) < 0.05);
-  assert.deepEqual(FIGURES_BY_TIER, { high: 900, medium: 500, low: 200 });
+  assert.deepEqual(FIGURES_BY_TIER, { high: 900, medium: 500, low: 200, lite: 80 });
 });
 
 test('market schedule: Wednesday and Friday 08:00-13:00, setup and packing around it', () => {
