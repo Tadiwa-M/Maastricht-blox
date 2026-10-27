@@ -28,7 +28,7 @@ const DEG = Math.PI / 180;
 import { PLACES_RD, placeChunk } from './places.js';
 import { loadingScreen, loadState } from './loading.js';
 import { gpuInfo, autoTierFor } from './gpu.js';
-import { showNotice } from './ui.js';
+import { showNotice, bindPerfToggle } from './ui.js';
 
 function parseHash() {
   const p = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -46,7 +46,17 @@ function parseHash() {
     worker: p.get('worker') !== '0',
     stream: p.get('stream') !== '0',
     farLevel: p.has('farlevel') ? +p.get('farlevel') : null,
+    perf: perfMode(p),
   };
+}
+
+/**
+ * Performance mode (HUD checkbox, #perf=0|1, remembered per browser; on by default): merged far
+ * blocks and the life budget (life/index.js). Off draws exactly as before them, for comparison.
+ */
+export function perfMode(p, store = typeof localStorage !== 'undefined' ? localStorage : null) {
+  if (p.has('perf')) return p.get('perf') !== '0';
+  try { return store?.getItem('blox.perf') !== 'off'; } catch { return true; }
 }
 
 /** Direction from target to camera for a compass azimuth (0 = north) and elevation. */
@@ -207,7 +217,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const inflate = (b) => readBody(b, 0, b.byteLength, 1);
   const far = new FarRegions(farIndex, { palette: new Map(palette.entries.map((e) => [e.idx, e])), mats,
     fetchBytes: (p, signal) => src.bytes(p, signal), decode: (b) => decodeBxf(b, inflate), covered: () => false,
-    blockRegions: 4 }); // the coarsest level merged per 4x4 regions: draw calls, not triangles, held laptops back
+    blockRegions: opts.perf ? 4 : 0 }); // the coarsest level merged per 4x4 regions: draw calls, not triangles, held laptops back
   const threads = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1));
   const pool = new PreparePool(meta, { size: opts.worker && src.kind === 'http' ? threads : 0 });
   const loader = new CityLoader(index, { source: src, pool });
@@ -399,7 +409,8 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const metaWorld = new World({ ...meta, features: { features: [] } });
   metaWorld.features = features;
   metaWorld.finish();
-  const ctx = { stage, camera: stage.camera, controls, city, models: extras.models || {}, ui, world: metaWorld, islands: [],
+  bindPerfToggle(opts.perf);
+  const ctx = { stage, camera: stage.camera, controls, city, models: extras.models || {}, ui, world: metaWorld, islands: [], perf: opts.perf,
     lod: null, box, demo: null, quality: () => tierName, still, features };
   hooks.push(...(await initHooks(ctx)).filter(Boolean));
   if (!film) { requestAnimationFrame(frame); return; }

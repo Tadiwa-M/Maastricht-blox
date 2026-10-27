@@ -206,6 +206,7 @@ export async function initLife(ctx) {
   // single figures beyond FIGURE_CULL_M, and let only the higher tiers' life cast shadows.
   let shadowTier = null;
   function budget() {
+    if (ctx.perf === false) { crowd.cullDist2 = 0; return; } // performance mode off: draw as before
     const t = ctx.controls?.target, d = t ? camera.position.distanceTo(t) : 0;
     group.visible = d < LIFE_VIEW_M;
     crowd.cullDist2 = FIGURE_CULL_M * FIGURE_CULL_M;
@@ -254,7 +255,7 @@ export async function initLife(ctx) {
     state.cyclists?.draw(crowd, fleet);
     state.cars?.draw(fleet);
     state.market?.drawVans(fleet);
-    const pb = by(PARKED_BIKES_BY_TIER);
+    const pb = ctx.perf === false ? { r: Infinity, cap: Infinity } : by(PARKED_BIKES_BY_TIER);
     for (const b of nearestWithin(parked.bikes, camera.position.x, -camera.position.z, pb.r, pb.cap)) {
       fleet.addBike(b.x, ground(b.x, b.z), -b.z, (-b.yaw * Math.PI) / 180, { colour: b.colour });
     }

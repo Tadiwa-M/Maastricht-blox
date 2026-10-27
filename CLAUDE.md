@@ -11,6 +11,7 @@
    `scripts/shots.sh`, review the screenshots and show them to the owner. On the GPU workstation
    also run `scripts/unity.ps1 all` (or `unity.sh`) for Unity compile/tests/screenshot.
 5. Communication: concise, high-signal, direct pushback over validation.
+6. **Approval first:** never commit, push or deploy without the owner's explicit approval.
 
 ## Rules
 

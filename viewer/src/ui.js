@@ -88,3 +88,18 @@ export function showNotice(text, doc = document) {
   doc.body.append(el);
   return el;
 }
+
+/** The "Performance mode" checkbox: saves the choice and reloads (the far city is built at load). */
+export function bindPerfToggle(on, doc = document) {
+  const box = doc.getElementById('perf');
+  if (!box) return;
+  box.closest('label').hidden = false;
+  box.checked = on;
+  box.addEventListener('change', () => {
+    try { localStorage.setItem('blox.perf', box.checked ? 'on' : 'off'); } catch { /* storage blocked: the hash still works */ }
+    const p = new URLSearchParams(location.hash.replace(/^#/, ''));
+    p.set('perf', box.checked ? '1' : '0');
+    location.hash = p.toString();
+    location.reload();
+  });
+}

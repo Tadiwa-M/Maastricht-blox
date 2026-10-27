@@ -65,3 +65,12 @@ test('fps meter measures real frame intervals and never rounds a slow machine to
   slow.tick(0); slow.tick(2500); slow.tick(5000); // 2.5 s per frame
   assert.equal(slow.label(), '0.4 fps (2500.0 ms)');
 });
+
+test('performance mode: on by default, #perf wins over the saved choice', async () => {
+  const { perfMode } = await import('../src/citymode.js');
+  const store = (v) => ({ getItem: () => v });
+  assert.equal(perfMode(new URLSearchParams(''), store(null)), true);
+  assert.equal(perfMode(new URLSearchParams(''), store('off')), false);
+  assert.equal(perfMode(new URLSearchParams('perf=1'), store('off')), true);
+  assert.equal(perfMode(new URLSearchParams('perf=0'), store('on')), false);
+});

@@ -371,6 +371,11 @@ What did it:
   for software rendering or by hand, because `auto` stops at `low` on a real GPU; the start tier
   comes from the GPU class (`gpu.js`); no canvas MSAA.
 
+**Performance mode** (panel checkbox, `#perf=0|1`, remembered in `localStorage`, on by default)
+switches the merged far blocks and the life budget on or off. Off draws exactly as before them,
+so the two can be compared on a real device (city overview, medium: off 1,249 calls / 6.5 M
+triangles, on 76 / 3.9 M). Changing it reloads the page, because the far city is built at load.
+
 Measure a world: `node build.mjs <world> && node tools/perf.mjs hero,map,facade`. SwiftShader fps
 is meaningless; compare triangles and draw calls.
 
