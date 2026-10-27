@@ -836,3 +836,8 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Real city, renderer.info per frame (calls / triangles), medium: overview 1,509 / 7.9 M ->
   1,188 / 3.3 M; Markt 796 / 11.9 M -> 796 / 8.0 M; street 1,310 / 12.8 M -> 1,310 / 9.3 M.
   Low: overview 1,044 / 2.5 M, Markt 312 / 4.3 M (before the bike fix).
+- Merged far blocks: the coarsest far level is one mesh per family for every 4x4 regions, and
+  only regions in the camera frustum are drawn. Real city at medium, calls / triangles: overview
+  73 / 3.9 M (was 1,509 / 7.9 M), Markt 588 / 7.8 M (796 / 11.9 M), street 628 / 9.2 M
+  (1,310 / 12.8 M). The images look unchanged (overview, Markt and street reviewed).
+  Tests: `farblock.test.mjs` (vertices land where the region meshes put them; grouping).

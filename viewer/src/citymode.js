@@ -206,7 +206,8 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   }
   const inflate = (b) => readBody(b, 0, b.byteLength, 1);
   const far = new FarRegions(farIndex, { palette: new Map(palette.entries.map((e) => [e.idx, e])), mats,
-    fetchBytes: (p, signal) => src.bytes(p, signal), decode: (b) => decodeBxf(b, inflate), covered: () => false });
+    fetchBytes: (p, signal) => src.bytes(p, signal), decode: (b) => decodeBxf(b, inflate), covered: () => false,
+    blockRegions: 4 }); // the coarsest level merged per 4x4 regions: draw calls, not triangles, held laptops back
   const threads = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1));
   const pool = new PreparePool(meta, { size: opts.worker && src.kind === 'http' ? threads : 0 });
   const loader = new CityLoader(index, { source: src, pool });

@@ -349,6 +349,28 @@ the medium overview (2.7 M triangles, 90 draws, half-res AO, no bloom by day) sh
 above 30 fps; street level with 3 near chunks (~6 M) is the heavy case, and `auto` falls back
 to low (~1.8-2.9 M) if it is not. Not yet measured on the real laptop.
 
+**City-scale pass (2026-10-27, the 4.1 x 5.6 km city, `tools/perf.mjs --site`, medium tier,
+calls / triangles per frame incl. shadows and life):**
+
+| view | before | after |
+|---|---|---|
+| city overview | 1,509 / 7.9 M | 73 / 3.9 M |
+| Markt | 796 / 11.9 M | 588 / 7.8 M |
+| street level | 1,310 / 12.8 M | 628 / 9.2 M |
+
+What did it:
+- **Merged far blocks** (`farregion.js` `blockMeshes`/`showBlock`, `FarRegions` `blockRegions: 4`).
+  The coarsest level of every 4x4 regions is one mesh per family. Each region is an index range,
+  and only regions wanted at that level and inside the camera frustum are drawn, with contiguous
+  ranges as one group. 352 regions x ~3 families (~1,050 calls) became ~70.
+- **Life budget** (`life/index.js`): parked bikes only the nearest within a tier range
+  (`PARKED_BIKES_BY_TIER`; 640 bikes at ~2,200 triangles each were 2.8 M per frame with shadows),
+  no life beyond 650 m camera-to-target, single figures culled beyond 320 m, and life shadows on
+  high/medium only.
+- **Tiers:** per-tier `shadowRange`; a `lite` tier (0.75 resolution, no shadows or bloom) used only
+  for software rendering or by hand, because `auto` stops at `low` on a real GPU; the start tier
+  comes from the GPU class (`gpu.js`); no canvas MSAA.
+
 Measure a world: `node build.mjs <world> && node tools/perf.mjs hero,map,facade`. SwiftShader fps
 is meaningless; compare triangles and draw calls.
 
