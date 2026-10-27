@@ -1,9 +1,9 @@
 // How busy the city is: counts by quality tier, day curves for people, bikes and cars, the
 // weekend, terrace occupancy and the market schedule. Pure, tested in test/life.density.test.mjs.
 
-export const FIGURES_BY_TIER = { high: 900, medium: 500, low: 200 }; // walkers within ~200 m of the camera
-export const CYCLISTS_BY_TIER = { high: 140, medium: 80, low: 30 };
-export const CARS_BY_TIER = { high: 110, medium: 65, low: 25 };
+export const FIGURES_BY_TIER = { high: 900, medium: 500, low: 200, lite: 80 }; // walkers within ~200 m of the camera
+export const CYCLISTS_BY_TIER = { high: 140, medium: 80, low: 30, lite: 12 };
+export const CARS_BY_TIER = { high: 110, medium: 65, low: 25, lite: 10 };
 
 function curve(pts, h) {
   h = ((h % 24) + 24) % 24;

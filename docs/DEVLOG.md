@@ -803,3 +803,25 @@ The workstation was unavailable, so the loading screen and this toggle were depl
 updating only `index.html`, `viewer.js` and `stream-worker.js` in the site repo (a blobless
 clone plus one normal commit; the world data is unchanged). The next `publish.ps1` run replaces
 it with a fresh single commit as usual.
+
+## 2026-10-27: performance on weak laptops (in progress)
+
+The owner says the city runs fine on their phone and workstation but very slowly on their laptop.
+Measured on the real city (`tools/perf.mjs`, medium tier): the overview is 2.2 M city triangles
+but 7.9 M per frame and 1,509 draw calls (the shadow pass redraws the city, plus life). The Markt
+view is 7.2 M triangles in view, 11.9 M per frame. Changes:
+- New `lite` tier: 0.75 render scale, no shadows (`shadows: false` -> `sun.castShadow`), no
+  bloom, short far/stream ranges, fewer people and vehicles (`density.js`).
+- `gpu.js`: classifies the WebGL renderer string (software / integrated / mobile / discrete).
+  `auto` starts big worlds at lite / low / medium accordingly, and a software renderer
+  (hardware acceleration off) gets an on-screen notice explaining how to fix it.
+- Per-tier `shadowRange` caps the sun's shadow box (high 1600 m, medium 1000, low 450, lite off).
+- The governor reacts faster (1.5 s settle, 1.5 s window).
+- No canvas MSAA: the scene renders into the post chain's targets, so it only cost bandwidth.
+Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
+
+**Open decisions**
+- Draw calls: 352 far regions × ~3 materials = ~1,050 calls on the overview. Merging them
+  (BatchedMesh or per-block merges of L3) is the next big CPU win.
+- The new-tier numbers on the real city are being measured; the lite and low looks still need
+  a review on the full city.

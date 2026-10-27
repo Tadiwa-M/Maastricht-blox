@@ -73,3 +73,18 @@ export function bindHudToggle(doc = document) {
     if (e.code === 'KeyU' && !e.repeat && !/^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName || '')) set(!hud.classList.contains('collapsed'));
   });
 }
+
+/** A dismissable message at the top of the screen (e.g. hardware acceleration is off). */
+export function showNotice(text, doc = document) {
+  const el = doc.createElement('div');
+  el.className = 'panel notice';
+  el.setAttribute('role', 'alert');
+  el.textContent = text;
+  const close = doc.createElement('button');
+  close.type = 'button';
+  close.textContent = 'OK';
+  close.addEventListener('click', () => el.remove());
+  el.append(' ', close);
+  doc.body.append(el);
+  return el;
+}

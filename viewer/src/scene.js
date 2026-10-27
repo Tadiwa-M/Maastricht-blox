@@ -31,7 +31,9 @@ export function sunAt(hours) {
 
 export class Stage {
   constructor(canvas, width, height) {
-    const r = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    // no canvas MSAA: the scene is drawn into the post chain's render targets, so a multisampled
+    // canvas only cost memory and bandwidth (it never smoothed the bricks)
+    const r = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
     r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     r.setSize(width, height, false);
     r.outputColorSpace = THREE.SRGBColorSpace;
@@ -143,6 +145,7 @@ export class Stage {
       this.renderer.setSize(this.width, this.height, false);
       this.post?.setPixelRatio(pr);
     }
+    this.sun.castShadow = tier.shadows !== false; // a change recompiles materials once
     const sh = this.sun.shadow;
     if (sh.mapSize.x !== tier.shadowMap) {
       sh.mapSize.set(tier.shadowMap, tier.shadowMap);
@@ -163,7 +166,7 @@ export class Stage {
   render(target) {
     this.sky.follow(this.camera);
     if (target) this.post.updateTiltShift(target);
-    this.renderer.shadowMap.needsUpdate = true; // consumed by the first scene render (RenderPass)
+    this.renderer.shadowMap.needsUpdate = this.sun.castShadow; // consumed by the first scene render (RenderPass)
     this.post.render();
     if (this.overlay.children.length) {
       this.renderer.autoClear = false;

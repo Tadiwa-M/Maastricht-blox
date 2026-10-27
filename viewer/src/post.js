@@ -76,7 +76,7 @@ export class Post {
   setNight(n) {
     this.night = n;
     this.bloom.strength = THREE.MathUtils.lerp(0.18, 0.7, n);
-    this.bloom.enabled = this.quality.bloom === 'always' || n > 0.05;
+    this.bloom.enabled = this.quality.bloom === 'always' || (this.quality.bloom !== 'off' && n > 0.05);
   }
 
   setPixelRatio(pr) {
