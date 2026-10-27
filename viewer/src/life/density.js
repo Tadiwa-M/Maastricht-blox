@@ -4,6 +4,19 @@
 export const FIGURES_BY_TIER = { high: 900, medium: 500, low: 200, lite: 80 }; // walkers within ~200 m of the camera
 export const CYCLISTS_BY_TIER = { high: 140, medium: 80, low: 30, lite: 12 };
 export const CARS_BY_TIER = { high: 110, medium: 65, low: 25, lite: 10 };
+// parked bikes: ~2,200 triangles each (and again for shadows); only the nearest within a range
+export const PARKED_BIKES_BY_TIER = { high: { r: 140, cap: 300 }, medium: { r: 90, cap: 160 }, low: { r: 55, cap: 80 }, lite: { r: 30, cap: 30 } };
+
+/** Items ({ x, z }, Unity metres) within r of (x, z), nearest first, at most cap. */
+export function nearestWithin(items, x, z, r, cap) {
+  const r2 = r * r, near = [];
+  for (const it of items) {
+    const d2 = (it.x - x) ** 2 + (it.z - z) ** 2;
+    if (d2 <= r2) near.push([d2, it]);
+  }
+  near.sort((a, b) => a[0] - b[0]);
+  return near.slice(0, cap).map((e) => e[1]);
+}
 
 function curve(pts, h) {
   h = ((h % 24) + 24) % 24;

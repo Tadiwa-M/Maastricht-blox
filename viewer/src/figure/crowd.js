@@ -51,6 +51,7 @@ export class FigureCrowd {
     }
     this.count = 0;
     this.lod = lod; this.hiDist2 = hiDist * hiDist; this.hiCap = hiCap; this.hi = 0;
+    this.cullDist2 = 0; // > 0: figures farther than this from the eye are not drawn (life/index.js sets it)
     this.eye = null; // camera position (three.js); near figures get the detailed parts
     this._J = {};
     this._cols = null;
@@ -69,6 +70,8 @@ export class FigureCrowd {
   /** Add one figure. pose: { x, y, z (three.js metres, feet), rotY, mode, phase, speed, t, look }. */
   add(v, pose) {
     if (this.count >= this.cap) return false;
+    const e0 = this.eye;
+    if (e0 && this.cullDist2 && (pose.x - e0.x) ** 2 + (pose.y - e0.y) ** 2 + (pose.z - e0.z) ** 2 > this.cullDist2) return false; // too small to see
     this.count++;
     this._cols = variantColours(v);
     let lo = false;

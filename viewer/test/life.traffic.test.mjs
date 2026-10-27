@@ -134,3 +134,13 @@ test('terraces face the street; stalls fit the square; parked bikes line up; bus
   assert.equal(liveryFor({}), '#0B5FA5');
   assert.equal(liveryFor({ agency: 'QBUZZ' }), '#E2001A');
 });
+
+test('parked bikes: only the nearest within the tier range are drawn', async () => {
+  const { nearestWithin, PARKED_BIKES_BY_TIER } = await import('../src/life/density.js');
+  const bikes = Array.from({ length: 200 }, (_, q) => ({ x: q, z: 0 }));
+  const got = nearestWithin(bikes, 50, 0, 10, 5);
+  assert.deepEqual(got.map((b) => b.x), [50, 49, 51, 48, 52]);
+  assert.equal(nearestWithin(bikes, 1000, 0, 10, 5).length, 0);
+  const t = PARKED_BIKES_BY_TIER;
+  assert.ok(t.high.cap > t.medium.cap && t.medium.cap > t.low.cap && t.low.r > t.lite.r);
+});

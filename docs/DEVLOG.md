@@ -828,3 +828,11 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Owner feedback: the lite look is not acceptable as the normal experience. `auto` now never
   steps below `low` on a real GPU (`FrameGovernor` `floor`); lite is reserved for software
   rendering or a manual pick in the Quality menu.
+- Life cost, measured per mesh at the Markt (medium): 640 parked bikes at full detail across the
+  whole loaded area were 1.4 M triangles (2.8 M with their shadows); people were cheap. Parked
+  bikes are now the nearest within a tier range (`PARKED_BIKES_BY_TIER`: medium 90 m / 160
+  bikes). Life is hidden when the camera is over 650 m from its target, single figures beyond
+  320 m are skipped, and only high/medium life casts shadows.
+- Real city, renderer.info per frame (calls / triangles), medium: overview 1,509 / 7.9 M ->
+  1,188 / 3.3 M; Markt 796 / 11.9 M -> 796 / 8.0 M; street 1,310 / 12.8 M -> 1,310 / 9.3 M.
+  Low: overview 1,044 / 2.5 M, Markt 312 / 4.3 M (before the bike fix).
