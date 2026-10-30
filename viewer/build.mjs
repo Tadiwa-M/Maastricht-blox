@@ -22,6 +22,7 @@ import { placeChunk } from './src/places.js';
 import { bakeFar } from './tools/bake-far.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
+const RELAY_URL = 'https://blox-relay.tmata1907.workers.dev'; // deployed by the owner, scripts/relay.ps1
 const args = process.argv.slice(2);
 const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
 const around = opt('--around');
@@ -196,8 +197,10 @@ async function buildSite(outDir) {
   }
   console.log(`life: ${life ? life.names.join(', ') : 'none'}`);
   // life: whether world/life/ exists, so the page doesn't fetch (and 404) when it doesn't
-  // relay: the Cloudflare Worker for live buses and map reports (relay/README.md), from BLOX_RELAY
-  const siteCfg = { base: 'world/', life: !!life, relay: process.env.BLOX_RELAY || '', build: gitShort(),
+  // relay: the Cloudflare Worker for live buses and map reports (relay/README.md); BLOX_RELAY
+  // overrides the deployed one, BLOX_RELAY=none builds without (PowerShell can't set an empty variable)
+  const relayEnv = process.env.BLOX_RELAY;
+  const siteCfg = { base: 'world/', life: !!life, relay: relayEnv === 'none' ? '' : relayEnv || RELAY_URL, build: gitShort(),
     originRD: index.originRD || null };
   await writeFile(join(outDir, 'world.js'), `window.BLOX_SITE = ${JSON.stringify(siteCfg)};\n`);
   console.log(`site: ${index.chunks.length} chunks + ${index.islands.length} islands (${(bytes / 1048576).toFixed(1)} MiB) `

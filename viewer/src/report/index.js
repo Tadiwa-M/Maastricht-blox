@@ -1,8 +1,9 @@
 // "Report a mistake" button and dialog (docs/guide/06-viewer.md, "Reporting mistakes").
 // The player describes the problem, optionally keeps a screenshot of the current view (on by
 // default) and adds a photo of their own. With the relay (window.BLOX_SITE.relay, relay/README.md)
-// the report becomes a GitHub issue without the reporter needing an account; without it, a
-// pre-filled GitHub issue opens and the screenshot downloads to attach by hand.
+// the report becomes a GitHub issue without the reporter needing an account. Without a relay, or
+// when it has no GITHUB_TOKEN (501) or can't be reached, a pre-filled GitHub issue opens and the
+// screenshot downloads to attach by hand.
 import { buildReport, issueUrl, CATEGORIES } from './report.js';
 import { streetFinder } from '../player/streets.js';
 
@@ -124,13 +125,15 @@ export async function initReport(ctx) {
       const photo = await photoData(form.photo.files?.[0]);
       const pics = { screenshot: form.shot.checked ? shot : null, photo };
       const base = { text: form.text.value, category: form.cat.value, where, build: site.build || '', ua: navigator.userAgent };
-      if (relay) {
-        const r = await fetch(`${relay}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...buildReport(base), images: pics }) });
+      // a relay without the GITHUB_TOKEN secret answers 501, and some networks block workers.dev:
+      // then GitHub's own form, as without a relay
+      const r = relay ? await fetch(`${relay}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...buildReport(base), images: pics }) }).catch(() => null) : null;
+      if (r && r.status !== 501) {
         const out = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(out.error || `The report server said ${r.status}.`);
         msg.innerHTML = `Thanks! Your report is <a href="${out.url}" target="_blank" rel="noopener" style="color:#F2A900">issue #${out.number}</a>.`;
-      } else { // no relay yet: GitHub's own form; images are attached by hand
+      } else { // no relay (or no reports on it): GitHub's own form; images are attached by hand
         for (const [name, data] of Object.entries(pics)) {
           if (data) Object.assign(document.createElement('a'), { href: data, download: `maastricht-blox-${name}.jpg` }).click();
         }

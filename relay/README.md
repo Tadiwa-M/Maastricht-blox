@@ -31,8 +31,9 @@ npx wrangler secret put NS_KEY     # optional, trains only
 - **NS_KEY**: apiportal.ns.nl -> Products -> "Ns-App" -> Subscribe -> Profile -> Primary key.
 
 Check: open `https://blox-relay.<your-subdomain>.workers.dev/health` -> `{"ok":true,"reports":true,...}`.
-Finally the site needs the relay URL: tell Claude, or set `BLOX_RELAY=<url>` when building the site
-(`$env:BLOX_RELAY="https://..."; .\scripts\site.ps1 ...`).
+Finally the site needs the relay URL. The deployed one (https://blox-relay.tmata1907.workers.dev)
+is the default in `viewer/build.mjs` (`RELAY_URL`); `BLOX_RELAY=<url>` overrides it when building
+the site, `BLOX_RELAY=none` builds without a relay.
 
 ## Limits and safety
 - Free plan: 100k requests a day; `/live` answers come from Cloudflare's cache (one upstream call per

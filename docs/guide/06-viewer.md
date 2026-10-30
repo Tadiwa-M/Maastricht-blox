@@ -252,8 +252,9 @@ screenshot of the current view (on by default, previewed), and an optional photo
 (scaled to 1280 px JPEG on the device). `report.js` (pure, tested) adds what a fixer needs: a link
 that reopens the exact view (map `#at=x,z&dist=` or walk `#mode=walk&at=x,z&yaw=`), the street,
 Unity, RD and grid-cell coordinates, and the build. With the relay
-(`window.BLOX_SITE.relay`, set from `BLOX_RELAY` at site build) it POSTs to `/report`, which files a
-GitHub issue: no GitHub account needed, images committed to the `map-reports` branch. Without a
+(`window.BLOX_SITE.relay`: the deployed relay by default, `BLOX_RELAY` overrides it at site build, `BLOX_RELAY=none` builds without) it POSTs to `/report`, which files a
+GitHub issue: no GitHub account needed, images committed to the `map-reports` branch. If the relay
+has no `GITHUB_TOKEN` (it answers 501) or can't be reached, it falls back as without one. Without a
 relay it opens GitHub's pre-filled new-issue page and downloads the images to attach.
 Issues labelled `map-report` are triaged by the `map-reports` workflow (Claude): fixes that fit
 `corrections/corrections.json` come back as pull requests, others get a diagnosis.

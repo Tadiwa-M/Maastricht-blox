@@ -952,3 +952,20 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   not apply: the relay doesn't use nodejs_compat).
 - Wrangler login ends on Cloudflare's welcome page (welcome.developers.workers.dev), which showed
   a certificate error on the owner's network; the login itself completes on localhost before that.
+
+## 2026-10-30: relay deployed, wired into the site
+
+- The owner deployed the relay: https://blox-relay.tmata1907.workers.dev. The live site's
+  `world.js` now carries it (`BLOX_SITE.relay`), and site builds use it by default (`build.mjs`
+  `RELAY_URL`; `BLOX_RELAY` overrides, `BLOX_RELAY=none` builds without), so a workstation publish
+  keeps it.
+- Live delays start only with a v2 timetable (`realtimeIds`): the live site still has v1 until
+  `blox life` is re-run on the workstation, so buses stay SCHEDULED until then.
+- Report button: a relay without the `GITHUB_TOKEN` secret (501) or one that can't be reached
+  (some networks block workers.dev) now falls back to the pre-filled GitHub issue instead of
+  showing "Could not send".
+
+**Open decisions**
+- Add `GITHUB_TOKEN` (`npx wrangler secret put GITHUB_TOKEN` in `relay/`, a fine-grained token for
+  this repo only: Contents + Issues read/write) so reports need no GitHub account.
+- Verify `<relay>/live?lines=ARR_<line>` against real OVapi data (field names are from the docs).
