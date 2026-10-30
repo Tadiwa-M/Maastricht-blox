@@ -259,7 +259,10 @@ export async function initLife(ctx) {
       reweigh();
       state.walkers.setRain(rainNow());
       state.walkers.setCount(Math.round(by(FIGURES_BY_TIER) * crowdFactor(clock.hours, clock.day)), at);
-      const vehicles = buses.map((b) => ({ x: b.x, z: b.z, yaw: b.yaw, halfW: busHalf[0], halfL: busHalf[1] }));
+      const trainHalf = [models.train.size[0] * world.studM / 2, models.train.size[1] * world.studM / 2];
+      const vehicles = state.vehicles.map((b) => (b.mode === 'rail'
+        ? { x: b.x, z: b.z, yaw: b.yaw, halfW: trainHalf[0], halfL: trainHalf[1] }
+        : { x: b.x, z: b.z, yaw: b.yaw, halfW: busHalf[0], halfL: busHalf[1] }));
       if (state.cars) vehicles.push(...state.cars.footprints(at, 30));
       state.walkers.update(dt, at, R, vehicles);
     }

@@ -13,6 +13,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+import shapely
+
 from .. import geo
 from ..geo import RDBox
 
@@ -35,6 +37,7 @@ def export_life(out_dir: Path, *, box: RDBox, gtfs_zip: Path | None, osm: Any | 
     walkways and uses the fallback river line. Returns the index document."""
     from .river import build_river
     from .streets import build_streets
+    from .snap import road_lines
     from .transit import build_transit
     from .walkways import build_walkways
 
@@ -47,7 +50,9 @@ def export_life(out_dir: Path, *, box: RDBox, gtfs_zip: Path | None, osm: Any | 
         "files": {}, "bytes": {}, "sources": [],
     }
     if gtfs_zip is not None:
-        doc = build_transit(gtfs_zip, box.buffer(margin_m), start, modes)
+        tbox = box.buffer(margin_m)
+        roads = road_lines(osm, shapely.box(*box.as_tuple())) if osm is not None else None
+        doc = build_transit(gtfs_zip, tbox, start, modes, roads)
         index["files"]["transit"] = "transit.json"
         index["bytes"]["transit"] = dump(doc, life / "transit.json")
         index["week"] = doc["meta"]["week"]

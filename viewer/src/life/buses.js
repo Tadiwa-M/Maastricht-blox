@@ -136,7 +136,9 @@ export class TimetableBuses {
 
   /** camera: THREE.Camera (three.js space). Returns the poses. */
   update(clock, camera) {
-    const list = this.poses(clock);
+    const all = this.poses(clock);
+    // the vehicle being ridden is not drawn (the passenger sees ride/cabin.js instead)
+    const list = this.hideId ? all.filter((b) => b.id !== this.hideId) : all;
     const cp = camera.position;
     const dist = list.map((b) => Math.hypot(b.x - cp.x, b.y - cp.y, -b.z - cp.z));
     const lod = assignLod(dist, { fullDist: this.caps.fullDist, farDist: this.caps.farDist,
@@ -174,7 +176,7 @@ export class TimetableBuses {
       const mat = this.signMaterial(b.route || { short: '', colour: '#C8102E' });
       for (const c of g.children) c.material = mat;
     });
-    this.stats = { active: list.length, full: lod.full.length, box: lod.box.length, hidden: lod.hidden };
-    return list;
+    this.stats = { active: all.length, full: lod.full.length, box: lod.box.length, hidden: lod.hidden };
+    return all;
   }
 }

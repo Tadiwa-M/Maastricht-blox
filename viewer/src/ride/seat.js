@@ -21,6 +21,14 @@ export function seatPosition(pose, mode = 'bus') {
   return [pose.x + fx * s.forward + rx * s.right, pose.y + s.eye, -pose.z + fz * s.forward + rz * s.right];
 }
 
+/** Where a passenger steps off when the timetable has no stop position (transit.json v1): beside
+ * the doors, on the right (kerb) side of the vehicle. Unity { x, z, yaw (deg) }. */
+export const DOOR_SIDE_M = { bus: 3.0, rail: 3.5 };
+export function doorSide(pose, mode = 'bus') {
+  const d = DOOR_SIDE_M[mode === 'rail' || mode === 'metro' ? 'rail' : 'bus'], y = pose.yaw * D2R;
+  return { x: pose.x + Math.cos(y) * d, z: pose.z - Math.sin(y) * d, yaw: pose.yaw };
+}
+
 /** Point to look at from `from` for a compass heading (deg) and pitch (rad, + = up). */
 export function lookTarget(from, headingDeg, pitch, dist = 10) {
   const h = headingDeg * D2R, c = Math.cos(pitch);

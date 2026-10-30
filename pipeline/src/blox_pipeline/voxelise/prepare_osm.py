@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import re
 
 import numpy as np
+from shapely import STRtree
 from shapely.geometry import LineString, Point
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
@@ -18,6 +20,8 @@ from .grid import FULL, TILE
 from .landmarks import CENTRE_ZONES, MAAS_NAMES
 from .raster import cover, stable_hash
 from .world import Deck, SurfacePatch, TreeSpec, VoxelConfig, WaterBody
+
+log = logging.getLogger(__name__)
 
 ROAD_WIDTH_M = {
     "motorway": 14.0, "trunk": 12.0, "primary": 10.0, "secondary": 8.0, "tertiary": 7.0,
@@ -181,6 +185,7 @@ def prepare_trees(osm: OsmData, dtm: HeightGrid, dsm: HeightGrid | None) -> list
             n = max(1, int(f.geom.length // 8.0))
             for k in range(n + 1):
                 points.append((f"{f.osm_id}#{k}", f.geom.interpolate(k / n, normalized=True)))
+    points = off_carriageway(points, osm)
     leaf, leaf_light = palette.idx("leaf"), palette.idx("leaf_light")
     out = []
     for key, p in sorted(points, key=lambda t: t[0]):
@@ -190,6 +195,68 @@ def prepare_trees(osm: OsmData, dtm: HeightGrid, dsm: HeightGrid | None) -> list
         crown = float(np.clip(0.36 * height, 2.5, 5.5))
         main, alt = (leaf, leaf_light) if h & 1 else (leaf_light, leaf)
         out.append(TreeSpec(I, J, height, crown, main, alt, h))
+    return out
+
+
+TREE_KERB_M = 1.0  # a trunk stands at least this far outside a carriageway's edge
+CARRIAGEWAY = frozenset(ROAD_WIDTH_M) - {"pedestrian", "footway", "cycleway", "path", "steps", "track"}
+
+
+def _carriageways(osm: OsmData) -> list[tuple[LineString, float]]:
+    """(centreline, half width + kerb clearance) of every way buses and cars drive on."""
+    out = []
+    for f in osm.roads:
+        hw, t = f.tags.get("highway", ""), f.tags
+        bus = t.get("bus") in ("yes", "designated") or t.get("psv") in ("yes", "designated")
+        if hw not in CARRIAGEWAY and not (hw == "pedestrian" and bus):
+            continue
+        if t.get("tunnel") in ("yes", "building_passage") or t.get("layer", "0").startswith("-"):
+            continue
+        reach = (parse_width(t) or ROAD_WIDTH_M.get(hw, 4.0)) / 2 + TREE_KERB_M
+        for g in getattr(f.geom, "geoms", [f.geom]):
+            if isinstance(g, LineString) and g.length > 0:
+                out.append((g, reach))
+    return out
+
+
+def off_carriageway(points: list[tuple[str, Point]], osm: OsmData) -> list[tuple[str, Point]]:
+    """OSM tree points are approximate (a few metres), and a trunk on the carriageway stood in the
+    path of every bus and car. Such a trunk moves straight out to the kerb side it is on (TREE_KERB_M
+    past the edge); one that would still be on a road (a narrow median, a junction) is dropped."""
+    roads = _carriageways(osm)
+    if not roads or not points:
+        return points
+    tree = STRtree([g for g, _ in roads])
+    far = max(r for _, r in roads)
+
+    def on_road(p: Point) -> tuple[LineString, float] | None:
+        hits = [roads[int(k)] for k in tree.query(p, predicate="dwithin", distance=far)]
+        hits = [(g, r) for g, r in hits if g.distance(p) < r - 1e-6]
+        return min(hits, key=lambda h: h[0].distance(p) - h[1]) if hits else None
+
+    out, moved, dropped = [], 0, 0
+    for key, p in points:
+        hit = on_road(p)
+        if hit is None:
+            out.append((key, p))
+            continue
+        g, reach = hit
+        s = g.project(p)
+        q = g.interpolate(s)
+        a, b = g.interpolate(max(0.0, s - 1.0)), g.interpolate(min(g.length, s + 1.0))
+        dx, dy = b.x - a.x, b.y - a.y
+        n = math.hypot(dx, dy) or 1.0
+        nx, ny = -dy / n, dx / n  # left normal
+        across = (p.x - q.x) * nx + (p.y - q.y) * ny
+        side = math.copysign(1.0, across) if across else (1.0 if stable_hash(key) & 1 else -1.0)
+        p2 = Point(q.x + nx * side * reach, q.y + ny * side * reach)
+        if on_road(p2) is None:
+            out.append((key, p2))
+            moved += 1
+        else:
+            dropped += 1
+    if moved or dropped:
+        log.info("trees: %d moved off the carriageway to the kerb, %d dropped (no room)", moved, dropped)
     return out
 
 
@@ -222,5 +289,5 @@ def register_pois(osm: OsmData, reg: FeatureRegistry) -> None:
         reg.add(kind, f.geom, name=f.name, osm_id=f.osm_id, address=addr, tags=keep)
 
 
-__all__ = ["island_paving", "prepare_water", "prepare_roads", "prepare_landuse", "prepare_trees", "register_pois",
+__all__ = ["island_paving", "off_carriageway", "prepare_water", "prepare_roads", "prepare_landuse", "prepare_trees", "register_pois",
            "parse_width"]

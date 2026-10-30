@@ -11,7 +11,8 @@
 import * as THREE from 'three';
 import { RideUI } from './ui.js';
 import { RouteLines } from './routes.js';
-import { seatPosition, lookTarget, outsideView, smoothYaw } from './seat.js';
+import { Cabin } from './cabin.js';
+import { seatPosition, lookTarget, outsideView, smoothYaw, doorSide, SEATS } from './seat.js';
 import { upcomingCalls } from '../life/schedule.js';
 
 const MARK_MAX = 80;
@@ -29,6 +30,9 @@ export async function initRide(ctx) {
     return typeof g === 'number' ? g : (ctx.city?.approxGround?.(x, zThree) ?? 0);
   };
   const routeLines = new RouteLines(stage.scene, groundAt);
+  const cabin = new Cabin(stage.scene);
+  const fleets = () => [life.buses, life.trains].filter(Boolean);
+  const hideVehicle = (id) => { for (const f of fleets()) f.hideId = id; };
   const s = { open: false, line: null, tab: 'now', query: '', stop: null, ride: null, refresh: 0 };
 
   const ui = new RideUI({
@@ -93,6 +97,7 @@ export async function initRide(ctx) {
     s.ride = { id, yaw: null, look: 0, pitch: -0.05, outside: false, wantOff: false, offK: -1, nextK: -1,
       near: camera.near, fov: camera.fov };
     controls.enabled = false;
+    hideVehicle(id);
     camera.near = 0.05;
     camera.fov = 70;
     camera.updateProjectionMatrix();
@@ -114,16 +119,20 @@ export async function initRide(ctx) {
     const r = s.ride;
     if (!r) return;
     s.ride = null;
+    hideVehicle(null);
+    cabin.place(null);
     camera.near = r.near; camera.fov = r.fov; camera.updateProjectionMatrix();
     controls.enabled = true;
     ui.showHud(null);
     if (life.clock && life.clock.speed > 1) life.clock.speed = 1;
     if (at) { // get off: walk from the stop
-      if (window.__bloxPlayer?.enterAtUnity?.(at.x, at.z, at.yaw, at.yaw, false)) return;
+      const yaw = (at.yaw * Math.PI) / 180; // the player's yaw is compass radians
+      if (window.__bloxPlayer?.enterAtUnity?.(at.x, at.z, yaw, yaw, false)) return;
     }
     const p = r.last;
-    if (p) { // back to the map above the vehicle
-      const t = new THREE.Vector3(p.x, p.y, -p.z);
+    if (p) { // back to the map above the vehicle (its ground can be NaN where nothing streamed in)
+      const y = Number.isFinite(p.y) ? p.y : (Number.isFinite(r.lastY) ? r.lastY : 0);
+      const t = new THREE.Vector3(p.x, y, -p.z);
       controls.target.copy(t);
       camera.position.copy(t).add(new THREE.Vector3(-Math.sin(p.yaw * Math.PI / 180) * 60, 70, Math.cos(p.yaw * Math.PI / 180) * 60));
       camera.lookAt(t);
@@ -196,10 +205,14 @@ export async function initRide(ctx) {
     r.lastY = gy;
     const pose = { ...v, y: gy, yaw: r.yaw };
     let from, to;
+    const rail = v.mode === 'rail' || v.mode === 'metro';
     if (r.outside) {
       const o = outsideView(pose, r.look);
       from = o.cam; to = o.target;
+      hideVehicle(null); cabin.place(null); // from outside: the real brick vehicle
     } else {
+      hideVehicle(r.id);
+      cabin.place(pose, rail ? 'rail' : 'bus', SEATS[rail ? 'rail' : 'bus']);
       from = seatPosition(pose, v.mode);
       to = lookTarget(from, r.yaw + r.look, r.pitch);
     }
@@ -213,9 +226,10 @@ export async function initRide(ctx) {
     r.nextK = next ? next.k : -1;
     // arrived at (or already past) the stop we asked for: step off there and walk
     if (r.wantOff && (!next || next.k > r.offK || (next.k === r.offK && next.inSec === 0))) {
-      const stop = tt().stops[v.pattern.stops?.[r.offK]];
-      if (stop) { leave({ x: stop.x, z: stop.y, yaw: r.yaw }); return; }
-      r.wantOff = false;
+      // v2 timetables know where the stop is; v1 ones don't: step off beside the doors
+      const stop = tt().stops?.[v.pattern.stops?.[r.offK]];
+      leave(stop ? { x: stop.x, z: stop.y, yaw: r.yaw } : doorSide(pose, v.mode));
+      return;
     }
     ui.showHud({ route: v.route, head: v.pattern.head, next: next ? stopName(next.stop) : '', hasNext: !!next, inSec: next?.inSec ?? 0,
       strip: calls.slice(1, 5).map((c) => stopName(c.stop)).filter(Boolean), outside: r.outside,

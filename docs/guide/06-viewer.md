@@ -209,6 +209,11 @@ GTA V: minimal UI, tips in one corner, a small spinner in the other).
   stripe (white, blue, yellow) and "A brick-built Limburg city". The Province of Limburg logo
   is deliberately not used: its brand guide requires the province's written consent, and a logo
   would suggest an endorsement. Limburg flag colours are accents only.
+- **Key art slides:** `src/title/*.jpg` (copied to the site by `build.mjs`) crossfade behind the
+  logo while loading; missing images are dropped. Render them with `tools/keyart.mjs` (views in
+  `VIEWS`) on a PC with a GPU: `node tools/keyart.mjs --url https://tadiwa-m.github.io/Maastricht_larper/`
+  renders from the published site (about a minute a view), `--site <dir>` from a local site
+  build. In a GPU-less container (software rendering) a 1080p view of the city takes hours.
 - **Live title:** once the baked skyline is in (`live()`), the backdrop clears to a vignette and
   the real city plays behind the logo. `citymode.js` attract mode circles the camera around the
   start view (0.045 rad/s) until start.
