@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { MaterialSet } from '../materials.js';
 import { placeholderModels } from '../placeholders.js';
 import { LifeClock, zonedWeekTime, parseDay } from './clock.js';
+import { LiveFeed } from './live.js';
 import { Timetable } from './schedule.js';
 import { WalkGraph } from './walkgraph.js';
 import { TimetableBuses } from './buses.js';
@@ -133,6 +134,8 @@ export async function initLife(ctx) {
 
   if (data?.transit?.trips?.length) {
     state.timetable = new Timetable(data.transit);
+    const relay = typeof window !== 'undefined' ? window.BLOX_SITE?.relay : '';
+    if (relay && !ctx.still) { state.live = new LiveFeed(relay, state.timetable); state.live.start(); }
     state.buses = new TimetableBuses({ timetable: state.timetable, model: models.bus, opts, ground, modes: ['bus', 'tram', 'other'] });
     group.add(state.buses.group);
     if (state.timetable.routes.some((r) => r.mode === 'rail')) { // trains on the rails, no lane offset
@@ -227,8 +230,15 @@ export async function initLife(ctx) {
       });
     }
   }
+  let liveCheck = -Infinity;
   function step(dt) {
     budget();
+    if (state.timetable && performance.now() - liveCheck > 1000) { // live delays only while the game clock shows the real time
+      liveCheck = performance.now();
+      const real = zonedWeekTime();
+      const off = Math.abs(((clock.day * 86400 + clock.sec) - (real.day * 86400 + real.sec) + 302400 + 604800) % 604800 - 302400);
+      state.timetable.delaysOn = off < 300 && clock.speed === 1;
+    }
     if (stage.night !== undefined && stage.night !== night) { night = stage.night; mats.setNight(night); }
     clock.advance(dt);
     t += dt;

@@ -127,9 +127,13 @@ def build_transit(zip_path: Path, box: RDBox, start: dt.date, modes: tuple[str, 
             if mode in modes:
                 routes[rid] = (short or long_ or rid, long_, route_colour(colour, mode), mode, agency)
         trips: dict[str, tuple[str, str, int, str]] = {}  # trip -> route, shape, mask, headsign
-        tcols = ["trip_id", "route_id", "service_id", "shape_id", "trip_headsign"]
+        realtime: dict[str, str] = {}  # trip -> OVapi realtime_trip_id ("ARR:21004:1234"), for live delays
+        tcols = ["trip_id", "route_id", "service_id", "shape_id", "trip_headsign", "realtime_trip_id"]
         masks: dict[str, int] = {}
-        for tid, rid, svc, shp, head in iter_rows(zf, "trips.txt", tcols, frozenset({"shape_id", "trip_headsign"})):
+        for tid, rid, svc, shp, head, rt in iter_rows(zf, "trips.txt", tcols,
+                                                      frozenset({"shape_id", "trip_headsign", "realtime_trip_id"})):
+            if rt:
+                realtime[tid] = rt
             if rid not in routes or shp not in touching:
                 continue
             if svc not in masks:
@@ -158,6 +162,8 @@ def build_transit(zip_path: Path, box: RDBox, start: dt.date, modes: tuple[str, 
         for sid, p in zip(sid_l, _rd(lat_l, lon_l)):
             stops[sid] = (float(p[0]), float(p[1]))
     doc = _assemble(routes, trips, shapes, calls, stops, week, names)
+    if realtime:  # v2: OVapi realtime ids per trips row, parallel to tripIds
+        doc["realtimeIds"] = [[realtime[t] for t in ids if t in realtime] for ids in doc["tripIds"]]
     doc["meta"]["feed"] = zip_path.name
     log.info("transit: %d routes, %d shapes, %d patterns, %d trips (week from %s) in %.1f s",
              len(doc["routes"]), len(doc["shapes"]), len(doc["patterns"]), len(doc["trips"]), week[0],

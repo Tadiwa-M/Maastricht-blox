@@ -57,7 +57,9 @@ machine: `scripts/setup-workstation.ps1` (or `.sh`), then `docs/guide/00-worksta
 - `pipeline/`: AHN + 3D BAG + OSM -> voxelised brick chunks and islands; GTFS -> life data
 - `viewer/`: the three.js game (streaming city, life, walk mode)
 - `contract/`: palette, brick catalogue, brick models, shared test vectors
-- `proxy/`: live-data server (GTFS-RT, weather, river level), for after launch
+- `relay/`: Cloudflare Worker for live bus delays, NS trains and map reports (`scripts/relay.ps1`)
+- `corrections/`: hand map fixes applied on every build (most map reports are fixed here)
+- `proxy/`: local live-data server (GTFS-RT, weather, river level), superseded by `relay/` for the site
 - `unity/`: a Unity 6 URP version (code written, parked until after the web launch)
 
 ## Licence and credits

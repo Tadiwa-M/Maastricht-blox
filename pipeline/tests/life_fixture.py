@@ -53,9 +53,9 @@ def build_gtfs_zip(path: Path) -> Path:
               ["r9", "ARR", "50", "Heerlen local", 3, ""],
               ["r30", "ARR", "30", "Express", 700, ""],
               ["rt", "NS", "RE", "Train", 2, ""]]
-    trips = [["route_id", "service_id", "trip_id", "trip_headsign", "shape_id"],
-             ["r4", "wk", "t4a", "Station", "sh4"],
-             ["r4", "wk", "t4b", "Station", "sh4"],  # same timing as t4a: shares its pattern
+    trips = [["route_id", "service_id", "trip_id", "trip_headsign", "shape_id", "realtime_trip_id"],
+             ["r4", "wk", "t4a", "Station", "sh4", "ARR:21004:1001"],
+             ["r4", "wk", "t4b", "Station", "sh4", "ARR:21004:1031"],  # same timing as t4a: shares its pattern
              ["r4", "sa", "t4sat", "Station", "sh4"],
              ["r4", "wk", "t4late", "Station", "sh4"],  # after midnight (25:10)
              ["r4", "old", "t4old", "Station", "sh4"],  # service not in the reference week

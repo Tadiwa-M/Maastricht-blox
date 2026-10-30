@@ -15,6 +15,7 @@
 import { build } from 'esbuild';
 import { mkdir, readFile, readdir, writeFile, copyFile, link, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { placeChunk } from './src/places.js';
@@ -144,6 +145,11 @@ async function bundle(out) {
   }
 }
 
+/** Short hash of the code commit (shown in reports), or '' outside a git checkout. */
+function gitShort() {
+  try { return execSync('git rev-parse --short HEAD', { cwd: here, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return ''; }
+}
+
 /** Hard link (fast, no extra disk) or copy when linking fails (other drive, Windows rules). */
 async function place(src, dst) {
   await rm(dst, { force: true });
@@ -190,7 +196,10 @@ async function buildSite(outDir) {
   }
   console.log(`life: ${life ? life.names.join(', ') : 'none'}`);
   // life: whether world/life/ exists, so the page doesn't fetch (and 404) when it doesn't
-  await writeFile(join(outDir, 'world.js'), `window.BLOX_SITE = { base: 'world/', life: ${!!life} };\n`);
+  // relay: the Cloudflare Worker for live buses and map reports (relay/README.md), from BLOX_RELAY
+  const siteCfg = { base: 'world/', life: !!life, relay: process.env.BLOX_RELAY || '', build: gitShort(),
+    originRD: index.originRD || null };
+  await writeFile(join(outDir, 'world.js'), `window.BLOX_SITE = ${JSON.stringify(siteCfg)};\n`);
   console.log(`site: ${index.chunks.length} chunks + ${index.islands.length} islands (${(bytes / 1048576).toFixed(1)} MiB) `
     + `from ${worldDir} -> ${outDir} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 }

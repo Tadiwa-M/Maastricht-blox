@@ -87,6 +87,13 @@ roof is a gable along the footprint's long axis (ridge at the DSM 90th percentil
 `blox fetch` keeps going after a failed source and lists the failures at the end, so OSM
 still downloads while 3D BAG is unreachable.
 
+### Corrections (`sources/corrections.py`, `corrections/corrections.json`)
+Hand fixes applied right after loading (after the OSM fallback buildings): `remove_building`,
+`set_height`, `add_building` (polygon + height, flat or gable roof, on the AHN ground) and
+`osm_tags` (edit an OSM object's tags). Coordinates are RD metres, as every map report lists
+them. The file is validated on load (a bad entry fails the build with its id); fixes that match
+nothing are logged. Format and examples: `corrections/README.md`.
+
 ### Terrain smoothing (`voxelise/terrain_smooth.py`)
 
 Before anything is quantised, the AHN ground model gets a NaN-aware blur

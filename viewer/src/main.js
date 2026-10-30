@@ -249,6 +249,8 @@ async function initHooks(ctx) {
   try { out.push(await (await import('./life/index.js')).initLife?.(ctx)); } catch (e) { console.error('life', e); }
   // [ride hook] the Transit panel and riding buses and trains (src/ride/); after life (its vehicles)
   try { out.push(await (await import('./ride/index.js')).initRide?.(ctx)); } catch (e) { console.error('ride', e); }
+  // [report hook] the "Report a mistake" button (src/report/)
+  try { out.push(await (await import('./report/index.js')).initReport?.(ctx)); } catch (e) { console.error('report', e); }
   return out.filter((h) => h && typeof h === 'object');
 }
 

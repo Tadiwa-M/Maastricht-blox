@@ -422,7 +422,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   metaWorld.finish();
   bindPerfToggle(opts.perf);
   const ctx = { stage, camera: stage.camera, controls, city, models: extras.models || {}, ui, world: metaWorld, islands: [], perf: opts.perf,
-    lod: null, box, demo: null, quality: () => tierName, still, features };
+    lod: null, box, demo: null, quality: () => tierName, still, features, originRD: index.originRD || null };
   hooks.push(...(await initHooks(ctx)).filter(Boolean));
   if (!film) { requestAnimationFrame(frame); return; }
   controls.enableDamping = false;
