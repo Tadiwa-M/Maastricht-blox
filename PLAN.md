@@ -68,6 +68,22 @@ Live and verified by the owner on a laptop and a phone (smooth after a stutter o
 real 3D BAG roofs for the outskirts (refetch when the API is reachable), shopfronts from OSM,
 fake interiors, cross-border transit.
 
+**Feature: Ride (owner, 2026-10-30).** "Instead of Google Maps, open the app: see the live
+bus and train routes on the city map, tap one, and ride along in first person as a passenger,
+looking around the bus and out of the windows. Make it really easy."
+- Tools: GTFS (OVapi gtfs-nl, already in the pipeline; `blox life --modes bus,rail` adds trains),
+  GTFS-Realtime (OVapi `vehiclePositions.pb` + `tripUpdates.pb` for buses, `trainUpdates.pb` for
+  train delays: trains have no GPS in the feed, so they are placed from the timetable plus the live
+  delay), a small relay (Cloudflare Worker, free) because a browser can't read the protobuf feeds
+  cross-origin, and the viewer's existing PathMover / brick models / look controls.
+- Phase R1 (no backend, works today): a Transit panel (lines, "next departures", vehicles now),
+  routes drawn on the map, tap a bus -> **Ride**: a seat camera inside the bus at passenger eye
+  height, free look out of the windows, a next-stop strip, "Get off" (walk from that stop) and
+  "Back to map". Trains (Maastricht <-> Randwyck) get a train model and the same ride.
+- Phase R2 (live): the relay plus the viewer merge. Vehicles use the live position or delay when
+  the feed has one, else the timetable, with a LIVE / SCHEDULED badge per vehicle.
+- Phase R3: "Plan a trip" (from a stop to a stop), stop search, and follow a vehicle on the map.
+
 **Post-launch backlog (owner, 2026-10-26)**, in rough priority order:
 1. Bugs: NPC behaviour (walkers go in random directions and vanish), cars vanish mid-street,
    water is walkable. (Startup stutter: done 2026-10-26, a loading

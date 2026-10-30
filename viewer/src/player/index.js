@@ -20,7 +20,7 @@
 import * as THREE from 'three';
 import { cityFromWorld } from './city-adapter.js';
 import { CharacterController } from './controller.js';
-import { FollowCamera } from './camera.js';
+import { FollowCamera, ZoomOutExit } from './camera.js';
 import { Input, frameSpeed } from './input.js';
 import { Character } from './character.js';
 import { Hud, TouchControls, isTouchDevice } from './hud.js';
@@ -47,6 +47,7 @@ export function initPlayer(ctx) {
   const S = world?.studM || 0.5;
   const still = /[?&]shot=1/.test(location.search);
 
+  const zoomExit = new ZoomOutExit();
   let mode = 'map', tween = null, mapView = null, jumpQueued = false, hover = null, streetT = 0;
   let padCount = 0, lookIdle = 0;
   const focusVec = new THREE.Vector3(), smoothFeet = [0, 0, 0];
@@ -121,7 +122,9 @@ export function initPlayer(ctx) {
     if (lockable()) input.requestLock(); // works when entered by a click or key; else the hint says click
     camera.near = 0.1;
     mode = 'walk';
+    zoomExit.reset();
     hud.setMode('walk', padCount > 0);
+    hud.firstWalkTip(padCount > 0);
     touch.show(true);
     const { focus, position } = follow.update(city, ctrl.pos, 1);
     if (animate) startTween(position, focus, 55, 'walk');
@@ -218,6 +221,11 @@ export function initPlayer(ctx) {
       // Esc with a free mouse (the locked one only frees it) / Start: menu; M / B: map
       if (frame.pressed.has('menu')) toggleMenu();
       if (frame.pressed.has('map')) { hud.toggleHelp(false); exitWalk(); }
+    }
+    if (mode === 'walk' && !tween) { // scroll / pinch / LT past the farthest camera: back to the map
+      const leave = zoomExit.update(frame.zoom, follow.aimDist >= follow.o.maxDist - 1e-3, dt);
+      if (zoomExit.progress() > 0.3) hud.toast('Keep zooming out for the map');
+      if (leave) { zoomExit.reset(); hud.toggleHelp(false); exitWalk(); }
     }
     if (mode === 'walk' || (tween && tween.to === 'walk')) {
       if (!tween) follow.input(frame.look, frame.zoom);

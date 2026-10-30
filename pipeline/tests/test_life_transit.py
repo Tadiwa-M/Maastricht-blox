@@ -125,3 +125,34 @@ def test_trips_split_over_services_are_merged() -> None:
     from blox_pipeline.life.transit import merge_trips
 
     assert merge_trips([(0, 600, 1), (1, 300, 4), (0, 600, 2), (0, 900, 1)]) == [[1, 300, 4], [0, 600, 3], [0, 900, 1]]
+
+
+def test_v2_stops_route_ids_and_trip_ids(doc: dict) -> None:
+    assert doc["version"] == 2
+    names = {s["id"]: s["name"] for s in doc["stops"]}
+    assert names["markt"] == "Markt" and names["station"] == "Station"
+    r4 = doc["routes"][_route(doc, "4")]
+    assert r4["id"] == "r4"  # the GTFS route id, as GTFS-Realtime reports it
+    p = next(p for p, _, _ in _trips(doc, "4"))
+    assert [doc["stops"][i]["id"] for i in p["stops"]] == ["vrijthof", "markt", "brug", "station"]
+    assert len(p["stops"]) * 3 == len(p["st"])  # one stop per (arr, dep, dist) triplet
+    assert len(doc["tripIds"]) == len(doc["trips"])
+    rows = {tuple(ids) for ids in doc["tripIds"]}
+    assert ("t4a",) in rows and ("t4b",) in rows  # same pattern, different start: own rows
+    s = doc["stops"][p["stops"][1]]
+    assert abs(s["x"] - (MARKT[0] - geo.X0)) < 0.5 and abs(s["y"] - (MARKT[1] - geo.Y0)) < 0.5
+
+
+def test_trains_kept_with_rail_mode(tmp_path: Path) -> None:
+    zp = build_gtfs_zip(tmp_path / "gtfs-nl.zip")
+    d = build_transit(zp, BOX, dt.date.fromisoformat(MONDAY), modes=("bus", "rail"))
+    train = next(r for r in d["routes"] if r["mode"] == "rail")
+    assert train["id"] == "rt" and train["colour"] == "#FFC917"
+    assert ["ttrain"] in d["tripIds"]
+
+
+def test_trip_ids_follow_merged_rows() -> None:
+    from blox_pipeline.life.transit import merge_trips_with_ids
+
+    rows, ids = merge_trips_with_ids([(0, 600, 1, "a"), (1, 300, 4, "b"), (0, 600, 2, "c")])
+    assert rows == [[1, 300, 4], [0, 600, 3]] and ids == [["b"], ["a", "c"]]

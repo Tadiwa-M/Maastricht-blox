@@ -46,6 +46,40 @@ export class Timetable {
     this.starts = Float64Array.from(this.trips, (t) => t[1]);
     this.maxDuration = this.patterns.reduce((m, p) => Math.max(m, p.duration), 0);
     this.week = doc.meta?.week || null;
+    // v2 (stops, trip ids): absent in v1 exports, then names and boards are simply unavailable
+    this.stops = doc.stops || [];
+    this.tripIds = doc.tripIds || null;
+    this.version = doc.version || 1;
+  }
+
+  /** Is this trips row running on (day, sec)? -> seconds since its start, or null. */
+  elapsed(q, day, sec) {
+    const [, start, mask] = this.trips[q];
+    for (const [d, s] of [[day, sec], [(day + 6) % 7, sec + 86400]]) {
+      if (mask & (1 << d) && s >= start && s - start <= this.patterns[this.trips[q][0]].duration) return s - start;
+    }
+    return null;
+  }
+
+  /**
+   * Upcoming departures from stop index `stop` after (day, sec), soonest first:
+   * [{ trip, pattern, route, head, inSec, at (sec of day) }]. Only stops before the last call.
+   */
+  departures(stop, day, sec, n = 8, horizon = 3 * 3600) {
+    const out = [];
+    for (const [d, s] of [[day, sec], [(day + 6) % 7, sec + 86400]]) {
+      const bit = 1 << d;
+      for (let q = this.lowerBound(s - this.maxDuration); q < this.trips.length && this.starts[q] <= s + horizon; q++) {
+        const [pi, start, mask] = this.trips[q];
+        if (!(mask & bit)) continue;
+        const pat = this.patterns[pi], k = pat.stops ? pat.stops.indexOf(stop) : -1;
+        if (k < 0 || k === pat.stops.length - 1) continue;
+        const at = start + pat.st[3 * k + 1];
+        if (at < s || at > s + horizon) continue;
+        out.push({ trip: q, pattern: pat, route: this.routes[pat.route], head: pat.head, inSec: at - s, at: at % 86400 });
+      }
+    }
+    return out.sort((a, b) => a.inSec - b.inSec).slice(0, n);
   }
 
   /** Index of the first trip starting at or after sec. */
@@ -72,9 +106,30 @@ export class Timetable {
         if (dist === null) continue;
         const shape = this.shapes[pattern.shape];
         if (dist < shape.d0 || dist > shape.d1) continue;
-        out.push({ id: `${d}:${q}`, trip: q, pattern, shape, route: this.routes[pattern.route], dist });
+        out.push({ id: `${d}:${q}`, trip: q, pattern, shape, route: this.routes[pattern.route], dist, tRel: s - start });
       }
     }
     return out;
   }
+}
+
+/**
+ * The calls still ahead of a vehicle tRel seconds into its pattern:
+ * [{ k (call index), stop (index into Timetable.stops or -1), inSec, dist }]. A call counts as
+ * ahead until the vehicle leaves it (dwelling at a stop: that stop is still "next").
+ */
+export function upcomingCalls(pattern, tRel) {
+  const out = [], st = pattern.st, n = st.length / 3;
+  for (let k = 0; k < n; k++) {
+    const dep = Math.max(st[3 * k], st[3 * k + 1]);
+    if (dep < tRel) continue;
+    out.push({ k, stop: pattern.stops ? pattern.stops[k] : -1, inSec: Math.max(0, st[3 * k] - tRel), dist: st[3 * k + 2] });
+  }
+  return out;
+}
+
+/** "now", "1 min", "12 min" for a wait in seconds. */
+export function waitLabel(sec) {
+  if (sec < 45) return 'now';
+  return `${Math.round(sec / 60)} min`;
 }

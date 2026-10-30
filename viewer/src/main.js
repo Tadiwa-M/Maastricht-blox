@@ -247,6 +247,8 @@ async function initHooks(ctx) {
   try { out.push(await (await import('./player/index.js')).initPlayer?.(ctx)); } catch (e) { console.error('player', e); }
   // [life hook] timetable buses, pedestrians, river boats (src/life/)
   try { out.push(await (await import('./life/index.js')).initLife?.(ctx)); } catch (e) { console.error('life', e); }
+  // [ride hook] the Transit panel and riding buses and trains (src/ride/); after life (its vehicles)
+  try { out.push(await (await import('./ride/index.js')).initRide?.(ctx)); } catch (e) { console.error('ride', e); }
   return out.filter((h) => h && typeof h === 'object');
 }
 

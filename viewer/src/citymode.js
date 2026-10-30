@@ -211,8 +211,8 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const floor = gpu.cls === 'software' ? 'lite' : 'low';
   let tierName = initialTier(mode, size, gpuTier), governor = new FrameGovernor(tierName, { floor });
   if (gpu.cls === 'software' && !still && !film) {
-    showNotice('Your browser is drawing without the graphics card (hardware acceleration is off), so the city will be slow. '
-      + 'Turn on "Use graphics acceleration when available" in the browser settings and restart it.');
+    cover.whenGone(() => showNotice('Your browser is drawing without the graphics card (hardware acceleration is off), so the city will be slow. '
+      + 'Turn on "Use graphics acceleration when available" in the browser settings and restart it.'));
   }
   const inflate = (b) => readBody(b, 0, b.byteLength, 1);
   const far = new FarRegions(farIndex, { palette: new Map(palette.entries.map((e) => [e.idx, e])), mats,
@@ -318,6 +318,16 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     ui.info(`${featureHead(f)}<small>${escapeHtml(t.name)} · ${escapeHtml(col?.name ?? '?')} · ${where} · faces ${FACING_NAMES[rot]} (rot ${rot})</small>`);
   });
 
+  // Attract mode behind the title screen: the camera circles the start view slowly (like a
+  // console game's live title scene) until someone presses start; then it simply stays there.
+  const ATTRACT_RAD_S = 0.045;
+  function attract(dt) {
+    const off = stage.camera.position.clone().sub(controls.target);
+    off.applyAxisAngle(new THREE.Vector3(0, 1, 0), ATTRACT_RAD_S * dt);
+    stage.camera.position.copy(controls.target).add(off);
+    stage.camera.lookAt(controls.target);
+  }
+
   const r = stage.renderer;
   r.info.autoReset = false;
   const clock = new THREE.Clock();
@@ -334,6 +344,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   function frame(now, fixedDt) {
     const dt = fixedDt ?? Math.min(clock.getDelta(), 0.1);
     const ms = meter.tick(now);
+    if (!cover.done && boot.silhouette) attract(dt);
     controls.update();
     const dist = cam.update();
     for (const h of hooks) h.update?.(dt, now);
@@ -383,13 +394,13 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
         + `${(r.info.render.triangles / 1e6).toFixed(2)} M tris · ${meter.label()}` });
     }
     if (!cover.done) {
-      if (!boot.silhouette && far.silhouetteReady()) { boot.silhouette = true; boot.since = now; }
+      if (!boot.silhouette && far.silhouetteReady()) { boot.silhouette = true; boot.since = now; cover.live(); }
       if (draw) boot.frames++;
       const ls = loader.stats();
       const st = loadState({ ...boot, loaded: ls.loaded, inflight: ls.inflight, pending: ls.pending,
         settled: loader.settled(), frames: boot.frames, streamMs: boot.silhouette ? now - boot.since : 0 });
       cover.update(st.frac, st.msg);
-      if (st.done) { cover.hide(); times.cover = performance.now() - t0; }
+      if (st.done && !cover.waiting) { cover.ready(); times.cover = performance.now() - t0; }
     }
     if (draw && (!still || ready)) settleFrames++;
     if (settleFrames === 4) { window.__bloxReady = true; readyAt = performance.now(); times.ready = readyAt - t0; }

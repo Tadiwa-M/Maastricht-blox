@@ -58,8 +58,10 @@ export class TimetableBuses {
    * timetable: Timetable. model: bus model JSON. opts: { palette, types, mats, studM, plateM }.
    * ground(x, z) -> y. caps: { full, box, fullDist, farDist }.
    */
-  constructor({ timetable, model, opts, ground, caps = {} }) {
+  constructor({ timetable, model, opts, ground, caps = {}, modes = null, laneM = LANE_M }) {
     this.tt = timetable;
+    this.modes = modes; // e.g. ['bus'] or ['rail']: one fleet per vehicle model; null = all
+    this.laneM = laneM; // buses keep right of the shape's centre line; trains run on it
     this.ground = ground;
     this.caps = { full: 24, box: 300, fullDist: 180, farDist: 900, ...caps };
     this.palette = opts.palette;
@@ -116,11 +118,13 @@ export class TimetableBuses {
 
   /** Poses of the trips active at the clock: [{ x, y, z (Unity metres), yaw, dist, route, id }]. */
   poses(clock) {
-    return this.tt.activeAt(clock.day, clock.sec).map((a) => {
+    const list = this.tt.activeAt(clock.day, clock.sec).filter((a) => !this.modes || this.modes.includes(a.route?.mode || 'bus'));
+    return list.map((a) => {
       const pose = this.mover(a.shape).poseAt(a.dist - a.shape.d0);
       const r = (pose.yaw * Math.PI) / 180;
-      const x = pose.position[0] + Math.cos(r) * LANE_M, z = pose.position[2] - Math.sin(r) * LANE_M;
-      return { x, y: this.ground(x, z), z, yaw: pose.yaw, dist: a.dist, route: a.route, id: a.id };
+      const x = pose.position[0] + Math.cos(r) * this.laneM, z = pose.position[2] - Math.sin(r) * this.laneM;
+      return { x, y: this.ground(x, z), z, yaw: pose.yaw, dist: a.dist, route: a.route, id: a.id,
+        trip: a.trip, pattern: a.pattern, tRel: a.tRel, mode: a.route?.mode || 'bus' };
     });
   }
 

@@ -109,7 +109,7 @@ export async function initLife(ctx) {
     new THREE.Plane(new THREE.Vector3(0, 0, 1), -box.min.z), new THREE.Plane(new THREE.Vector3(0, 0, -1), box.max.z)] : null;
   const mats = new MaterialSet({ clippingPlanes: planes });
   const ph = placeholderModels();
-  const models = { bus: ctx.models?.bus || ph.bus, boat: ctx.models?.boat || ph.boat, character: ctx.models?.character || ph.walker_a };
+  const models = { bus: ctx.models?.bus || ph.bus, train: ctx.models?.train || ctx.models?.bus || ph.bus, boat: ctx.models?.boat || ph.boat, character: ctx.models?.character || ph.walker_a };
   const toyMat = figureMaterial({ clippingPlanes: planes });
   const capOf = (t) => t.high;
   const crowd = new FigureCrowd(capOf(FIGURES_BY_TIER) + 900, { material: toyMat }); // walkers + riders + seated + market
@@ -132,8 +132,14 @@ export async function initLife(ctx) {
   const hideDemo = (name) => { for (const a of ctx.demo?.actors || []) if (a.obj.userData.model?.name === name || a.obj.name === `model:${name}`) a.obj.visible = false; };
 
   if (data?.transit?.trips?.length) {
-    state.buses = new TimetableBuses({ timetable: new Timetable(data.transit), model: models.bus, opts, ground });
+    state.timetable = new Timetable(data.transit);
+    state.buses = new TimetableBuses({ timetable: state.timetable, model: models.bus, opts, ground, modes: ['bus', 'tram', 'other'] });
     group.add(state.buses.group);
+    if (state.timetable.routes.some((r) => r.mode === 'rail')) { // trains on the rails, no lane offset
+      state.trains = new TimetableBuses({ timetable: state.timetable, model: models.train, opts, ground, modes: ['rail', 'metro'],
+        laneM: 0, caps: { full: 8, box: 40 } });
+      group.add(state.trains.group);
+    }
     hideDemo('bus');
   }
   let walkDoc = data?.walkways || null;
@@ -228,6 +234,8 @@ export async function initLife(ctx) {
     t += dt;
     const at = target(), R = livingRadius();
     const buses = state.buses ? state.buses.update(clock, camera) : [];
+    // every scheduled vehicle this frame (Ride: the transit panel and the passenger camera read this)
+    state.vehicles = state.trains ? buses.concat(state.trains.update(clock, camera)) : buses;
     const traffic = trafficFactor(clock.hours, clock.day);
     if (state.cars) {
       state.cars.setCount(Math.round(by(CARS_BY_TIER) * traffic), at);

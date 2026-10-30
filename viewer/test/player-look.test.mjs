@@ -143,9 +143,25 @@ test('map drags: Ctrl/Alt + left orbits, middle tilts, plain left/right stay wit
 });
 
 test('HUD hint follows the mode, the mouse lock and the device', () => {
-  assert.match(hintFor('walk', { locked: false }), /Click to look around.*M map.*Esc menu/);
-  assert.match(hintFor('walk', { locked: true }), /Mouse look.*M map.*Esc free mouse/);
+  assert.match(hintFor('walk', { locked: false }), /Click to look around.*M or scroll out: map.*Esc menu/);
+  assert.match(hintFor('walk', { locked: true }), /Mouse look.*M or scroll out: map.*Esc frees the mouse/);
   assert.match(hintFor('walk', { pad: true }), /right stick look/);
-  assert.match(hintFor('walk', { touch: true }), /drag/);
+  assert.match(hintFor('walk', { touch: true }), /drag.*pinch out for the map/);
   assert.match(hintFor('map'), /middle-drag tilt.*Q E/);
+});
+
+test('zooming out past the farthest walk camera leads back to the map', async () => {
+  const { ZoomOutExit } = await import('../src/player/camera.js');
+  const z = new ZoomOutExit({ threshold: 1.6, drain: 1.2 });
+  assert.equal(z.update(1, false, 0.016), false); // still zooming the camera out: no build-up
+  assert.equal(z.progress(), 0);
+  assert.equal(z.update(0.8, true, 0.016), false);
+  assert.ok(z.progress() > 0.4);
+  assert.equal(z.update(-0.1, true, 0.016), false); // zooming in resets
+  assert.equal(z.progress(), 0);
+  z.update(0.8, true, 0.016);
+  z.update(0, true, 1); // a second of nothing drains it
+  assert.equal(z.progress(), 0);
+  z.update(0.9, true, 0.016);
+  assert.equal(z.update(0.9, true, 0.016), true); // two quick notches past the max: leave
 });

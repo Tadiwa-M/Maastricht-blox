@@ -10,6 +10,13 @@ const CSS = `
 #pl-bar button, #pl-help button { background: #ffcf5a; color: #1b1b1b; border: 0; border-radius: 7px; padding: 6px 12px;
   font: 600 13px system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
 #pl-hint { color: #b9bcc4; }
+#pl-back { position: fixed; top: 14px; right: 14px; z-index: 5; display: flex; align-items: center; gap: 8px;
+  background: #F2A900; color: #10153a; border: 0; border-radius: 10px; padding: 9px 14px 9px 12px; cursor: pointer;
+  font: 700 15px system-ui, sans-serif; box-shadow: 0 3px 0 #b07b00, 0 6px 16px rgba(0,0,0,.3); }
+#pl-back[hidden] { display: none; }
+#pl-back:active { transform: translateY(2px); box-shadow: 0 1px 0 #b07b00; }
+#pl-back kbd { font: 600 11px system-ui, sans-serif; background: rgba(16,21,58,.15); border-radius: 4px; padding: 1px 5px; }
+@media (max-width: 600px) { #pl-back kbd { display: none; } }
 #pl-street { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); color: #fff; z-index: 5;
   font: 600 18px system-ui, sans-serif; text-shadow: 0 1px 4px rgba(0,0,0,.6); pointer-events: none; }
 #pl-toast { position: fixed; top: 54px; left: 50%; transform: translateX(-50%); background: rgba(18,22,30,.8);
@@ -35,7 +42,7 @@ const CSS = `
 #pl-compass { position: fixed; right: 14px; bottom: 40px; width: 44px; height: 44px; border-radius: 50%; z-index: 5;
   background: rgba(18,22,30,.72); border: 1px solid rgba(255,255,255,.25); cursor: pointer; padding: 0; }
 #pl-compass svg { width: 100%; height: 100%; display: block; }
-body.shot #pl-bar, body.shot #pl-toast, body.shot #pl-help, body.shot .pl-touch, body.shot #pl-compass { display: none; }
+body.shot #pl-bar, body.shot #pl-back, body.shot #pl-toast, body.shot #pl-help, body.shot .pl-touch, body.shot #pl-compass { display: none; }
 @media (max-width: 600px) { #pl-hint { display: none; } }
 `;
 
@@ -137,10 +144,10 @@ export class TouchControls {
 /** Hint line for the bottom bar (pure, tested). */
 export function hintFor(mode, { touch = false, pad = false, locked = false } = {}) {
   if (mode === 'walk') {
-    if (touch) return 'Joystick to move · drag the right side to look';
+    if (touch) return 'Joystick to move · drag the right side to look · pinch out for the map';
     if (pad) return 'Left stick move · right stick look · A jump · B map · Start menu';
-    return locked ? 'Mouse look · WASD move · Shift run · Space jump · M map · Esc free mouse'
-      : 'Click to look around · WASD move · Space jump · M map · Esc menu';
+    return locked ? 'Mouse look · WASD move · Space jump · M or scroll out: map · Esc frees the mouse'
+      : 'Click to look around · WASD move · Space jump · M or scroll out: map · Esc menu';
   }
   if (touch) return 'Double-tap the ground to walk there';
   if (pad) return 'A: walk at the centre · left stick pan · right stick orbit · LT/RT zoom';
@@ -156,6 +163,11 @@ export class Hud {
     this.button = el('button', { id: 'pl-walk' });
     this.button.addEventListener('click', () => (this.mode === 'walk' ? onExit() : onWalk()));
     this.bar.append(this.hint, this.button);
+    // walk mode: an always-visible way back (the bottom bar's button is easy to miss)
+    this.back = el('button', { id: 'pl-back', hidden: true, title: 'Back to the map (M, scroll out, or B on a controller)' },
+      '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 3 3 5.5v15.5l6-2.5 6 2.5 6-2.5V3l-6 2.5L9 3Zm1 2.2 4 1.7v12l-4-1.7v-12ZM5 6.8l3-1.3v12l-3 1.3v-12Zm11 .1 3-1.3v12l-3 1.3v-12Z"/></svg>'
+      + '<span>Map</span><kbd>M</kbd>');
+    this.back.addEventListener('click', () => onExit());
     this.street = el('div', { id: 'pl-street' });
     this.toastEl = el('div', { id: 'pl-toast', hidden: true });
     const rows = CONTROLS.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('');
@@ -171,7 +183,7 @@ export class Hud {
       + 'font-family="system-ui,sans-serif" font-weight="700" fill="#fff">N</text></g></svg>');
     this.needle = this.compass.querySelector('#pl-needle');
     this.compass.addEventListener('click', () => onNorth?.());
-    document.body.append(this.bar, this.street, this.toastEl, this.help, this.compass);
+    document.body.append(this.bar, this.back, this.street, this.toastEl, this.help, this.compass);
     this.state = { pad: false, locked: false };
     this.setMode('map');
   }
@@ -208,6 +220,7 @@ export class Hud {
     this.mode = mode;
     this.state.pad = padConnected;
     this.button.textContent = mode === 'walk' ? 'Map (M)' : 'Walk here';
+    this.back.hidden = mode !== 'walk';
     if (mode !== 'walk') this.setStreet('');
     this.refreshHint();
   }
@@ -220,11 +233,20 @@ export class Hud {
 
   toggleHelp(on = this.help.hidden) { this.help.hidden = !on; }
 
-  toast(text) {
+  toast(text, ms = 2500) {
     this.toastEl.textContent = text;
     this.toastEl.hidden = false;
     this.toastEl.style.opacity = '1';
     clearTimeout(this.toastTimer);
-    this.toastTimer = setTimeout(() => { this.toastEl.style.opacity = '0'; }, 2500);
+    this.toastTimer = setTimeout(() => { this.toastEl.style.opacity = '0'; }, ms);
+  }
+
+  /** The first few times someone starts walking: how to get back (remembered per browser). */
+  firstWalkTip(pad = false) {
+    let n = 0;
+    try { n = +(localStorage.getItem('blox.walkTips') || 0); localStorage.setItem('blox.walkTips', String(n + 1)); } catch { /* show it */ }
+    if (n >= 3) return;
+    const how = isTouchDevice() ? 'pinch out or tap Map' : pad ? 'press B' : 'press M or scroll out';
+    this.toast(`You're walking! To fly back to the map, ${how}.`, 6000);
   }
 }

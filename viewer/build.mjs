@@ -136,6 +136,12 @@ async function bundle(out) {
   await build({ ...common, entryPoints: [join(here, 'src', 'main.js')], format: 'esm', outfile: join(out, 'viewer.js'), plugins: [optionalModules] });
   await build({ ...common, entryPoints: [join(here, 'src', 'stream-worker.js')], format: 'iife', outfile: join(out, 'stream-worker.js') });
   await copyFile(join(here, 'src', 'index.html'), join(out, 'index.html'));
+  // title-screen key art (rendered from the city by tools/keyart.mjs)
+  const art = join(here, 'src', 'title');
+  if (existsSync(art)) {
+    await mkdir(join(out, 'title'), { recursive: true });
+    for (const f of await readdir(art)) if (/\.(jpe?g|webp)$/.test(f)) await copyFile(join(art, f), join(out, 'title', f));
+  }
 }
 
 /** Hard link (fast, no extra disk) or copy when linking fails (other drive, Windows rules). */

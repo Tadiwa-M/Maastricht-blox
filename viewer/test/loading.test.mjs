@@ -42,3 +42,10 @@ test('progress bar never moves backwards and hide is idempotent', () => {
   s.update(0.9);
   assert.equal(bar.style.width, '60%');
 });
+
+test('start screen tips are short and about the game', async () => {
+  const { TIPS } = await import('../src/loading.js');
+  assert.ok(TIPS.length >= 5);
+  for (const t of TIPS) assert.ok(t.length < 90 && /[.!?]$/.test(t), t);
+  assert.ok(TIPS.some((t) => /back to the map/.test(t)), 'one tip says how to get back to the map');
+});
