@@ -49,7 +49,17 @@ export class Timetable {
     // v2 (stops, trip ids): absent in v1 exports, then names and boards are simply unavailable
     this.stops = doc.stops || [];
     this.tripIds = doc.tripIds || null;
+    this.realtimeIds = doc.realtimeIds || null;
     this.version = doc.version || 1;
+    this.delays = new Map(); // trips row -> live delay in seconds (life/live.js)
+    this.maxDelay = 0;
+    this.delaysOn = true; // off while the game clock is away from real time (fast-forward, #t=)
+  }
+
+  /** Live delays by trips row (Map row -> s); vehicles on those rows run late (or early) by it. */
+  setDelays(map) {
+    this.delays = map;
+    this.maxDelay = Math.max(0, ...[...map.values()].map((d) => Math.abs(d)));
   }
 
   /** Is this trips row running on (day, sec)? -> seconds since its start, or null. */
@@ -74,9 +84,11 @@ export class Timetable {
         if (!(mask & bit)) continue;
         const pat = this.patterns[pi], k = pat.stops ? pat.stops.indexOf(stop) : -1;
         if (k < 0 || k === pat.stops.length - 1) continue;
-        const at = start + pat.st[3 * k + 1];
+        const delay = this.delaysOn ? this.delays.get(q) : undefined;
+        const at = start + pat.st[3 * k + 1] + (delay || 0);
         if (at < s || at > s + horizon) continue;
-        out.push({ trip: q, pattern: pat, route: this.routes[pat.route], head: pat.head, inSec: at - s, at: at % 86400 });
+        out.push({ trip: q, pattern: pat, route: this.routes[pat.route], head: pat.head, inSec: at - s, at: at % 86400,
+          live: delay !== undefined, delay: delay || 0 });
       }
     }
     return out.sort((a, b) => a.inSec - b.inSec).slice(0, n);
@@ -98,15 +110,18 @@ export class Timetable {
     // today's service day, and yesterday's trips still running after midnight
     for (const [d, s] of [[day, sec], [(day + 6) % 7, sec + 86400]]) {
       const bit = 1 << d;
-      for (let q = this.lowerBound(s - this.maxDuration); q < this.trips.length && this.starts[q] <= s; q++) {
+      const md = this.delaysOn ? this.maxDelay : 0;
+      for (let q = this.lowerBound(s - this.maxDuration - md); q < this.trips.length && this.starts[q] <= s + md; q++) {
         const [pi, start, mask] = this.trips[q];
         if (!(mask & bit)) continue;
         const pattern = this.patterns[pi];
-        const dist = tripDistAt(pattern.st, s - start, DWELL_S);
+        const delay = this.delaysOn ? this.delays.get(q) : undefined;
+        const dist = tripDistAt(pattern.st, s - start - (delay || 0), DWELL_S);
         if (dist === null) continue;
         const shape = this.shapes[pattern.shape];
         if (dist < shape.d0 || dist > shape.d1) continue;
-        out.push({ id: `${d}:${q}`, trip: q, pattern, shape, route: this.routes[pattern.route], dist, tRel: s - start });
+        out.push({ id: `${d}:${q}`, trip: q, pattern, shape, route: this.routes[pattern.route], dist,
+          tRel: s - start - (delay || 0), live: delay !== undefined, delay: delay || 0 });
       }
     }
     return out;

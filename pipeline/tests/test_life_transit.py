@@ -156,3 +156,10 @@ def test_trip_ids_follow_merged_rows() -> None:
 
     rows, ids = merge_trips_with_ids([(0, 600, 1, "a"), (1, 300, 4, "b"), (0, 600, 2, "c")])
     assert rows == [[1, 300, 4], [0, 600, 3]] and ids == [["b"], ["a", "c"]]
+
+
+def test_realtime_ids_for_live_delays(doc: dict) -> None:
+    assert len(doc["realtimeIds"]) == len(doc["trips"])
+    row = doc["tripIds"].index(["t4a"])
+    assert doc["realtimeIds"][row] == ["ARR:21004:1001"]  # OVapi journey key, as the relay returns it
+    assert doc["realtimeIds"][doc["tripIds"].index(["t30"])] == []  # rows without one stay empty

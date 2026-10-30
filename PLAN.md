@@ -80,9 +80,15 @@ looking around the bus and out of the windows. Make it really easy."
   routes drawn on the map, tap a bus -> **Ride**: a seat camera inside the bus at passenger eye
   height, free look out of the windows, a next-stop strip, "Get off" (walk from that stop) and
   "Back to map". Trains (Maastricht <-> Randwyck) get a train model and the same ride.
-- Phase R2 (live): the relay plus the viewer merge. Vehicles use the live position or delay when
+- Phase R2 (live, code done 2026-10-31; relay deploy + verify pending): the relay plus the viewer merge. Vehicles use the live position or delay when
   the feed has one, else the timetable, with a LIVE / SCHEDULED badge per vehicle.
 - Phase R3: "Plan a trip" (from a stop to a stop), stop search, and follow a vehicle on the map.
+
+**Accuracy (owner, 2026-10-31):** BGT (the municipality's large-scale map, via PDOK) for the
+ground: roads, pavements, water, bridges. Proper bridges (deck at road height, railings, piers),
+ramps instead of plate steps on sloping roads, canopies (the station's bus platforms), the 3D BAG
+retry, and hand-built landmarks (station, both bridges, ...). One full rebuild for all of it.
+Reports: done (button, relay, corrections file, Claude triage workflow).
 
 **Post-launch backlog (owner, 2026-10-26)**, in rough priority order:
 1. Bugs: NPC behaviour (walkers go in random directions and vanish), cars vanish mid-street,

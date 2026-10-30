@@ -1,5 +1,5 @@
 # Windows wrapper for scripts/check.sh: runs it with Git Bash (not WSL's bash).
-# Usage: .\scripts\check.ps1 [pipeline|proxy|dotnet|viewer ...]
+# Usage: .\scripts\check.ps1 [pipeline|proxy|dotnet|viewer|relay ...]
 $ErrorActionPreference = 'Stop'
 $bash = @("$env:ProgramFiles\Git\bin\bash.exe", "${env:ProgramFiles(x86)}\Git\bin\bash.exe",
           "$env:LOCALAPPDATA\Programs\Git\bin\bash.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1

@@ -241,6 +241,25 @@ and an optional sun time-lapse (`hours`). Edit that list to re-cut the film. `-Q
 quarter-length test cut. ffmpeg comes from PATH or is installed on the spot as `ffmpeg-static`
 (an npm package; no admin needed).
 
+### Reporting mistakes (`src/report/`)
+A flag button (bottom right) opens "Report a mistake": a category, the player's description, a
+screenshot of the current view (on by default, previewed), and an optional photo of their own
+(scaled to 1280 px JPEG on the device). `report.js` (pure, tested) adds what a fixer needs: a link
+that reopens the exact view (map `#at=x,z&dist=` or walk `#mode=walk&at=x,z&yaw=`), the street,
+Unity, RD and grid-cell coordinates, and the build. With the relay
+(`window.BLOX_SITE.relay`, set from `BLOX_RELAY` at site build) it POSTs to `/report`, which files a
+GitHub issue: no GitHub account needed, images committed to the `map-reports` branch. Without a
+relay it opens GitHub's pre-filled new-issue page and downloads the images to attach.
+Issues labelled `map-report` are triaged by the `map-reports` workflow (Claude): fixes that fit
+`corrections/corrections.json` come back as pull requests, others get a diagnosis.
+
+### Live buses (`src/life/live.js`, `relay/`)
+`LiveFeed` polls the relay's `/live` every 20 s for the lines in the timetable (OVapi line bases
+from `transit.json` `realtimeIds`) and sets per-row delays on the `Timetable` (`setDelays`); a
+delayed bus is drawn that much further back on its route and marked live (LIVE badge in the
+Transit panel and the ride HUD). Delays apply only while the game clock is within 5 minutes of real
+Maastricht time at 1x speed (`delaysOn`); a feed silent for 150 s falls back to the timetable.
+
 ## Publishing (GitHub Pages)
 
 The live site is the separate repo `Tadiwa-M/Maastricht_larper`, served at

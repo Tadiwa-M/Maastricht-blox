@@ -1,0 +1,15 @@
+{
+  "name": "blox-relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker: live bus/train data and map reports for the Maastricht Blox site.",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "3.114.0"
+  }
+}

@@ -20,7 +20,9 @@
 - Launch target is the web build: `viewer/` → `scripts/site.ps1|sh` → `scripts/publish.ps1|sh` (GitHub Pages
   repo `Tadiwa-M/Maastricht_larper`, one force-pushed commit per release). Never commit site builds,
   world data or the owner's photos to this repo.
-- Layout: `pipeline/` (Python data → chunks), `viewer/` (three.js game), `proxy/` (Python live-data server),
+- Map reports: fix with an entry in `corrections/corrections.json` when possible (data, reviewable), code
+  only when a whole class of problem needs it. Live data and reports go through `relay/` (Cloudflare Worker).
+- Layout: `pipeline/` (Python data → chunks), `viewer/` (three.js game), `relay/` (Worker), `proxy/` (Python live-data server),
   `unity/` (Unity 6 URP project; runtime code under `unity/Assets/Blox/`), `docs/`.
 - Unity assemblies: `Blox.Data` (pure C#, no UnityEngine, testable with dotnet), `Blox.Meshing`,
   `Blox.Rendering`, `Blox.Live`, `Blox.Gameplay`. Data/gameplay must not depend on Rendering.

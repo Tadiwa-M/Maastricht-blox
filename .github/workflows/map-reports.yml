@@ -1,0 +1,49 @@
+# Map reports (from the in-game "Report a mistake" button, via the relay) are triaged by Claude:
+# a fix that fits corrections/corrections.json becomes a pull request for the owner to review;
+# anything else gets a diagnosis comment and labels. Nothing is ever merged automatically.
+# Needs the ANTHROPIC_API_KEY repository secret; without it the job skips itself.
+name: map-reports
+on:
+  issues:
+    types: [opened, labeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  triage:
+    if: >
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'map-report')
+        && (github.event.action == 'opened' || github.event.label.name == 'map-report'))
+      || (github.event_name == 'issue_comment' && contains(github.event.issue.labels.*.name, 'map-report')
+        && contains(github.event.comment.body, '@claude') && github.event.comment.author_association == 'OWNER')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip without an API key
+        id: key
+        run: echo "ok=${{ secrets.ANTHROPIC_API_KEY != '' }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.ok == 'true'
+      - uses: anthropics/claude-code-action@v1
+        if: steps.key.outputs.ok == 'true'
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are triaging map report #${{ github.event.issue.number }} for Maastricht Blox (read CLAUDE.md,
+            corrections/README.md and docs/guide/02-pipeline.md first). The issue body has the reporter's words,
+            RD coordinates, the grid cell, a link that opens the spot in the game, and maybe images.
+            1. Decide what kind of problem it is: building (missing, wrong height, should not be there), street/
+               terrain, bridge/water, life (people, vehicles), name/place, or not a real problem.
+            2. If it can be fixed by an entry in corrections/corrections.json (remove_building, set_height,
+               add_building, osm_tags), add exactly that entry with "issue" and a short "note", run
+               `cd pipeline && uv run pytest -q tests/test_sources_corrections.py`, and open a pull request titled
+               "Map fix: <place> (#${{ github.event.issue.number }})" that links the issue. Never merge it.
+            3. Otherwise, comment on the issue with a short diagnosis (what is wrong, which pipeline or viewer
+               part causes it, what a fix would need) and add the label `needs-code`.
+            Be concise. Never put personal data from images into comments. Coordinates are RD (EPSG:28992).
+          claude_args: --max-turns 25

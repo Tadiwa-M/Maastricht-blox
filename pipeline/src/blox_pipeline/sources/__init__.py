@@ -15,6 +15,7 @@ from .osm import clip_path, fetch_osm, load_osm
 from .http import DownloadError
 from .model import Building, HeightGrid, OsmData, OsmFeature, RGBGrid, Surface
 from .osm_buildings import fallback_buildings
+from .corrections import apply_corrections, load_corrections
 
 __all__ = [
     "Building", "HeightGrid", "OsmData", "OsmFeature", "RGBGrid", "Surface", "SourceData",
@@ -93,6 +94,7 @@ def load_all(bbox: RDBox, root: Path | None = None) -> SourceData:
         log.warning("no 3D BAG data cached: all buildings come from OSM footprints + AHN heights")
         buildings = []
     buildings += fallback_buildings(osm, buildings, dtm, dsm)
+    buildings, _ = apply_corrections(load_corrections(), buildings, osm, dtm)  # corrections/corrections.json
     return SourceData(
         dtm=dtm, dsm=dsm, buildings=buildings,
         osm=osm, ortho=load_ortho(bbox, root),

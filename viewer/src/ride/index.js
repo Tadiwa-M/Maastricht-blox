@@ -61,6 +61,7 @@ export async function initRide(ctx) {
     if (!force && now - s.refresh < 1000) return;
     s.refresh = now;
     const t = tt(), vehicles = life.vehicles || [];
+    ui.setLive(!!(life.live?.ok && t.delaysOn));
     if (s.tab === 'now') {
       const counts = new Map();
       for (const v of vehicles) counts.set(v.pattern.route, (counts.get(v.pattern.route) || 0) + 1);

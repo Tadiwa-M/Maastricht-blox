@@ -887,3 +887,26 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   `src/title/*.jpg` simply shows the plain backdrop.
 - Key art views now avoid the bridges (Vrijthof, Stadhuis, a high view over the Maas): the
   Sint Servaasbrug currently renders as a thin deck on grassy islands. See the accuracy plan.
+
+## 2026-10-31: viewer deployed; report button, relay, live delays, corrections
+
+- Deployed the viewer (title screen, back to map, Ride) to the live site. The site repo's
+  `models.json` gained the train model; the city data is unchanged.
+- OVapi blocks browsers (the owner's console check showed CORS blocked), so live data goes
+  through `relay/`, a Cloudflare Worker: `/live` (OVapi per-line JSON, reduced to per-journey delays,
+  edge-cached 20 s, so the free CPU limit holds), `/trains` (NS Reisinformatie, optional `NS_KEY`)
+  and `/report` (map report -> GitHub issue, with images on the `map-reports` branch; 5 per IP per
+  hour, JPEG only, `[map]` titles only). Deployed with `scripts/relay.ps1` from any PC.
+- Pipeline: `transit.json` gains `realtimeIds` (OVapi `realtime_trip_id` per trips row).
+  Viewer: `LiveFeed` applies the delays near real time.
+- "Report a mistake" (flag button): description, category, screenshot (default on), own photo,
+  exact location and a link back to the spot. The `map-reports` workflow lets Claude triage
+  reports into `corrections/corrections.json` pull requests (needs the `ANTHROPIC_API_KEY` secret).
+- `corrections/corrections.json` with `sources/corrections.py`: data-only map fixes applied on every
+  build. Tests for all of it (viewer 174, relay 5, pipeline 520).
+
+**Open decisions**
+- OVapi's JSON field names come from its documentation; the sandbox can't reach OVapi. Verify
+  once the relay is deployed: `<relay>/live?lines=ARR_<line>` should list journeys with delays.
+- A partial rebuild (one area into an existing world) is blocked by feature ids being numbered
+  city-wide. Until that is solved, corrections land with the next full city build.
