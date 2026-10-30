@@ -173,3 +173,43 @@ street names and the URL hash.
   away does nothing (click again).
 - Entering walk mode via the "Walk here" button or F captures the mouse at once; via the
   gamepad (no user gesture) the hint asks for a click.
+
+## Getting back to the map (2026-10-30)
+
+Visitors kept asking how to get back to the map from walk mode: the mouse is captured, so the
+bottom bar's Map button can't be clicked, and people try to zoom out the Google Maps way. Now:
+- **Scroll or pinch out past the farthest walk camera** -> back to the map (`ZoomOutExit` in
+  `camera.js`: zoom-out that arrives while the camera is at `maxDist` builds up, and 1.6 m of it
+  leaves; zooming in resets it, idle time drains it; "Keep zooming out for the map" shows on the way).
+- A **Map** button with a `M` key cap, top right, always visible while walking (`#pl-back`).
+- A tip the first three times someone starts walking ("To fly back to the map, press M or
+  scroll out"; touch: pinch out or tap Map; controller: press B), counted in `localStorage`.
+- Hints now say "M or scroll out: map"; the start screen's "Back to map" card says the same.
+
+## Ride: buses and trains (2026-10-30, phase R1: timetable)
+
+The owner's goal: open the app instead of Google Maps, see the buses and trains on the city map,
+tap one and ride along as a passenger, looking around and out of the windows.
+- **Transit button** (bottom left, or `T`): a side panel with two tabs.
+  - **Running now:** line chips (tap one to draw its route on the city and filter), and every
+    vehicle on the move with "Next: <stop> · 2 min" and **Ride**.
+  - **Stops:** search a stop name to get the next departures there; **Jump on** skips the life
+    clock to just before that departure and boards it.
+  While the panel is open, route-coloured badges float over the vehicles on the map; tapping one
+  boards it.
+- **Riding** (`ride/index.js`, math in `ride/seat.js`): every frame the camera sits on a
+  passenger seat (`SEATS`: a little ahead of the middle on the left, eye 1.75 m, inside the
+  window band of both brick models) of the vehicle's current pose (`life/buses.js` poses). The
+  vehicle heading is smoothed (`smoothYaw`), since shapes are polylines. Look around by dragging,
+  with arrows/Q/E, or the right stick. The HUD shows the line, the destination, the next stop with
+  minutes, and the following stops, plus buttons: **Get off at <stop>** (steps off when the
+  vehicle reaches it and continues in walk mode from the stop), **Outside view** (chase camera),
+  **Fast** (life clock 10x) and **Map**. Esc / B also leave. When the trip ends you are put back
+  on the map above it.
+- **Trains:** `blox life` now keeps `bus,rail` by default. Rail routes get their own fleet with
+  the new `train` brick model (6 x 52 studs, hollow saloon, doors both sides) and no lane offset.
+- **Data:** `transit.json` v2 adds `stops` (name, Unity m), `patterns[].stops`, `routes[].id` and
+  `tripIds` (GTFS trip ids per row, for the live feed). v1 files still work: no stop names or
+  boards. Re-run `blox life` to get v2.
+
+Phase R2 (live positions and delays) is next; see PLAN.md.

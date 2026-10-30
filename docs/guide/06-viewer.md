@@ -201,13 +201,26 @@ triangles, 17.5 / 5.4 / 1.5 MB.
 - **Picking** steps cell by cell along the ray (Amanatides & Woo), so the cost depends on ray
   length, not brick count (`picking.js`, tested in `test/picking.test.mjs`).
 
-### Loading screen (`src/loading.js`)
-A cover (`#loading` in `index.html`) hides the first seconds: city index -> baked silhouette ->
-first streaming ring -> 8 drawn frames (the shaders compile on the first ones), then it fades
-out. The phase logic is the pure `loadState()`, which is tested. The first ring counts as done
-at 90% loaded, when the loader settles, or after 8 s at most. Progress never moves backwards.
-Load errors show on the cover. It is skipped for `?shot=1` and automation (`navigator.webdriver`),
-so screenshots and perf runs are unchanged. `window.__bloxTimes.cover` records when it lifted.
+### Title screen (`src/loading.js`, `#loading` in `index.html`)
+Modelled on console-game title screens (Spider-Man PS4, FIFA: the live game world behind the logo;
+GTA V: minimal UI, tips in one corner, a small spinner in the other).
+- **Key art while loading:** a dark backdrop with the logo: MAASTRICHT in Anton (Google Fonts,
+  OFL; falls back to Impact-like system fonts), BLOX on a yellow brick with studs, a thin Limburg
+  stripe (white, blue, yellow) and "A brick-built Limburg city". The Province of Limburg logo
+  is deliberately not used: its brand guide requires the province's written consent, and a logo
+  would suggest an endorsement. Limburg flag colours are accents only.
+- **Live title:** once the baked skyline is in (`live()`), the backdrop clears to a vignette and
+  the real city plays behind the logo. `citymode.js` attract mode circles the camera around the
+  start view (0.045 rad/s) until start.
+- **Corners:** "DID YOU KNOW" tips bottom-left, crossfading every 5.5 s (`TIPS`); a flipping brick
+  spinner with the phase message bottom-right; a thin progress line along the bottom edge.
+- **Ready:** PRESS ANY KEY (TAP TO START on touch) with button prompts (Drag: Explore,
+  2x Click/Tap: Walk, M/Map: Back to map). Any key, click, tap or gamepad button starts; the
+  start key is swallowed. On start the logo lifts and fades, and the game UI (hidden under
+  `body.title`) appears.
+- Phases are the pure `loadState()`: index -> silhouette -> first ring (90%, settled or 8 s) ->
+  8 drawn frames. Notices wait for `whenGone()`; load errors show on the screen. Skipped under
+  `?shot=1` and webdriver, so the screenshot, perf and film tools are unchanged.
 
 ### Panel (HUD) toggle
 The top-left panel collapses to its title with the **hide/show** button or the **U** key

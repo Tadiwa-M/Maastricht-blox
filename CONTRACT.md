@@ -281,8 +281,9 @@ Brick layout consumes this and emits BrickRecords. It must reproduce the grid ex
 
 ## 7.1 Brick models (v2): things that move
 
-Buses, boats and characters are **brick models**: small assemblies rendered as one movable
-object, never baked into chunks. Files: `contract/models/<name>.json`.
+Buses, trains, boats and characters are **brick models**: small assemblies rendered as one movable
+object, never baked into chunks. Files: `contract/models/<name>.json` (`bus`, `train`, `boat`,
+`character`; adding a model file is not a format change).
 
 ```json
 { "name": "bus", "version": 1,

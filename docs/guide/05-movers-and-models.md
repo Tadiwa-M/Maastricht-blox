@@ -159,7 +159,8 @@ OVapi gtfs-nl.zip ──┐ blox fetch --only gtfs      data/raw/gtfs/gtfs-nl.zi
 OSM slice clip ─────┤ blox life --out build/world
                     ▼
 build/world/life/index.json      {version, files: {transit, walkways, streets, river}, bytes, week, boxUnity}
-                 transit.json    routes (+ operator), shapes, patterns, trips (one reference week)
+                 transit.json    routes (+ operator, GTFS id), shapes, patterns (+ stop list), trips (one
+                                 reference week); v2 adds stops (name, Unity m) and tripIds per trips row
                  walkways.json   walk graph: nodes, edges, spawn weights
                  streets.json    cycle graph, directed road graph, terraces, bike spots, the market
                  river.json      Maas centreline + width

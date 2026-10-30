@@ -844,3 +844,46 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - The owner asked for the optimisations to be toggleable: a **Performance mode** checkbox
   (`#perf=0|1`, saved per browser) turns the merged far blocks and the life budget on or off.
   Rule from the owner (2026-10-27): no commits, pushes or deploys without their approval.
+
+## 2026-10-30: game-style start screen, a clear way back to the map
+
+- The start screen was redone in the Limburg flag colours, with an original brick emblem rather
+  than the province's logo (its brand guide requires written consent, and a logo implies
+  endorsement). It has a brick progress bar, phase messages, rotating tips and a "how to play"
+  card, and ends on PRESS ANY KEY / TAP TO START (key, click, tap or gamepad button). The
+  software-rendering notice now waits until after start.
+- Everyone the owner showed it to asked how to get back to the map. Zooming out past the walk
+  camera's farthest distance now returns to the map (`ZoomOutExit`). There is also an always-visible
+  Map button top right in walk mode, a tip the first three walks, and updated hints.
+- Checked in headless Chromium: desktop and phone start screens while loading and when ready, tap
+  to start, the Map button and hints in walk mode, and 60 wheel notches out of walk mode -> map.
+  159 tests pass.
+- Owner: the first start screen looked like a web page. Redone as a console-style title screen:
+  Anton display logo with BLOX on a yellow brick, the live city behind it once the skyline has
+  loaded (attract-mode camera circling the start view), GTA-style tips bottom-left, a brick
+  spinner bottom-right, PRESS ANY KEY with button prompts, and the game UI hidden until start.
+  Also fixed: the walk-mode Map button showed in map mode too (`display: flex` beat `hidden`).
+
+## 2026-10-30: Ride (phase R1), trains, transit.json v2
+
+- Pipeline: `transit.json` v2 has stops with names, per-pattern stop lists, GTFS route ids and
+  trip ids per row (`merge_trips_with_ids`). `blox life --modes` defaults to `bus,rail`, so the
+  Maastricht <-> Randwyck trains are exported. Tests for v2, rail and the trip-id merge.
+- New brick model `train` (`models/train.py`, contract/models/train.json, 302 bricks).
+- Viewer: the Transit panel (running now, lines, stop departure boards), route ribbons, vehicle
+  badges, and riding with a passenger seat camera, free look, next stop, get off, outside view
+  and fast-forward. Buses and trains are separate fleets (`TimetableBuses` `modes`, `laneM`).
+  Tests: `ride.schedule`, `ride.seat`, `ride.routes`.
+- Live data (R2): the planned Worker would decode the national GTFS-Realtime protobuf (MBs) on
+  every request, which doesn't fit Cloudflare's free 10 ms CPU limit. The alternative is OVapi's
+  per-line JSON API (small). Whether a browser can call it directly (CORS, HTTPS) is to be checked
+  from the owner's browser, since the cloud sandbox can't reach OVapi.
+- Ride fixes found in browser tests on the real city: a vehicle over a spot not streamed in yet
+  has a NaN ground height, and a NaN camera poisons the clipping-plane uniforms and stops
+  rendering (`firstElem.toArray is not a function` inside three.js). The seat now falls back to
+  the last or approximate ground and never sets a non-finite camera. The seat eye height was
+  raised to 2.1 m, since both models have their cabin floor at 1.2 m, and the outside view moved
+  back and up. Title key art: slides whose image doesn't load are dropped, so a site without
+  `src/title/*.jpg` simply shows the plain backdrop.
+- Key art views now avoid the bridges (Vrijthof, Stadhuis, a high view over the Maas): the
+  Sint Servaasbrug currently renders as a thin deck on grassy islands. See the accuracy plan.

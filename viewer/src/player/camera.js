@@ -90,3 +90,24 @@ export class FollowCamera {
     return { focus, position };
   }
 }
+
+/**
+ * "Zoom out to leave": people who walk in try to get back to the map the Google Maps way, by
+ * scrolling or pinching out. Zoom-out input that arrives while the follow camera is already at
+ * its farthest builds up; past `threshold` metres of it, update() says leave. Zooming in resets,
+ * idle time drains it. progress() (0..1) drives a hint.
+ */
+export class ZoomOutExit {
+  constructor({ threshold = 1.6, drain = 1.2 } = {}) { Object.assign(this, { threshold, drain, v: 0 }); }
+
+  /** zoom: metres this frame (+ = out); atMax: camera already at its max distance. -> leave? */
+  update(zoom, atMax, dt) {
+    if (zoom < 0) this.v = 0;
+    else if (zoom > 0 && atMax) this.v += zoom;
+    else this.v = Math.max(0, this.v - this.drain * dt);
+    return this.v >= this.threshold;
+  }
+
+  progress() { return Math.min(1, this.v / this.threshold); }
+  reset() { this.v = 0; }
+}

@@ -213,7 +213,7 @@ def build_parser() -> argparse.ArgumentParser:
     li.add_argument("--gtfs", help="GTFS zip (default: the cached OVapi feed from 'blox fetch --only gtfs')")
     li.add_argument("--date", help="first day of the reference week, YYYY-MM-DD (default: today)")
     li.add_argument("--margin", type=float, help="metres around the bbox for routes (default 500)")
-    li.add_argument("--modes", default="bus", help="comma list of GTFS modes to keep (default bus)")
+    li.add_argument("--modes", default="bus,rail", help="comma list of GTFS modes to keep (default bus,rail)")
     li.add_argument("--no-transit", action="store_true")
     li.add_argument("--no-walkways", action="store_true")
     li.set_defaults(func=cmd_life)
