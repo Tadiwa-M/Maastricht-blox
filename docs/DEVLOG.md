@@ -942,3 +942,13 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - One checked spot (line 4 along the Markt) follows a mapped pedestrian way within 1 m: the
   real bus lane there. Whether that way has `bus=*` tags (then snapping and the tree rule cover
   it) can only be checked with the real OSM extract on the workstation.
+
+## 2026-10-30: relay script on Windows PowerShell
+
+- `scripts/relay.ps1` stopped on the owner's PC at the login check: Windows PowerShell 5.1 with
+  `$ErrorActionPreference = "Stop"` turns any native stderr line (Wrangler's "out-of-date"
+  warning) into a terminating error. The script now runs native tools under "Continue" and
+  checks exit codes. Wrangler stays pinned at 3.114.0 (its nodejs_compat deprecation note does
+  not apply: the relay doesn't use nodejs_compat).
+- Wrangler login ends on Cloudflare's welcome page (welcome.developers.workers.dev), which showed
+  a certificate error on the owner's network; the login itself completes on localhost before that.
