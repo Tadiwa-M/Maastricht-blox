@@ -213,7 +213,8 @@ GTA V: minimal UI, tips in one corner, a small spinner in the other).
   logo while loading; missing images are dropped. Render them with `tools/keyart.mjs` (views in
   `VIEWS`) on a PC with a GPU: `node tools/keyart.mjs --url https://tadiwa-m.github.io/Maastricht_larper/`
   renders from the published site (about a minute a view), `--site <dir>` from a local site
-  build. In a GPU-less container (software rendering) a 1080p view of the city takes hours.
+  build. The browser encodes the JPEGs (no ffmpeg needed). In a GPU-less container (software
+  rendering) a 1080p view of the city takes hours.
 - **Live title:** once the baked skyline is in (`live()`), the backdrop clears to a vignette and
   the real city plays behind the logo. `citymode.js` attract mode circles the camera around the
   start view (0.045 rad/s) until start.

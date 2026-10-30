@@ -969,3 +969,10 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Add `GITHUB_TOKEN` (`npx wrangler secret put GITHUB_TOKEN` in `relay/`, a fine-grained token for
   this repo only: Contents + Issues read/write) so reports need no GitHub account.
 - Verify `<relay>/live?lines=ARR_<line>` against real OVapi data (field names are from the docs).
+
+## 2026-10-30: key art without ffmpeg
+
+- `tools/keyart.mjs` now encodes the JPEGs in the browser (canvas `toDataURL`), so it runs on a
+  Windows PC with only Node. Before, without ffmpeg it left PNGs, which the title screen ignores.
+- Status: the title slideshow is live but has no slides yet (`viewer/src/title/` is empty); the
+  owner renders them on a GPU PC with `--url`.

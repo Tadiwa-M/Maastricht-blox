@@ -5,9 +5,8 @@
 // --url renders from the published site (no world files needed), e.g.
 //   node tools/keyart.mjs --url https://tadiwa-m.github.io/Maastricht_larper/
 // Without --headless a browser window opens so the GPU renders (about a minute a view; software
-// rendering takes hours). Needs ffmpeg (or ffmpeg-static) for JPEG.
-import { writeFile, mkdir, rm } from 'node:fs/promises';
-import { spawnSync } from 'node:child_process';
+// rendering takes hours). Writes <view>.jpg (encoded by the browser).
+import { writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -31,7 +30,6 @@ async function main() {
   const headless = flag('--headless'), only = opt('--only')?.split(',');
   const out = resolve(argv[0] || join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'title'));
   await mkdir(out, { recursive: true });
-  const ff = spawnSync('ffmpeg', ['-version']).status === 0 ? 'ffmpeg' : await import('ffmpeg-static').then((m) => m.default).catch(() => null);
   const { server, url } = live ? { server: null, url: live.endsWith('/') ? live : `${live}/` } : await serve(root);
   const browser = await chromium.launch({ headless,
     args: headless ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--ignore-gpu-blocklist'] });
@@ -59,13 +57,16 @@ async function main() {
       }
       await pose();
       for (let q = 0; q < 30; q++) await p.evaluate(() => window.__bloxFilm.step(1 / 30)); // people and boats move in
-      const { url: png } = await p.evaluate(() => window.__bloxCapture());
-      const pngFile = join(out, `${v.name}.png`);
-      await writeFile(pngFile, Buffer.from(png.split(',')[1], 'base64'));
-      if (ff) {
-        const r = spawnSync(ff, ['-y', '-loglevel', 'error', '-i', pngFile, '-q:v', '4', join(out, `${v.name}.jpg`)]);
-        if (r.status === 0) await rm(pngFile);
-      }
+      // the browser encodes the JPEG itself (no ffmpeg needed)
+      const jpg = await p.evaluate(async () => {
+        const { url } = window.__bloxCapture();
+        const img = new Image();
+        await new Promise((ok, fail) => { img.onload = ok; img.onerror = fail; img.src = url; });
+        const c = Object.assign(document.createElement('canvas'), { width: img.width, height: img.height });
+        c.getContext('2d').drawImage(img, 0, 0);
+        return c.toDataURL('image/jpeg', 0.85);
+      });
+      await writeFile(join(out, `${v.name}.jpg`), Buffer.from(jpg.split(',')[1], 'base64'));
       console.log(`wrote ${v.name} (${v.place})`);
       await p.close();
     }
