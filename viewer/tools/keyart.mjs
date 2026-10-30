@@ -1,8 +1,11 @@
 // Title-screen key art: render fixed views of the real city (film mode: full streaming, still
 // frame) and save them as JPEGs for the title screen's slideshow (src/title/, copied to the site by
 // build.mjs). The views recreate classic Maastricht postcard angles in bricks.
-// Usage: node tools/keyart.mjs --site <city site dir> [outDir=src/title] [--only maas,brug] [--headless]
-// Without --headless a browser window opens so the GPU renders. Needs ffmpeg (or ffmpeg-static) for JPEG.
+// Usage: node tools/keyart.mjs --site <city site dir> | --url <live site> [outDir=src/title] [--only maas,brug] [--headless]
+// --url renders from the published site (no world files needed), e.g.
+//   node tools/keyart.mjs --url https://tadiwa-m.github.io/Maastricht_larper/
+// Without --headless a browser window opens so the GPU renders (about a minute a view; software
+// rendering takes hours). Needs ffmpeg (or ffmpeg-static) for JPEG.
 import { writeFile, mkdir, rm } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { join, resolve, dirname } from 'node:path';
@@ -22,13 +25,14 @@ async function main() {
   const argv = process.argv.slice(2);
   const flag = (f) => { const i = argv.indexOf(f); if (i < 0) return false; argv.splice(i, 1); return true; };
   const opt = (f) => { const i = argv.indexOf(f); if (i < 0) return null; const v = argv[i + 1]; argv.splice(i, 2); return v; };
-  const root = siteArg(argv, null);
-  if (!root) throw new Error('--site <dir> is required (a scripts/site build of the city)');
+  const live = opt('--url');
+  const root = live ? null : siteArg(argv, null);
+  if (!root && !live) throw new Error('--site <dir> (a scripts/site build of the city) or --url <site> is required');
   const headless = flag('--headless'), only = opt('--only')?.split(',');
   const out = resolve(argv[0] || join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'title'));
   await mkdir(out, { recursive: true });
   const ff = spawnSync('ffmpeg', ['-version']).status === 0 ? 'ffmpeg' : await import('ffmpeg-static').then((m) => m.default).catch(() => null);
-  const { server, url } = await serve(root);
+  const { server, url } = live ? { server: null, url: live.endsWith('/') ? live : `${live}/` } : await serve(root);
   const browser = await chromium.launch({ headless,
     args: headless ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--ignore-gpu-blocklist'] });
   try {
@@ -67,7 +71,7 @@ async function main() {
     }
   } finally {
     await browser.close();
-    server.close();
+    server?.close();
   }
 }
 

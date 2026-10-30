@@ -910,3 +910,35 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   once the relay is deployed: `<relay>/live?lines=ARR_<line>` should list journeys with delays.
 - A partial rebuild (one area into an existing world) is blocked by feature ids being numbered
   city-wide. Until that is solved, corrections land with the next full city build.
+
+## 2026-10-30: ride cabin, buses on the road
+
+- The owner rode a bus: from inside, the brick model is a box of studs with slit windows, so
+  there was nothing to see. The seat view now hides the ridden vehicle (fleet `hideId`) and draws
+  a light passenger cabin around the camera (`ride/cabin.js`): blue panels up to the sill, large
+  window openings between thin pillars, ceiling, low seat backs, grab pole. The outside view shows
+  the real model again.
+- Buses drove through trees and people. Measured cause: GTFS shapes run a median 3-4 m (75th
+  percentile 6.5 m) off the OSM road centrelines; with the 1.6 m lane offset that put buses on
+  the pavement. `blox life` now snaps bus shapes onto the drivable OSM roads (`life/snap.py`,
+  direction-aware, sticky, median-smoothed): 95 % of bus points within 2.2 m of a centreline.
+  Needs a `blox life` re-run on the workstation; no world rebuild.
+- Trees: brick crowns start at >= 4 m, above a bus, so what buses hit are trunks. OSM tree
+  points standing on a carriageway now move to the kerb (`prepare_osm.off_carriageway`), or are
+  dropped where there is no room. Needs a world rebuild (lands with the accuracy rebuild).
+- People keep further clear of vehicles (0.9 m alone, 1.9 m in groups) and now also of trains.
+- Ride cabin screenshots: the grab pole moved 1.6 m ahead into the aisle; it blocked the view
+  when looking right.
+
+- "Get off" did nothing on the live site: it still has the v1 timetable (no stop positions,
+  `blox life` not re-run yet), so the request found no stop and quietly reset. It now steps off
+  at the stop when the data has one, else beside the doors on the kerb side (`seat.doorSide`).
+  The walk facing was also passed in degrees where the player takes radians.
+- `tools/keyart.mjs --url <site>` renders the title key art from the published site, so any PC
+  with a GPU can make the slides (about a minute each). In this GPU-less container a 1080p city
+  view took hours and container restarts killed both runs.
+
+**Open decisions**
+- One checked spot (line 4 along the Markt) follows a mapped pedestrian way within 1 m: the
+  real bus lane there. Whether that way has `bus=*` tags (then snapping and the tree rule cover
+  it) can only be checked with the real OSM extract on the workstation.

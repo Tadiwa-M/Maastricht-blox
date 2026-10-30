@@ -297,7 +297,12 @@ uneven ground or across chunk borders. `VoxelConfig.street_props=False` switches
 
 **Trees**: plane/chestnut (`trees.py`): one-stud trunk, bare for >= 4 m (45 % of the height),
 three branch stubs, crown of a core plus 3-5 blobs (seeded), noisy outline, paler leaves 1 in
-16. Default height 8-15 m (no DSM), crown 0.36 h in 2.5-5.5 m.
+16. Default height 8-15 m (no DSM), crown 0.36 h in 2.5-5.5 m. Placement
+(`prepare_osm.off_carriageway`, 2026-10-30): OSM tree points are a few metres off, and trunks on
+the carriageway stood in the path of every bus and car. A trunk within half the road width + 1 m
+of a car road, `busway` or pedestrian street with bus access moves straight out to that side's
+kerb (1 m past the edge); if that spot is on another road too (narrow median, junction) the
+tree is dropped. Tunnels don't count. The build log says how many moved and dropped.
 
 ### The Stadhuis (hero model)
 

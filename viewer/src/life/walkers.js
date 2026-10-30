@@ -139,7 +139,8 @@ export class Pedestrians {
         }
         g.travelled = k.step(dt);
       }
-      if (vehicles.length) clearVehicles([k], vehicles);
+      // the whole group stands around its leader: keep the leader that much further clear
+      if (vehicles.length) clearVehicles([k], vehicles, g.size > 1 ? 1.9 : 0.9);
     }
   }
 

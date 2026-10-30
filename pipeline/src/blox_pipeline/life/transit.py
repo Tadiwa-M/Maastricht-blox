@@ -21,12 +21,15 @@ import datetime as dt
 from pathlib import Path
 
 import numpy as np
+import shapely
+from shapely.geometry import LineString
 
 from .. import geo
 from ..geo import RDBox
 from .calendar import read_calendar, reference_week
 from .csvzip import gtfs_seconds, iter_rows
 from .polyline import cumulative, densify, inside_run, project
+from .snap import snap_path
 
 log = logging.getLogger(__name__)
 
@@ -112,8 +115,10 @@ def _read_shapes(zf: zipfile.ZipFile, ids: set[str], box: RDBox) -> dict[str, _S
     return out
 
 
-def build_transit(zip_path: Path, box: RDBox, start: dt.date, modes: tuple[str, ...] = ("bus",)) -> dict:
-    """Read the GTFS zip and return the ``transit.json`` document for RD ``box``."""
+def build_transit(zip_path: Path, box: RDBox, start: dt.date, modes: tuple[str, ...] = ("bus",),
+                  roads: list[LineString] | None = None) -> dict:
+    """Read the GTFS zip and return the ``transit.json`` document for RD ``box``. ``roads``
+    (``snap.road_lines``): bus shapes are pulled onto these centrelines (``snap.py``)."""
     t0 = time.monotonic()
     with zipfile.ZipFile(zip_path) as zf:
         cal = read_calendar(zf)
@@ -142,6 +147,8 @@ def build_transit(zip_path: Path, box: RDBox, start: dt.date, modes: tuple[str, 
                 trips[tid] = (rid, shp, masks[svc], head)
         shapes = _read_shapes(zf, {t[1] for t in trips.values()}, box)
         trips = {k: t for k, t in trips.items() if t[1] in shapes}
+        if roads:
+            _snap_bus_shapes(shapes, {t[1] for t in trips.values() if routes[t[0]][3] == "bus"}, roads)
         calls: dict[str, list[tuple[int, int, int, str]]] = defaultdict(list)
         scols = ["trip_id", "arrival_time", "departure_time", "stop_id", "stop_sequence"]
         for tid, arr, dep, stop, seq in iter_rows(zf, "stop_times.txt", scols):
@@ -169,6 +176,22 @@ def build_transit(zip_path: Path, box: RDBox, start: dt.date, modes: tuple[str, 
              len(doc["routes"]), len(doc["shapes"]), len(doc["patterns"]), len(doc["trips"]), week[0],
              time.monotonic() - t0)
     return doc
+
+
+def _snap_bus_shapes(shapes: dict[str, _Shape], ids: set[str], roads: list[LineString]) -> None:
+    t0, tree = time.monotonic(), shapely.STRtree(roads)
+    moved = []
+    for sid in ids:
+        s = shapes[sid]
+        i0, i1 = s.run
+        before = s.pts[i0:i1 + 1]
+        after = snap_path(before, roads, tree)
+        moved.append(np.hypot(*(after - before).T))
+        s.pts = s.pts.copy()
+        s.pts[i0:i1 + 1] = after
+    m = np.concatenate(moved) if moved else np.zeros(1)
+    log.info("transit: %d bus shapes snapped to %d road lines (median move %.1f m, max %.1f m) in %.1f s",
+             len(ids), len(roads), float(np.median(m)), float(m.max()), time.monotonic() - t0)
 
 
 def _project_calls(shape: _Shape, seq: list[tuple[int, int, int, str]], stops: dict[str, tuple[float, float]],

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { seatPosition, lookTarget, outsideView, angleDelta, smoothYaw, SEATS } from '../src/ride/seat.js';
+import { seatPosition, lookTarget, outsideView, angleDelta, smoothYaw, doorSide, DOOR_SIDE_M, SEATS } from '../src/ride/seat.js';
 
 const near = (a, b, eps = 1e-6) => a.every((v, i) => Math.abs(v - b[i]) < eps);
 
@@ -32,4 +32,11 @@ test('yaw smoothing takes the short way round and snaps on big jumps', () => {
   assert.ok(angleDelta(350, y) > 0 && angleDelta(350, y) < 20);
   assert.equal(smoothYaw(0, 170, 0.1), 170);
   assert.equal(smoothYaw(null, 42, 0.1), 42);
+});
+
+test('ride: without a stop position the passenger steps off on the right (kerb) side', () => {
+  const north = doorSide({ x: 10, z: 20, yaw: 0 }); // heading north: right is east (+x)
+  assert.ok(Math.abs(north.x - (10 + DOOR_SIDE_M.bus)) < 1e-9 && Math.abs(north.z - 20) < 1e-9);
+  const east = doorSide({ x: 0, z: 0, yaw: 90 }, 'rail'); // heading east: right is south (-z)
+  assert.ok(Math.abs(east.x) < 1e-9 && Math.abs(east.z + DOOR_SIDE_M.rail) < 1e-9 && east.yaw === 90);
 });

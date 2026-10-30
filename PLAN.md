@@ -82,6 +82,9 @@ looking around the bus and out of the windows. Make it really easy."
   "Back to map". Trains (Maastricht <-> Randwyck) get a train model and the same ride.
 - Phase R2 (live, code done 2026-10-31; relay deploy + verify pending): the relay plus the viewer merge. Vehicles use the live position or delay when
   the feed has one, else the timetable, with a LIVE / SCHEDULED badge per vehicle.
+- R1 polish (2026-10-30, uncommitted until approved): passenger cabin with big windows in the
+  seat view (`ride/cabin.js`); bus shapes snapped to the OSM roads in `blox life` (needs a
+  `blox life` re-run); tree trunks moved off carriageways (with the accuracy rebuild).
 - Phase R3: "Plan a trip" (from a stop to a stop), stop search, and follow a vehicle on the map.
 
 **Accuracy (owner, 2026-10-31):** BGT (the municipality's large-scale map, via PDOK) for the

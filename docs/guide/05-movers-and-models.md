@@ -184,7 +184,8 @@ blox life --out build/world [--date 2026-10-26] [--bbox ...] [--margin 500] [--m
 | `fetch.py` | downloads `sources/config.py: GTFS_URL` to `data/raw/gtfs/` (zip checked, older than 7 days refetched) |
 | `csvzip.py` | streams CSV rows from the zip (stop_times.txt is ~1 GB unzipped; never extracted) |
 | `calendar.py` | `calendar.txt` + `calendar_dates.txt`; the **reference week** = 7 days from `--date` (moved inside the feed's validity), one per weekday |
-| `transit.py` | bus routes whose shape comes within `--margin` (500 m) of the bbox; shapes densified <= 10 m and clipped to the box (one point beyond each edge) with the **full shape's** cumulative distance; stops projected onto the shape in calling order (earliest segment within 5 m of the best, so out-and-back streets work; > 60 m off = ignored); only the stops bracketing the clipped part kept |
+| `transit.py` | bus routes whose shape comes within `--margin` (500 m) of the bbox; shapes densified <= 10 m and clipped to the box (one point beyond each edge) with the **full shape's** cumulative distance; stops projected onto the shape in calling order (earliest segment within 5 m of the best, so out-and-back streets work; > 60 m off = ignored); only the stops bracketing the clipped part kept; bus shapes snapped onto the OSM road centrelines (`snap.py`) |
+| `snap.py` | GTFS bus shapes run 3-7 m off the centrelines, which put buses (after the lane offset) on the pavement, through trees and people. Each point moves to the nearest drivable road (car roads, `busway`, pedestrian streets with bus access) within 12 m that runs the same way (cos >= 0.6, so junctions don't pull it onto the cross street), sticking to the previous road unless another is 2 m closer; a 5-point running median of the moves removes single-point jumps. Distances (timing) are unchanged. On the city: 95 % of bus points within 2.2 m of a centreline (was a median of 3.3 m) |
 | `walkways.py` | walk graph from OSM (below) |
 | `river.py` | `waterway=river` named Maas/Meuse, merged and clipped, densified 20 m; width from the water polygon; a hand-set approximate line if OSM has none |
 | `streets.py` | `streets.json` (below): cycle + road graphs, cafe terraces, bike spots, market |
@@ -336,7 +337,8 @@ side at the slowest member's pace, each with a lateral place on the way; every 2
 group **stops** for 2-12 s (groups turn to each other to chat). Spawn weights: walkways.json,
 then `liveWeights`: the busiest nodes x1.6 by day, the market square x3 while it is on. Random
 walk as before (weighted neighbours, going straight on, rounded corners, `avoid`,
-`clearVehicles` for buses and the nearest 30 cars). In the rain (`ctx.weather.rain` 0..1 when a
+`clearVehicles` for buses, trains and the nearest 30 cars; people step 0.9 m clear of a
+vehicle's footprint, groups 1.9 m since their members walk side by side). In the rain (`ctx.weather.rain` 0..1 when a
 weather source exists, else `#rain=1`) up to 75 % of the grown-ups carry an umbrella and
 terraces empty.
 

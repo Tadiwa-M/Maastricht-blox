@@ -198,14 +198,21 @@ tap one and ride along as a passenger, looking around and out of the windows.
   While the panel is open, route-coloured badges float over the vehicles on the map; tapping one
   boards it.
 - **Riding** (`ride/index.js`, math in `ride/seat.js`): every frame the camera sits on a
-  passenger seat (`SEATS`: a little ahead of the middle on the left, eye 1.75 m, inside the
-  window band of both brick models) of the vehicle's current pose (`life/buses.js` poses). The
+  passenger seat (`SEATS`: a little ahead of the middle on the left, eye 2.1 m above the
+  road, inside the window band) of the vehicle's current pose (`life/buses.js` poses). The
   vehicle heading is smoothed (`smoothYaw`), since shapes are polylines. Look around by dragging,
   with arrows/Q/E, or the right stick. The HUD shows the line, the destination, the next stop with
   minutes, and the following stops, plus buttons: **Get off at <stop>** (steps off when the
   vehicle reaches it and continues in walk mode from the stop), **Outside view** (chase camera),
   **Fast** (life clock 10x) and **Map**. Esc / B also leave. When the trip ends you are put back
   on the map above it.
+- **Cabin** (`ride/cabin.js`, 2026-10-30): seen from inside, the brick models are a box of studs
+  with slit windows, so in the seat view the ridden vehicle is hidden (the fleet's `hideId`) and a
+  light passenger cabin follows its pose instead: floor, low blue panels up to the sill (1.5 m),
+  window openings up to 2.6 m between thin pillars, a ceiling, seat backs ahead that stay below
+  the sill, and a yellow grab pole. `CABINS` holds the bus and train sizes; the seat eye (2.1 m)
+  sits in the middle of the windows (`ride.cabin.test.mjs`). The outside view shows the real
+  model again.
 - **Trains:** `blox life` now keeps `bus,rail` by default. Rail routes get their own fleet with
   the new `train` brick model (6 x 52 studs, hollow saloon, doors both sides) and no lane offset.
 - **Data:** `transit.json` v2 adds `stops` (name, Unity m), `patterns[].stops`, `routes[].id` and
