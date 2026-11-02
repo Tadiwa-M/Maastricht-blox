@@ -85,7 +85,23 @@ looking around the bus and out of the windows. Make it really easy."
 - R1 polish (2026-10-30, uncommitted until approved): passenger cabin with big windows in the
   seat view (`ride/cabin.js`); bus shapes snapped to the OSM roads in `blox life` (needs a
   `blox life` re-run); tree trunks moved off carriageways (with the accuracy rebuild).
-- Phase R3: "Plan a trip" (from a stop to a stop), stop search, and follow a vehicle on the map.
+- Phase R3 (future, owner 2026-11-02): **Plan a trip, like a maps app.** In the Transit panel:
+  pick a start and a destination (address, postcode, stop or a tap on the map), get bus options
+  (leave/arrive times, walk legs, transfers) like a maps app, and the chosen route drawn on the
+  city. Choosing **walk** shows the best path on the ground as a green arrow line, like the
+  racing line in an F1 game; "Ride" boards the first bus of the chosen option.
+  Model: the owner's earlier routing app (`Tadiwa-M/Maastricht-and-Heerlan-Routing-Applications`,
+  Java: postcodes -> time-aware A* over a GTFS bus graph with a 5-minute transfer penalty,
+  GraphHopper for walking, route drawn on a map). Here it runs in the browser on data we already
+  export: `transit.json` v2 (stops, patterns, trips) for a connection-scan search over today's
+  connections, the walk graph (`walkways.json`) for walk legs and the walking route, addresses
+  from the BAG/OSM features (the old app's `maastricht_postal_codes.csv`, MIT, for postcodes).
+  Pieces: an address/stop search box, the trip search (pure, tested), a results list, route
+  drawing (bus legs in route colours via `ride/routes.js`, walk legs as the green chevron line
+  on the ground), then follow-me while walking. Also: stop search and follow a vehicle on the map.
+- Traffic rules (owner 2026-11-02, after the accuracy rebuild): buses, cars and bikes see each
+  other (queue behind, give way at junctions, stop for people on crossings); today buses only
+  push walkers aside and drive through cars and bikes.
 
 **Accuracy (owner, 2026-10-31):** BGT (the municipality's large-scale map, via PDOK) for the
 ground: roads, pavements, water, bridges. Proper bridges (deck at road height, railings, piers),

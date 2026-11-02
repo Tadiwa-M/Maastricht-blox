@@ -986,3 +986,15 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   over the Markt), vrijthof (moved to 10:30 and raised to 38 m: at 16:12 the camera looked into
   the sun and Sint Servaas was a flat backlit block) and maas (dusk, high over the river). Sint
   Servaas is still a rough block (no facade detail): a hero model candidate.
+
+## 2026-11-02: v2 timetable live; trip planner planned
+
+- On the workstation: fresh GTFS, `blox life` (84 bus shapes snapped, median move 2.6 m; 28 lines,
+  2,317 trips for the week from 2026-11-02), site build with the slides, published. The owner saw
+  live schedule data through the relay. Buses still drive through people, bikes and cars: traffic
+  rules are planned (PLAN.md).
+- PLAN.md: Phase R3 is now a maps-style trip planner (start and destination, bus options, route
+  drawn, a green racing-line arrow path for walking), modelled on the owner's earlier routing app
+  (Tadiwa-M/Maastricht-and-Heerlan-Routing-Applications).
+- Next on the workstation: retry the 3D BAG fetch; only if it completes, build `build/world_city2`
+  next to the current world and compare before publishing.
