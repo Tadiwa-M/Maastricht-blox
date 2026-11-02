@@ -24,6 +24,7 @@ own repo, or code that calls it) · ~ = secondary source only · **UNVERIFIED** 
 | KNMI Data Platform | weather (alternative) | `https://api.dataplatform.knmi.nl/open-data/v1/datasets/10-minute-in-situ-meteorological-observations/versions/1.0/files` | API key (anonymous shared key, or a free registered key) | CC BY 4.0 (**UNVERIFIED**) | ✔ |
 | Rijkswaterstaat WaterWebservices | Maas water level | `https://ddapi20-waterwebservices.rijkswaterstaat.nl/ONLINEWAARNEMINGENSERVICES/OphalenLaatsteWaarnemingen` | none | open data (repo CC0; data licence **UNVERIFIED**) | ✔ (station code **UNVERIFIED**) |
 | adsb.lol | aircraft | `https://api.adsb.lol/v2/point/{lat}/{lon}/{radius_nm}` | none today (a key is announced for "the future") | ODbL 1.0, "© adsb.lol contributors" | ✔ / ~ |
+| BGT (PDOK) | ground surfaces, water, bridges, walls, canopies | `https://api.pdok.nl/kadaster/bgt/ogc/v1` (OGC API Features, RD via `crs`/`bbox-crs`) | none | **CC0 1.0** (the API's licence link); credited as 'BGT via PDOK' | ✔ (2026-11-02, `blox fetch`) |
 | PDOK Luchtfoto | colour sampling | `https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0` (layer `Actueel_orthoHR`, ~8 cm) | none | **CC BY**, credit "Beeldmateriaal Nederland" | ✔ |
 | SNCB / De Lijn / TEC / DB | cross-border (later) | see section 12 | varies (registration) | varies | ~ |
 
@@ -238,6 +239,7 @@ own repo, or code that calls it) · ~ = secondary source only · **UNVERIFIED** 
 ## 10. PDOK Luchtfoto (aerial imagery for colour sampling)
 
 - WMTS: `https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0?request=GetCapabilities&service=wmts`.
+  The WMS serves `image/jpeg` only (checked 2026-11-02; `blox fetch --only ortho` asks for JPEG).
   Layers `Actueel_orthoHR` (~8 cm, latest year: **2026** HR is published) and
   `Actueel_ortho25` (25 cm). Tile matrix sets: `EPSG:28992` (and probably `EPSG:3857`,
   **UNVERIFIED**). WMS: `https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0`.
@@ -252,7 +254,8 @@ basisdata.nl                     # AHN5/AHN6 GeoTIFF tiles + bladwijzer index
 api.ellipsis-drive.com           # AHN OGC API Features file lists (optional)
 www.ahn.nl                       # AHN docs / dataroom
 service.pdok.nl                  # AHN4 ATOM/WMS, luchtfoto WMTS/WMS
-api.pdok.nl                      # PDOK OGC APIs (optional, e.g. BAG/locatieserver)
+api.pdok.nl                      # PDOK OGC APIs: BGT (ground surfaces, required)
+api.openstreetmap.org            # OSM API map call (container test areas when Geofabrik is unreachable)
 data.3dbag.nl                    # 3DBAG tile index + tiles
 3dbag.nl  docs.3dbag.nl  api.3dbag.nl   # docs / optional API
 download.geofabrik.de            # OSM extracts

@@ -81,7 +81,11 @@ class PreparedBuilding:
 
 @dataclass
 class SurfacePatch:
-    """A ground-surface paint: ``shape`` TILE (roads) or FULL (grass etc.)."""
+    """A ground-surface paint: ``shape`` TILE (roads) or FULL (grass etc.).
+
+    ``paint=False``: the patch only sets its feature id (and its deck): an OSM street inside the
+    BGT area names the ground without painting it. ``keep_feature``: the patch paints but keeps
+    the feature id already there (BGT surfaces have no names of their own)."""
 
     geom: BaseGeometry
     colour: int
@@ -89,6 +93,8 @@ class SurfacePatch:
     priority: float
     feature_id: int = 0
     deck: "Deck | None" = None
+    paint: bool = True
+    keep_feature: bool = False
 
 
 @dataclass
@@ -141,6 +147,8 @@ class PreparedWorld:
     islands: list = field(default_factory=list)  # islands.IslandGroup: built apart, not in chunks
     heroes: list = field(default_factory=list)   # heroes.HeroPlan: hand-authored landmark models
     props: list = field(default_factory=list)    # street_props.Prop: lamps, bollards, benches
+    carriageways: BaseGeometry | None = None     # BGT drivable surfaces (props keep clear)
+    bgt_extent: BaseGeometry | None = None       # where the BGT is the ground (outside: OSM)
     _btree: STRtree | None = None
     _ptree: STRtree | None = None
     _wtree: STRtree | None = None

@@ -118,3 +118,34 @@ class OsmData:
     buildings: list[OsmFeature] = field(default_factory=list)  # (Multi)Polygon, for names/addr
     addresses: list[OsmFeature] = field(default_factory=list)  # Point with addr:*
     pois: list[OsmFeature] = field(default_factory=list)  # named Point/Polygon
+
+
+@dataclass
+class BgtFeature:
+    """A current BGT object (PDOK) with geometry in RD metres.
+
+    ``layer`` is the BGT collection (``wegdeel``, ``waterdeel``, ...), ``props`` the attributes
+    the pipeline uses (``functie``, ``fysiek_voorkomen``, ``plus_fysiek_voorkomen``, ``type``, ...)."""
+
+    layer: str
+    lid: str  # lokaal_id
+    props: dict[str, Any]
+    geom: BaseGeometry
+
+    @property
+    def level(self) -> int:
+        """``relatieve_hoogteligging``: 0 ground, 1+ on a bridge or deck, -1 below ground."""
+        v = self.props.get("relatieve_hoogteligging")
+        return int(v) if isinstance(v, (int, float)) else 0
+
+
+@dataclass
+class BgtData:
+    """BGT objects of the slice, plus the area the cache covers completely (``extent``).
+    Inside ``extent`` the BGT is the ground truth; outside it the OSM fallback applies."""
+
+    features: list[BgtFeature] = field(default_factory=list)
+    extent: BaseGeometry | None = None
+
+    def layer(self, *names: str) -> list[BgtFeature]:
+        return [f for f in self.features if f.layer in names]

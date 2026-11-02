@@ -39,7 +39,7 @@ catalogue, palette, rotation rules with shared test vectors). Architecture and g
 ```bash
 scripts/check.sh                                   # all tests: pipeline, proxy, C# (dotnet), viewer
 cd pipeline
-uv run blox --slice city fetch                     # AHN, 3D BAG, OSM (cached, resumable)
+uv run blox --slice city fetch                     # AHN, 3D BAG, BGT, OSM (cached, resumable)
 uv run blox --slice city fetch --only gtfs         # bus timetable
 uv run blox --slice city build --out ../build/world_city   # ~2-3 h on a workstation
 uv run blox --slice city life  --out ../build/world_city   # buses, walkways, streets, river

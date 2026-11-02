@@ -33,6 +33,7 @@ A brick-built, game-quality miniature of Maastricht, playable in the browser.
 | GPU workstation | Unity 6 LTS + GPU; setup via `scripts/setup-workstation.ps1` | being set up (laptop already verified) |
 | Capture | `scripts/shots.sh` (viewer screenshots), OBS for the demo video | shots in use |
 | Keys/accounts | NS API key (trains), PDOK/3D BAG/OVapi need none | NS key pending |
+| Ground truth | BGT via PDOK OGC API Features (`sources/bgt.py`) | in use (A1) |
 
 ## 3. Phases
 
@@ -108,10 +109,11 @@ ground: roads, pavements, water, bridges. Proper bridges (deck at road height, r
 ramps instead of plate steps on sloping roads, canopies (the station's bus platforms), the 3D BAG
 retry, and hand-built landmarks (station, both bridges, ...). One full rebuild for all of it.
 Phases (goal: the version sent to the gemeente):
-- A1 Ground from BGT (next; needs network access to api.pdok.nl, so a fresh session): fetch
-  the BGT road parts, pavements, cycle paths, water, green and bridge outlines for the city
-  (PDOK, cached like 3D BAG), and use them instead of buffered OSM lines; check small areas
-  (station, Markt, Servaasbrug) built in the container before the workstation rebuild.
+- A1 Ground from BGT (code done 2026-11-02, awaiting the owner's review): `blox fetch --only bgt`
+  caches ten BGT collections (PDOK OGC API, 512 m blocks, current objects only, ~14 MB/km²);
+  inside the cached area BGT polygons paint the ground and water, OSM only names streets and
+  keeps rails and bridge decks; OSM stays the fallback outside it. Checked on a 1.3 x 0.6 km
+  container build (station Wyck side, Markt, Servaasbrug), guide 02 "Ground from the BGT".
 - A2 Bridges and water: decks from BGT bridge outlines at road height, railings, piers; nobody
   walks or rides on water unless on a deck.
 - A3 Ramps (done 2026-11-02: `wedge_1x2`, `voxelise/ramps.py`), station bus-platform canopies,

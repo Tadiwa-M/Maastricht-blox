@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 import math
 import re
+from dataclasses import replace
 
 import numpy as np
+import shapely
 from shapely import STRtree
 from shapely.geometry import LineString, Point
 from shapely.geometry.base import BaseGeometry
@@ -83,7 +85,10 @@ def bank_level(geom: BaseGeometry, dtm: HeightGrid) -> float:
     return float(np.nanmedian(dtm.values)) - 0.5
 
 
-def prepare_water(osm: OsmData, dtm: HeightGrid, cfg: VoxelConfig, reg: FeatureRegistry) -> list[WaterBody]:
+def prepare_water(osm: OsmData, dtm: HeightGrid, cfg: VoxelConfig, reg: FeatureRegistry,
+                  outside: BaseGeometry | None = None) -> list[WaterBody]:
+    """OSM water areas and buffered waterways. ``outside``: the BGT area; water inside it comes
+    from the BGT (prepare_bgt), so only the parts outside are returned (names still register)."""
     out: list[WaterBody] = []
     water_col = palette.idx("water")
     for f in sorted(osm.water, key=lambda f: f.osm_id):
@@ -105,6 +110,29 @@ def prepare_water(osm: OsmData, dtm: HeightGrid, cfg: VoxelConfig, reg: FeatureR
         col = water_col if width >= 5 else shallow
         fid = reg.add("water", poly, key=f.name, name=f.name, osm_id=f.osm_id) if f.name else 0
         out.append(WaterBody(poly, level, col, fid))
+    if outside is None:
+        return out
+    clipped = [WaterBody(w.geom.difference(outside), w.level_m, w.colour, w.feature_id) for w in out]
+    return [w for w in clipped if not w.geom.is_empty and w.geom.area > 0.01]
+
+
+def outside_bgt(patches: list[SurfacePatch], extent: BaseGeometry) -> list[SurfacePatch]:
+    """Inside the BGT area OSM patches stop painting: they keep only their feature id (street
+    and park names) and their bridge deck. Patches with neither are dropped there (kerbs).
+    Rails (``P_RAIL`` and up) are not ground surfaces of the BGT and stay as they are."""
+    shapely.prepare(extent)
+    out: list[SurfacePatch] = []
+    for p in patches:
+        if p.priority >= P_RAIL or not extent.intersects(p.geom):
+            out.append(p)
+            continue
+        inside = p.geom if extent.contains(p.geom) else p.geom.intersection(extent)
+        if inside is not p.geom:
+            rest = p.geom.difference(extent)
+            if not rest.is_empty and rest.area > 0.01:
+                out.append(replace(p, geom=rest))
+        if (p.feature_id or p.deck is not None) and not inside.is_empty:
+            out.append(replace(p, geom=inside, paint=False))
     return out
 
 
@@ -289,5 +317,5 @@ def register_pois(osm: OsmData, reg: FeatureRegistry) -> None:
         reg.add(kind, f.geom, name=f.name, osm_id=f.osm_id, address=addr, tags=keep)
 
 
-__all__ = ["island_paving", "off_carriageway", "prepare_water", "prepare_roads", "prepare_landuse", "prepare_trees", "register_pois",
+__all__ = ["island_paving", "off_carriageway", "outside_bgt", "prepare_water", "prepare_roads", "prepare_landuse", "prepare_trees", "register_pois",
            "parse_width"]

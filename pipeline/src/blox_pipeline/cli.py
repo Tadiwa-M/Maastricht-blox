@@ -28,9 +28,9 @@ def _bbox(text: str | None) -> RDBox:
 
 # ---------------------------------------------------------------------------- fetch
 def cmd_fetch(args: argparse.Namespace) -> int:
-    from .sources import fetch_all
+    from .sources import DEFAULT_SOURCES, fetch_all
 
-    only = tuple(s.strip() for s in args.only.split(",")) if args.only else ("ahn", "bag3d", "osm")
+    only = tuple(s.strip() for s in args.only.split(",")) if args.only else DEFAULT_SOURCES
     root = Path(args.data_dir) if args.data_dir else None
     bbox = _bbox(args.bbox)
     log.info("fetching %s for RD bbox %s", ",".join(only), bbox.as_tuple())
@@ -99,7 +99,7 @@ def log_facade_stats(world_runs: list, island_runs: list) -> None:
 
 
 def cmd_build(args: argparse.Namespace) -> int:
-    from .sources import ORTHO_CREDIT, SOURCE_CREDITS, load_all
+    from .sources import BGT_CREDIT, ORTHO_CREDIT, SOURCE_CREDITS, load_all
     from .voxelise import VoxelConfig, build_features, iter_chunk_tiles, prepare_world
 
     try:
@@ -138,6 +138,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         if n % 64 == 0:
             log.info("%d/%d chunks", n, len(chunks))
     sources = list(SOURCE_CREDITS) + ([ORTHO_CREDIT] if src.ortho is not None and not args.no_ortho else [])
+    sources += [BGT_CREDIT] if src.bgt is not None else []
     out_dir = Path(args.out)
     write_world(out_dir, out, build_features(world.registry), sources, islands=islands)
     if render_preview is not None and not args.no_preview:
@@ -188,9 +189,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
     bbox_help = "RD bbox xmin,ymin,xmax,ymax (default: the whole slice)"
 
-    f = sub.add_parser("fetch", help="download AHN, 3D BAG, OSM (and optionally ortho) into data/raw")
+    f = sub.add_parser("fetch", help="download AHN, 3D BAG, BGT, OSM (and optionally ortho, GTFS) into data/raw")
     f.add_argument("--bbox", help=bbox_help)
-    f.add_argument("--only", help="comma list of ahn,bag3d,osm,ortho,gtfs (default ahn,bag3d,osm)")
+    f.add_argument("--only", help="comma list of ahn,bag3d,bgt,osm,ortho,gtfs (default ahn,bag3d,bgt,osm)")
     f.add_argument("--data-dir", help="cache dir (default <repo>/data/raw or $BLOX_DATA_DIR)")
     f.set_defaults(func=cmd_fetch)
 

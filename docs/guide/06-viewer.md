@@ -24,6 +24,11 @@ node tools/perf.mjs city,hero,street hooks=0 --site ../build/site   # + load tim
 node tools/bake-far.mjs <world> <out>                  # just the far bake (out/far/)
 ```
 
+Place views of a built area: `node screenshot.mjs <out> markt,station --site <site>` (place presets
+only exist in the streamed city, not in the diorama `dist/`), or any spot with
+`city "at=<x>,<y>&dist=<m>"` (x, y = RD minus the slice origin). Where the pinned Playwright's own
+browser is missing (cloud containers), point it at another one: `BLOX_CHROMIUM=/opt/pw-browsers/chromium`.
+
 Or from the repo root: `scripts/shots.sh` regenerates the models and the test scene, then
 takes `hero`, `facade`, `gallery` and a night hero shot into `build/shots/`.
 

@@ -18,6 +18,9 @@ const { server, url } = await serve(root);
 const base = `${url}index.html?shot=1`;
 
 const browser = await chromium.launch({
+  // BLOX_CHROMIUM: a browser binary when the pinned Playwright's own download is missing
+  // (cloud containers ship one at /opt/pw-browsers/chromium)
+  executablePath: process.env.BLOX_CHROMIUM || undefined,
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-gl=angle'],
 });
 await mkdir(outDir, { recursive: true });

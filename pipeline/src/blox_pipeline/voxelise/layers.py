@@ -119,6 +119,10 @@ def _patch(p: SurfacePatch, L: Layers) -> None:
         sub(L.deck_feat, L.box, win)[bridge] = p.feature_id
         mask = mask & ~bridge
     mask = mask & (sub(L.water_k, L.box, win) == NONE)  # no road/grass paint under water
+    if not p.paint:  # names the ground only (an OSM street inside the BGT area)
+        if p.feature_id:
+            sub(L.ground_feat, L.box, win)[mask] = p.feature_id
+        return
     colour = np.full(mask.shape, p.colour, np.uint8)
     if p.colour == palette.idx("cobble_dark"):  # setts of a few tones, as in the owner's photos
         ii, jj = np.meshgrid(np.arange(win.i0, win.i1), np.arange(win.j0, win.j1), indexing="ij")
@@ -128,7 +132,8 @@ def _patch(p: SurfacePatch, L: Layers) -> None:
         colour[(h >= 15) & (h < 19)] = palette.idx("rail_brown")
     sub(L.ground_color, L.box, win)[mask] = colour[mask]
     sub(L.ground_shape, L.box, win)[mask] = p.shape
-    sub(L.ground_feat, L.box, win)[mask] = p.feature_id
+    if not p.keep_feature:
+        sub(L.ground_feat, L.box, win)[mask] = p.feature_id
 
 
 def _water(world: PreparedWorld, L: Layers, area) -> None:

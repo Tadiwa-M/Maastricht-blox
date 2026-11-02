@@ -94,10 +94,11 @@ class _Site:
         hard += [p.geom for p in world.patches if p.deck is not None]
         hard += [Point(geo.X0 + (t.I + 0.5) * geo.STUD_M, geo.Y0 + (t.J + 0.5) * geo.STUD_M) for t in world.trees]
         self.hard = STRtree(hard) if hard else None
-        roads = []
+        roads = [world.carriageways] if world.carriageways is not None else []
+        ext = world.bgt_extent  # inside it the BGT carriageways are exact; OSM buffers outside
         for f in osm.roads:
             hw = f.tags.get("highway", "")
-            if hw in CAR:
+            if hw in CAR and (ext is None or not ext.contains(f.geom)):
                 roads.append(f.geom.buffer((parse_width(f.tags) or ROAD_WIDTH_M.get(hw, 4.0)) / 2))
         self.roads = unary_union(roads) if roads else None
         if self.roads is not None:

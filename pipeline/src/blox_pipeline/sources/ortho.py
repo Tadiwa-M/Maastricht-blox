@@ -10,12 +10,21 @@ from PIL import Image
 from .. import geo
 from ..geo import RDBox
 from . import config
-from .http import PNG_MAGIC, download, expect_magic, make_session
+from .http import JPEG_MAGIC, download, expect_magic, make_session
 from .model import RGBGrid
 
 
-def block_path(block: RDBox, root: Path | None = None) -> Path:
-    return (root or config.data_dir()) / "ortho" / f"{int(block.xmin)}_{int(block.ymin)}_{int(block.xmax - block.xmin)}.png"
+def block_path(block: RDBox, root: Path | None = None, ext: str = ".jpg") -> Path:
+    """PDOK's WMS serves JPEG only (2026-11); ``.png`` blocks from older fetches are still read."""
+    return (root or config.data_dir()) / "ortho" / f"{int(block.xmin)}_{int(block.ymin)}_{int(block.xmax - block.xmin)}{ext}"
+
+
+def cached_block(block: RDBox, root: Path | None = None) -> Path | None:
+    for ext in (".jpg", ".png"):
+        p = block_path(block, root, ext)
+        if p.exists():
+            return p
+    return None
 
 
 def wms_params(block: RDBox) -> dict[str, str]:
@@ -24,7 +33,7 @@ def wms_params(block: RDBox) -> dict[str, str]:
         "SERVICE": "WMS", "VERSION": "1.3.0", "REQUEST": "GetMap",
         "LAYERS": config.ORTHO_LAYER, "STYLES": "", "CRS": "EPSG:28992",
         "BBOX": f"{block.xmin},{block.ymin},{block.xmax},{block.ymax}",
-        "WIDTH": str(px), "HEIGHT": str(px), "FORMAT": "image/png",
+        "WIDTH": str(px), "HEIGHT": str(px), "FORMAT": "image/jpeg",
     }
 
 
@@ -32,8 +41,10 @@ def fetch_ortho(bbox: RDBox, root: Path | None = None) -> list[Path]:
     sess = make_session()
     out = []
     for block in geo.iter_blocks(bbox, config.ORTHO_BLOCK_M):
-        out.append(download(config.ORTHO_WMS_URL, block_path(block, root), params=wms_params(block),
-                            session=sess, validate=expect_magic(*PNG_MAGIC)))
+        old = cached_block(block, root)
+        out.append(old if old is not None else download(
+            config.ORTHO_WMS_URL, block_path(block, root), params=wms_params(block),
+            session=sess, validate=expect_magic(*JPEG_MAGIC)))
     return out
 
 
@@ -43,8 +54,8 @@ def load_ortho(bbox: RDBox, root: Path | None = None) -> RGBGrid | None:
     rgb = np.zeros((box.ni, box.nj, 3), dtype=np.uint8)
     found = False
     for block in geo.iter_blocks(bbox, config.ORTHO_BLOCK_M):
-        p = block_path(block, root)
-        if not p.exists():
+        p = cached_block(block, root)
+        if p is None:
             continue
         found = True
         img = np.asarray(Image.open(p).convert("RGB"))

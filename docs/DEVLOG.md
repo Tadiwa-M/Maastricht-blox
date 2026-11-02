@@ -1016,3 +1016,51 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 **Open decisions**
 - Kerb lines are paved too and get wedges where they step; check on real streets after the rebuild.
 - Steps of two plates or more (steep streets, about 20 %) keep their steps.
+
+## 2026-11-02: accuracy A1, ground from the BGT
+
+- Network: the owner opened the container's network. PDOK (api.pdok.nl, service.pdok.nl) and
+  api.3dbag.nl answer; download.geofabrik.de and overpass-api.de drop the connection upstream
+  (TLS reset, not the policy). For the container test area OSM came from the OSM API's `map` call
+  (12 tiles + 5 incomplete multipolygons via `relation/<id>/full`, merged with pyosmium); the
+  workstation keeps using Geofabrik.
+- API choice: PDOK's **OGC API Features** (`api.pdok.nl/kadaster/bgt/ogc/v1`, the `lv/...` path is an
+  alias) over the download API: per-bbox requests fit the existing block cache, RD in and out
+  (`bbox-crs`, `crs`), pages of 1000 with `links[rel=next]`, no async job polling. It returns
+  historic versions too (`eind_registratie` set, about half of all objects), so pages are slimmed
+  on arrival to current objects and the fields we use (~14 MB/km², ~320 MB for the city slice;
+  the raw pages are ~75 MB/km²). Licence: CC0 1.0 (the API's licence link); credited in the
+  manifest only when used.
+- `sources/bgt.py`: `blox fetch --only bgt` (also in the default fetch), 512 m blocks, ten
+  collections: the six ground ones plus bridge decks, platforms, walls/quay walls and
+  canopies (`overkapping`) for A2/A3. Resumes at the first missing page; a block counts only when
+  all ten collections are done (`BgtData.extent`).
+- `voxelise/prepare_bgt.py`: level-0 BGT polygons paint the ground inside the extent (green 40,
+  footways 41, cycle paths 42 in red, kerbs 43, carriageways/parking 44; colours from the
+  material, dark cobbles in the old centre). OSM patches inside the extent only name the ground
+  (`SurfacePatch.paint=False`) and keep their bridge decks and rails; outside it everything is OSM
+  as before. BGT water replaces OSM water inside the extent; touching parts share one level (the
+  BGT cuts the Maas at every bridge, which first showed as seams). Street props avoid the BGT
+  carriageways. Yards (`erf`) keep the aerial-photo colour.
+- First container build showed two of my own bugs, both fixed and tested: OSM rails were dropped
+  inside the BGT area, and kerb lines criss-crossed the Markt (its car lanes are flush
+  decorative setts; `sierbestrating` carriageways now get no kerb).
+- Test area: `blox build --bbox 176250,317600,177550,318200` (station Wyck side, Markt,
+  Servaasbrug; 820 chunks, 3,755 BGT objects, 3.5 min) with and without the BGT; top-down and 3D
+  before/after shots shown to the owner. Visible: real pavements, medians, traffic islands and
+  roundabout islands in Wyck, the Stationsplein and bus lanes as mapped instead of buffered
+  lines, the river's true outline at the quays, no OSM footway stripes across the Markt.
+- Found on the way: PDOK's aerial WMS serves JPEG only now, so `blox fetch --only ortho` failed
+  everywhere. It asks for JPEG (`ortho/<block>.jpg`); old `.png` blocks are still read.
+  `viewer/screenshot.mjs` takes `BLOX_CHROMIUM` for containers whose browser does not match the
+  pinned Playwright. Tests: pipeline 568 (+36: BGT source on two real PDOK pages, ground
+  classification and paint order, water, ortho).
+
+**Open decisions**
+- Bridges still use the OSM deck lines; BGT bridge decks (`overbruggingsdeel`, level 1+) and the
+  roads on them are cached but unused until A2.
+- Still OSM-based: tree placement relative to carriageways, `blox life` walkways and bus snapping,
+  facade street context. Walkways over water are A2 ("nobody walks on water").
+- Ballast and the station square came out darker (BGT unpaved = soil, concrete pavers = grey);
+  correct per the BGT, but tell me if a lighter look reads better.
+- City fetch on the workstation: `blox --slice city fetch --only bgt`, ~20 min, ~320 MB.

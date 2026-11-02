@@ -26,6 +26,29 @@ BAG3D_BLOCK_M = 256.0
 BAG3D_PAGE_LIMIT = 100
 BAG3D_LICENCE = "CC BY 4.0"
 
+# ---------------------------------------------------------------- BGT (PDOK OGC API Features)
+# The municipality's large-scale base map (Basisregistratie Grootschalige Topografie): every
+# road part, pavement, cycle path, water and green surface as a polygon, in RD. Items come in
+# pages of up to 1000; follow links[rel=next]. The API also returns historic versions
+# (``eind_registratie`` set): only current objects are kept in the cache (sources/bgt.py).
+BGT_API_URL = "https://api.pdok.nl/kadaster/bgt/ogc/v1/collections/{collection}/items"
+BGT_CRS = "http://www.opengis.net/def/crs/EPSG/0/28992"
+BGT_BLOCK_M = 512.0
+BGT_PAGE_LIMIT = 1000
+BGT_COLLECTIONS = (
+    "wegdeel",                 # road parts: carriageways, footways, cycle paths, parking, squares
+    "ondersteunendwegdeel",    # verges and traffic islands
+    "begroeidterreindeel",     # green terrain (planted, grass, shrubs)
+    "onbegroeidterreindeel",   # unplanted terrain (yards, paved or unpaved areas)
+    "waterdeel",               # water surfaces
+    "ondersteunendwaterdeel",  # banks
+    "overbruggingsdeel",       # bridge decks (A2)
+    "kunstwerkdeel_vlak",      # platforms (perron), jetties (A2/A3)
+    "scheiding_vlak",          # walls, quay walls (A2)
+    "overigbouwwerk",          # canopies (overkapping, A3), sheds
+)
+BGT_LICENCE = "CC0 1.0"
+
 # ---------------------------------------------------------------- OSM (Geofabrik)
 OSM_PBF_URL = "https://download.geofabrik.de/europe/netherlands/limburg-latest.osm.pbf"
 OSM_CLIP_MARGIN_M = 300.0  # keep a bit around the slice so ways at the edge are whole
