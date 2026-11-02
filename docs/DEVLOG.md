@@ -976,3 +976,13 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   Windows PC with only Node. Before, without ffmpeg it left PNGs, which the title screen ignores.
 - Status: the title slideshow is live but has no slides yet (`viewer/src/title/` is empty); the
   owner renders them on a GPU PC with `--url`.
+- First run on the owner's laptop showed nothing for minutes (no output until a view was done)
+  and the laptop hibernated. Now: progress lines while loading and streaming, a load error is
+  reported, `--quality`. Bug fixed on the way: the streaming loop ran 400 frames back-to-back,
+  seconds on a fast GPU, before chunks arrive over the network (`--url`), so views came out half
+  loaded; it now waits in real time until the view has settled (max 240 s).
+- With the real-time wait the tool renders a view in about a minute even in software
+  (`--quality low`), so the three slides were rendered here: `viewer/src/title/` stadhuis (high
+  over the Markt), vrijthof (moved to 10:30 and raised to 38 m: at 16:12 the camera looked into
+  the sun and Sint Servaas was a flat backlit block) and maas (dusk, high over the river). Sint
+  Servaas is still a rough block (no facade detail): a hero model candidate.

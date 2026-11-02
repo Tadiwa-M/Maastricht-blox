@@ -1,7 +1,8 @@
 // Title-screen key art: render fixed views of the real city (film mode: full streaming, still
 // frame) and save them as JPEGs for the title screen's slideshow (src/title/, copied to the site by
 // build.mjs). The views recreate classic Maastricht postcard angles in bricks.
-// Usage: node tools/keyart.mjs --site <city site dir> | --url <live site> [outDir=src/title] [--only maas,brug] [--headless]
+// Usage: node tools/keyart.mjs --site <city site dir> | --url <live site> [outDir=src/title] [--only maas,brug]
+//        [--quality high|medium] [--headless]
 // --url renders from the published site (no world files needed), e.g.
 //   node tools/keyart.mjs --url https://tadiwa-m.github.io/Maastricht_larper/
 // Without --headless a browser window opens so the GPU renders (about a minute a view; software
@@ -14,11 +15,12 @@ import { serve, siteArg } from './serve.mjs';
 
 /** cam / target: [three.js x, metres above the ground there, three.js z] (x = I * 0.5, z = -J * 0.5). */
 export const VIEWS = [
-  { name: 'vrijthof', place: 'Vrijthof', t: 16.2, day: 'sat', cam: [1532, 6, -3728], target: [1440, 24, -3688], fov: 55 },
+  { name: 'vrijthof', place: 'Vrijthof', t: 10.5, day: 'sat', cam: [1545, 38, -3735], target: [1440, 18, -3688], fov: 55 },
   { name: 'stadhuis', place: 'Stadhuis · Markt', t: 9.5, day: 'wed', cam: [1668, 1.7, -3915], target: [1722, 16, -3990], fov: 60 },
   { name: 'maas', place: 'De Maas', t: 17.8, day: 'fri', cam: [2320, 170, -3640], target: [1760, 0, -3860], fov: 45 },
 ];
 // Bridges (Sint Servaasbrug, Wilhelminabrug) are left out until they are modelled properly.
+const STREAM_S = 240; // longest wait for a view to stream in
 
 async function main() {
   const argv = process.argv.slice(2);
@@ -27,7 +29,7 @@ async function main() {
   const live = opt('--url');
   const root = live ? null : siteArg(argv, null);
   if (!root && !live) throw new Error('--site <dir> (a scripts/site build of the city) or --url <site> is required');
-  const headless = flag('--headless'), only = opt('--only')?.split(',');
+  const headless = flag('--headless'), only = opt('--only')?.split(','), quality = opt('--quality') || 'high';
   const out = resolve(argv[0] || join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'title'));
   await mkdir(out, { recursive: true });
   const { server, url } = live ? { server: null, url: live.endsWith('/') ? live : `${live}/` } : await serve(root);
@@ -37,8 +39,11 @@ async function main() {
     for (const v of VIEWS.filter((x) => !only || only.includes(x.name))) {
       const p = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
       p.on('pageerror', (e) => console.log(`[${v.name}] ${e.message}`));
-      await p.goto(`${url}index.html?film=1#quality=high&view=markt&t=${v.t}&day=${v.day}`);
+      console.log(`[${v.name}] loading the city (the window stays dark until it is in)...`);
+      await p.goto(`${url}index.html?film=1#quality=${quality}&view=markt&t=${v.t}&day=${v.day}`);
       await p.waitForFunction(() => window.__bloxFilm || window.__bloxError, null, { timeout: 600000 });
+      const err = await p.evaluate(() => window.__bloxError && String(window.__bloxError));
+      if (err) throw new Error(`[${v.name}] the site failed to load: ${err}`);
       const ground = (x, z) => p.evaluate(([x, z]) => {
         const h = window.__blox.city.groundHeight(x, z);
         return typeof h === 'number' ? h : window.__blox.city.approxGround(x, z);
@@ -50,10 +55,17 @@ async function main() {
       };
       await pose();
       await p.evaluate((h) => window.__bloxFilm.time(h), v.t);
-      for (let q = 0; q < 400; q++) { // stream the view in; re-aim once the real ground is known
+      // stream the view in (chunks download over the network: wait in real time, up to STREAM_S),
+      // re-aiming once the real ground is known
+      const t0 = Date.now();
+      let said = 0;
+      for (let q = 0; Date.now() - t0 < STREAM_S * 1000; q++) {
         await p.evaluate(() => window.__bloxFilm.step(0));
+        await p.waitForTimeout(100);
         if (q % 20 === 0) await pose();
-        if (q > 40 && await p.evaluate(() => window.__bloxFilm.settled())) break;
+        const s = Math.floor((Date.now() - t0) / 1000);
+        if (s >= said + 10) { said = s; console.log(`[${v.name}] streaming the view in... ${s} s`); }
+        if (s >= 5 && q % 10 === 0 && await p.evaluate(() => window.__bloxFilm.settled())) break;
       }
       await pose();
       for (let q = 0; q < 30; q++) await p.evaluate(() => window.__bloxFilm.step(1 / 30)); // people and boats move in
