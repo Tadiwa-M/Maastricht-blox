@@ -47,7 +47,11 @@ namespace Blox.Tests
         public void CatalogueLoadsFromContract()
         {
             var c = Repo.Catalogue;
-            Assert.Equal(56, c.Types.Count);
+            Assert.Equal(57, c.Types.Count);
+            var w = c.ByName("wedge_1x2"); // catalogue v4: ramp wedge, a generic slope (no studs)
+            Assert.Equal(BrickKind.Slope, w.Kind);
+            Assert.Equal((1, 2, 1), (w.W, w.D, w.H));
+            Assert.Equal(0, w.StudRows);
             var s = c.ByName("slope33_2x3");
             Assert.Equal(BrickKind.Slope, s.Kind);
             Assert.Equal((2, 3, 3), (s.W, s.D, s.H));

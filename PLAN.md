@@ -107,6 +107,16 @@ looking around the bus and out of the windows. Make it really easy."
 ground: roads, pavements, water, bridges. Proper bridges (deck at road height, railings, piers),
 ramps instead of plate steps on sloping roads, canopies (the station's bus platforms), the 3D BAG
 retry, and hand-built landmarks (station, both bridges, ...). One full rebuild for all of it.
+Phases (goal: the version sent to the gemeente):
+- A1 Ground from BGT (next; needs network access to api.pdok.nl, so a fresh session): fetch
+  the BGT road parts, pavements, cycle paths, water, green and bridge outlines for the city
+  (PDOK, cached like 3D BAG), and use them instead of buffered OSM lines; check small areas
+  (station, Markt, Servaasbrug) built in the container before the workstation rebuild.
+- A2 Bridges and water: decks from BGT bridge outlines at road height, railings, piers; nobody
+  walks or rides on water unless on a deck.
+- A3 Ramps (done 2026-11-02: `wedge_1x2`, `voxelise/ramps.py`), station bus-platform canopies,
+  the "building in the road" spot; then the full rebuild (3D BAG cached on the workstation,
+  2026-11-02) and the gemeente email.
 Reports: done (button, relay, corrections file).
 
 **Post-launch backlog (owner, 2026-10-26)**, in rough priority order:

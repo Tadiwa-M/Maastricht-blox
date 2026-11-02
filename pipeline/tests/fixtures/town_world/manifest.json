@@ -15,7 +15,7 @@
  "palette": "palette.json",
  "catalogue": "brick_catalogue.json",
  "features": "features.json",
- "generated": "2026-10-24T03:35:09Z",
+ "generated": "2026-11-02T17:32:58Z",
  "sources": [
   {
    "name": "AHN",
@@ -41,46 +41,46 @@
    "cx": 16,
    "cy": 31,
    "file": "chunks/c_16_31.bxc",
-   "bricks": 3330,
+   "bricks": 3362,
    "minK": 98,
    "maxK": 197,
-   "sha1": "ce9d9895a1da1e40b358571c8d477d7efb47a896"
+   "sha1": "0e7fb2f0385c448ed1272584de0a35a09f9d20f1"
   },
   {
    "cx": 16,
    "cy": 32,
    "file": "chunks/c_16_32.bxc",
-   "bricks": 976,
+   "bricks": 983,
    "minK": 98,
    "maxK": 173,
-   "sha1": "b8f4e24064089b03f89c184fc1edd53b0de88161"
+   "sha1": "54f0974973d9b005d3079c464db2135382f4f199"
   },
   {
    "cx": 17,
    "cy": 31,
    "file": "chunks/c_17_31.bxc",
-   "bricks": 2559,
+   "bricks": 2575,
    "minK": 100,
    "maxK": 197,
-   "sha1": "09a4e5a9d712b312117bb86050713f37dba22a19"
+   "sha1": "2e8ec20726d19e45a7b1440d65bc8e598b8ef776"
   },
   {
    "cx": 17,
    "cy": 32,
    "file": "chunks/c_17_32.bxc",
-   "bricks": 1501,
+   "bricks": 1513,
    "minK": 100,
    "maxK": 173,
-   "sha1": "0af4f50d9abfeedfabc80715362896882bf0b6cf"
+   "sha1": "0c0ef587e1eb5cff91f68df41a631fbb63a2613a"
   },
   {
    "cx": 18,
    "cy": 31,
    "file": "chunks/c_18_31.bxc",
-   "bricks": 847,
+   "bricks": 879,
    "minK": 101,
    "maxK": 111,
-   "sha1": "69b71806ca8ba140108d8ff1b4a3f3d101f137da"
+   "sha1": "0ce0630822282ff1b0dcd604b28533819999474d"
   },
   {
    "cx": 18,

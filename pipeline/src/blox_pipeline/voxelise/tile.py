@@ -13,6 +13,7 @@ from .heroes import heroes_near, paint_heroes
 from .street_props import paint_props, props_near
 from .grid import FULL, SLOPE_STACK, TILE, WATER, VoxelTile
 from .layers import NONE, Layers, shifted
+from .ramps import paint_ramps
 from .trees import tree_cells
 from .world import PreparedWorld, TreeSpec
 
@@ -58,11 +59,14 @@ def voxelise_tile(world: PreparedWorld, layers: Layers, box: CellBox) -> VoxelTi
     _fill_decks(tile, L, kk)
     for cells in tree_vox:
         _fill_tree(tile, *cells)
+    cv = TileCanvas(tile)
     if world.facades or heroes or props:  # last: pieces win over tree leaves and glass cells
-        cv = TileCanvas(tile)
         paint_heroes(cv, heroes)
         paint_facades(tile, world.facades_near(box.i0, box.j0, box.i1, box.j1), canvas=cv)
         paint_props(cv, props)
+    if cfg.ramps:  # after the props: lamps and bollards keep their spot
+        paint_ramps(cv, L)
+    if cv.placed or world.facades or heroes or props:
         tile.placed = cv.records()
     return tile
 

@@ -31,6 +31,7 @@ class VoxelConfig:
     islands: bool = True  # rotated buildings on their own grid (CONTRACT 5.1); False: staircases
     heroes: bool = True   # hand-authored landmark models (heroes.py) instead of their 3D BAG shape
     street_props: bool = True  # lamp posts, bollards with chains, benches (street_props.py)
+    ramps: bool = True  # wedges soften one-plate steps on sloping paved ground (ramps.py)
     island_min_yaw_deg: float = 3.0  # buildings turned more than this become islands
 
 

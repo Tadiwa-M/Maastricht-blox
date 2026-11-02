@@ -111,12 +111,17 @@ counts as occupied for stud-exposure tests. Geometry every renderer must reprodu
 | 54 | `bollard_1x1` | `fence` | 1×1×5 | cast-iron bollard: flared foot, faceted shaft, collar with chain eyes along `w`, ball top |
 | 55 | `chain_1x4` | `fence` | 4×1×3 | chain hanging along `w` between bollards one stud beyond each end (links reach ~0.17 m past the box) |
 | 56 | `vent_1x2` | `tile_grille` | 2×1×2 | cellar vent: frame round a recess of vertical bars, front at +j |
+| 57 | `wedge_1x2` | `slope` | 1×2×1 | ramp wedge: the generic slope profile 1 plate tall over 2 studs (high back at −j, 0.05 m lip at the +j front), no studs |
 
 **Look-v2 pieces (ids 48-56, catalogue v3, 2026-10-24)** were appended without a
 `contractVersion` bump: they **reuse existing kinds**, so every reader still parses the
 catalogue, and a renderer that does not know a piece by name draws the generic shape of its
 kind. The viewer draws all of them (`viewer/src/details-look.js`); **Unity's mesher does not
 draw the new pieces yet** (it uses the generic shape of their kind; Unity is parked).
+
+**Ramp wedge (id 57, catalogue v4, 2026-11-02)** was appended the same way: kind `slope`, so
+every renderer draws it with the generic slope profile. The pipeline places it on sloping paved
+ground where a column lies one plate below its paved neighbour (`voxelise/ramps.py`).
 
 `window`/`door` panes always render with the `glass` material (night glow included); the
 record colour is the frame.

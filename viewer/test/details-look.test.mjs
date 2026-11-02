@@ -15,7 +15,7 @@ const OVERHANG = { chain_1x4: 0.16, lamp_double_1x3: 0.0, bollard_1x1: 0.0 }; //
 test('every look-v2 piece is in the catalogue and has a builder', () => {
   const names = new Set(cat.types.map((t) => t.name));
   for (const n of LOOK_PIECES) assert.ok(names.has(n), n);
-  for (const t of cat.types.filter((t) => t.id >= 48)) assert.ok(LOOK_PIECES.includes(t.name), t.name);
+  for (const t of cat.types.filter((t) => t.id >= 48 && t.id <= 56)) assert.ok(LOOK_PIECES.includes(t.name), t.name); // 57+: generic kinds (wedge)
 });
 
 test('look-v2 near geometry stays in its box (front at -z) and windows have glass', () => {

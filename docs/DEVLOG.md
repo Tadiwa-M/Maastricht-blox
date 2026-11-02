@@ -998,3 +998,21 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   (Tadiwa-M/Maastricht-and-Heerlan-Routing-Applications).
 - Next on the workstation: retry the 3D BAG fetch; only if it completes, build `build/world_city2`
   next to the current world and compare before publishing.
+
+## 2026-11-02: accuracy phase 3a, ramps (wedges)
+
+- The owner chose wedges over smoothing for "steps on the road". New catalogue piece
+  `wedge_1x2` (id 57, kind `slope`, 1x2x1, no studs; catalogue v4). Like ids 48-56 it reuses an
+  existing kind, so no `contractVersion` bump: the viewer, far meshes and Unity draw it with the
+  generic slope profile.
+- `voxelise/ramps.py` places it on paved ground one plate below a paved neighbour (vectorised
+  site search, then the canvas rules: air only, props win, no chunk straddling). Before/after
+  screenshots on the test town (fixture regenerated: 99 wedges in 5 chunks).
+- The 3D BAG fetch for the whole city completed on the workstation (no "giving up"): real
+  buildings are cached for the accuracy rebuild.
+- BGT (phase 1) waits for a session with network access to api.pdok.nl (the owner added the
+  domains; this container predates the change).
+
+**Open decisions**
+- Kerb lines are paved too and get wedges where they step; check on real streets after the rebuild.
+- Steps of two plates or more (steep streets, about 20 %) keep their steps.

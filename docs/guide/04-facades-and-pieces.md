@@ -295,6 +295,14 @@ square lamps, bollard-chain-bollard groups every 18 m outside centre car streets
 within 1.2 m of buildings/islands/heroes/water/decks/trunks, on car roads (lamps, benches), on
 uneven ground or across chunk borders. `VoxelConfig.street_props=False` switches them off.
 
+**Ramps** (`ramps.py`, 2026-11-02): bricks are whole plates, so a climbing road rises in
+0.2 m steps. Where a paved column (ground shape TILE: roads, pavements, squares) lies exactly one
+plate below a paved neighbour, a `wedge_1x2` (id 57: 1 plate over 2 studs, about 11°) sits on it,
+high end against the step, low edge downhill. Both columns under it must be open paved ground
+at the same level, its cells air (trunks, lamps and placed pieces win), and it must not straddle
+a chunk; otherwise the step stays. `VoxelConfig.ramps=False` switches it off. Tests:
+`test_voxelise_ramps.py`; the test town has 99 wedges.
+
 **Trees**: plane/chestnut (`trees.py`): one-stud trunk, bare for >= 4 m (45 % of the height),
 three branch stubs, crown of a core plus 3-5 blobs (seeded), noisy outline, paler leaves 1 in
 16. Default height 8-15 m (no DSM), crown 0.36 h in 2.5-5.5 m. Placement

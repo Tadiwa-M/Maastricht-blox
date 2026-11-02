@@ -1,5 +1,5 @@
 {
- "version": 3,
+ "version": 4,
  "note": "ids are stable and append-only; w along +i, d along +j at rot 0; h in plates; directional pieces' front faces +j at rot 0",
  "types": [
   {
@@ -511,6 +511,16 @@
    "d": 1,
    "h": 2,
    "studs": "none"
+  },
+  {
+   "id": 57,
+   "name": "wedge_1x2",
+   "kind": "slope",
+   "w": 1,
+   "d": 2,
+   "h": 1,
+   "studs": "backRows",
+   "studRows": 0
   }
  ]
 }
