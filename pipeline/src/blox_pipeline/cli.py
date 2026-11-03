@@ -173,8 +173,13 @@ def cmd_life(args: argparse.Namespace) -> int:
         osm = load_osm(osm_file, box)
     start = dt.date.fromisoformat(args.date) if args.date else dt.date.today()
     margin = config.GTFS_MARGIN_M if args.margin is None else args.margin
+    bgt = None
+    if osm is not None:
+        from .sources.bgt import load_bgt
+
+        bgt = load_bgt(box, root)  # water and bridges for walkways; optional
     index = export_life(Path(args.out), box=box, gtfs_zip=gtfs, osm=osm, start=start, margin_m=margin,
-                        modes=tuple(m.strip() for m in args.modes.split(",")))
+                        modes=tuple(m.strip() for m in args.modes.split(",")), bgt=bgt)
     log.info("wrote %s/life/ (%s)", args.out, ", ".join(f"{k} {v / 1024:.0f} KiB" for k, v in index["bytes"].items()))
     return 0
 

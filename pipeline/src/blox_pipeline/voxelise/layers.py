@@ -37,6 +37,7 @@ class Layers:
     deck_top: NDArray[np.uint8]
     deck_body: NDArray[np.uint8]
     deck_feat: NDArray[np.uint32]
+    deck_pier: NDArray[np.uint8]  # 1: a pier stands under the deck here
     bld_top: NDArray[np.int32]
     bld_feat: NDArray[np.uint32]
     bld_wall: NDArray[np.uint8]
@@ -117,6 +118,13 @@ def _patch(p: SurfacePatch, L: Layers) -> None:
         sub(L.deck_top, L.box, win)[bridge] = p.colour
         sub(L.deck_body, L.box, win)[bridge] = p.deck.body
         sub(L.deck_feat, L.box, win)[bridge] = p.feature_id
+        if p.deck.piers is not None:
+            ph = cover(p.deck.piers, win)
+            if ph is not None:
+                pw, pm = ph
+                pier = np.zeros(mask.shape, bool)
+                sub(pier, win, pw)[pm] = True
+                sub(L.deck_pier, L.box, win)[bridge & pier] = 1
         mask = mask & ~bridge
     mask = mask & (sub(L.water_k, L.box, win) == NONE)  # no road/grass paint under water
     if not p.paint:  # names the ground only (an OSM street inside the BGT area)

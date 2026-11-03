@@ -50,7 +50,8 @@ node screenshot.mjs ../build/shots/player hero "mode=walk&at=700,1505&yaw=0"
 main.js  [player hook] -> player/index.js initPlayer(ctx)   ctx = { stage, camera, controls, city?, models, ui, world, islands, lod }
   index.js        modes (map <-> walk), camera tweens, per-frame tick (wraps stage.render), URL hash, window.__bloxPlayer
   city-adapter.js city query API from the in-memory World + islands (used until/unless ctx.city is given)
-  controller.js   CharacterController: kinematic cylinder against city.isSolid
+  controller.js   CharacterController: kinematic cylinder against city.isSolid; stops at water
+                  (onWater: the first solid cell within 8 m below the feet is a water brick)
   camera.js       FollowCamera (aim + damped shown values) + pullIn (collision-aware orbit)
   look.js         rotation math: yaw wrap, pitch clamp, mouse sensitivity/invert, camera-relative
                   heading, smoothDamp, gamepad StickLook curve, auto-recenter, map spin damping
@@ -69,7 +70,11 @@ main.js  [player hook] -> player/index.js initPlayer(ctx)   ctx = { stage, camer
 
 Everything collides through two functions in three.js world metres (x east, y up, z = -north):
 `isSolid(x, y, z) -> true | false | 'unknown'` and `groundHeight(x, z) -> y | 'unknown'`
-('unknown' = not loaded). The viewer core's streaming `src/city.js` provides them; until it is
+('unknown' = not loaded). Water bricks are solid (boats and the river ripples sit on them), so
+the controller also asks `isWater` when the city has it: a move whose footing would be water
+is refused like a wall, unless the player is already on water (so they can climb out). Bridge
+decks are not water, so they stay walkable (accuracy A2, 2026-11-02).
+The viewer core's streaming `src/city.js` provides them; until it is
 passed in as `ctx.city`, `city-adapter.js` builds them from the World (chunk occupancy, unknown
 outside loaded chunks, solid below the world) and each island (the point goes through the
 inverse island pose into local cells, exactly like picking). Island buildings therefore

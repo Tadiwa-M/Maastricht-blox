@@ -1046,7 +1046,7 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   inside the BGT area, and kerb lines criss-crossed the Markt (its car lanes are flush
   decorative setts; `sierbestrating` carriageways now get no kerb).
 - Test area: `blox build --bbox 176250,317600,177550,318200` (station Wyck side, Markt,
-  Servaasbrug; 820 chunks, 3,755 BGT objects, 3.5 min) with and without the BGT; top-down and 3D
+  Sint Servaasbrug and Wilhelminabrug; 820 chunks, 3,755 BGT objects, 3.5 min) with and without the BGT; top-down and 3D
   before/after shots shown to the owner. Visible: real pavements, medians, traffic islands and
   roundabout islands in Wyck, the Stationsplein and bus lanes as mapped instead of buffered
   lines, the river's true outline at the quays, no OSM footway stripes across the Markt.
@@ -1064,3 +1064,36 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Ballast and the station square came out darker (BGT unpaved = soil, concrete pavers = grey);
   correct per the BGT, but tell me if a lighter look reads better.
 - City fetch on the workstation: `blox --slice city fetch --only bgt`, ~20 min, ~320 MB.
+
+## 2026-11-02: accuracy A2, bridges and water
+
+- Correction to the A1 entry: the before/after shots labelled "servaasbrug" (RD y ~318040) show
+  the **Wilhelminabrug**; the Sint Servaasbrug is the stone bridge at y ~317786 (the viewer's
+  `brug` preset). Both are in the test area.
+- Bridge decks from the BGT (`voxelise/bridges.py`): touching `overbruggingsdeel` parts are one
+  bridge, the deck runs along its long axis at road height (AHN just beyond each end), at least
+  the clearance above the water, and the BGT road parts on it paint its top. OSM bridge decks
+  that overlap one are dropped; picking still names the bridge (the OSM way's feature id). The
+  Servaasbrug now has its real width with the paved walkway and the steel lift span at the Wyck
+  end in asphalt; the Wilhelminabrug its red cycle lanes.
+- Piers: the mapped pier islands under a deck (land enclosed by water) rise to the deck; the
+  first build used evenly spaced slabs, which missed the Servaasbrug's real piers and left the
+  deck floating above them. Bridges without mapped piers still get slabs every <= 30 m in the
+  water (`Layers.deck_pier`). Railings
+  (`railing_1x2`, metal) along open deck edges (`voxelise/railings.py`); the catalogue already had
+  the piece, so no catalogue or contract change.
+- Nobody walks on water: `blox life` drops walkway edges over water that is not under a bridge
+  (`life/water.py`, BGT water when cached), 10 of 11,133 edges in the test area. In the viewer the
+  real cause of "water is walkable" was the player: water bricks are solid in the query API, so
+  the controller walked on the river. It now refuses a move whose footing is water (bridges are
+  not water). Cars, buses and cyclists follow OSM roads, which cross water only on bridges, which
+  now have decks.
+- Test area rebuilt (A1 vs A2 top-down and 3D shots shown to the owner). Tests: pipeline +10
+  (bridges, piers, railings, walkways), viewer +2 (water bank, bridge deck).
+
+**Open decisions**
+- The deck is a straight ramp between its ends: no arch. The Servaasbrug's real hump (and the
+  cutwaters on its piers) would need a hero model.
+- Railings are metal for every bridge; the Servaasbrug has stone parapets in reality.
+- Needs on the workstation: the world rebuild (decks, piers, railings) and a `blox life` re-run
+  (walkways).

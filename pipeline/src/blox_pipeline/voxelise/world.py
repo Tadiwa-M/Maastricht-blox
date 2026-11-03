@@ -32,6 +32,7 @@ class VoxelConfig:
     heroes: bool = True   # hand-authored landmark models (heroes.py) instead of their 3D BAG shape
     street_props: bool = True  # lamp posts, bollards with chains, benches (street_props.py)
     ramps: bool = True  # wedges soften one-plate steps on sloping paved ground (ramps.py)
+    railings: bool = True  # railing pieces along bridge deck edges (railings.py)
     island_min_yaw_deg: float = 3.0  # buildings turned more than this become islands
 
 
@@ -105,6 +106,7 @@ class Deck:
     z0: float
     z1: float
     body: int  # palette idx of the deck structure
+    piers: BaseGeometry | None = None  # pier footprints: columns of ``body`` from the ground up
 
     def z_at(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         import shapely

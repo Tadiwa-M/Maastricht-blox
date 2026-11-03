@@ -168,3 +168,38 @@ test('adapter over a World: solid bricks, air above, unknown outside loaded chun
   assert.ok(Math.abs(c.pos[1] - 0.6) < 0.02, `on the floor: ${c.pos[1]}`);
   assert.ok(c.pos[0] < 5 - 0.2, 'brick on top of the floor is a wall');
 });
+
+test('stops at the river bank (level or 1.8 m below) but walks a bridge deck over it', () => {
+  // floor top at K 20. North of J = 20 a quay `drop` plates high; south of it the river: one
+  // plate of water on the floor (top at K 21), except under a deck at I 8..12 (x 4-6.5 m), which
+  // is solid stone up to the quay top
+  for (const drop of [1, 10]) {
+    const city = synthCity({ floorK: 20 });
+    city.fill(0, 20, 20, 39, 39, 20 + drop - 1);
+    city.water(0, 0, 20, 7, 19, 20);
+    city.water(13, 0, 20, 39, 19, 20);
+    city.fill(8, 0, 20, 12, 19, 20 + drop - 1);
+    const quay = city.floorY + drop * 0.2;
+    const c = new CharacterController(city);
+    c.spawn(2, quay, -15); // I 4, J 30: on the quay, in line with the water
+    run(c, 0.3, {});
+    run(c, 6, { move: [0, -1], speed: 1.4 });
+    assert.ok(-c.pos[2] / 0.5 >= 19.5, `drop ${drop}: walked onto the water (J ${-c.pos[2] / 0.5})`);
+    assert.ok(Math.abs(c.pos[1] - quay) < 0.05, `drop ${drop}: left the quay height (${c.pos[1]})`);
+    const b = new CharacterController(city);
+    b.spawn(5, quay, -15); // I 10: in line with the deck
+    run(b, 0.3, {});
+    run(b, 6, { move: [0, -1], speed: 1.4 });
+    assert.ok(-b.pos[2] / 0.5 < 15, `drop ${drop}: the deck was not walkable (J ${-b.pos[2] / 0.5})`);
+  }
+});
+
+test('a city without isWater walks as before', () => {
+  const city = synthCity();
+  delete city.isWater;
+  const c = new CharacterController(city);
+  c.spawn(5, city.floorY, -5);
+  run(c, 0.3, {});
+  run(c, 1, north());
+  assert.ok(c.pos[2] < -6);
+});

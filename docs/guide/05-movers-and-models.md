@@ -223,6 +223,10 @@ through the slice and 55 000 trips a week gives **0.85 MB** (180 patterns, 9 180
   get a 6 m lattice of nodes linked 8-ways inside the polygon, tied to the ways crossing them.
 - dead ends within 5 m of another way are joined to it (the edge is split); components with
   fewer than 3 nodes are dropped.
+- nobody walks on water (accuracy A2, `life/water.py`): edges with an end, midpoint or quarter
+  point on water that is not under a bridge are dropped (`meta.wet` counts them). Water: OSM
+  areas + buffered waterways + BGT `waterdeel` when cached; bridges: OSM `bridge=*` ways
+  (half width + 1 m) + BGT `overbruggingsdeel`. Test area 2026-11-02: 10 of 11,133 edges.
 - spawn weight = way kind (square 4, pedestrian 3, living street 2, footway/sidewalk 1.5,
   crossing 1, steps 0.8, path 0.7) x (1 + 0.4 per shop/cafe/restaurant within 30 m, max 8),
   stored x 2 as integers.

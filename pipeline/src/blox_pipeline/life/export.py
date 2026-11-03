@@ -32,7 +32,7 @@ def dump(doc: Any, path: Path) -> int:
 
 
 def export_life(out_dir: Path, *, box: RDBox, gtfs_zip: Path | None, osm: Any | None, start: dt.date,
-                margin_m: float, modes: tuple[str, ...] = ("bus",)) -> dict:
+                margin_m: float, modes: tuple[str, ...] = ("bus",), bgt: Any | None = None) -> dict:
     """Write the life files for RD ``box``. ``gtfs_zip`` None skips transit; ``osm`` None skips
     walkways and uses the fallback river line. Returns the index document."""
     from .river import build_river
@@ -58,7 +58,9 @@ def export_life(out_dir: Path, *, box: RDBox, gtfs_zip: Path | None, osm: Any | 
         index["week"] = doc["meta"]["week"]
         index["sources"].append({"name": "OVapi GTFS", "licence": "open data (OVapi)", "attribution": "OVapi"})
     if osm is not None:
-        doc = build_walkways(osm, box)
+        from .water import wet_area
+
+        doc = build_walkways(osm, box, wet=wet_area(osm, bgt))  # nobody walks on water (A2)
         index["files"]["walkways"] = "walkways.json"
         index["bytes"]["walkways"] = dump(doc, life / "walkways.json")
         index["files"]["streets"] = "streets.json"

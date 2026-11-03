@@ -114,8 +114,9 @@ Phases (goal: the version sent to the gemeente):
   inside the cached area BGT polygons paint the ground and water, OSM only names streets and
   keeps rails and bridge decks; OSM stays the fallback outside it. Checked on a 1.3 x 0.6 km
   container build (station Wyck side, Markt, Servaasbrug), guide 02 "Ground from the BGT".
-- A2 Bridges and water: decks from BGT bridge outlines at road height, railings, piers; nobody
-  walks or rides on water unless on a deck.
+- A2 Bridges and water (code done 2026-11-02, awaiting the owner's review): decks from BGT bridge
+  outlines at road height with the BGT road parts on top, piers, `railing_1x2` railings; walkways
+  over water dropped in `blox life`; the player can no longer walk onto water.
 - A3 Ramps (done 2026-11-02: `wedge_1x2`, `voxelise/ramps.py`), station bus-platform canopies,
   the "building in the road" spot; then the full rebuild (3D BAG cached on the workstation,
   2026-11-02) and the gemeente email.

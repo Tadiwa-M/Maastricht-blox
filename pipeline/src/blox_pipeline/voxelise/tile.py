@@ -13,6 +13,7 @@ from .heroes import heroes_near, paint_heroes
 from .street_props import paint_props, props_near
 from .grid import FULL, SLOPE_STACK, TILE, WATER, VoxelTile
 from .layers import NONE, Layers, shifted
+from .railings import RAILING_PLATES, paint_railings
 from .ramps import paint_ramps
 from .trees import tree_cells
 from .world import PreparedWorld, TreeSpec
@@ -45,6 +46,8 @@ def voxelise_tile(world: PreparedWorld, layers: Layers, box: CellBox) -> VoxelTi
         k_hi = max(k_hi, h.top_k)
     for p in props:
         k_hi = max(k_hi, p.top_k)
+    if cfg.railings and (L.deck_k != NONE).any():
+        k_hi = max(k_hi, int(L.deck_k.max()) + RAILING_PLATES)
     valid_bottom = bottom[L.ground_k != NONE]
     if k_hi < 0 or valid_bottom.size == 0:
         return VoxelTile.empty(box.i0, box.j0, 0, box.ni, box.nj, 0)
@@ -66,6 +69,8 @@ def voxelise_tile(world: PreparedWorld, layers: Layers, box: CellBox) -> VoxelTi
         paint_props(cv, props)
     if cfg.ramps:  # after the props: lamps and bollards keep their spot
         paint_ramps(cv, L)
+    if cfg.railings:
+        paint_railings(cv, ext, box)
     if cv.placed or world.facades or heroes or props:
         tile.placed = cv.records()
     return tile
@@ -186,6 +191,8 @@ def _fill_decks(tile: VoxelTile, L: Layers, kk: NDArray) -> None:
     has = d != NONE
     free = (tile.color == 0) | (tile.shape == WATER) | np.isin(tile.color, _water_colours())
     _put(tile, has & free & (kk >= d - 2) & (kk < d), L.deck_body, FULL, L.deck_feat)
+    pier = (has & (L.deck_pier[..., None] == 1)) & (kk > L.ground_k[..., None]) & (kk < d - 2)
+    _put(tile, pier & free, L.deck_body, FULL, L.deck_feat)
     _put(tile, has & free & (kk == d), L.deck_top, TILE, L.deck_feat)
 
 

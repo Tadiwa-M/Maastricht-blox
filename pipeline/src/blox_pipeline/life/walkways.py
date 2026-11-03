@@ -242,8 +242,9 @@ def _components(n: int, edges: set[tuple[int, int]]) -> np.ndarray:
     return np.array([find(a) for a in range(n)])
 
 
-def build_walkways(osm: OsmData, box: RDBox, min_component: int = 3) -> dict:
-    """The ``walkways.json`` document: nodes, edges and spawn weights inside RD ``box``."""
+def build_walkways(osm: OsmData, box: RDBox, min_component: int = 3, wet: BaseGeometry | None = None) -> dict:
+    """The ``walkways.json`` document: nodes, edges and spawn weights inside RD ``box``.
+    ``wet``: water not under a bridge (``life/water.py``); nodes in it and edges crossing it go."""
     g = Graph()
     clip = shapely.box(*box.as_tuple())
     for f in osm.roads:
@@ -283,6 +284,7 @@ def build_walkways(osm: OsmData, box: RDBox, min_component: int = 3) -> dict:
                     if d[k] <= AREA_STEP_M * 1.5:
                         g.edge(n, grid[k])
     snapped = _snap_dead_ends(g) if g.xy else 0
+    dropped = _drop_wet(g, wet) if (wet is not None and g.xy) else 0
     weights = np.asarray(g.weight, float)
     shops = [f.geom.centroid for f in osm.pois
              if "shop" in f.tags or f.tags.get("amenity") in SHOP_AMENITIES]
@@ -293,7 +295,27 @@ def build_walkways(osm: OsmData, box: RDBox, min_component: int = 3) -> dict:
             for n in h.near(p.x, p.y, SHOP_RADIUS_M):
                 count[n] += 1
         weights *= 1 + 0.4 * np.minimum(count, 8)
-    return _to_doc(g, weights, min_component, {"areas": areas, "snapped": snapped, "shops": len(shops)})
+    return _to_doc(g, weights, min_component, {"areas": areas, "snapped": snapped, "shops": len(shops), "wet": dropped})
+
+
+def _drop_wet(g: Graph, wet: BaseGeometry) -> int:
+    """Remove every edge with an end, its midpoint or a quarter point on water (the nodes left
+    alone are dropped as small components). Returns how many edges went."""
+    shapely.prepare(wet)
+    xy = np.asarray(g.xy).reshape(-1, 2)
+    on = shapely.contains_xy(wet, xy[:, 0], xy[:, 1])
+    gone = set()
+    for a, b in g.edges:
+        if on[a] or on[b]:
+            gone.add((a, b))
+            continue
+        for t in (0.25, 0.5, 0.75):
+            p = xy[a] + (xy[b] - xy[a]) * t
+            if shapely.contains_xy(wet, p[0], p[1]):
+                gone.add((a, b))
+                break
+    g.edges -= gone
+    return len(gone)
 
 
 def _to_doc(g: Graph, weights: np.ndarray, min_component: int, stats: dict) -> dict:

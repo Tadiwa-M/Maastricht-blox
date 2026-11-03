@@ -20,13 +20,13 @@ export { angleDelta };
 
 export const DEFAULTS = {
   radius: 0.35, height: 1.9, walk: 1.4, run: 4.0, accel: 12, airAccel: 3,
-  gravity: 18, jumpSpeed: 4.4, stepMax: 0.42, turnRate: 10, maxFall: 30,
+  gravity: 18, jumpSpeed: 4.4, stepMax: 0.42, turnRate: 10, maxFall: 30, waterProbe: 8,
 };
 
 const RING = Array.from({ length: 8 }, (_, q) => [Math.cos((q * Math.PI) / 4), Math.sin((q * Math.PI) / 4)]);
 
 export class CharacterController {
-  /** city: { isSolid(x, y, z) }. opts: see DEFAULTS. */
+  /** city: { isSolid(x, y, z), isWater?(x, y, z) }. opts: see DEFAULTS. */
   constructor(city, opts = {}) {
     this.city = city;
     this.o = { ...DEFAULTS, ...opts };
@@ -92,10 +92,26 @@ export class CharacterController {
     return false;
   }
 
+  /**
+   * Would the feet end up on water at (x, z)? The first solid cell below the feet (within
+   * waterProbe metres: a quay above the river) is a water brick. Water bricks are solid in the
+   * query API (movers float on them), so without this the player walks on the river.
+   */
+  onWater(x, y, z) {
+    if (!this.city.isWater) return false;
+    for (let d = 0.05; d <= this.o.waterProbe; d += 0.2) {
+      if (this.solid(x, y - d, z)) return this.city.isWater(x, y - d, z) === true;
+    }
+    return false;
+  }
+
   /** Try to move the feet horizontally by (dx, dz); returns true if (part of) it happened. */
   moveAxis(dx, dz) {
     const [x, y, z] = this.pos;
     const nx = x + dx, nz = z + dz;
+    // the river is a wall at the bank (decks are not water: bridges stay walkable); once in the
+    // water (spawned there, or fallen in), any move is allowed so the player can get out
+    if (this.grounded && this.onWater(nx, y, nz) && !this.onWater(x, y, z)) return false;
     if (!this.bodyHits(nx, y, nz)) { this.pos[0] = nx; this.pos[2] = nz; return true; }
     if (!this.grounded) return false; // no stepping in mid-air
     for (let up = 0.05; up <= this.o.stepMax + 1e-9; up += 0.05) {

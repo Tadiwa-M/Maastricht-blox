@@ -49,7 +49,7 @@ blox build:  sources/  load           -> AHN HeightGrid, 3D BAG Buildings, OsmDa
 | `rotation.py` | the facing rule ([guide 01](01-coordinates-and-rotation.md)) |
 | `catalogue.py`, `palette.py` | load `contract/*.json`; stud offsets and extents per type/rot |
 | `sources/` | downloads (`http.py`: resumable, idempotent), `config.py` holds **all** endpoints; readers for AHN GeoTIFF, CityJSON, BGT pages (`bgt.py`), OSM PBF, aerial photo |
-| `voxelise/` | turn sources into a dense `VoxelTile`: terrain, water, bridges, buildings (roof planes → slope stacks), trees, colours (`colours.py`, `landmarks.py`), features (`features.py`); facades: runs (`facade_runs.py`), style (`facade_style.py`), street context (`streets.py`), painting + placed pieces (`facade_paint.py`); glass-cell windows as the fallback |
+| `voxelise/` | turn sources into a dense `VoxelTile`: terrain, water, BGT ground (`prepare_bgt.py`), bridges (`bridges.py`, railings `railings.py`), buildings (roof planes → slope stacks), trees, colours (`colours.py`, `landmarks.py`), features (`features.py`); facades: runs (`facade_runs.py`), style (`facade_style.py`), street context (`streets.py`), painting + placed pieces (`facade_paint.py`); glass-cell windows as the fallback |
 | `facade/` | the facade grammar: facade runs (`run.py`, `frame.py`) used by test-scene houses and real buildings ([guide 04](04-facades-and-pieces.md)) |
 | `testscene/` | hand-authored look-test chunk (`scene.py`), the `Canvas` painter (`canvas.py`), build script (`build.py`) |
 | `layout/` | voxels → bricks (below) |
@@ -109,7 +109,7 @@ edges in the wrong place, let roads cut into squares and missed pavements, media
 `ondersteunendwegdeel`, `begroeidterreindeel`, `onbegroeidterreindeel`, `waterdeel`,
 `ondersteunendwaterdeel` for the ground; `overbruggingsdeel`, `kunstwerkdeel_vlak`,
 `scheiding_vlak`, `overigbouwwerk` are cached for A2/A3 (bridge decks, platforms, quay walls,
-canopies). The API also returns **historic versions** (`eind_registratie` set; about half the
+canopies; A2 uses the bridge decks). The API also returns **historic versions** (`eind_registratie` set; about half the
 objects): `slim_page` keeps only current objects and the attributes in `KEEP_PROPS`, coordinates
 to the millimetre, about 14 MB per km² (~320 MB for the city slice). Cache:
 `data/raw/bgt/<x>_<y>_512/<collection>/page_NNNN.json` + `done`; an interrupted fetch resumes at
@@ -138,6 +138,21 @@ the surface type (`fysiek_voorkomen`); in the old centre setts and pavers are th
 clipped to the rest. Touching BGT parts form one body with one level (the BGT cuts the Maas at
 every bridge); the level and name come from the OSM water that overlaps the body most (the Maas
 keeps `maas_level_m`), otherwise the bank estimate.
+
+**Bridges** (A2, `voxelise/bridges.py`, `voxelise/railings.py`). Touching `overbruggingsdeel`
+parts (level 1+) form one bridge. Its deck follows the long axis of the minimum rotated
+rectangle; the height at each end is the AHN ground 3 m beyond it (an end over water takes the
+other end's), raised to `bridge_clearance_m` above water it spans, linear in between (the
+existing `Deck`). The BGT road parts on the bridge (level 1+ `wegdeel` etc.) paint the deck top
+with their class colours (cycle lanes red, walkways paved); the deck body is limestone in the old
+centre, light grey elsewhere. Picking a deck names it after the OSM bridge way it overlaps most.
+OSM bridge decks that overlap a BGT bridge are dropped (rail decks stay). Piers (`Deck.piers` ->
+`Layers.deck_pier` -> deck-body columns from the ground up to the deck): mapped piers first,
+i.e. land under the deck that water encloses within 15 m (the Servaasbrug's pier islands, which
+otherwise stood lower than the deck with a gap); a bridge without any gets a 2 m slab across the
+deck at spans of at most 30 m, where it stands in water. Railings: `railing_1x2` (metal)
+on every pair of deck-edge columns whose outward neighbour is open (no deck at that level, no
+ground up to it), so bridge ends stay open (`VoxelConfig.railings`).
 
 **Street props** keep clear of the BGT carriageways (`world.carriageways`) inside the extent and
 of OSM road buffers outside it. Still OSM-based (later phases): tree positions relative to the
