@@ -37,6 +37,8 @@ class Canopy:
     roof: int  # palette idx
     post: int
     posts: BaseGeometry | None  # post positions (points)
+    wall: BaseGeometry | None = None  # cells under the roof filled from the ground up (a shelter's glass back)
+    wall_colour: int = 0
 
 
 def canopy_outlines(bgt: BgtData) -> list[BaseGeometry]:
@@ -110,6 +112,12 @@ def paint_canopy(c: Canopy, L) -> None:
     take = mask & (k > cur)
     cur[take] = k
     sub(L.canopy_color, L.box, win)[take] = c.roof
+    if c.wall is not None:
+        wh = cover(c.wall, L.box)
+        if wh is not None:
+            ww, wm = wh
+            col = sub(L.canopy_post, L.box, ww)
+            col[wm & (sub(L.canopy_k, L.box, ww) == k)] = c.wall_colour
     if c.posts is None:
         return
     for p in getattr(c.posts, "geoms", [c.posts]):

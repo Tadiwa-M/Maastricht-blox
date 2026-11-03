@@ -162,6 +162,15 @@ outline that keep off the carriageways (bus lanes stay clear). Underneath stays 
 (`Layers.canopy_k/canopy_color/canopy_post`); buildings win where they overlap; trees and street
 props keep out (`VoxelConfig.canopies`).
 
+**Bus shelters** (A3, `voxelise/shelters.py`). Every OSM stop node tagged `shelter=yes`
+(`highway=bus_stop` or `public_transport=platform`; a stop mapped twice within 6 m gets one)
+becomes a small canopy: a 4 x 1.5 m dark-grey roof 2.6 m above the ground, a glass back wall
+(`Canopy.wall`, filled like posts) and two metal front posts. It stands beside the nearest
+carriageway (BGT inside its area, OSM road buffers outside), long side along the road (snapped
+to the grid axes), front edge at least 0.75 m off the kerb; a stop node on the carriageway steps
+out at its nearest edge. A spot touching a building, water or another roof is skipped (logged).
+`VoxelConfig.shelters`. Test area 2026-11-03: 14 placed, 2 skipped.
+
 **Street props** keep clear of the BGT carriageways (`world.carriageways`) inside the extent and
 of OSM road buffers outside it. Still OSM-based (later phases): tree positions relative to the
 carriageway (`off_carriageway`), walkways and bus paths in `blox life`, facade street context.

@@ -119,7 +119,7 @@ Phases (goal: the version sent to the gemeente):
   over water dropped in `blox life`; the player can no longer walk onto water.
 - A3 Ramps (done 2026-11-02: `wedge_1x2`, `voxelise/ramps.py`), station canopies
   (code done 2026-11-03: the train platform roofs from BGT `overkapping`, `voxelise/canopies.py`;
-  the bus platforms have no canopy in any source, see DEVLOG), the "building in the road" spot
+  bus shelters at every OSM `shelter=yes` stop, `voxelise/shelters.py`), the "building in the road" spot
   (location needed from the owner); then the full rebuild (3D BAG cached on the workstation,
   2026-11-02) and the gemeente email.
 Reports: done (button, relay, corrections file).

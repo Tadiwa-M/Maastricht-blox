@@ -12,6 +12,7 @@ from .heroes import take_heroes
 from .street_props import plan_props
 from .bridges import prepare_bgt_bridges
 from .canopies import plan_canopies
+from .shelters import plan_shelters, shelter_blocked, shelter_roads
 from .prepare_bgt import carriageways, prepare_bgt_ground, prepare_bgt_water
 from .prepare_osm import P_RAIL, island_paving, outside_bgt, prepare_landuse, prepare_roads, prepare_trees, prepare_water, register_pois
 from .streets import street_context
@@ -69,8 +70,10 @@ def prepare_world(src: SourceData, cfg: VoxelConfig | None = None) -> PreparedWo
         streets=street_context(src.osm), islands=islands,
         carriageways=carriageways(bgt) if bgt is not None else None, bgt_extent=extent,
     )
-    if cfg.canopies and bgt is not None:  # free-standing roofs: the station's bus and platform canopies
+    if cfg.canopies and bgt is not None:  # free-standing roofs: the station's platform canopies
         world.canopies = plan_canopies(bgt, src.dtm, src.dsm, world.carriageways)
+    if cfg.shelters:  # a shelter at every OSM stop tagged shelter=yes
+        world.canopies += plan_shelters(src.osm, src.dtm, shelter_roads(world, src.osm), shelter_blocked(world))
     world.index()
     if cfg.heroes:  # hand-authored landmark models replace their 3D BAG shape
         take_heroes(world)

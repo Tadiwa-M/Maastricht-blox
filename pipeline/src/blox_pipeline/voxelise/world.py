@@ -34,6 +34,7 @@ class VoxelConfig:
     ramps: bool = True  # wedges soften one-plate steps on sloping paved ground (ramps.py)
     railings: bool = True  # railing pieces along bridge deck edges (railings.py)
     canopies: bool = True  # free-standing roofs from the BGT (canopies.py)
+    shelters: bool = True  # bus shelters at OSM stops tagged shelter=yes (shelters.py)
     island_min_yaw_deg: float = 3.0  # buildings turned more than this become islands
 
 

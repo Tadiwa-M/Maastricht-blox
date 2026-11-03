@@ -1121,3 +1121,13 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Bus-platform shelters (above).
 - Canopy roofs are light grey with 1-stud metal posts.
 - The workstation rebuild (A1-A3) can run now; the two open items land as corrections later.
+
+## 2026-11-03: bus shelters
+
+- The owner chose shelters at every OSM stop tagged `shelter=yes` (the bus platforms have no
+  canopy in any source). `voxelise/shelters.py`: a 4 x 1.5 m roof at 2.6 m, glass back wall away
+  from the road, two metal posts, beside the nearest carriageway (BGT or OSM), skipped where a
+  building, water or another roof is in the way. Built on the canopy layers (`Canopy.wall`).
+  Test area: 14 placed, 2 skipped. Tests: pipeline +6.
+- The owner's first try at the overnight rebuild ran from the home folder, so nothing ran
+  (`..\build` resolved to `C:\Users\build`); the commands now start with a `cd` into the repo.
