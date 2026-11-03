@@ -117,8 +117,10 @@ Phases (goal: the version sent to the gemeente):
 - A2 Bridges and water (code done 2026-11-02, awaiting the owner's review): decks from BGT bridge
   outlines at road height with the BGT road parts on top, piers, `railing_1x2` railings; walkways
   over water dropped in `blox life`; the player can no longer walk onto water.
-- A3 Ramps (done 2026-11-02: `wedge_1x2`, `voxelise/ramps.py`), station bus-platform canopies,
-  the "building in the road" spot; then the full rebuild (3D BAG cached on the workstation,
+- A3 Ramps (done 2026-11-02: `wedge_1x2`, `voxelise/ramps.py`), station canopies
+  (code done 2026-11-03: the train platform roofs from BGT `overkapping`, `voxelise/canopies.py`;
+  the bus platforms have no canopy in any source, see DEVLOG), the "building in the road" spot
+  (location needed from the owner); then the full rebuild (3D BAG cached on the workstation,
   2026-11-02) and the gemeente email.
 Reports: done (button, relay, corrections file).
 

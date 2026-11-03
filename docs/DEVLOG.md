@@ -1097,3 +1097,27 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Railings are metal for every bridge; the Servaasbrug has stone parapets in reality.
 - Needs on the workstation: the world rebuild (decks, piers, railings) and a `blox life` re-run
   (walkways).
+
+## 2026-11-03: accuracy A3, station canopies
+
+- The station's platform roofs are BGT `overkapping` objects (5,921 m² and 2,001 m² over the
+  tracks, ~4.7 m high by the AHN surface model); 3D BAG doesn't have them (not BAG buildings), so
+  they were missing. `voxelise/canopies.py`: a 2-plate roof slab at the DSM median height, metal
+  posts every 8 m that keep off carriageways, open underneath (buses and walkers find the street
+  under a roof: ground lookups use 2.5 m headroom over the chunk's ground level).
+- The **bus** platforms (OSM stops "Station A-H", RD ~177320-177350, 317910-318010) have no canopy
+  in any source: no BGT `overkapping`, no OSM roof, and the AHN surface there is at the ground
+  (0.0-0.3 m). OSM tags them `shelter=yes` only. Asked the owner: a shelter prop at every
+  `shelter=yes` stop, or an outline they draw (a corrections entry).
+- First container build hung: the post placement buffered the city-wide carriageway union once
+  per candidate post. It now clips the union to the canopy first (0.07 s for the test area).
+- "Building in the road": nothing in the repo says where it is. With the BGT I listed buildings
+  standing on carriageway or water in the test area: two 3D BAG buildings partly over a street
+  (RD 176273,318094: 58 of 115 m²; 177106,317633: 14 of 39 m²), possibly passages, and five OSM
+  houseboats at the Maaspromenade (`building=houseboat`, real). Waiting for the owner's location.
+- Tests: pipeline +4 (canopies).
+
+**Open decisions**
+- Bus-platform shelters (above).
+- Canopy roofs are light grey with 1-stud metal posts.
+- The workstation rebuild (A1-A3) can run now; the two open items land as corrections later.

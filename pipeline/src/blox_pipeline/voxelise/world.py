@@ -33,6 +33,7 @@ class VoxelConfig:
     street_props: bool = True  # lamp posts, bollards with chains, benches (street_props.py)
     ramps: bool = True  # wedges soften one-plate steps on sloping paved ground (ramps.py)
     railings: bool = True  # railing pieces along bridge deck edges (railings.py)
+    canopies: bool = True  # free-standing roofs from the BGT (canopies.py)
     island_min_yaw_deg: float = 3.0  # buildings turned more than this become islands
 
 
@@ -151,6 +152,7 @@ class PreparedWorld:
     props: list = field(default_factory=list)    # street_props.Prop: lamps, bollards, benches
     carriageways: BaseGeometry | None = None     # BGT drivable surfaces (props keep clear)
     bgt_extent: BaseGeometry | None = None       # where the BGT is the ground (outside: OSM)
+    canopies: list = field(default_factory=list)  # canopies.Canopy: free-standing roofs (A3)
     _btree: STRtree | None = None
     _ptree: STRtree | None = None
     _wtree: STRtree | None = None
@@ -175,6 +177,9 @@ class PreparedWorld:
             self.index()
         assert self._ptree is not None
         return [self.patches[i] for i in sorted(self._ptree.query(area))]  # priority order
+
+    def canopies_in(self, area: BaseGeometry) -> list:
+        return [c for c in self.canopies if c.geom.intersects(area)]
 
     def water_in(self, area: BaseGeometry) -> list[WaterBody]:
         if self._wtree is None:

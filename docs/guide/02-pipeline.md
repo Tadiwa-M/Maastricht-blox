@@ -49,7 +49,7 @@ blox build:  sources/  load           -> AHN HeightGrid, 3D BAG Buildings, OsmDa
 | `rotation.py` | the facing rule ([guide 01](01-coordinates-and-rotation.md)) |
 | `catalogue.py`, `palette.py` | load `contract/*.json`; stud offsets and extents per type/rot |
 | `sources/` | downloads (`http.py`: resumable, idempotent), `config.py` holds **all** endpoints; readers for AHN GeoTIFF, CityJSON, BGT pages (`bgt.py`), OSM PBF, aerial photo |
-| `voxelise/` | turn sources into a dense `VoxelTile`: terrain, water, BGT ground (`prepare_bgt.py`), bridges (`bridges.py`, railings `railings.py`), buildings (roof planes → slope stacks), trees, colours (`colours.py`, `landmarks.py`), features (`features.py`); facades: runs (`facade_runs.py`), style (`facade_style.py`), street context (`streets.py`), painting + placed pieces (`facade_paint.py`); glass-cell windows as the fallback |
+| `voxelise/` | turn sources into a dense `VoxelTile`: terrain, water, BGT ground (`prepare_bgt.py`), bridges (`bridges.py`, railings `railings.py`), canopies (`canopies.py`), buildings (roof planes → slope stacks), trees, colours (`colours.py`, `landmarks.py`), features (`features.py`); facades: runs (`facade_runs.py`), style (`facade_style.py`), street context (`streets.py`), painting + placed pieces (`facade_paint.py`); glass-cell windows as the fallback |
 | `facade/` | the facade grammar: facade runs (`run.py`, `frame.py`) used by test-scene houses and real buildings ([guide 04](04-facades-and-pieces.md)) |
 | `testscene/` | hand-authored look-test chunk (`scene.py`), the `Canvas` painter (`canvas.py`), build script (`build.py`) |
 | `layout/` | voxels → bricks (below) |
@@ -109,7 +109,7 @@ edges in the wrong place, let roads cut into squares and missed pavements, media
 `ondersteunendwegdeel`, `begroeidterreindeel`, `onbegroeidterreindeel`, `waterdeel`,
 `ondersteunendwaterdeel` for the ground; `overbruggingsdeel`, `kunstwerkdeel_vlak`,
 `scheiding_vlak`, `overigbouwwerk` are cached for A2/A3 (bridge decks, platforms, quay walls,
-canopies; A2 uses the bridge decks). The API also returns **historic versions** (`eind_registratie` set; about half the
+canopies; A2 uses the bridge decks, A3 the canopies). The API also returns **historic versions** (`eind_registratie` set; about half the
 objects): `slim_page` keeps only current objects and the attributes in `KEEP_PROPS`, coordinates
 to the millimetre, about 14 MB per km² (~320 MB for the city slice). Cache:
 `data/raw/bgt/<x>_<y>_512/<collection>/page_NNNN.json` + `done`; an interrupted fetch resumes at
@@ -153,6 +153,14 @@ otherwise stood lower than the deck with a gap); a bridge without any gets a 2 m
 deck at spans of at most 30 m, where it stands in water. Railings: `railing_1x2` (metal)
 on every pair of deck-edge columns whose outward neighbour is open (no deck at that level, no
 ground up to it), so bridge ends stay open (`VoxelConfig.railings`).
+
+**Canopies** (A3, `voxelise/canopies.py`). BGT `overigbouwwerk` of type `overkapping` (free-standing
+roofs: the station's train platform roofs; not BAG buildings, so 3D BAG lacks them)
+become a 2-plate roof slab whose top is the DSM median inside the outline (clamped to 2.6-15 m
+above the ground; 4.5 m without a DSM), with metal posts on an 8 m grid 0.75 m inside the
+outline that keep off the carriageways (bus lanes stay clear). Underneath stays open
+(`Layers.canopy_k/canopy_color/canopy_post`); buildings win where they overlap; trees and street
+props keep out (`VoxelConfig.canopies`).
 
 **Street props** keep clear of the BGT carriageways (`world.carriageways`) inside the extent and
 of OSM road buffers outside it. Still OSM-based (later phases): tree positions relative to the

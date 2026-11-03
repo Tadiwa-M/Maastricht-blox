@@ -92,6 +92,7 @@ class _Site:
         hard += [h.footprint.buffer(stadhuis_reach()) for h in world.heroes]
         hard += [w.geom for w in world.water]
         hard += [p.geom for p in world.patches if p.deck is not None]
+        hard += [c.geom for c in world.canopies]  # a lamp would pierce the roof
         hard += [Point(geo.X0 + (t.I + 0.5) * geo.STUD_M, geo.Y0 + (t.J + 0.5) * geo.STUD_M) for t in world.trees]
         self.hard = STRtree(hard) if hard else None
         roads = [world.carriageways] if world.carriageways is not None else []

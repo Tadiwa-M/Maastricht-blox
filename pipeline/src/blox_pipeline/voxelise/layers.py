@@ -15,6 +15,7 @@ from .. import geo
 from ..geo import CellBox
 from . import palette
 from .grid import FULL, RIDGE_I, RIDGE_J, SLOPE_E, SLOPE_N, SLOPE_S, SLOPE_W, SLOPE_STACK
+from .canopies import paint_canopy
 from .prepare_buildings import roof_pitch_ok
 from .raster import cell_hash, cover, sub
 from .world import PreparedBuilding, PreparedWorld, SurfacePatch
@@ -46,6 +47,9 @@ class Layers:
     win_period: NDArray[np.uint8]
     win_offset: NDArray[np.uint8]
     island_k: NDArray[np.int32]  # top K of an island building over this column (occupancy only)
+    canopy_k: NDArray[np.int32]  # top K of a canopy roof slab (canopies.py), open underneath
+    canopy_color: NDArray[np.uint8]
+    canopy_post: NDArray[np.uint8]  # palette idx of a post under the canopy here, 0 = none
 
     @classmethod
     def empty(cls, box: CellBox) -> "Layers":
@@ -80,6 +84,8 @@ def build_layers(world: PreparedWorld, box: CellBox) -> Layers:
     for b in world.buildings_in(area):
         _building(world, b, L)
     _islands(world, L, area)
+    for c in world.canopies_in(area):
+        paint_canopy(c, L)
     _heroes(world, L)
     _ridges(L)
     return L

@@ -13,6 +13,7 @@ from .heroes import heroes_near, paint_heroes
 from .street_props import paint_props, props_near
 from .grid import FULL, SLOPE_STACK, TILE, WATER, VoxelTile
 from .layers import NONE, Layers, shifted
+from .canopies import SLAB_PLATES
 from .railings import RAILING_PLATES, paint_railings
 from .ramps import paint_ramps
 from .trees import tree_cells
@@ -46,6 +47,8 @@ def voxelise_tile(world: PreparedWorld, layers: Layers, box: CellBox) -> VoxelTi
         k_hi = max(k_hi, h.top_k)
     for p in props:
         k_hi = max(k_hi, p.top_k)
+    if (L.canopy_k != NONE).any():
+        k_hi = max(k_hi, int(L.canopy_k.max()))
     if cfg.railings and (L.deck_k != NONE).any():
         k_hi = max(k_hi, int(L.deck_k.max()) + RAILING_PLATES)
     valid_bottom = bottom[L.ground_k != NONE]
@@ -60,6 +63,7 @@ def voxelise_tile(world: PreparedWorld, layers: Layers, box: CellBox) -> VoxelTi
     _fill_buildings(tile, L, kk)
     _fill_windows(tile, ext, L, kk, cfg.storey_plates, cfg.window_band)
     _fill_decks(tile, L, kk)
+    _fill_canopies(tile, L, kk)
     for cells in tree_vox:
         _fill_tree(tile, *cells)
     cv = TileCanvas(tile)
@@ -82,7 +86,7 @@ def layers_ground(layers: Layers, I: int, J: int) -> int:
     if not (0 <= i < layers.box.ni and 0 <= j < layers.box.nj):
         return NONE
     if (layers.bld_top[i, j] != NONE or layers.water_k[i, j] != NONE or layers.deck_k[i, j] != NONE
-            or layers.island_k[i, j] != NONE):
+            or layers.island_k[i, j] != NONE or layers.canopy_k[i, j] != NONE):
         return NONE
     return int(layers.ground_k[i, j])
 
@@ -194,6 +198,19 @@ def _fill_decks(tile: VoxelTile, L: Layers, kk: NDArray) -> None:
     pier = (has & (L.deck_pier[..., None] == 1)) & (kk > L.ground_k[..., None]) & (kk < d - 2)
     _put(tile, pier & free, L.deck_body, FULL, L.deck_feat)
     _put(tile, has & free & (kk == d), L.deck_top, TILE, L.deck_feat)
+
+
+def _fill_canopies(tile: VoxelTile, L: Layers, kk: NDArray) -> None:
+    """Roof slab (``SLAB_PLATES`` up to the canopy top) and posts from the ground up to it;
+    cells already taken (buildings, decks) stay."""
+    c = L.canopy_k[..., None]
+    has = c != NONE
+    if not has.any():
+        return
+    free = tile.color == 0
+    _put(tile, has & free & (kk > c - SLAB_PLATES) & (kk <= c), L.canopy_color, FULL, 0)
+    post = has & (L.canopy_post[..., None] != 0) & (kk > L.ground_k[..., None]) & (kk <= c - SLAB_PLATES)
+    _put(tile, post & (tile.color == 0), L.canopy_post, FULL, 0)
 
 
 def _water_colours() -> list[int]:
