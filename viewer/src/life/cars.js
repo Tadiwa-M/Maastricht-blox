@@ -64,10 +64,11 @@ export class Cars {
     this.count = Math.min(n, this.cars.length);
   }
 
-  update(dt, target, radius = this.radius) {
+  /** env: traffic-rule inputs for stepTraffic ({ t, people, obstacles }). */
+  update(dt, target, radius = this.radius, env = {}) {
     this.radius = radius;
     const active = this.cars.slice(0, this.count);
-    stepTraffic(this.g, active, dt, this.rand);
+    stepTraffic(this.g, active, dt, this.rand, env);
     for (const c of active) {
       const a = this.g.from[c.e];
       if (c.gone || Math.hypot(this.g.x[a] - target[0], this.g.z[a] - target[1]) > radius * 1.3) {

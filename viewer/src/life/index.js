@@ -76,6 +76,27 @@ export function initialClock(hash = typeof location !== 'undefined' ? location.h
   return { clock: new LifeClock({ day, sec, speed }), fixed };
 }
 
+/**
+ * What the traffic rules see this frame (life/traffic.js stepTraffic env): the light clock (game
+ * seconds of the day), people who may be on a crossing (walker groups, the player), and obstacles
+ * in the lanes (buses as three circles along their length, cyclists, the player).
+ */
+function trafficEnvFor(state, clock, buses, busHalf) {
+  const obstacles = [], people = [];
+  for (const b of buses) {
+    const r = (b.yaw * Math.PI) / 180, fx = Math.sin(r), fz = Math.cos(r), h = busHalf ? busHalf[1] * 0.66 : 4;
+    for (const k of [-1, 0, 1]) obstacles.push({ x: b.x + fx * h * k, z: b.z + fz * h * k, r: busHalf ? busHalf[0] : 1.3 });
+  }
+  if (state.cyclists) state.cyclists.positions(obstacles);
+  for (const g of state.walkers?.groups || []) if (g.walker) people.push({ x: g.walker.x, z: g.walker.z });
+  const pl = typeof window !== 'undefined' ? window.__bloxPlayer : null;
+  if (pl?.mode === 'walk') {
+    const p = { x: pl.ctrl.pos[0], z: -pl.ctrl.pos[2], r: 0.4 };
+    obstacles.push(p); people.push(p);
+  }
+  return { t: clock.sec, people, obstacles };
+}
+
 /** Unity y of the water surface: water tops along the river in the world, else 44.1 m NAP. */
 function waterLevel(world, river, ctx) {
   if (world?.count > 0 && river) {
@@ -244,13 +265,14 @@ export async function initLife(ctx) {
     clock.advance(dt);
     t += dt;
     const at = target(), R = livingRadius();
+    const trafficEnv = (buses) => trafficEnvFor(state, clock, buses, state.busHalf);
     const buses = state.buses ? state.buses.update(clock, camera) : [];
     // every scheduled vehicle this frame (Ride: the transit panel and the passenger camera read this)
     state.vehicles = state.trains ? buses.concat(state.trains.update(clock, camera)) : buses;
     const traffic = trafficFactor(clock.hours, clock.day);
     if (state.cars) {
       state.cars.setCount(Math.round(by(CARS_BY_TIER) * traffic), at);
-      state.cars.update(dt, at, Math.max(R, 150));
+      state.cars.update(dt, at, Math.max(R, 150), trafficEnv(buses));
     }
     if (state.cyclists) {
       state.cyclists.setCount(Math.round(by(CYCLISTS_BY_TIER) * traffic), at);

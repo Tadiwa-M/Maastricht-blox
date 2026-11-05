@@ -98,3 +98,34 @@ def test_cli_index_lists_streets(tmp_path: Path) -> None:
     index = json.loads((out / "life" / "index.json").read_text())
     assert index["files"]["streets"] == "streets.json"
     assert json.loads((out / "life" / "streets.json").read_text())["kind"] == "streets"
+
+
+def test_roads_export_signals_crossings_and_roundabouts():
+    from shapely.geometry import LineString, Point
+
+    from blox_pipeline import geo as _geo
+    from blox_pipeline.geo import RDBox
+    from blox_pipeline.life.streets import build_roads
+    from blox_pipeline.sources.model import OsmData, OsmFeature
+
+    x0, y0 = _geo.X0 + 100, _geo.Y0 + 100
+    osm = OsmData(
+        roads=[
+            OsmFeature("way/1", {"highway": "secondary"}, LineString([(x0, y0), (x0 + 40, y0), (x0 + 80, y0)])),
+            OsmFeature("way/2", {"highway": "residential"}, LineString([(x0 + 40, y0 - 30), (x0 + 40, y0), (x0 + 40, y0 + 30)])),
+            OsmFeature("way/3", {"highway": "tertiary", "junction": "roundabout"},
+                       LineString([(x0 + 200, y0), (x0 + 210, y0 + 10), (x0 + 200, y0 + 20), (x0 + 190, y0 + 10), (x0 + 200, y0)])),
+        ],
+        traffic=[
+            OsmFeature("node/1", {"highway": "traffic_signals"}, Point(x0 + 40, y0)),
+            OsmFeature("node/2", {"highway": "crossing", "crossing": "zebra"}, Point(x0 + 40, y0 + 30)),
+            OsmFeature("node/3", {"highway": "traffic_signals"}, Point(x0 + 500, y0 + 500)),  # not on a road
+        ],
+    )
+    doc = build_roads(osm, RDBox(x0 - 50, y0 - 50, x0 + 300, y0 + 100))
+    xy = [(doc["nodes"][2 * i], doc["nodes"][2 * i + 1]) for i in range(len(doc["nodes"]) // 2)]
+    assert [xy[i] for i in doc["signals"]] == [(140.0, 100.0)]
+    assert [xy[i] for i in doc["crossings"]] == [(140.0, 130.0)]
+    assert len(doc["roundabout"]) == 4
+    for q in doc["roundabout"]:
+        assert doc["flags"][q] & 1, "roundabout edges are one-way"

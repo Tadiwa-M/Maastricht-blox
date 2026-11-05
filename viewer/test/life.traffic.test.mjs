@@ -144,3 +144,70 @@ test('parked bikes: only the nearest within the tier range are drawn', async () 
   const t = PARKED_BIKES_BY_TIER;
   assert.ok(t.high.cap > t.medium.cap && t.medium.cap > t.low.cap && t.low.r > t.lite.r);
 });
+
+// ---- G1b traffic rules ---------------------------------------------------------------------
+import { signalState, hasPriority, stopLine, laneGap, SIGNAL, YIELD_MAX_S } from '../src/life/traffic.js';
+
+/** A + junction at (0, 0): arms of 60 m to N, E, S, W (node 0 = centre, 1 N, 2 E, 3 S, 4 W). */
+function cross({ ns = 'residential', ew = 'residential', signals = [], crossings = [] } = {}) {
+  const classes = ['primary', 'secondary', 'tertiary', 'residential'];
+  const f = (c) => classes.indexOf(c) << 1;
+  return new RoadGraph({ nodes: [0, 0, 0, 60, 60, 0, 0, -60, -60, 0], edges: [0, 1, 0, 2, 0, 3, 0, 4],
+    flags: [f(ns), f(ew), f(ns), f(ew)], classes, signals, crossings });
+}
+const edge = (g, a, b) => g.from.findIndex((x, i) => x === a && g.to[i] === b);
+const car = (g, a, b, s, v = 6) => ({ e: edge(g, a, b), s, v, len: 4.2, next: edge(g, b, b === 0 ? (a === 3 ? 1 : a === 1 ? 3 : a === 2 ? 4 : 2) : 0) });
+
+test('traffic lights: north-south and east-west never green together', () => {
+  const g = cross();
+  for (let t = 0; t < SIGNAL.cycle; t += 0.5) {
+    const n = signalState(g, edge(g, 3, 0), t), e = signalState(g, edge(g, 4, 0), t);
+    assert.ok(!(n !== 'red' && e !== 'red'), `t=${t}: ${n} / ${e}`);
+  }
+  assert.equal(signalState(g, edge(g, 3, 0), 5), 'green');
+  assert.equal(signalState(g, edge(g, 4, 0), 5), 'red');
+});
+
+test('a car stops at a red light and goes on green', () => {
+  const g = cross({ signals: [0] });
+  const c = car(g, 3, 0, 40, 8); // heading north, 20 m before the light
+  assert.ok(Number.isFinite(stopLine(g, c, new Map(), { t: 35 }))); // NS red
+  assert.equal(stopLine(g, c, new Map(), { t: 5 }), Infinity);
+  const cars = [car(g, 3, 0, 20, 8)];
+  for (let q = 0; q < 300; q++) stepTraffic(g, cars, 1 / 30, () => 0.5, { t: 35 });
+  assert.ok(cars[0].e === edge(g, 3, 0) && cars[0].s < 60 && cars[0].v < 0.2, `waits at the line: s ${cars[0].s}`);
+});
+
+test('right of way: equal roads give way to the right; the bigger road goes first', () => {
+  const g = cross();
+  const north = car(g, 3, 0, 50), fromEast = car(g, 2, 0, 50), fromWest = car(g, 4, 0, 50);
+  assert.ok(hasPriority(g, north, fromEast), 'a car from the right goes first');
+  assert.ok(!hasPriority(g, north, fromWest), 'not one from the left');
+  const big = cross({ ew: 'secondary' });
+  assert.ok(hasPriority(big, car(big, 3, 0, 50), car(big, 4, 0, 50)), 'the secondary road has priority, even from the left');
+  assert.ok(!hasPriority(big, car(big, 4, 0, 50), car(big, 3, 0, 50)));
+});
+
+test('roundabout: entering cars give way to cars on it', () => {
+  const g = cross();
+  g.round[edge(g, 2, 0)] = 1; // pretend the east arm is the ring
+  assert.ok(hasPriority(g, car(g, 4, 0, 50), car(g, 2, 0, 50)));
+  assert.ok(!hasPriority(g, car(g, 2, 0, 50), car(g, 4, 0, 50)));
+});
+
+test('four cars at an equal junction: nobody is stuck for ever', () => {
+  const g = cross();
+  const cars = [car(g, 3, 0, 45, 3), car(g, 2, 0, 45, 3), car(g, 1, 0, 45, 3), car(g, 4, 0, 45, 3)];
+  for (let q = 0; q < 30 * (YIELD_MAX_S + 10); q++) stepTraffic(g, cars, 1 / 30, () => 0.5, { t: 0 });
+  assert.ok(cars.every((c) => g.from[c.e] === 0 || c.gone), cars.map((c) => `${g.from[c.e]}->${g.to[c.e]}@${c.s.toFixed(1)}`).join(' '));
+});
+
+test('crossings: stop for people on them; lane obstacles: queue behind, ignore the pavement', () => {
+  const g = cross({ crossings: [0] });
+  const c = car(g, 3, 0, 40, 6);
+  assert.ok(Number.isFinite(stopLine(g, c, new Map(), { people: [{ x: 1, z: 0.5 }] })));
+  assert.equal(stopLine(g, c, new Map(), { people: [{ x: 15, z: 0 }] }), Infinity);
+  // the car drives 1.5 m right of the centre line: a bus 15 m ahead in its lane, a walker on the pavement
+  assert.ok(laneGap(g, { ...c }, [{ x: 1.5, z: -5, r: 1.3 }]) < 20);
+  assert.equal(laneGap(g, { ...c }, [{ x: 6, z: -5, r: 0.3 }]), Infinity);
+});

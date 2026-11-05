@@ -1234,3 +1234,20 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Owner play-test: the walk's hips still look odd. The captured hip twist and drop are halved in the
   feel layer (`FEEL.hips` 0.5): they read oddly on a blocky hip piece.
 - Tests: viewer +4 (A* walking routes, shape cutting, journey geometry, RD -> GPS).
+
+## 2026-11-05: G1b traffic rules
+
+- `streets.json` roads gain `signals`, `crossings` (OSM nodes snapped to the graph) and
+  `roundabout` edges; roundabouts without a `oneway` tag were exported two-way (cars could go round
+  the wrong way), now one-way. Needs a `blox life` re-run (minutes), no world rebuild.
+- `life/traffic.js`: city-wide light cycle (north-south vs east-west, never both green), right of
+  way (bigger road, give way to the right, roundabout priority, 6 s impatience), crossings, lane
+  obstacles (buses, bikes, the player); braking capped so a car can still hit you. Cars see the
+  player, cyclists and buses through a per-frame env built in `life/index.js`.
+- Simulated on the real test-area roads: no red-light running, no standoffs.
+- Tests: pipeline +1 (export), viewer +6 (lights, red/green, priority, roundabout, four-way, crossings
+  and lanes).
+
+**Open decisions**
+- Buses follow the timetable and don't yield; making them queue would need the schedule to slip.
+- The light cycle isn't drawn yet (no visible traffic-light models); cars just stop.

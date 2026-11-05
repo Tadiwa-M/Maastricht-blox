@@ -55,6 +55,12 @@ export class Cyclists {
     }
   }
 
+  /** Where the riders are (Unity metres): obstacles for the cars' lanes. */
+  positions(out = []) {
+    for (const c of this.riders.slice(0, this.count)) out.push({ x: c.walker.x, z: c.walker.z, r: 0.5 });
+    return out;
+  }
+
   /** Riders into the FigureCrowd, bikes into the VehicleFleet. */
   draw(crowd, fleet) {
     for (const c of this.riders.slice(0, this.count)) {

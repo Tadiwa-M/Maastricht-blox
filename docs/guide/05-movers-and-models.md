@@ -427,3 +427,28 @@ Press **C** in Play mode to take control of the figure (`Gameplay/Locomotion/Cha
 
 Walk 1.4 m/s, run (Shift) 3.2 m/s. The maths is tested in
 `unity/Assets/Blox/Editor/PureTests~/LocomotionTests.cs`. Nothing has run in a Unity editor yet.
+
+
+## Traffic rules (game phase G1b, 2026-11-05)
+
+`life/traffic.js` turns every rule into a **stop line**: a standing obstacle the car-following
+model (IDM) brakes for, so one law drives everything. Data from `blox life` (`streets.json`
+`roads`): `signals` and `crossings` (OSM `highway=traffic_signals` / `highway=crossing` nodes,
+snapped to road-graph nodes) and `roundabout` (edges of `junction=roundabout` ways, now one-way
+as OSM defines them; they were two-way before). Older viewers ignore the new keys.
+
+- **Traffic lights:** one city-wide 60 s cycle (`SIGNAL`): approaches running north-south
+  (bearing within 45° of the axis) have 26 s green, 3 s amber, then red, while east-west approaches
+  have the opposite half, with a 1 s all-red gap: crossing directions are never green together. A
+  car stops at red, and at amber if it can brake comfortably (3 m/s²).
+- **Junctions without lights** (3+ roads): within 25 m a car checks the cars approaching the same
+  node; it gives way to cars on a bigger road (`CLASS_RANK`), to cars from its right on an equal
+  road (the Dutch rule), and when entering a roundabout to cars on it. After 6 s of waiting it goes
+  (`YIELD_MAX_S`): no four-way standoffs.
+- **Crossings:** stop when a walker group or the player is within 4 m of the crossing node.
+- **Lane obstacles:** buses (three circles along their length), cyclists and the player in the
+  lane up to 30 m ahead are queued behind. Braking is capped at 7 m/s², so a car can still hit
+  someone who steps out right in front of it (the player then pops apart: player/bump.js).
+- Not yet: buses run on the timetable and don't yield (their positions come from the schedule).
+- Checked on the real test-area roads (12 lights, 19 crossings, 42 roundabout edges): 80 cars for
+  4 minutes, no car through a red light, no standoff (longest wait 32.7 s = one red phase).

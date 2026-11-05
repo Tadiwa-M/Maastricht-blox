@@ -178,7 +178,7 @@ priority roads from OSM into `streets.json`), owner play-tests on the GPU PC
   accessory, from the figure's parts; preview turntable; saved in the browser and in the link
   (`#figure=`), ready to send to other players in G2.
 
-**G1b Traffic rules** (GTA V / Cities: Skylines style lane traffic)
+**G1b Traffic rules** (GTA V / Cities: Skylines style lane traffic; code done 2026-11-05)
 - Right of way at junctions: priority roads by class, give way to the right where equal
   (Dutch rule), roundabouts give way to traffic on them.
 - Traffic lights from OSM `highway=traffic_signals` (timed cycles per junction), zebra and signal

@@ -107,11 +107,15 @@ def build_roads(osm: OsmData, box: RDBox) -> dict:
             xy.append((x, y))
         return index[k]
 
+    round_ways: set[tuple[int, int]] = set()
     for f in osm.roads:
         cls = drive_class(f.tags)
         if cls is None:
             continue
         ow = oneway(f.tags)
+        rb = f.tags.get("junction") in ("roundabout", "circular")
+        if rb and not ow:
+            ow = 1  # roundabouts are one-way in the way's direction
         for line in _lines(f.geom.intersection(clip)):
             pts = densify(np.asarray(line.coords)[:, :2], ROAD_STEP_M)
             if ow < 0:
@@ -125,15 +129,49 @@ def build_roads(osm: OsmData, box: RDBox) -> dict:
                     edges[(b, a)] &= ~1
                     continue
                 edges[(a, b)] = flag
+                if rb:
+                    round_ways.add((a, b))
     nodes: list[float] = []
     for x, y in xy:
         nodes += [round(x - geo.X0, 1), round(y - geo.Y0, 1)]
     flat: list[int] = []
     flags: list[int] = []
-    for (a, b), fl in edges.items():
+    roundabout: list[int] = []
+    for q, ((a, b), fl) in enumerate(edges.items()):
         flat += [a, b]
         flags.append(fl)
-    return {"nodes": nodes, "edges": flat, "flags": flags, "classes": ROAD_CLASSES}
+        if (a, b) in round_ways:
+            roundabout.append(q)
+    signals, crossings = _traffic_nodes(osm, index)
+    return {"nodes": nodes, "edges": flat, "flags": flags, "classes": ROAD_CLASSES,
+            "signals": signals, "crossings": crossings, "roundabout": roundabout}
+
+
+def _traffic_nodes(osm: OsmData, index: dict[tuple[int, int], int]) -> tuple[list[int], list[int]]:
+    """Road graph nodes with a traffic light / a pedestrian crossing (OSM nodes on the road ways:
+    their coordinates are kept by densify, so they match a graph node exactly; 0.5 m tolerance)."""
+    signals: set[int] = set()
+    crossings: set[int] = set()
+    for f in osm.traffic:
+        p = f.geom
+        if p.geom_type != "Point":
+            continue
+        n = None
+        for dx in (-5, 0, 5):
+            for dy in (-5, 0, 5):
+                n = index.get((round(p.x * 10) + dx, round(p.y * 10) + dy))
+                if n is not None:
+                    break
+            if n is not None:
+                break
+        if n is None:
+            continue
+        t = f.tags
+        if t.get("highway") == "traffic_signals" or t.get("crossing") == "traffic_signals":
+            signals.add(n)
+        elif t.get("highway") == "crossing" or t.get("crossing") in ("zebra", "marked", "uncontrolled"):
+            crossings.add(n)
+    return sorted(signals), sorted(crossings)
 
 
 def _street_lines(osm: OsmData, clip: Polygon) -> list[LineString]:
