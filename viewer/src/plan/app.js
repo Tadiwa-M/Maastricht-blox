@@ -11,6 +11,8 @@ import { TripPlanner } from './raptor.js';
 import { gpsToUnity, unityToGps } from './geo.js';
 import { WalkRouter } from './walk.js';
 import { journeyGeometry } from './route.js';
+import { PlaceIndex } from './places.js';
+import { attachSuggest, resolvePlace } from './suggest.js';
 
 const site = window.BLOX_SITE || null;
 const $ = (id) => document.getElementById(id);
@@ -34,8 +36,9 @@ async function load() {
   if (!(doc.version >= 2) || !doc.stops?.length) { status('This timetable is too old for planning (needs a fresh blox life).', 'err'); return; }
   state.tt = new Timetable(doc);
   state.planner = new TripPlanner(state.tt);
-  const names = [...new Set(doc.stops.map((s) => s.name))].sort((a, b) => a.localeCompare(b));
-  $('pl-stops').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
+  state.places = new PlaceIndex([], doc.stops); // stops at once; shops, cafés, streets and addresses follow
+  fetch(`${site.base}places.json`).then((r) => r.json()).then((d) => { state.places = new PlaceIndex(d.places || [], doc.stops); })
+    .catch(() => { /* an older site build: stops only */ });
   if (site.relay) {
     state.live = new LiveFeed(site.relay, state.tt);
     if (state.live.usable) { state.live.start(); setInterval(() => state.results.length && plan(false), 30000); }
@@ -49,12 +52,6 @@ async function load() {
   }).catch(() => { /* straight lines then */ });
 }
 
-/** A stop name -> the middle of its stops (a name often has several platforms). */
-function stopPoint(name) {
-  const ss = state.tt.stops.filter((s) => s.name.toLowerCase() === name.trim().toLowerCase());
-  if (!ss.length) return null;
-  return [ss.reduce((a, s) => a + s.x, 0) / ss.length, ss.reduce((a, s) => a + s.y, 0) / ss.length];
-}
 
 function locate() {
   if (!navigator.geolocation) { status('This browser has no location.', 'err'); return; }
@@ -73,10 +70,18 @@ function locate() {
 
 function readInputs() {
   const f = $('pl-from').value.trim(), t = $('pl-to').value.trim();
-  if (f && f !== 'My location') { state.from = stopPoint(f); state.fromLabel = f; }
-  if (t) { state.to = stopPoint(t); state.toLabel = t; }
-  if (!state.from) { status(f ? `No stop called "${f}"` : 'Where from? Use your location or a stop.', 'err'); return false; }
-  if (!state.to) { status(t ? `No stop called "${t}"` : 'Where to? Type a stop.', 'err'); return false; }
+  if (f && f !== 'My location') {
+    const p = resolvePlace($('pl-from'), state.places);
+    state.from = p ? [p.x, p.z] : null; state.fromLabel = p ? p.name : f;
+  }
+  if (t) {
+    const p = resolvePlace($('pl-to'), state.places);
+    state.to = p ? [p.x, p.z] : null; state.toLabel = p ? p.name : t;
+    if (p) $('pl-to').value = p.name;
+  }
+  if (!state.from) { status(f ? `Nothing called "${f}" found` : 'Where from? Use your location, or type a place.', 'err'); return false; }
+  if (!state.to) { status(t ? `Nothing called "${t}" found` : 'Where to? Type a place, street, address or stop.', 'err'); return false; }
+  status('');
   return true;
 }
 
@@ -116,7 +121,9 @@ function walkAll(sec) {
 function ensureMap() {
   if (state.map) return state.map;
   $('pl-map').hidden = false;
-  const m = L.map('pl-map', { zoomControl: false, attributionControl: true });
+  // one finger scrolls the page past the map; pinch (or two fingers) moves the map
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const m = L.map('pl-map', { zoomControl: false, attributionControl: true, dragging: !touch, tap: false, scrollWheelZoom: false });
   L.tileLayer('https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png', {
     maxZoom: 19, maxNativeZoom: 19, attribution: 'Kaart © <a href="https://www.kadaster.nl">Kadaster</a> (BRT, CC BY 4.0)',
   }).addTo(m);
@@ -168,7 +175,7 @@ function showRoute(j) {
   L.circleMarker(ll(state.to), { radius: 9, color: '#fff', weight: 3, fillColor: '#e11d48', fillOpacity: 1 }).bindTooltip(esc(state.toLabel)).addTo(g);
   if (state.fromLabel !== 'My location') L.circleMarker(ll(state.from), { radius: 7, color: '#fff', weight: 3, fillColor: '#111827', fillOpacity: 1 }).addTo(g);
   const all = legs.flatMap((l) => l.pts.map(ll));
-  const fit = () => { m.invalidateSize(); m.fitBounds(L.latLngBounds(all).pad(0.15), { maxZoom: 18 }); };
+  const fit = () => { m.invalidateSize(); m.fitBounds(L.latLngBounds(all).pad(0.2), { maxZoom: 16, animate: false }); }; // never closer than street level
   fit();
   requestAnimationFrame(fit); // the map box may only get its size after this frame's layout
   // the walk legs now have real distances: refresh the card text
@@ -219,7 +226,7 @@ function render() {
   }).join('');
   for (const a of out.querySelectorAll('article')) a.addEventListener('click', () => {
     state.open = state.open === +a.dataset.i ? -1 : +a.dataset.i;
-    if (state.open >= 0) { showRoute(state.results[state.open]); $('pl-map').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    if (state.open >= 0) showRoute(state.results[state.open]); // the map is sticky: no page jump
     render();
   });
 }
@@ -243,6 +250,8 @@ $('pl-swap').addEventListener('click', () => {
 });
 $('pl-from').addEventListener('input', () => { if ($('pl-from').value !== 'My location') state.from = null; });
 $('pl-to').addEventListener('input', () => { state.to = null; });
-for (const id of ['pl-from', 'pl-to']) $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') plan(); });
+for (const id of ['pl-from', 'pl-to']) $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.defaultPrevented) plan(); });
+attachSuggest($('pl-from'), () => state.places);
+attachSuggest($('pl-to'), () => state.places, () => { if (state.from) plan(); });
 setInterval(() => state.results.length && render(), 15000); // the "leave in" countdown
 load().catch((e) => status(`Could not load the timetable: ${e.message}`, 'err'));

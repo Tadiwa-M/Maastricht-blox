@@ -504,4 +504,17 @@ A phone-first page in every site build, next to the 3D city: `plan.html` + `plan
      you: "Missed: plan again from here".
   **Teleport** skips the game clock to 3 s before the first bus leaves and seats you on it; the
   rest of the trip continues as above. **End trip** stops guiding. `window.__bloxTrip` for tests.
-- Next: R3c (addresses, postcodes, saved places).
+- **Any place (R3c part 1, 2026-11-05):** From and To search shops, cafés, pubs and other named
+  places, landmarks, streets, BAG addresses ("Papenstraat 5") and stops (`plan/places.js`:
+  accent- and case-blind, word starts match, stations/landmarks/stops rank higher), with a
+  suggestion list under the field (`plan/suggest.js`; tap, or arrows + Enter). The site build writes
+  `world/places.json` from `features.json` (phone page; the test area's is 174 KB); the game builds
+  the same index from the features it already loads. The in-game planner has **📍 Me** too: your
+  real GPS position as the start, and "Start trip" puts you there in the city.
+- **Phones:** inputs are 16 px (iOS zooms into smaller ones), no double-tap zoom, and the phone
+  page's map stays at the top while you scroll the options (fits at most zoom 16). On touch
+  screens one finger scrolls the page; two fingers move and zoom the map.
+- **Start trip** puts you facing the first leg (the stop or the destination). The walk camera
+  fits the screen: on portrait phones the view widens (`fitFov`) and the shoulder offset shrinks
+  (`shoulderScale`, `player/camera.js`).
+- Next: postcodes, saved places (home, university).

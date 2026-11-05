@@ -9,6 +9,9 @@ import { TripPlanner } from './raptor.js';
 import { WalkRouter } from './walk.js';
 import { TripGuide } from './trip.js';
 import { GroundLine } from './groundline.js';
+import { PlaceIndex, placesFromFeatures } from './places.js';
+import { attachSuggest, resolvePlace } from './suggest.js';
+import { gpsToUnity } from './geo.js';
 
 const CSS = `
 #tp-panel { position: fixed; left: 14px; top: 14px; z-index: 7; width: min(360px, calc(100vw - 28px)); max-height: calc(100vh - 110px);
@@ -19,7 +22,9 @@ const CSS = `
 #tp-panel h3 button { background: none; border: 0; color: #b9bcc4; font-size: 18px; cursor: pointer; }
 #tp-panel .row { display: flex; gap: 6px; margin: 6px 0; align-items: center; }
 #tp-panel label { width: 40px; color: #aeb2c6; font-size: 13px; }
-#tp-panel input { flex: 1 1 0; width: 0; padding: 8px; border-radius: 8px; border: 0; background: #262b52; color: #f6f3ea; font: inherit; }
+#tp-panel button.me { border: 0; border-radius: 8px; padding: 8px; background: #2c335f; color: #f6f3ea; cursor: pointer; white-space: nowrap; }
+#tp-panel input { flex: 1 1 0; width: 0; padding: 8px; border-radius: 8px; border: 0; background: #262b52; color: #f6f3ea; font: 16px system-ui, sans-serif; }
+#tp-panel, #tp-hud { touch-action: manipulation; } /* iPhones zoom into fields under 16 px, and on double taps */
 #tp-panel button.go { width: 100%; background: #F2A900; color: #10153a; border: 0; border-radius: 8px; padding: 9px; font: 700 15px system-ui; cursor: pointer; margin-top: 4px; }
 #tp-panel .opt { background: #191d3d; border-radius: 10px; padding: 9px 10px; margin-top: 8px; }
 #tp-panel .opt .t { display: flex; justify-content: space-between; font-weight: 700; }
@@ -71,9 +76,25 @@ export async function initTrip(ctx) {
     const t = controls?.target;
     return t ? [t.x, -t.z] : [0, 0];
   }
-  function stopPoint(name) {
-    const ss = life.timetable.stops.filter((x) => x.name.toLowerCase() === name.trim().toLowerCase());
-    return ss.length ? [ss.reduce((a, x) => a + x.x, 0) / ss.length, ss.reduce((a, x) => a + x.y, 0) / ss.length] : null;
+  /** Shops, cafés, streets, addresses (the world's features) and the timetable's stops. */
+  function places() {
+    const n = ctx.features?.size || 0;
+    if (!s.places || s.placesN !== n) {
+      const studM = ctx.world?.studM || 0.5;
+      s.places = new PlaceIndex(n ? placesFromFeatures(ctx.features.values(), studM) : [], life.timetable.stops);
+      s.placesN = n;
+    }
+    return s.places;
+  }
+  const originRD = () => window.BLOX_SITE?.originRD || ctx.world?.manifest?.originRD || [175700, 316500];
+  /** Your real position (GPS, asked once; it stays in this browser) as Unity metres. */
+  function locate(done) {
+    if (!navigator.geolocation) { done(null, 'This browser has no location.'); return; }
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const p = gpsToUnity(pos.coords.latitude, pos.coords.longitude, originRD());
+      done(s.planner.near(p[0], p[1], 1500).length ? p : null, 'You seem to be outside the city in this game.');
+    }, (e) => done(null, e.code === 1 ? 'Location blocked: allow it in the browser.' : 'Could not get your location.'),
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
   }
 
   // ---- the panel ---------------------------------------------------------------------------
@@ -81,26 +102,40 @@ export async function initTrip(ctx) {
     if (on && !ready()) return;
     panel.hidden = !on;
     if (!on) return;
-    const names = [...new Set(life.timetable.stops.map((x) => x.name))].sort((a, b) => a.localeCompare(b));
     panel.innerHTML = `<h3>PLAN A TRIP <button title="Close">✕</button></h3>
-      <div class="row"><label>From</label><input id="tp-from" list="tp-stops" placeholder="Here (where you stand)"></div>
-      <div class="row"><label>To</label><input id="tp-to" list="tp-stops" placeholder="A stop"></div>
-      <datalist id="tp-stops">${names.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
+      <div class="row"><label>From</label><input id="tp-from" placeholder="Here (where you stand)"><button class="me" title="Your real location (GPS)">📍 Me</button></div>
+      <div class="row"><label>To</label><input id="tp-to" placeholder="Café, shop, street, address, stop…"></div>
       <button class="go">Plan</button><div id="tp-res"></div>
       <p class="fine">On your phone: <a href="plan.html" target="_blank">plan.html</a> (with your GPS).</p>`;
     panel.querySelector('h3 button').onclick = () => open(false);
     panel.querySelector('.go').onclick = () => plan();
-    for (const i of panel.querySelectorAll('input')) i.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') plan(); });
+    const fromIn = panel.querySelector('#tp-from'), toIn = panel.querySelector('#tp-to');
+    for (const i of [fromIn, toIn]) i.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter' && !e.defaultPrevented) plan(); });
+    attachSuggest(fromIn, places, () => { s.gps = null; });
+    attachSuggest(toIn, places, () => plan());
+    fromIn.addEventListener('input', () => { s.gps = null; });
+    panel.querySelector('.me').onclick = () => {
+      fromIn.value = 'Finding you…';
+      locate((p, why) => {
+        if (!p) { fromIn.value = ''; panel.querySelector('#tp-res').innerHTML = `<p class="fine">${esc(why)}</p>`; return; }
+        s.gps = p; fromIn.value = 'My real location'; fromIn.place = null;
+        if (toIn.value.trim()) plan();
+      });
+    };
   }
 
   function plan() {
-    const f = panel.querySelector('#tp-from').value.trim(), t = panel.querySelector('#tp-to').value.trim();
-    const from = f ? stopPoint(f) : here(), to = stopPoint(t);
+    const fromIn = panel.querySelector('#tp-from'), toIn = panel.querySelector('#tp-to');
+    const f = fromIn.value.trim(), t = toIn.value.trim();
+    const fp = s.gps ? null : f ? resolvePlace(fromIn, places()) : null, tp = resolvePlace(toIn, places());
+    const from = s.gps || (f ? (fp ? [fp.x, fp.z] : null) : here()), to = tp ? [tp.x, tp.z] : null;
     const res = panel.querySelector('#tp-res');
-    if (!from || !to) { res.innerHTML = `<p class="fine">${!to ? 'Pick a stop to go to.' : `No stop called "${esc(f)}".`}</p>`; return; }
+    if (!from || !to) { res.innerHTML = `<p class="fine">${!t ? 'Where to? A café, shop, street, address or stop.' : !to ? `Nothing called "${esc(t)}" found.` : `Nothing called "${esc(f)}" found.`}</p>`; return; }
+    if (tp) toIn.value = tp.name;
+    s.fromGps = !!s.gps || (!!fp); // starting somewhere other than where you stand: the trip puts you there
     const c = life.clock;
     s.results = s.planner.plan(from, to, c.day, c.sec, 4);
-    s.from = from; s.to = to; s.toLabel = t;
+    s.from = from; s.to = to; s.toLabel = tp ? tp.name : t;
     res.innerHTML = s.results.map((j, i) => `<div class="opt">
       <div class="t"><span>${hhmm(j.dep)} → ${hhmm(j.arr)}</span><span>${Math.round(j.duration / 60)} min</span></div>
       <div class="chips">${j.legs.filter((l) => l.mode === 'bus').map((l) => `<span class="chip" style="background:${esc(l.colour || '#3a3f63')}">${esc(l.line)}</span>`).join('›') || '🚶 Walk'}
@@ -123,9 +158,11 @@ export async function initTrip(ctx) {
       const c = life.clock;
       if (L.dep - c.sec > 3) c.set(c.day, L.dep - 3); // skip to the departure
       if (ride()) ride().state.pendingBoard = { id: L.vid, until: performance.now() + 4000 };
-    } else if (p && p.mode !== 'walk') {
-      const [x, z] = s.from; // start walking where the trip starts
-      p.enterAtUnity(x, z, 0, 0, true);
+    } else if (p && (p.mode !== 'walk' || s.fromGps)) {
+      const [x, z] = s.from; // start walking where the trip starts (your GPS position, or the place you typed)
+      const to = j.legs[0]?.to; // face the first leg (compass yaw: 0 north, + clockwise)
+      const yaw = to && Math.hypot(to.x - x, to.z - z) > 1 ? Math.atan2(to.x - x, to.z - z) : 0;
+      p.enterAtUnity(x, z, yaw, yaw, true);
     }
     s.routeFor = null;
     showHud();

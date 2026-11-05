@@ -175,6 +175,14 @@ async function buildSite(outDir) {
     if (existsSync(join(worldDir, f))) await place(join(worldDir, f), join(wdir, f.replace(/^.*\//, '')));
   }
   if (!existsSync(join(wdir, 'features.json'))) await writeFile(join(wdir, 'features.json'), '{"features":[]}');
+  // places.json: what the trip planner can search (names, streets, addresses), a few hundred KB
+  // instead of the whole feature file (src/plan/places.js)
+  {
+    const { placesFromFeatures } = await import('./src/plan/places.js');
+    const fd = await readJson(join(wdir, 'features.json'));
+    const list = Array.isArray(fd) ? fd : fd.features || [];
+    await writeFile(join(wdir, 'places.json'), JSON.stringify({ version: 1, places: placesFromFeatures(list, manifest.studM || 0.5) }));
+  }
   const baked = await bakeFar(worldDir, wdir);
   let bytes = 0;
   for (const e of [...baked.chunks, ...baked.islands]) {

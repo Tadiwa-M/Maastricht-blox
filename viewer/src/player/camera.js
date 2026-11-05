@@ -22,6 +22,20 @@ export const CAM = {
   shoulder: 0.5, followTime: 0.09, sprintFrom: 3.0, sprintBack: 0.9, fov: 55, sprintFov: 7,
 };
 
+/**
+ * Vertical FOV (degrees) for a screen aspect (width / height). Landscape keeps `vfov`; on narrow
+ * (portrait phone) screens it widens so the view is at least `minHfov` across, up to `maxVfov`,
+ * instead of the tunnel view a fixed vertical FOV gives there.
+ */
+export function fitFov(vfov, aspect, { minHfov = 62, maxVfov = 78 } = {}) {
+  const r = Math.PI / 180;
+  const need = 2 * Math.atan(Math.tan((minHfov * r) / 2) / Math.max(0.1, aspect)) / r;
+  return Math.max(vfov, Math.min(maxVfov, need));
+}
+
+/** Share of the shoulder offset kept on a screen of this aspect: full on landscape, less on portrait. */
+export function shoulderScale(aspect) { return Math.min(1, Math.max(0.35, aspect / 1.3)); }
+
 /** Unit vector from the focus to the camera (three.js axes) for a look yaw/pitch. */
 export function backDir(yaw, pitch) {
   const c = Math.cos(pitch);
@@ -60,6 +74,7 @@ export class FollowCamera {
     this.side = this.o.shoulder; // shoulder offset after wall checks
     this.trail = null; this.vtrail = [0, 0, 0]; // lagging follow point
     this.sprint = 0; this.fov = this.o.fov;
+    this.aspect = 16 / 9; // screen width / height (index.js keeps it current)
   }
 
   // shown values; assigning snaps the aim too (no damping)
@@ -96,11 +111,12 @@ export class FollowCamera {
     else for (const k of [0, 2]) [this.trail[k], this.vtrail[k]] = smoothDamp(this.trail[k], feet[k], this.vtrail[k], o.followTime, dt);
     this.trail[1] = feet[1];
     this.sprint += (Math.min(1, Math.max(0, (speed - o.sprintFrom) / 2)) - this.sprint) * Math.min(1, dt * 3);
-    this.fov = o.fov + o.sprintFov * this.sprint;
+    this.fov = fitFov(o.fov + o.sprintFov * this.sprint, this.aspect);
     const head = [this.trail[0], this.trail[1] + o.focusY, this.trail[2]];
     // over the right shoulder, unless a wall is there
     const right = [Math.cos(this._yaw), 0, Math.sin(this._yaw)];
-    const side = o.shoulder > 0 ? Math.min(o.shoulder, pullIn(city, head, right, o.shoulder, { margin: 0.25, spread: 0.1 })) : 0;
+    const sh = o.shoulder * shoulderScale(this.aspect);
+    const side = sh > 0 ? Math.min(sh, pullIn(city, head, right, sh, { margin: 0.25, spread: 0.1 })) : 0;
     this.side += (side - this.side) * (side < this.side ? 1 : Math.min(1, dt * 4));
     const focus = [head[0] + right[0] * this.side, head[1], head[2] + right[2] * this.side];
     const dir = backDir(this._yaw, this._pitch);

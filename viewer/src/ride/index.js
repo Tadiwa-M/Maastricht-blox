@@ -14,6 +14,7 @@ import { RouteLines } from './routes.js';
 import { Cabin } from './cabin.js';
 import { seatPosition, lookTarget, outsideView, smoothYaw, doorSide, SEATS } from './seat.js';
 import { upcomingCalls } from '../life/schedule.js';
+import { fitFov } from '../player/camera.js';
 
 const MARK_MAX = 80;
 const LOOK_RAD_PX = 0.004, KEY_RAD_S = 1.6, PAD_RAD_S = 2.4;
@@ -99,7 +100,7 @@ export async function initRide(ctx) {
     controls.enabled = false;
     hideVehicle(id);
     camera.near = 0.05;
-    camera.fov = 70;
+    camera.fov = fitFov(70, camera.aspect); // wider on portrait phones
     camera.updateProjectionMatrix();
     ui.showHud({ route: v.route, head: v.pattern.head, next: '', inSec: 0, strip: [], live: false });
   }

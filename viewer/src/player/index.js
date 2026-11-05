@@ -171,9 +171,10 @@ export function initPlayer(ctx) {
     hud.setMode('walk', padCount > 0);
     hud.firstWalkTip(padCount > 0);
     touch.show(true);
-    const { focus, position } = follow.update(city, ctrl.pos, 1);
-    if (animate) startTween(position, focus, 55, 'walk');
-    else { tween = null; setCamera(position, focus, 55); }
+    follow.aspect = camera.aspect;
+    const { focus, position, fov } = follow.update(city, ctrl.pos, 1);
+    if (animate) startTween(position, focus, fov, 'walk');
+    else { tween = null; setCamera(position, focus, fov); }
   }
 
   function exitWalk() {
@@ -313,6 +314,7 @@ export function initPlayer(ctx) {
       // smooth the followed height (step-ups and landings), keep x/z exact
       smoothFeet[0] = ctrl.pos[0]; smoothFeet[2] = ctrl.pos[2];
       smoothFeet[1] += (ctrl.pos[1] - smoothFeet[1]) * Math.min(1, dt * 10);
+      follow.aspect = camera.aspect; // portrait phones: wider view, less shoulder offset
       if (!tween) {
         const { focus, position, fov } = follow.update(city, smoothFeet, dt, res.speed);
         setCamera(position, focus, fov);

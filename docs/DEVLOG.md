@@ -1262,3 +1262,35 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   ground). Boarding and getting off reuse `ride/` (board, wantOff/offK, leave at the stop);
   teleport reuses its clock jump. Bus legs now carry the running vehicle's id (`vid`).
 - Tests: viewer +3 (the whole trip, missed bus, teleport).
+
+## 2026-11-05: plan to any place; GPS in the game
+
+- Owner: only stop names worked as destinations (e.g. "Missouri", a coffee shop, didn't); the
+  GPS start seemed gone (the Transit panel's "Plan a trip" now opens the in-game planner, which
+  had no location button).
+- `plan/places.js` + `plan/suggest.js`: search over named POIs, landmarks, streets, addresses and
+  stops with a suggestion list; `places.json` written by the site build; the game indexes its
+  loaded features. 📍 Me in the in-game planner (GPS start; the trip puts you there).
+- Phone test: GPS at the Markt, "bierwin" -> the Bierwinkel Stadsbrouwerij, planned and drawn.
+- Tests: viewer +2 (places from features, search).
+
+## 2026-11-05: planner on phones: no zoom-in, no jumps
+
+- Owner: picking a trip on mobile "zooms me in", buggy.
+- Causes: iOS zooms into any input under 16 px (the in-game planner's were 14 px); double-tap
+  zoom on buttons; the route map fit to zoom 18 and the page scrolled the map into view on every
+  pick; one-finger swipes over the map panned it instead of scrolling the page.
+- Fixes: inputs 16 px; `touch-action: manipulation` on the planner (no double-tap zoom); the
+  phone page's map is sticky at the top (42vh), fits without animation at most zoom 16, no
+  `scrollIntoView`; on touch screens one finger scrolls the page, two fingers move/zoom the map.
+
+## 2026-11-05: walk camera on phones; trips start facing the route
+
+- Owner: "the camera angle is weird".
+- A fixed 55° vertical FOV on a portrait phone (390x844) is only ~27° across: a tunnel view, with
+  the over-the-shoulder offset pushing the player well off centre. `player/camera.js` `fitFov`
+  widens the vertical FOV on narrow screens (at least 62° across, at most 78° vertical) and
+  `shoulderScale` shrinks the shoulder offset there; landscape is unchanged. The bus passenger
+  view uses the same fit.
+- "Start trip" spawned you facing north; it now faces the first leg (stop or destination).
+- Tests: viewer +1 (fitFov/shoulderScale). Screens checked at 390x844 and 1280x720.

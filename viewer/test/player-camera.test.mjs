@@ -151,3 +151,12 @@ test('over the right shoulder, pulled in by a wall on that side; trails the body
   for (let q = 0; q < 120; q++) s = c3.update(city, [feet[0], feet[1], feet[2] - 1], 1 / 60, 5.2);
   assert.ok(s.fov > cam.o.fov + 5);
 });
+
+test('phones: portrait screens get a wider view and a smaller shoulder offset; landscape is unchanged', async () => {
+  const { fitFov, shoulderScale } = await import('../src/player/camera.js');
+  assert.equal(fitFov(55, 16 / 9), 55);
+  const p = fitFov(55, 390 / 844);
+  assert.ok(p > 70 && p <= 78, `portrait fov ${p}`);
+  assert.equal(shoulderScale(16 / 9), 1);
+  assert.ok(shoulderScale(390 / 844) < 0.4);
+});

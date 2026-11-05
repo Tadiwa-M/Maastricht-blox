@@ -19,11 +19,12 @@
   header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
   h1 { font: 400 28px/1 'Anton', Impact, sans-serif; letter-spacing: .05em; margin: 0; }
   header a { color: var(--gold); font-size: 14px; }
-  .box { background: var(--card); border-radius: 14px; padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .box { position: relative; background: var(--card); border-radius: 14px; padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .row { display: flex; gap: 8px; align-items: center; min-width: 0; }
   label { flex: 0 0 auto; }
   label { width: 44px; color: var(--dim); font-size: 14px; }
-  input { flex: 1 1 0; width: 0; min-width: 0; font: inherit; padding: 12px; border-radius: 10px; border: 0; background: #262b52; color: var(--ink); }
+  html, body, button, input, article { touch-action: manipulation; } /* no double-tap zoom */
+  input { flex: 1 1 0; width: 0; min-width: 0; font: 16px system-ui, -apple-system, sans-serif; /* 16 px: iPhones don't zoom in */ padding: 12px; border-radius: 10px; border: 0; background: #262b52; color: var(--ink); }
   input[type=time] { flex: 0 0 auto; width: auto; }
   button { font: 600 16px system-ui, sans-serif; border: 0; border-radius: 10px; padding: 12px 14px; cursor: pointer; background: #2c335f; color: var(--ink); }
   #pl-go { background: var(--gold); color: #10153a; width: 100%; font-size: 18px; }
@@ -47,7 +48,8 @@
   .legs .ic { width: 28px; text-align: center; }
   .none { color: var(--dim); }
   .fine { color: #6f7491; font-size: 12px; margin-top: 20px; }
-  #pl-map { height: 52vh; border-radius: 14px; margin-top: 14px; background: #d9d9d9; }
+  /* the map stays at the top while the options scroll under it, like a maps app */
+  #pl-map { position: sticky; top: 0; z-index: 2; height: 42vh; border-radius: 14px; margin-top: 14px; background: #d9d9d9; }
   #pl-map[hidden] { display: none; }
   .pl-chev span { display: block; width: 18px; height: 18px; line-height: 22px; text-align: center; color: #fff;
     font: 900 15px/22px system-ui, sans-serif; text-shadow: 0 0 2px #0b3d1f, 0 0 2px #0b3d1f; }
@@ -57,12 +59,11 @@
 <body>
 <header><h1>PLAN A TRIP</h1><a href="index.html">3D city →</a></header>
 <div class="box">
-  <div class="row"><label for="pl-from">From</label><input id="pl-from" list="pl-stops" placeholder="A stop" autocomplete="off"><button id="pl-me" type="button">📍 Me</button></div>
-  <div class="row"><label for="pl-to">To</label><input id="pl-to" list="pl-stops" placeholder="A stop" autocomplete="off"><button id="pl-swap" type="button" aria-label="Swap">⇅</button></div>
+  <div class="row"><label for="pl-from">From</label><input id="pl-from" placeholder="A place or stop" autocomplete="off"><button id="pl-me" type="button">📍 Me</button></div>
+  <div class="row"><label for="pl-to">To</label><input id="pl-to" placeholder="Café, shop, street, address, stop…" autocomplete="off"><button id="pl-swap" type="button" aria-label="Swap">⇅</button></div>
   <div class="row"><label for="pl-time">Leave</label><input id="pl-time" type="time" aria-label="Leave at (empty: now)"><span style="color:var(--dim);font-size:14px">empty = now</span></div>
   <button id="pl-go" type="button">Plan</button>
 </div>
-<datalist id="pl-stops"></datalist>
 <div id="pl-status" hidden></div>
 <div id="pl-map" hidden></div>
 <div id="pl-results"></div>
