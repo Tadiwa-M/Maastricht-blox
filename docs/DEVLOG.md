@@ -1251,3 +1251,14 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 **Open decisions**
 - Buses follow the timetable and don't yield; making them queue would need the schedule to slip.
 - The light cycle isn't drawn yet (no visible traffic-light models); cars just stop.
+
+## 2026-11-05: trip navigation in the 3D city
+
+- Owner: the green racing line belongs on the ground in the 3D world; picking a plan should be
+  "start trip" like Google Maps: the line leads to the bus stop, you board, ride, get off and are led
+  on; teleporting onto the planned bus stays possible; you can exit the trip.
+- `plan/ingame.js` (in-game planner + trip HUD), `plan/trip.js` (the step logic: walk, wait,
+  board, ride, get off, walk, arrive, missed), `plan/groundline.js` (flowing green chevrons on the
+  ground). Boarding and getting off reuse `ride/` (board, wantOff/offK, leave at the stop);
+  teleport reuses its clock jump. Bus legs now carry the running vehicle's id (`vid`).
+- Tests: viewer +3 (the whole trip, missed bus, teleport).

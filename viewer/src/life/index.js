@@ -168,6 +168,7 @@ export async function initLife(ctx) {
   }
   let walkDoc = data?.walkways || null;
   if (!walkDoc && world.count > 0) walkDoc = walkwaysFromWorld(world, { blocked: islandBlocker(ctx.islands) });
+  state.walkDoc = walkDoc; // the trip guide's green line routes on it (plan/ingame.js)
   let walkGraph = null;
   if (walkDoc) {
     const graph = new WalkGraph(clipWalkways(walkDoc, rect));

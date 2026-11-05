@@ -195,7 +195,10 @@ export class TripPlanner {
       if (!l) { r--; continue; }
       if (l.mode === 'bus') {
         const p = this.tt.patterns[l.pattern], route = this.tt.routes[p.route] || {};
-        out.push({ mode: 'bus', line: route.short, colour: route.colour, head: p.head, pattern: l.pattern, trip: l.trip.q,
+        // the running vehicle's id (life/buses.js): "<service day>:<trips row>"; a trip shifted -24 h
+        // belongs to yesterday's service
+        const svc = l.trip.start < this.tt.trips[l.trip.q][1] ? (this.day + 6) % 7 : this.day;
+        out.push({ mode: 'bus', line: route.short, colour: route.colour, head: p.head, pattern: l.pattern, trip: l.trip.q, vid: `${svc}:${l.trip.q}`,
           from: this.stopRef(l.fromStop), to: this.stopRef(s), dep: l.dep, arr: l.arr, stops: l.toI - l.fromI,
           live: this.tt.delays?.has(l.trip.q) ?? false, fromI: l.fromI, toI: l.toI });
         s = l.fromStop; r--;

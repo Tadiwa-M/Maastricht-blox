@@ -489,5 +489,19 @@ A phone-first page in every site build, next to the 3D city: `plan.html` + `plan
   converts back (RD -> GPS). The page grew to 173 KB (Leaflet), ~50 KB gzipped.
 - The search no longer lets walking prune the buses: bus options are listed even when walking is
   quicker (it was hiding every bus on short trips).
-- Next: the route on the 3D city (the green line on the ground), R3c (addresses, postcodes, saved
-  places).
+- **In the 3D city (R3b, 2026-11-05): "Start trip", navigation like a maps app.** The Transit
+  panel's "Plan a trip" opens the in-game planner (`plan/ingame.js`, the `trip` hook after `ride`):
+  From = where you stand (walk mode) or the map's centre, or a stop; To = a stop. Each option has
+  **Start trip** and **Teleport onto the bus**. During a trip (`plan/trip.js`, pure, tested):
+  1. walk: a green chevron racing line on the ground (`plan/groundline.js`: one InstancedMesh,
+     chevrons every 1.6 m flowing toward the target at 2.2 m/s, on the walkable surface incl.
+     bridge decks) leads to the boarding stop, re-routed on the walk graph as you move;
+  2. wait: the HUD counts down to the bus; when it is within 30 m of the stop and so are you,
+     **F** (or the button) boards it through `ride/`;
+  3. ride: the guide tells ride to get off at the planned stop (`wantOff`, `offK`); you land there
+     in walk mode;
+  4. the line leads on to the destination; "You have arrived". A bus that left 90 s ago without
+     you: "Missed: plan again from here".
+  **Teleport** skips the game clock to 3 s before the first bus leaves and seats you on it; the
+  rest of the trip continues as above. **End trip** stops guiding. `window.__bloxTrip` for tests.
+- Next: R3c (addresses, postcodes, saved places).
