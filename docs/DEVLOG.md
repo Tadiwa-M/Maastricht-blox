@@ -1161,3 +1161,32 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Feel numbers (turn rates, acceleration, lean, bank, shoulder offset, sprint speed 4 m/s) need
   the owner's play-test on a GPU; this container can't judge motion.
 - `film.ps1` should install the Playwright browser itself when it is missing.
+
+## 2026-11-05: G1a part 2, motion capture, knock-downs, feel layer
+
+- Owner: "move like actual people", with the feel of open-world brick games; asked about open
+  resources (NVIDIA SimReady was the example). Chosen: the CMU Graphics Lab Motion Capture
+  Database (free for commercial use; mocap.cs.cmu.edu's HTTPS certificate doesn't verify from the
+  container, so the clips come from the archive.org mirror of B. Hahne's BVH conversion, the same
+  files). Not used: Ubisoft LaFAN1 (non-commercial, no derivatives), Mixamo (Adobe licence).
+- `pipeline/.../tools/gait.py` (BVH reader, forward kinematics, rig angles in the body frame,
+  stride cycles, averaging; `--default` fetches the 14 clips and writes `viewer/src/figure/gait-data.js`,
+  reproducible byte for byte). Every walking figure now plays the captured gait (heel strike,
+  double knee flex, arm counter-swing, hip twist and drop, chest counter-twist, real stride
+  lengths) through `figure/gait.js`, with a small brick-game exaggeration (`FEEL`). Crowds get it
+  too (same rig), ahead of G1c.
+- Rapier was proposed and then not adopted for now: the city can't be a physics scene, and the
+  G1 needs are a few bodies. Instead `player/bump.js` (slow vehicles push, moving ones knock;
+  speed measured between frames) and `player/scatter.js`: knocked down or after a big fall the
+  figure pops apart into its parts, they tumble and bounce, then fly back and snap together.
+- Feel: the head looks around after standing still for a few seconds. Page footer credits BGT and
+  the motion capture.
+- Tests: pipeline +4 (gait on a synthetic BVH), viewer +15 (gait ranges and phase, bump, scatter,
+  fidget). Smoke-tested in a browser (diorama build, software rendering): walk, creator, knock-down.
+
+**Open decisions**
+- `FEEL` numbers, the knock speed (1.5 m/s) and the fall height (~3.4 m) need the owner's play-test.
+- Not yet captured: start/stop transitions and jumps (CMU has them: 16_57 sudden stop, 16_01/05
+  jumps); turning gaits. Next candidates once the owner has felt the basic gait.
+- In the streamed city the link's walk position (`#mode=walk&at=`) is applied before the chunks
+  load, so it is ignored there (only the diorama honours it); worth fixing for shareable links.

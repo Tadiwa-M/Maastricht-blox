@@ -4,6 +4,7 @@
 // limb forward (-z), a negative knee bends the shin back, a positive elbow bends forward,
 // a positive head pitch lifts the chin.
 import { BODY, LO_HAIR } from './parts.js';
+import { gaitPose } from './gait.js';
 
 export const MODE = { WALK: 0, IDLE: 1, SIT: 2, CYCLE: 3, BROWSE: 4 };
 export const SEAT_H = 0.46; // chair seat height (m)
@@ -33,20 +34,11 @@ export function jointAngles(v, pose, out = {}) {
   out.pelvisY = BODY.pelvisY; out.bob = 0; out.lean = v.stoop; out.headPitch = v.stoop * 0.7; out.headYaw = pose.look || 0; // positive pitch = chin up
   set2(out, 'hip', 0, 0); set2(out, 'knee', -0.04, -0.04); set2(out, 'ankle', 0.04, 0.04);
   set2(out, 'sh', 0, 0); set2(out, 'abd', 0.07, 0.07); set2(out, 'elbow', 0.12, 0.12);
-  if (mode === MODE.WALK) {
-    const k = clamp((pose.speed ?? 1.2) / 1.2, 0, 1.25) * (v.kind === 'older' ? 0.75 : 1);
-    const ph = pose.phase || 0, sn = Math.sin(ph);
-    set2(out, 'hip', 0.42 * k * sn, -0.42 * k * sn);
-    set2(out, 'knee', -(0.06 + 0.75 * k * Math.max(0, Math.cos(ph))), -(0.06 + 0.75 * k * Math.max(0, -Math.cos(ph))));
-    set2(out, 'ankle', -(out.hip[0] + out.knee[0]) * 0.7, -(out.hip[1] + out.knee[1]) * 0.7);
-    set2(out, 'sh', -0.5 * k * sn, 0.5 * k * sn);
-    set2(out, 'elbow', 0.15 + 0.5 * Math.max(0, out.sh[0]), 0.15 + 0.5 * Math.max(0, out.sh[1]));
-    out.bob = 0.02 * k * Math.cos(2 * ph);
-    out.lean = v.stoop + 0.05 * k;
-    if ((pose.speed ?? 0) > 2.2) { // running: lean in, elbows bent, bigger bounce
-      out.lean += 0.14; set2(out, 'elbow', 1.25 + 0.3 * Math.max(0, out.sh[0]), 1.25 + 0.3 * Math.max(0, out.sh[1]));
-      out.bob *= 1.8;
-    }
+  out.pelvisYaw = 0; out.chestYaw = 0; out.pelvisRoll = 0;
+  if (mode === MODE.WALK) { // motion-captured gait (gait.js), blended walk -> run by speed
+    const speed = (pose.speed ?? 1.2) * (v.kind === 'older' ? 0.8 : 1);
+    gaitPose(pose.phase || 0, speed, out);
+    out.lean += v.stoop;
   } else if (mode === MODE.IDLE || mode === MODE.BROWSE) {
     const sway = Math.sin(t * 1.1 + seed);
     out.bob = 0.004 * Math.sin(t * 2.2 + seed);
@@ -95,7 +87,7 @@ function motion(v, pose, out) {
     const idle = jointAngles(v, { ...pose, mode: MODE.IDLE, blend: undefined, air: 0, dip: 0, lean: 0 }, IDLE_J);
     const b = Math.max(0, pose.blend);
     for (const k of PAIRS) for (let q = 0; q < 2; q++) out[k][q] = idle[k][q] + (out[k][q] - idle[k][q]) * b;
-    for (const k of ['bob', 'lean', 'headPitch']) out[k] = idle[k] + (out[k] - idle[k]) * b;
+    for (const k of ['bob', 'lean', 'headPitch', 'pelvisYaw', 'chestYaw', 'pelvisRoll']) out[k] = idle[k] + (out[k] - idle[k]) * b;
   }
   if (pose.lean) out.lean += pose.lean;
   const a = Math.min(1, Math.max(0, pose.air || 0));
@@ -171,9 +163,9 @@ export function poseFigure(v, pose, emit, J = jointAngles(v, pose), lo = false) 
   const s = v.scale, w = v.width, K = keys(v), mode = pose.mode ?? MODE.WALK;
   const base = root(M[0], pose.x, pose.y, pose.z, pose.rotY || 0, s);
   if (pose.bank) rz(base, pose.bank); // roll about the feet: lean into a turn
-  const pelvis = tr(copy(M[1], base), 0, J.pelvisY + J.bob, 0);
+  const pelvis = rz(ry(tr(copy(M[1], base), 0, J.pelvisY + J.bob, 0), J.pelvisYaw || 0), J.pelvisRoll || 0);
   emit(lo ? 'lo:hips' : 'hips', sc(copy(M[2], pelvis), w, 1, w), 'bottom');
-  const chest = rx(copy(M[3], pelvis), -J.lean);
+  const chest = rx(ry(copy(M[3], pelvis), (J.chestYaw || 0) - (J.pelvisYaw || 0)), -J.lean);
   const torso = sc(copy(M[4], chest), w, 1, w);
   const longTop = v.top === 'dress' || v.top === 'coat', seated = mode === MODE.SIT || mode === MODE.CYCLE;
   emit(lo ? (seated ? 'lo:top:short' : K.loTop) : longTop && seated ? K.shirt : K.top, torso, 'top');
@@ -203,6 +195,13 @@ export function poseFigure(v, pose, emit, J = jointAngles(v, pose), lo = false) 
     emit(lo ? 'lo:shin' : 'shin', shin, 'bottom');
     if (!lo) emit('shoe', rx(tr(copy(M[8], shin), 0, -BODY.shin, 0), J.ankle[q]), 'shoe');
   }
+}
+
+/** The part matrices of a posed figure (copies): [{ key, mat, colourKey }] (scattering, tests). */
+export function captureParts(v, pose, J = jointAngles(v, pose)) {
+  const out = [];
+  poseFigure(v, pose, (key, m, colourKey) => out.push({ key, mat: Float32Array.from(m), colourKey }), J);
+  return out;
 }
 
 /** Instances per figure of a variant (for pool sizing): 14 + accessory. */

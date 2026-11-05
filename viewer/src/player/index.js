@@ -30,6 +30,8 @@ import { streetFinder } from './streets.js';
 import { raycastCity, spawnPoint } from './ray.js';
 import { parseWalkHash } from './hash.js';
 import { Creator } from './creator.js';
+import { VehicleContacts, lifeVehicles } from './bump.js';
+import { Scatter } from './scatter.js';
 import { defaultChoices, loadChoices } from '../figure/custom.js';
 
 const DEG = Math.PI / 180;
@@ -52,6 +54,17 @@ export function initPlayer(ctx) {
   const S = world?.studM || 0.5;
   const still = /[?&]shot=1/.test(location.search);
 
+  // knock-downs: vehicles push or knock the player; a big fall too; the figure pops apart (scatter.js)
+  const contacts = new VehicleContacts();
+  let scatter = null, airMinVy = 0, wasGrounded = true;
+  const scatterGround = (x, z) => { const g = city.groundHeight(x, z); return typeof g === 'number' ? g : null; };
+  function knockDown(impulse) {
+    scatter = new Scatter(character.currentParts(), impulse, scatterGround);
+    const L = ctrl.loco;
+    L.heading = Math.atan2(impulse[0], -impulse[2]); L.speed = Math.hypot(impulse[0], impulse[2]) * 0.6; L.pivoting = false;
+    ctrl.vel[1] = Math.max(ctrl.vel[1], impulse[1] * 0.5);
+    ctrl.grounded = false;
+  }
   const zoomExit = new ZoomOutExit();
   let mode = 'map', tween = null, mapView = null, jumpQueued = false, hover = null, streetT = 0;
   let padCount = 0, lookIdle = 0;
@@ -274,10 +287,29 @@ export function initPlayer(ctx) {
       const jump = jumpQueued || frame.pressed.has('jump');
       jumpQueued = false;
       const speed = frameSpeed(frame, ctrl.o.walk, ctrl.o.run);
-      const res = tween || creator.open ? ctrl.update(dt, {}, follow.yaw) : ctrl.update(dt, { move: frame.move, speed, jump }, follow.yaw);
+      const frozen = tween || creator.open || scatter;
+      const res = frozen ? ctrl.update(dt, {}, follow.yaw) : ctrl.update(dt, { move: frame.move, speed, jump }, follow.yaw);
       const L = ctrl.loco;
-      character.update(ctrl.pos, ctrl.yaw, res.speed, res.travelled, dt,
-        { angVel: L.angVel, accel: L.accel, steer: L.steer, grounded: ctrl.grounded, vy: ctrl.vel[1] });
+      if (!tween && !scatter) {
+        // vehicles: pushed aside by a slow one, knocked flying by a moving one (three.js z = -north)
+        const life = window.__bloxLife;
+        const hit = life ? contacts.check([ctrl.pos[0], -ctrl.pos[2]],
+          lifeVehicles(life, [ctrl.pos[0], -ctrl.pos[2]], life.busHalf, life.trainHalf), dt) : null;
+        if (hit?.push) { ctrl.moveAxis(hit.push[0], 0); ctrl.moveAxis(0, -hit.push[1]); }
+        else if (hit?.knock) { knockDown([hit.knock[0], hit.knock[1], -hit.knock[2]]); hud.toast('Ouch!'); }
+        // a big fall: more than ~3.4 m (landing faster than 11 m/s)
+        if (!ctrl.grounded) airMinVy = Math.min(airMinVy, ctrl.vel[1]);
+        if (!scatter && ctrl.grounded && !wasGrounded && airMinVy < -11) knockDown([0, 2, 0]);
+        if (ctrl.grounded) airMinVy = 0;
+      }
+      wasGrounded = ctrl.grounded;
+      if (scatter) {
+        character.drawParts(scatter.update(dt, scatter.gathering ? character.partsAt(ctrl.pos, ctrl.yaw) : null));
+        if (scatter.done && ctrl.grounded) { scatter = null; airMinVy = 0; }
+      } else {
+        character.update(ctrl.pos, ctrl.yaw, res.speed, res.travelled, dt,
+          { angVel: L.angVel, accel: L.accel, steer: L.steer, grounded: ctrl.grounded, vy: ctrl.vel[1] });
+      }
       // smooth the followed height (step-ups and landings), keep x/z exact
       smoothFeet[0] = ctrl.pos[0]; smoothFeet[2] = ctrl.pos[2];
       smoothFeet[1] += (ctrl.pos[1] - smoothFeet[1]) * Math.min(1, dt * 10);
@@ -317,7 +349,7 @@ export function initPlayer(ctx) {
     get mode() { return mode; },
     state: () => ({ mode, pos: [...ctrl.pos], yaw: ctrl.yaw, grounded: ctrl.grounded, frozen: ctrl.frozen,
       cam: camera.position.toArray(), camDist: follow.dist, street: hud.street.textContent }),
-    enterAtUnity, exitWalk, enterAt, ctrl, follow, city, orbit, input, settings,
+    enterAtUnity, exitWalk, enterAt, ctrl, follow, city, orbit, input, settings, knockDown,
   };
   window.__bloxPlayer = api;
   return api;

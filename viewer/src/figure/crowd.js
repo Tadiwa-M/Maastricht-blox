@@ -85,6 +85,12 @@ export class FigureCrowd {
     return true;
   }
 
+  /** Add loose parts of a figure (scattered pieces): parts = [{ key, mat: Float32Array(16), colourKey }]. */
+  addParts(v, parts) {
+    this._cols = variantColours(v);
+    for (const p of parts) this._emit(p.key, p.mat, p.colourKey);
+  }
+
   end() {
     for (const { mesh, n } of this.meshes.values()) {
       mesh.count = n;

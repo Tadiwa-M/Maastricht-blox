@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { FigureCrowd } from '../figure/crowd.js';
 import { makeVariant } from '../figure/variants.js';
 import { customVariant } from '../figure/custom.js';
-import { MODE } from '../figure/rig.js';
+import { MODE, captureParts } from '../figure/rig.js';
 import { MotionState } from './motion.js';
 
 export const PLAYER_SEED = 52;
@@ -34,6 +34,21 @@ export class Character {
     this.group.add(this.crowd.group);
     this.motion = new MotionState();
     this.pose = { x: 0, y: 0, z: 0, rotY: 0, mode: MODE.IDLE, phase: 0, speed: 0, t: 0 };
+  }
+
+  /** The figure's parts posed standing at feet facing yaw (where scattered pieces reassemble). */
+  partsAt(feet, yaw) {
+    return captureParts(this.variant, { x: feet[0], y: feet[1], z: feet[2], rotY: -yaw, mode: MODE.IDLE, t: 0 });
+  }
+
+  /** The current pose's parts (where a knock-down starts). */
+  currentParts() { return captureParts(this.variant, this.pose); }
+
+  /** Draw loose parts instead of the posed figure (scatter.js). */
+  drawParts(parts) {
+    this.crowd.begin();
+    this.crowd.addParts(this.variant, parts);
+    this.crowd.end();
   }
 
   /** Swap the figure's look (character creator); a fresh variant object (the crowd caches per variant). */

@@ -25,11 +25,11 @@ test('walk fades in with speed: standing is the idle pose, no pop at the start',
 
 test('stride grows with speed so the step rate stays natural (no skating)', () => {
   assert.ok(strideAt(1.4) > 0.7 && strideAt(1.4) < 0.85);
-  assert.ok(strideAt(5) > 1.3);
+  assert.ok(strideAt(5) > 1.2);
   const steps = (speed) => { const m = new MotionState(); for (let q = 0; q < 60; q++) m.update(DT, { ...base, speed, travelled: speed * DT }); return m.phase / Math.PI; };
   const walk = steps(1.4), sprint = steps(5);
   assert.ok(walk > 1.4 && walk < 2.2, `walk steps/s ${walk}`);
-  assert.ok(sprint > 2.6 && sprint < 4, `sprint steps/s ${sprint}`);
+  assert.ok(sprint > 2.6 && sprint < 4.6, `sprint steps/s ${sprint}`);
 });
 
 test('leans into acceleration, banks into turns (the inside of the turn)', () => {
@@ -62,4 +62,15 @@ test('bank rolls the whole figure about the feet', () => {
   const heads = (bank) => { let h; poseFigure(v, { x: 0, y: 0, z: 0, rotY: 0, mode: MODE.IDLE, bank }, (k, m) => { if (k === 'head') h = m[12]; }); return h; };
   assert.ok(Math.abs(heads(0)) < 1e-6);
   assert.ok(Math.abs(heads(0.2)) > 0.1);
+});
+
+test('standing still for a while, the head looks around', () => {
+  const m = new MotionState();
+  let most = 0;
+  for (let t = 0; t < 12; t += DT) most = Math.max(most, Math.abs(m.update(DT, base).look));
+  assert.ok(most > 0.2, `look ${most}`);
+  const w = new MotionState();
+  let moving = 0;
+  for (let t = 0; t < 12; t += DT) moving = Math.max(moving, Math.abs(w.update(DT, { ...base, speed: 1.4, travelled: 1.4 * DT }).look));
+  assert.ok(moving < 1e-6, 'not while walking straight');
 });

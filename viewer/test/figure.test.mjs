@@ -62,8 +62,9 @@ test('human scale: adults 1.70-1.90 m, kids ~1.2 m, slim shoulders, feet on the 
 test('poses: walk swings legs, sitting puts the seat at chair height, cycling reaches the pedals', () => {
   const v = makeVariant(5, { kind: 'adult' });
   const a = jointAngles(v, { mode: MODE.WALK, phase: Math.PI / 2, speed: 1.3 });
-  assert.ok(a.hip[0] > 0.3 && a.hip[1] < -0.3, 'legs opposite');
-  assert.ok(a.sh[0] < 0 && a.sh[1] > 0, 'arms opposite the legs');
+  // motion-captured gait: the left thigh peaks at phase pi/2 while the right is near vertical
+  assert.ok(a.hip[0] > 0.45 && a.hip[0] > a.hip[1] + 0.4, 'legs opposite');
+  assert.ok(a.sh[0] < a.sh[1] - 0.1, 'arms counter-swing against the legs');
   const s = jointAngles(v, { mode: MODE.SIT });
   assert.ok(Math.abs(s.pelvisY * v.scale - (SEAT_H + 0.075 * v.scale)) < 0.01);
   assert.ok(s.hip[0] > 1.3 && s.knee[0] < -1.3);

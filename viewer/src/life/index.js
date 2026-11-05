@@ -206,6 +206,7 @@ export async function initLife(ctx) {
   };
   let night = -1, statT = 0, t = 0;
   const busHalf = [models.bus.size[0] * world.studM / 2, models.bus.size[1] * world.studM / 2];
+  state.busHalf = busHalf; // the player's vehicle contacts (player/bump.js) use the same footprints
   const by = (table) => table[tier()] ?? table.medium;
   // weather: ctx.weather?.rain (0..1) when a weather source exists, else #rain=0..1 in the URL
   const hashRain = typeof location !== 'undefined' ? +(new URLSearchParams(location.hash.replace(/^#/, '')).get('rain') || 0) : 0;
@@ -260,6 +261,7 @@ export async function initLife(ctx) {
       state.walkers.setRain(rainNow());
       state.walkers.setCount(Math.round(by(FIGURES_BY_TIER) * crowdFactor(clock.hours, clock.day)), at);
       const trainHalf = [models.train.size[0] * world.studM / 2, models.train.size[1] * world.studM / 2];
+      state.trainHalf = trainHalf;
       const vehicles = state.vehicles.map((b) => (b.mode === 'rail'
         ? { x: b.x, z: b.z, yaw: b.yaw, halfW: trainHalf[0], halfL: trainHalf[1] }
         : { x: b.x, z: b.z, yaw: b.yaw, halfW: busHalf[0], halfL: busHalf[1] }));

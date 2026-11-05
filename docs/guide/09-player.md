@@ -55,6 +55,8 @@ main.js  [player hook] -> player/index.js initPlayer(ctx)   ctx = { stage, camer
   locomotion.js   heading + speed: turn arcs, sharp-turn cost, pivots, eased speed (G1a)
   motion.js       figure motion layer: walk/idle blend, stride, lean, bank, air, landing (G1a)
   creator.js      character creator panel (choices and link code: figure/custom.js)
+  bump.js         vehicle contacts: pushed by slow vehicles, knocked by moving ones (G1a)
+  scatter.js      knock-down: the figure pops apart and snaps back together (G1a)
   camera.js       FollowCamera (aim + damped shown values) + pullIn (collision-aware orbit)
   look.js         rotation math: yaw wrap, pitch clamp, mouse sensitivity/invert, camera-relative
                   heading, smoothDamp, gamepad StickLook curve, auto-recenter, map spin damping
@@ -106,11 +108,39 @@ collide like any other brick.
 - Movement is camera-relative (`look.js moveHeading`: W walks where the camera looks, S toward
   it).
 
+### Motion-captured gait (`figure/gait.js`, `figure/gait-data.js`, G1a)
+
+Every walking figure (player and crowds) plays real human gait: stride-cycle tables measured
+from motion capture (CMU Graphics Lab Motion Capture Database, BVH conversion by B. Hahne; "free
+for use in research and commercial projects", credited in the page footer). The pipeline tool
+`python -m blox_pipeline.tools.gait --default` fetches the clips (cached in `data/raw/mocap`:
+walk 16_15/16/21/22/31/32, jog 16_35/36/45/46/56, run 16_55, 09_01, 09_04), measures our rig's
+angles in the body's frame (hips, knees, ankles, shoulders relative to the spine, abduction,
+elbows, lean, bounce, pelvis twist and drop, chest twist), cuts stride cycles, averages them
+(12 walk, 11 jog/run) and writes `gait-data.js` (32 samples per curve, phase-aligned to the rig:
+left thigh peaks at pi/2). No mesh, skeleton or model is imported: only angles, on our own figure.
+The rig blends walk (1.31 m/s) to run (3.3 m/s) by speed, ambles below a walk and lengthens the
+swing in a sprint. Stride per step follows the capture (0.70 m walking, 1.0 m running, ~1.3 m
+sprinting at scale 1). A brick-game feel layer (`FEEL`) exaggerates a little: arm swing x1.25,
+bounce x1.3, hip sway x1.1, lean x0.7. The pelvis twists and drops and the chest counter-twists
+(new rig fields `pelvisYaw`, `pelvisRoll`, `chestYaw`).
+
+### Knock-downs (`bump.js`, `scatter.js`, G1a)
+
+Vehicles from the life system (`window.__bloxLife`: buses, trains, car footprints) are checked
+against the player each frame; their speed is measured between frames. A vehicle slower than
+1.5 m/s pushes the player out to its nearer long side; a faster one knocks the player flying
+(forward, sideways and up), and so does landing faster than 11 m/s (a ~3.4 m drop). Then the
+figure **pops apart**: every part flies with the impulse, tumbles and bounces on the street for
+1.5 s, then the parts fly back in an arc and snap together where the body landed (0.45 s);
+controls pause meanwhile. No physics engine: a city of millions of bricks can't be a physics
+scene, and these few bodies don't need one (Rapier stays an option for G2 props).
+
 ### Figure motion (`motion.js` + `figure/rig.js`, G1a)
 
 - Walk and idle **blend** by speed (smoothstep 0.05-0.9 m/s), so starting and stopping ease
   instead of snapping between modes.
-- **Stride** grows with speed (0.52 + 0.18 × v m, 0.6-1.5): about 1.8 steps/s walking, 3.4
+- **Stride** follows the motion capture (`gait.js strideAt`): about 1.9 steps/s walking, 4
   sprinting, so the feet don't skate.
 - **Lean** forward into acceleration and back when braking (±0.12-0.16 rad), a little more at pace;
   **bank** into turns from speed × turn rate (up to 0.22 rad, a roll about the feet); the **head**
