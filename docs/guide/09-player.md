@@ -123,7 +123,9 @@ The rig blends walk (1.31 m/s) to run (3.3 m/s) by speed, ambles below a walk an
 swing in a sprint. Stride per step follows the capture (0.70 m walking, 1.0 m running, ~1.3 m
 sprinting at scale 1). A brick-game feel layer (`FEEL`) exaggerates a little: arm swing x1.25,
 bounce x1.3, hip sway x1.1, lean x0.7. The pelvis twists and drops and the chest counter-twists
-(new rig fields `pelvisYaw`, `pelvisRoll`, `chestYaw`).
+(new rig fields `pelvisYaw`, `pelvisRoll`, `chestYaw`); the trunk counter-tilts against the hip
+drop and keeps only 15% of it (`TRUNK_ROLL`), so the head stays nearly level (1.9 cm side sway
+walking, 5.1 cm running; a test holds it under 6 cm).
 
 ### Knock-downs (`bump.js`, `scatter.js`, G1a)
 

@@ -6,6 +6,9 @@
 import { BODY, LO_HAIR } from './parts.js';
 import { gaitPose } from './gait.js';
 
+/** Share of the hip drop (pelvisRoll) the trunk follows: a real walker's trunk stays nearly upright. */
+export const TRUNK_ROLL = 0.15;
+
 export const MODE = { WALK: 0, IDLE: 1, SIT: 2, CYCLE: 3, BROWSE: 4 };
 export const SEAT_H = 0.46; // chair seat height (m)
 export const SADDLE = { h: 0.93, back: 0.17, bbH: 0.3, crank: 0.17 }; // bike: saddle height, saddle behind the bottom bracket
@@ -165,7 +168,8 @@ export function poseFigure(v, pose, emit, J = jointAngles(v, pose), lo = false) 
   if (pose.bank) rz(base, pose.bank); // roll about the feet: lean into a turn
   const pelvis = rz(ry(tr(copy(M[1], base), 0, J.pelvisY + J.bob, 0), J.pelvisYaw || 0), J.pelvisRoll || 0);
   emit(lo ? 'lo:hips' : 'hips', sc(copy(M[2], pelvis), w, 1, w), 'bottom');
-  const chest = rx(ry(copy(M[3], pelvis), (J.chestYaw || 0) - (J.pelvisYaw || 0)), -J.lean);
+  // the trunk counter-tilts against the hip drop (people stay upright; only TRUNK_ROLL of it shows)
+  const chest = rx(ry(rz(copy(M[3], pelvis), -(J.pelvisRoll || 0) * (1 - TRUNK_ROLL)), (J.chestYaw || 0) - (J.pelvisYaw || 0)), -J.lean);
   const torso = sc(copy(M[4], chest), w, 1, w);
   const longTop = v.top === 'dress' || v.top === 'coat', seated = mode === MODE.SIT || mode === MODE.CYCLE;
   emit(lo ? (seated ? 'lo:top:short' : K.loTop) : longTop && seated ? K.shirt : K.top, torso, 'top');

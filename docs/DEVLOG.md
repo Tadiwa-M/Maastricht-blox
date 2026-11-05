@@ -1212,3 +1212,11 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Walking times are straight-line estimates until R3b routes walks on the walk graph.
 - Destinations are stops only until R3c (addresses, postcodes, places).
 - Needs a site build and publish from the workstation (the live timetable already has v2 stops).
+
+## 2026-11-05: walk sway fix
+
+- Owner play-test on the workstation: the run looks good, the walk "bobs side to side". Cause: the
+  captured hip drop (pelvis roll, about +-6 deg walking) tilted the whole upper body, which hangs
+  from the pelvis in the rig: the head swayed 12.8 cm per cycle (real walkers: 3-5 cm). The chest
+  now counter-tilts and keeps 15% of the drop (`rig.js TRUNK_ROLL`): 1.9 cm walking, 5.1 cm running.
+  Test added. Viewer only: lands with the next site build.

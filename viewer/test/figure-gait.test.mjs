@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../src/figure/gait-data.js';
 import { gaitPose, strideAt, WALK, RUN, GAIT_KEYS } from '../src/figure/gait.js';
+import { poseFigure, jointAngles, MODE } from '../src/figure/rig.js';
+import { makeVariant } from '../src/figure/variants.js';
 
 const TAU = Math.PI * 2;
 const range = (speed, key, q) => {
@@ -51,4 +53,16 @@ test('speed blends walk to run, ambles below a walk, sprints beyond the run', ()
   assert.ok(gaitPose(1, RUN.speed).elbow[0] > 1.2, 'elbows bent when running');
   assert.ok(strideAt(WALK.speed) > 0.6 && strideAt(WALK.speed) < 0.8, `walk stride ${strideAt(WALK.speed)}`);
   assert.ok(strideAt(RUN.speed) > strideAt(WALK.speed));
+});
+
+test('the head stays nearly level: side sway within a real walker\'s 3-6 cm (the trunk counters the hip drop)', () => {
+  const v = makeVariant(52, { kind: 'adult' });
+  for (const speed of [WALK.speed, RUN.speed]) {
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < 64; i++) {
+      const pose = { x: 0, y: 0, z: 0, rotY: 0, mode: MODE.WALK, phase: (i / 64) * TAU, speed };
+      poseFigure(v, pose, (k, m) => { if (k === 'head') { lo = Math.min(lo, m[12]); hi = Math.max(hi, m[12]); } }, jointAngles(v, pose));
+    }
+    assert.ok(hi - lo < 0.06, `speed ${speed}: head sways ${((hi - lo) * 100).toFixed(1)} cm`);
+  }
 });
