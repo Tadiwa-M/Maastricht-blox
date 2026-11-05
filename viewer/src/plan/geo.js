@@ -22,3 +22,23 @@ export function gpsToUnity(lat, lon, originRD) {
   const [x, y] = wgs84ToRd(lat, lon);
   return [x - originRD[0], y - originRD[1]];
 }
+
+// RD -> WGS84: the inverse polynomial (Schreutelaar), same accuracy
+const K = [[0, 1, 3235.65389], [2, 0, -32.58297], [0, 2, -0.2475], [2, 1, -0.84978], [0, 3, -0.0655], [2, 2, -0.01709],
+  [1, 0, -0.00738], [4, 0, 0.0053], [2, 3, -0.00039], [4, 1, 0.00033], [1, 1, -0.00012]];
+const L = [[1, 0, 5260.52916], [1, 1, 105.94684], [1, 2, 2.45656], [3, 0, -0.81885], [1, 3, 0.05594], [3, 1, -0.05607],
+  [0, 1, 0.01199], [3, 2, -0.00256], [1, 4, 0.00128], [0, 2, 0.00022], [2, 0, -0.00022], [5, 0, 0.00026]];
+
+/** [lat, lon] degrees for RD metres. */
+export function rdToWgs84(x, y) {
+  const dx = (x - X0) * 1e-5, dy = (y - Y0) * 1e-5;
+  let lat = 0, lon = 0;
+  for (const [p, q, c] of K) lat += c * dx ** p * dy ** q;
+  for (const [p, q, c] of L) lon += c * dx ** p * dy ** q;
+  return [PHI0 + lat / 3600, LAM0 + lon / 3600];
+}
+
+/** [lat, lon] for Unity metres (x east, z north from the world's origin). */
+export function unityToGps(x, z, originRD) {
+  return rdToWgs84(x + originRD[0], z + originRD[1]);
+}

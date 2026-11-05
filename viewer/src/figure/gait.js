@@ -14,7 +14,7 @@ export const GAIT_KEYS = ['hip0', 'hip1', 'knee0', 'knee1', 'ankle0', 'ankle1', 
   'elbow0', 'elbow1', 'lean', 'bob', 'pelvisYaw', 'chestYaw', 'pelvisRoll'];
 
 /** Brick-game exaggeration over the captured motion (1 = as captured). */
-export const FEEL = { arms: 1.25, bounce: 1.3, hips: 1.1, lean: 0.7 };
+export const FEEL = { arms: 1.25, bounce: 1.3, hips: 0.5, lean: 0.7 }; // hips: the captured twist and drop read oddly on a blocky hip piece
 
 const N = DATA.samples;
 const LEG = BODY.thigh + BODY.shin; // metres at scale 1

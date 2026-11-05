@@ -20,3 +20,14 @@ test('Unity metres from the world origin', () => {
   const [x, z] = gpsToUnity(50.8492, 5.6909, [174700, 314000]);
   assert.ok(Math.abs(x - 1688.98) < 2 && Math.abs(z - 3751.41) < 2);
 });
+
+test('RD -> GPS within 2 m (round trip and pyproj points)', async () => {
+  const { rdToWgs84, unityToGps } = await import('../src/plan/geo.js');
+  for (const [lon, lat, x, y] of REF) {
+    const [la, lo] = rdToWgs84(x, y);
+    const m = Math.hypot((la - lat) * 111320, (lo - lon) * 111320 * Math.cos((lat * Math.PI) / 180));
+    assert.ok(m < 2, `${x},${y}: ${m.toFixed(2)} m`);
+  }
+  const [la, lo] = unityToGps(1688.98, 3751.41, [174700, 314000]);
+  assert.ok(Math.abs(la - 50.8492) < 3e-5 && Math.abs(lo - 5.6909) < 3e-5);
+});

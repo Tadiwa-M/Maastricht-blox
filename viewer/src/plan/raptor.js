@@ -127,7 +127,7 @@ export class TripPlanner {
     for (const s of this.near(to[0], to[1], o.accessM)) egress.set(s, this.walkSecM(Math.hypot(this.sx[s] - to[0], this.sz[s] - to[1])));
     const direct = sec + this.walkSecM(Math.hypot(to[0] - from[0], to[1] - from[1]));
     const front = [];
-    let bestTarget = direct;
+    let bestTarget = INF; // walking all the way is offered on its own: it must not prune the buses
     for (let k = 1; k <= K && marked.size; k++) {
       tau.push(Float64Array.from(tau[k - 1]));
       label.push(new Array(n).fill(null));
@@ -180,7 +180,7 @@ export class TripPlanner {
         front.push({ rides: k, arr, legs: this.legs(label, k, last, from, to, arr) });
       }
     }
-    if (direct <= bestTarget + 60 || !front.length) front.unshift({ rides: 0, arr: direct, legs: [walkLeg(from, to, sec, direct)] });
+    front.unshift({ rides: 0, arr: direct, legs: [walkLeg(from, to, sec, direct)] });
     return front;
   }
 
@@ -224,9 +224,14 @@ export class TripPlanner {
     let t = sec;
     for (let tries = 0; out.length < count && tries < count + 3; tries++) {
       const front = this.search(from, to, day, t);
-      const fastest = front.reduce((a, b) => (b.arr < a.arr ? b : a));
+      const walk = front[0]; // rides 0
+      const buses = front.filter((j) => j.rides > 0);
+      // like a maps app: bus options are listed even when walking is quicker; walking is listed
+      // first time round when it is the fastest
+      const fastest = buses.length ? buses.reduce((a, b) => (b.arr < a.arr ? b : a)) : walk;
       const picks = [fastest];
-      const fewer = front.filter((j) => j.rides < fastest.rides && j.arr <= fastest.arr + this.o.fewerTransfersSlack);
+      if (tries === 0 && walk.arr < fastest.arr) picks.push(walk);
+      const fewer = buses.filter((j) => j.rides < fastest.rides && j.arr <= fastest.arr + this.o.fewerTransfersSlack);
       if (fewer.length) picks.push(fewer[0]);
       for (const j of picks) {
         const sum = summarise(j);

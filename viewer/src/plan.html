@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Blox Plan">
 <link rel="manifest" href="plan.webmanifest">
+<link rel="stylesheet" href="leaflet.css">
 <link rel="icon" href="plan-icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="plan-icon.svg">
 <title>Plan a trip · Maastricht Blox</title>
@@ -46,6 +47,11 @@
   .legs .ic { width: 28px; text-align: center; }
   .none { color: var(--dim); }
   .fine { color: #6f7491; font-size: 12px; margin-top: 20px; }
+  #pl-map { height: 52vh; border-radius: 14px; margin-top: 14px; background: #d9d9d9; }
+  #pl-map[hidden] { display: none; }
+  .pl-chev span { display: block; width: 18px; height: 18px; line-height: 22px; text-align: center; color: #fff;
+    font: 900 15px/22px system-ui, sans-serif; text-shadow: 0 0 2px #0b3d1f, 0 0 2px #0b3d1f; }
+  .walkonly { font-weight: 700; }
 </style>
 </head>
 <body>
@@ -58,6 +64,7 @@
 </div>
 <datalist id="pl-stops"></datalist>
 <div id="pl-status" hidden></div>
+<div id="pl-map" hidden></div>
 <div id="pl-results"></div>
 <p class="fine">Buses on the published timetable (OVapi), live delays where the operator shares them. Your location stays on this phone. Fan-made; not affiliated with Arriva or the Province of Limburg.</p>
 <script src="world.js"></script>

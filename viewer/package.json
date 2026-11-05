@@ -10,6 +10,7 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
+    "leaflet": "1.9.4",
     "three": "0.170.0"
   },
   "devDependencies": {

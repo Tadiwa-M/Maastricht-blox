@@ -1220,3 +1220,17 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   from the pelvis in the rig: the head swayed 12.8 cm per cycle (real walkers: 3-5 cm). The chest
   now counter-tilts and keeps 15% of the drop (`rig.js TRUNK_ROLL`): 1.9 cm walking, 5.1 cm running.
   Test added. Viewer only: lands with the next site build.
+
+## 2026-11-05: trip planner R3b (route on a map), hips calmer
+
+- Owner: picking a trip should show the route drawn out like a maps app, walking as the green
+  racing line. The phone page now draws the best route at once on PDOK's base map (Leaflet): bus
+  legs on their line's shape in the line colour, walks on the walk graph (A*) with green chevrons,
+  a GPS dot, and "Walk all the way" always offered with real footpath timing.
+- Bugs found in the phone test: the walking estimate pruned every bus slower than walking (short
+  trips showed only "walk"), fixed; the map first drew before its box had a size, fixed; the local
+  test server didn't send `.css`/`.svg`/`.webmanifest`/`.jpg` types (Leaflet's stylesheet was
+  ignored), fixed in `tools/serve.mjs`.
+- Owner play-test: the walk's hips still look odd. The captured hip twist and drop are halved in the
+  feel layer (`FEEL.hips` 0.5): they read oddly on a blocky hip piece.
+- Tests: viewer +4 (A* walking routes, shape cutting, journey geometry, RD -> GPS).

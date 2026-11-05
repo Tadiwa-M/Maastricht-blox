@@ -479,5 +479,15 @@ A phone-first page in every site build, next to the 3D city: `plan.html` + `plan
 - The Transit panel in the 3D city links to it ("Plan a trip"). The last trip is remembered on the
   phone (`localStorage`). The relay only answers the published site's origin, so local test builds
   show scheduled times.
-- Next: R3b (the route on a 2D map and the 3D city, walking line, GPS dot), R3c (addresses,
-  postcodes, saved places).
+- **Map (R3b, 2026-11-05):** planning draws the best route at once, like a maps app; tapping another
+  card switches to it. Leaflet 1.9.4 (bundled; `leaflet.css` copied into the site) over PDOK's
+  free base map (BRT achtergrondkaart, Web Mercator tiles, CC BY 4.0, credited). Bus legs follow
+  their line's shape between the stops in the line colour (`plan/route.js`); walk legs follow the
+  walk graph (`plan/walk.js`, A*, `world/life/walkways.json` loaded in the background) as the green
+  chevron "racing line"; "Walk all the way" is always offered, timed on the real footpaths. With
+  "📍 Me" a blue dot follows your GPS (`watchPosition`, on the phone only). `plan/geo.js` also
+  converts back (RD -> GPS). The page grew to 173 KB (Leaflet), ~50 KB gzipped.
+- The search no longer lets walking prune the buses: bus options are listed even when walking is
+  quicker (it was hiding every bus on short trips).
+- Next: the route on the 3D city (the green line on the ground), R3c (addresses, postcodes, saved
+  places).
