@@ -52,6 +52,9 @@ main.js  [player hook] -> player/index.js initPlayer(ctx)   ctx = { stage, camer
   city-adapter.js city query API from the in-memory World + islands (used until/unless ctx.city is given)
   controller.js   CharacterController: kinematic cylinder against city.isSolid; stops at water
                   (onWater: the first solid cell within 8 m below the feet is a water brick)
+  locomotion.js   heading + speed: turn arcs, sharp-turn cost, pivots, eased speed (G1a)
+  motion.js       figure motion layer: walk/idle blend, stride, lean, bank, air, landing (G1a)
+  creator.js      character creator panel (choices and link code: figure/custom.js)
   camera.js       FollowCamera (aim + damped shown values) + pullIn (collision-aware orbit)
   look.js         rotation math: yaw wrap, pitch clamp, mouse sensitivity/invert, camera-relative
                   heading, smoothDamp, gamepad StickLook curve, auto-recenter, map spin damping
@@ -87,21 +90,46 @@ collide like any other brick.
 - Anything that is not `false` is solid, so **unknown (unloaded) space is a wall and a floor**:
   you stop at its edge and can never fall through it. Standing inside unknown space freezes the
   player until the city knows what is there.
-- Horizontal velocity eases toward the wanted velocity (12 m/s² on the ground, 3 in the air);
-  the move is cut into ≤ 0.1 m sub-steps and resolved per axis, so the body slides along walls
+- **Locomotion** (`locomotion.js`, G1a 2026-11-05, the Assassin's Creed / God of War pattern): the
+  body keeps a heading and a speed instead of easing a velocity vector, and always faces its
+  heading (no sideways slide). The heading turns toward the wanted direction at 14 rad/s on the
+  spot, 9 at a walk, 3.2 at a sprint (wide arcs when fast); a sharp turn costs speed (55% kept at
+  90°); a reversal of more than ~130° above 2.4 m/s plants the feet, brakes at 16 m/s² and pivots.
+  Speed eases up at 7 m/s² and down at 10. In the air grip is 25%. A wall that cuts the move
+  short also cuts the speed. Outputs angular velocity, smoothed acceleration and steer angle for
+  the animation.
+- The move is cut into ≤ 0.1 m sub-steps and resolved per axis, so the body slides along walls
   (also turned island walls) and never tunnels through one at a low frame rate.
 - **Step up** to 0.42 m (1-2 plates: kerbs, steps); a 3-plate (0.6 m) brick is a wall. Walking
   off a step of up to 0.42 m snaps down instead of hopping. Higher drops fall with gravity
   (18 m/s²) and land exactly on the surface (bisection). Jump: 4.4 m/s, a ~0.5 m hop.
 - Movement is camera-relative (`look.js moveHeading`: W walks where the camera looks, S toward
-  it); the figure turns smoothly toward the move direction (exponential, 10 /s, frame-rate
-  independent).
+  it).
+
+### Figure motion (`motion.js` + `figure/rig.js`, G1a)
+
+- Walk and idle **blend** by speed (smoothstep 0.05-0.9 m/s), so starting and stopping ease
+  instead of snapping between modes.
+- **Stride** grows with speed (0.52 + 0.18 × v m, 0.6-1.5): about 1.8 steps/s walking, 3.4
+  sprinting, so the feet don't skate.
+- **Lean** forward into acceleration and back when braking (±0.12-0.16 rad), a little more at pace;
+  **bank** into turns from speed × turn rate (up to 0.22 rad, a roll about the feet); the **head**
+  leads toward where you steer.
+- **Air** tucks the legs and spreads the arms; a **landing** dips hips and knees in proportion to
+  the fall speed, then recovers.
+- These are optional rig fields (`blend`, `lean`, `bank`, `air`, `dip`); crowds don't set them and
+  look exactly as before (G1c gives them the same layer).
 - Spawned inside geometry (a click on a wall or roof), the body is lifted up to 4 m to free
   space, then falls.
 
 ### Camera
 
-Orbit around the shoulder (1.6 m above the feet): yaw (unlimited, wrapped to ±180°), pitch
+**Over the shoulder** (God of War style, G1a): the focus is 1.6 m above the feet and 0.5 m to
+the right of it (the player sits left of centre), shrunk when a wall is on that side; the focus
+trails the body (`smoothDamp`, 0.09 s) instead of being welded on; sprinting (above 3 m/s) pulls
+the camera back up to 0.9 m and widens the field of view from 55° by up to 7°.
+
+Orbit around that focus: yaw (unlimited, wrapped to ±180°), pitch
 (−35° to 70°), distance 1.2-14 m (default 5 m, pitch 13°, so the sky is visible behind the
 city). Input moves an *aim* (`aimYaw`, `aimPitch`, `aimDist`); the shown values follow it with
 a critically damped spring (`smoothDamp`, 0.05 s for rotation, 0.14 s for zoom), stable and
@@ -178,6 +206,17 @@ street names and the URL hash.
   away does nothing (click again).
 - Entering walk mode via the "Walk here" button or F captures the mouse at once; via the
   gamepad (no user gesture) the hint asks for a click.
+
+## Character creator (G1a, 2026-11-05)
+
+C (or "Your character" in the menu) in walk mode opens a panel and turns the camera round to
+face the figure, circling it slowly: the figure is the preview. Choices (`figure/custom.js`):
+height, build, skin, hair style and colour, hat colour (for caps, beanies and hats), top style
+and colour, trousers, shoes, carrying (nothing, backpack, bag) and its colour; "Surprise me";
+"Copy link". Every change applies at once and is saved in the browser (`localStorage`
+`blox.look`) and the link (`#look=a…`: a version letter and one base-36 digit per choice), so a
+shared link opens the city with your character, and G2 can send the same code to other players.
+`#figure=<seed>` still picks a random look instead. The parts stay our own figure design.
 
 ## Getting back to the map (2026-10-30)
 

@@ -137,7 +137,53 @@ Reports: done (button, relay, corrections file).
    fake interiors, cross-border transit (De Lijn, TEC, DB).
 Polish, the demo video (captured from the web build), the LinkedIn post. Then: live GPS buses
 through a hosted proxy, weather, controller polish, the Unity desktop/AR version.
-**Exit:** a public link, a video and a post.
+**Exit:** a public link, a video and a post. (Done 2026-11-05: accuracy rebuild live, video and
+LinkedIn post out.)
+
+### Phase 4: The game (current, owner 2026-11-05)
+
+**Outline.** The world is good; now it must feel like a game. Three tracks, in order:
+**G1 movement and traffic** (this phase), **G2 multiplayer capture the flag** (Cloudflare Durable
+Objects rooms through the relay; flags at landmarks), **G3 smarter NPCs** (later; NPCs stay
+**scripted**, owner 2026-11-05). We copy proven patterns from open-world games instead of
+inventing our own, and keep everything procedural (no motion-capture assets: the figure is our
+own brick-style design, posed by `figure/rig.js`).
+
+**Tools.** three.js viewer (`viewer/src/player/`, `figure/`, `life/`), node tests for every rule
+(pure logic, no GPU), the pipeline only where data is missing (traffic lights, crossings and
+priority roads from OSM into `streets.json`), owner play-tests on the GPU PC
+(`scripts/site.ps1 samples\markt_v3 build\site_markt -Serve` for a quick local check).
+
+**G1a Player feel and character creator** (first)
+- Locomotion like Assassin's Creed and God of War: the body moves along its heading and turns in
+  arcs (turn rate drops with speed) instead of sliding; a hard reversal at speed plants and
+  pivots; walk / jog / sprint with eased speed changes; the body leans into acceleration and
+  banks into turns.
+- Animation: walk and idle blend by speed (no snapping between modes), stride length matched to
+  speed (feet don't skate), start/stop settle, head turns toward where you're steering, airborne
+  and landing poses for jumps and drops.
+- Camera like God of War: over the shoulder, slight follow lag, eases in on sprint, still pulls
+  in at walls.
+- Character creator: body (build, height), skin, hair style and colour, top, bottoms, shoes,
+  accessory, from the figure's parts; preview turntable; saved in the browser and in the link
+  (`#figure=`), ready to send to other players in G2.
+
+**G1b Traffic rules** (GTA V / Cities: Skylines style lane traffic)
+- Right of way at junctions: priority roads by class, give way to the right where equal
+  (Dutch rule), roundabouts give way to traffic on them.
+- Traffic lights from OSM `highway=traffic_signals` (timed cycles per junction), zebra and signal
+  crossings from OSM `crossing=*`: cars stop for people on them.
+- Buses on the same rules; vehicles brake for the player; the player collides with vehicles.
+
+**G1c Scripted NPC behaviour** (Assassin's Creed crowds, Watch Dogs routines)
+- Walkers with destinations by time of day (home, work, university, shops, cafés, the Friday
+  market) and A* routes over the walk graph instead of wandering; they cross at crossings, avoid
+  each other smoothly, step aside for the player and vehicles, and never pop away in view.
+- Movers on bridges stay on the deck (today they drop to the water under the Servaasbrug).
+- Same animation upgrades as the player (blend, lean, stride matching).
+
+**Exit G1:** a play-test on the owner's PC where walking feels fluid, a custom character, cars
+that stop at lights and junctions, and people who visibly go somewhere.
 
 ## 4. Process (how we work)
 

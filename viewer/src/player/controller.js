@@ -6,21 +6,22 @@
 // the body (finer than a 0.2 m plate). Anything that is not `false` counts as solid, so
 // 'unknown' (unloaded) space is a wall and a floor: the player can never walk or fall into it.
 //
-// Per step: horizontal velocity eases toward the wanted velocity (acceleration), the move is
-// split into sub-steps of at most 0.1 m and resolved one axis at a time (so the body slides
+// Per step: locomotion.js turns the heading toward the wanted direction (arcs, pivots) and eases
+// the speed; the body faces its heading. The move is split into sub-steps of at most 0.1 m and resolved one axis at a time (so the body slides
 // along walls, also rotated island walls); a blocked axis tries to lift the body by up to
 // stepMax (kerbs, stairs: 1-2 plates) and refuses anything higher (walls). Then gravity: the
 // fall is sub-stepped too and lands exactly on the surface (bisection). Walking off a step
-// snaps down to the lower surface instead of hopping. Yaw turns smoothly toward the
-// camera-relative move direction (look.js moveHeading: W walks where the camera looks).
+// snaps down to the lower surface instead of hopping. The wanted direction is camera-relative
+// (look.js moveHeading: W walks where the camera looks).
 
-import { angleDelta, moveHeading, approach, TAU } from './look.js';
+import { angleDelta, moveHeading } from './look.js';
+import { Locomotion } from './locomotion.js';
 
 export { angleDelta };
 
 export const DEFAULTS = {
-  radius: 0.35, height: 1.9, walk: 1.4, run: 4.0, accel: 12, airAccel: 3,
-  gravity: 18, jumpSpeed: 4.4, stepMax: 0.42, turnRate: 10, maxFall: 30, waterProbe: 8,
+  radius: 0.35, height: 1.9, walk: 1.4, run: 4.0,
+  gravity: 18, jumpSpeed: 4.4, stepMax: 0.42, maxFall: 30, waterProbe: 8, airGrip: 0.25,
 };
 
 const RING = Array.from({ length: 8 }, (_, q) => [Math.cos((q * Math.PI) / 4), Math.sin((q * Math.PI) / 4)]);
@@ -33,6 +34,7 @@ export class CharacterController {
     this.pos = [0, 0, 0];
     this.vel = [0, 0, 0];
     this.yaw = 0; // compass radians, clockwise from north (forward = (sin, 0, -cos) in three.js)
+    this.loco = new Locomotion();
     this.grounded = false;
     this.frozen = false;
     this.travelled = 0;
@@ -76,6 +78,7 @@ export class CharacterController {
     this.pos = [x, y, z];
     this.vel = [0, 0, 0];
     this.yaw = yaw;
+    this.loco.heading = yaw; this.loco.speed = 0; this.loco.pivoting = false;
     this.unstick();
     this.grounded = this.footSolid(...this.pos);
   }
@@ -136,28 +139,28 @@ export class CharacterController {
     if (this.frozen || dt <= 0) return { speed: 0, travelled: 0 };
     if (this.bodyHits(x0, y0, z0)) this.unstick();
 
+    // where the body wants to go (heading, turn arcs, pivots, eased speed: locomotion.js); the
+    // facing is the heading, so the body never slides sideways
     const m = Math.min(1, Math.hypot(move[0], move[1]));
-    let wx = 0, wz = 0;
-    if (m > 1e-3) {
-      const heading = moveHeading(camYaw, move);
-      wx = Math.sin(heading) * speed * m; wz = -Math.cos(heading) * speed * m;
-      this.yaw += angleDelta(this.yaw, heading) * approach(o.turnRate, dt);
-      this.yaw = ((this.yaw % TAU) + TAU) % TAU;
-    }
-    const a = (this.grounded ? o.accel : o.airAccel) * dt;
-    const ease = (v, w) => v + Math.max(-a * Math.max(speed, o.walk), Math.min(a * Math.max(speed, o.walk), w - v));
-    this.vel[0] = ease(this.vel[0], wx);
-    this.vel[2] = ease(this.vel[2], wz);
+    const want = m > 1e-3 ? moveHeading(camYaw, move) : null;
+    const loco = this.loco;
+    loco.update(dt, want, speed * m, this.grounded ? 1 : o.airGrip);
+    this.yaw = loco.heading;
+    this.vel[0] = loco.vx;
+    this.vel[2] = loco.vz;
 
     if (jump && this.grounded) { this.vel[1] = o.jumpSpeed; this.grounded = false; }
 
     // horizontal, sub-stepped, axis by axis
     const dx = this.vel[0] * dt, dz = this.vel[2] * dt;
     const n = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.1));
+    const [hx, , hz] = this.pos;
+    let stopped = false;
     for (let q = 0; q < n; q++) {
-      if (dx && !this.moveAxis(dx / n, 0)) this.vel[0] = 0;
-      if (dz && !this.moveAxis(0, dz / n)) this.vel[2] = 0;
+      if (dx && !this.moveAxis(dx / n, 0)) { this.vel[0] = 0; stopped = true; }
+      if (dz && !this.moveAxis(0, dz / n)) { this.vel[2] = 0; stopped = true; }
     }
+    if (stopped && dt > 0) loco.blocked(Math.hypot(this.pos[0] - hx, this.pos[2] - hz) / dt); // walls slow you down
 
     // vertical
     const wasGrounded = this.grounded;

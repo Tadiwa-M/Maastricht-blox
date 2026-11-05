@@ -29,6 +29,8 @@ import { loadSettings, saveSettings } from './settings.js';
 import { streetFinder } from './streets.js';
 import { raycastCity, spawnPoint } from './ray.js';
 import { parseWalkHash } from './hash.js';
+import { Creator } from './creator.js';
+import { defaultChoices, loadChoices } from '../figure/custom.js';
 
 const DEG = Math.PI / 180;
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
@@ -40,7 +42,10 @@ export function initPlayer(ctx) {
   const city = ctx.city || cityFromWorld(world, ctx.islands || []);
   const ctrl = new CharacterController(city);
   const follow = new FollowCamera();
-  const character = new Character(ctx.models, world);
+  const store = (() => { try { return localStorage; } catch { return null; } })();
+  const hashFigure = new URLSearchParams(location.hash.replace(/^#/, '')).has('figure');
+  let look = hashFigure ? null : loadChoices(location.hash, store);
+  const character = new Character(ctx.models, world, { look });
   character.group.visible = false;
   stage.scene.add(character.group);
   const findStreet = world?.features ? streetFinder(world.features.values()) : () => '';
@@ -58,6 +63,33 @@ export function initPlayer(ctx) {
     onWalk: () => enterAt(centreRay()), onExit: exitWalk, settings,
     onSettings: (s) => saveSettings(s),
     onNorth: () => { if (mode === 'walk') follow.aimYaw = 0; else orbit.north(); },
+  });
+  // character creator: C or the menu (walk mode); the camera turns round to face the figure
+  let creatorCam = null;
+  const creator = new Creator(look || defaultChoices(), {
+    store,
+    onChange: (v, ch) => { look = ch; character.setVariant(v); },
+    onDone: () => closeCreator(),
+  });
+  function openCreator() {
+    if (mode !== 'walk' || tween || creator.open) return;
+    hud.toggleHelp(false);
+    input.releaseLock();
+    creatorCam = { yaw: follow.aimYaw, pitch: follow.aimPitch, dist: follow.aimDist, spin: 0 };
+    creator.show(true);
+  }
+  function closeCreator() {
+    creator.show(false);
+    if (creatorCam) { follow.aimYaw = creatorCam.yaw; follow.aimPitch = creatorCam.pitch; follow.aimDist = creatorCam.dist; }
+    creatorCam = null;
+  }
+  const creatorBtn = document.createElement('button');
+  creatorBtn.textContent = 'Your character (C)';
+  creatorBtn.addEventListener('click', () => openCreator());
+  hud.help.insertBefore(creatorBtn, hud.help.lastChild);
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'KeyC' || e.repeat || /INPUT|TEXTAREA|SELECT/.test(e.target?.tagName || '')) return;
+    if (creator.open) closeCreator(); else openCreator();
   });
   const touch = new TouchControls(canvas, () => { jumpQueued = true; }, (x, y) => mode === 'map' && enterAt(screenRay(x, y)));
   const input = new Input(canvas, {
@@ -227,24 +259,31 @@ export function initPlayer(ctx) {
       if (zoomExit.progress() > 0.3) hud.toast('Keep zooming out for the map');
       if (leave) { zoomExit.reset(); hud.toggleHelp(false); exitWalk(); }
     }
+    if (creator.open && mode !== 'walk') closeCreator();
     if (mode === 'walk' || (tween && tween.to === 'walk')) {
-      if (!tween) follow.input(frame.look, frame.zoom);
+      if (creator.open) { // turntable: the camera faces the figure and circles it slowly
+        creatorCam.spin += dt * 0.25;
+        follow.aimYaw = ctrl.yaw + Math.PI + 0.5 * Math.sin(creatorCam.spin);
+        follow.aimPitch = 0.08; follow.aimDist = 2.6;
+      } else if (!tween) follow.input(frame.look, frame.zoom);
       const moving = Math.hypot(...frame.move) > 0.2;
       lookIdle = frame.lookInput ? 0 : lookIdle + dt;
-      if (!tween && settings.recenter && ctrl.grounded) {
+      if (!tween && !creator.open && settings.recenter && ctrl.grounded) {
         follow.recenter(ctrl.yaw, { idle: lookIdle, moving, moveAngle: Math.atan2(frame.move[0], frame.move[1]), dt });
       }
       const jump = jumpQueued || frame.pressed.has('jump');
       jumpQueued = false;
       const speed = frameSpeed(frame, ctrl.o.walk, ctrl.o.run);
-      const res = tween ? ctrl.update(dt, {}, follow.yaw) : ctrl.update(dt, { move: frame.move, speed, jump }, follow.yaw);
-      character.update(ctrl.pos, ctrl.yaw, res.speed, res.travelled, dt);
+      const res = tween || creator.open ? ctrl.update(dt, {}, follow.yaw) : ctrl.update(dt, { move: frame.move, speed, jump }, follow.yaw);
+      const L = ctrl.loco;
+      character.update(ctrl.pos, ctrl.yaw, res.speed, res.travelled, dt,
+        { angVel: L.angVel, accel: L.accel, steer: L.steer, grounded: ctrl.grounded, vy: ctrl.vel[1] });
       // smooth the followed height (step-ups and landings), keep x/z exact
       smoothFeet[0] = ctrl.pos[0]; smoothFeet[2] = ctrl.pos[2];
       smoothFeet[1] += (ctrl.pos[1] - smoothFeet[1]) * Math.min(1, dt * 10);
       if (!tween) {
-        const { focus, position } = follow.update(city, smoothFeet, dt);
-        setCamera(position, focus, camera.fov);
+        const { focus, position, fov } = follow.update(city, smoothFeet, dt, res.speed);
+        setCamera(position, focus, fov);
       }
       // camera squeezed against a wall: hide the figure instead of filling the view with it
       character.group.visible = follow.dist > 0.9 || !!tween;

@@ -1131,3 +1131,33 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   Test area: 14 placed, 2 skipped. Tests: pipeline +6.
 - The owner's first try at the overnight rebuild ran from the home folder, so nothing ran
   (`..\build` resolved to `C:\Users\build`); the commands now start with a `cd` into the repo.
+
+## 2026-11-04/05: accuracy rebuild published; game phase G1a (player feel, character creator)
+
+- Workstation: BGT fetched for the city (88 blocks), `world_city2` built (22,358 chunks, 10,253
+  islands, 54,966 BGT objects over 23.07 km², 76 shelters), `blox life` re-run, published. Old
+  world archived as `build\world_city_2026-10-26.tgz` (30,419 entries, 0.18 GB). Video filmed
+  (needed `npx playwright install chromium` in `viewer/` on that PC); LinkedIn post out. Stills
+  were rendered here from the live site (`keyart.mjs`-style views, headless).
+- Found in those stills: walkers and cyclists over the river under the Servaasbrug stand on the
+  water (the life ground lookup's 2.5 m headroom over the chunk's median ground misses a deck
+  ~5 m above the water: G1c), and BAG `0935100000022003` (1935, 14.7 m) rises through the
+  Servaasbrug's city end (owner to confirm against reality before a correction).
+- Owner: the next phase is the game. Plan in PLAN.md Phase 4: G1 movement and traffic (G1a
+  player feel + character creator, G1b traffic rules, G1c scripted NPC behaviour), G2 multiplayer
+  capture the flag, G3 smarter NPCs later; NPCs stay scripted for now. NVIDIA SimReady (realistic
+  OpenUSD props, rigid-body physics for robotics) was considered and not adopted: off-style and
+  not what G1 needs.
+- G1a, viewer only (no rebuild): `player/locomotion.js` (heading + speed: turn arcs slower at
+  speed, sharp turns cost speed, a hard reversal at speed plants and pivots, eased acceleration
+  and braking, walls cut speed; the body faces its heading instead of sliding), `player/motion.js`
+  + optional rig fields (walk/idle blend by speed, stride matched to speed, lean into
+  acceleration, bank into turns, head leads the turn, jump tuck, landing dip), over-the-shoulder
+  follow camera with trailing and a sprint pull-back/FOV widening, and the character creator
+  (`figure/custom.js`, `player/creator.js`; C or the menu; saved in the browser and `#look=`).
+  Tests: viewer +16 (locomotion, motion, camera, creator data).
+
+**Open decisions**
+- Feel numbers (turn rates, acceleration, lean, bank, shoulder offset, sprint speed 4 m/s) need
+  the owner's play-test on a GPU; this container can't judge motion.
+- `film.ps1` should install the Playwright browser itself when it is missing.

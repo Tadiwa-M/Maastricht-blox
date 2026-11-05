@@ -17,6 +17,9 @@ import { PITCH, clamp, wrapAngle, applyLook, smoothDamp, smoothDampAngle, recent
 export const CAM = {
   minDist: 1.2, maxDist: 14, dist: 5, pitch: 0.22, minPitch: PITCH.min, maxPitch: PITCH.max, margin: 0.3, focusY: 1.6,
   turnTime: 0.05, zoomTime: 0.14, // smoothDamp times (s): rotation, distance
+  // God of War style: the player sits left of centre (camera over the right shoulder), the
+  // camera trails the body a little, and pulls back and widens when sprinting
+  shoulder: 0.5, followTime: 0.09, sprintFrom: 3.0, sprintBack: 0.9, fov: 55, sprintFov: 7,
 };
 
 /** Unit vector from the focus to the camera (three.js axes) for a look yaw/pitch. */
@@ -54,6 +57,9 @@ export class FollowCamera {
     this.vel = { yaw: 0, pitch: 0, dist: 0 };
     this.yaw = 0; this.pitch = this.o.pitch; this.want = this.o.dist;
     this.dist = this.o.dist; // after collision pull-in
+    this.side = this.o.shoulder; // shoulder offset after wall checks
+    this.trail = null; this.vtrail = [0, 0, 0]; // lagging follow point
+    this.sprint = 0; this.fov = this.o.fov;
   }
 
   // shown values; assigning snaps the aim too (no damping)
@@ -74,20 +80,34 @@ export class FollowCamera {
   recenter(playerYaw, opts) { this.aimYaw = recenterYaw(this.aimYaw, playerYaw, opts); }
 
   /** Jump the shown values to the aim (no easing). */
-  snap() { this.yaw = this.aimYaw; this.pitch = this.aimPitch; this.want = this.aimDist; }
+  snap() { this.yaw = this.aimYaw; this.pitch = this.aimPitch; this.want = this.aimDist; this.trail = null; }
 
-  /** feet: player feet [x, y, z]. Returns { focus, position } (three.js arrays). */
-  update(city, feet, dt) {
+  /**
+   * feet: player feet [x, y, z]; speed: the player's m/s (sprint pull-back and FOV).
+   * Returns { focus, position, fov } (three.js arrays, degrees).
+   */
+  update(city, feet, dt, speed = 0) {
     const o = this.o, v = this.vel;
     [this._yaw, v.yaw] = smoothDampAngle(this._yaw, this.aimYaw, v.yaw, o.turnTime, dt);
     [this._pitch, v.pitch] = smoothDamp(this._pitch, this.aimPitch, v.pitch, o.turnTime, dt);
     [this._want, v.dist] = smoothDamp(this._want, this.aimDist, v.dist, o.zoomTime, dt);
-    const focus = [feet[0], feet[1] + o.focusY, feet[2]];
+    // trail the body a little (the camera follows, it isn't welded on)
+    if (!this.trail || dt >= 0.5) { this.trail = [...feet]; this.vtrail = [0, 0, 0]; }
+    else for (const k of [0, 2]) [this.trail[k], this.vtrail[k]] = smoothDamp(this.trail[k], feet[k], this.vtrail[k], o.followTime, dt);
+    this.trail[1] = feet[1];
+    this.sprint += (Math.min(1, Math.max(0, (speed - o.sprintFrom) / 2)) - this.sprint) * Math.min(1, dt * 3);
+    this.fov = o.fov + o.sprintFov * this.sprint;
+    const head = [this.trail[0], this.trail[1] + o.focusY, this.trail[2]];
+    // over the right shoulder, unless a wall is there
+    const right = [Math.cos(this._yaw), 0, Math.sin(this._yaw)];
+    const side = o.shoulder > 0 ? Math.min(o.shoulder, pullIn(city, head, right, o.shoulder, { margin: 0.25, spread: 0.1 })) : 0;
+    this.side += (side - this.side) * (side < this.side ? 1 : Math.min(1, dt * 4));
+    const focus = [head[0] + right[0] * this.side, head[1], head[2] + right[2] * this.side];
     const dir = backDir(this._yaw, this._pitch);
-    const free = pullIn(city, focus, dir, this._want);
+    const free = pullIn(city, focus, dir, this._want + o.sprintBack * this.sprint);
     this.dist = free < this.dist ? free : this.dist + (free - this.dist) * Math.min(1, dt * 4);
     const position = [0, 1, 2].map((k) => focus[k] + dir[k] * this.dist);
-    return { focus, position };
+    return { focus, position, fov: this.fov };
   }
 }
 

@@ -124,3 +124,30 @@ test('walk hash: #mode=walk&at=x,z with optional yaw/camyaw/pitch/dist', () => {
   assert.equal(parseWalkHash('#view=hero'), null);
   assert.equal(parseWalkHash('#mode=walk&at=a,b'), null);
 });
+
+test('over the right shoulder, pulled in by a wall on that side; trails the body; sprint pulls back and widens', () => {
+  const city = synthCity();
+  const feet = [10, city.floorY, -10];
+  const cam = new FollowCamera();
+  cam.yaw = 0; // looking north: right is +x
+  let r = cam.update(city, feet, 1);
+  assert.ok(Math.abs(r.focus[0] - (feet[0] + cam.o.shoulder)) < 1e-6, `focus x ${r.focus[0]}`);
+  assert.equal(r.fov, cam.o.fov);
+  // a wall 0.4 m to the right: the shoulder offset shrinks so the camera doesn't sit inside it
+  const walled = synthCity();
+  walled.fill(21, 0, 5, 21, 39, 12); // x 10.5-11 m
+  const c2 = new FollowCamera(); c2.yaw = 0;
+  r = c2.update(walled, feet, 1);
+  assert.ok(r.focus[0] < feet[0] + 0.3, `walled focus x ${r.focus[0]}`);
+  // trailing: a sudden 1 m step forward is not followed at once
+  const c3 = new FollowCamera(); c3.yaw = 0;
+  c3.update(city, feet, 1);
+  r = c3.update(city, [feet[0], feet[1], feet[2] - 1], 1 / 60);
+  assert.ok(r.focus[2] > feet[2] - 0.9, 'the camera lags behind');
+  for (let q = 0; q < 60; q++) r = c3.update(city, [feet[0], feet[1], feet[2] - 1], 1 / 60);
+  assert.ok(Math.abs(r.focus[2] - (feet[2] - 1)) < 0.01, 'and catches up');
+  // sprinting
+  let s;
+  for (let q = 0; q < 120; q++) s = c3.update(city, [feet[0], feet[1], feet[2] - 1], 1 / 60, 5.2);
+  assert.ok(s.fov > cam.o.fov + 5);
+});

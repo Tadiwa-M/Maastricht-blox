@@ -76,7 +76,42 @@ export function jointAngles(v, pose, out = {}) {
     }
     set2(out, 'sh', 0.95, 0.95); set2(out, 'elbow', 0.35, 0.35); set2(out, 'abd', 0.1, 0.1);
   }
+  if (pose.blend !== undefined || pose.air || pose.dip || pose.lean) motion(v, pose, out);
   return out;
+}
+
+const IDLE_J = {};
+const PAIRS = ['hip', 'knee', 'ankle', 'sh', 'abd', 'elbow'];
+
+/**
+ * Optional motion layer (the player; crowds leave these unset): pose.blend 0..1 mixes the idle
+ * pose into the walk by speed, so starting and stopping ease instead of snapping between modes;
+ * pose.lean adds forward lean (rad, + = forward: acceleration); pose.air 0..1 tucks the legs and
+ * lifts the arms (jumping, falling); pose.dip 0..1 bends the knees and lowers the hips (landing).
+ * pose.bank (roll into turns) is applied by poseFigure.
+ */
+function motion(v, pose, out) {
+  if (pose.blend !== undefined && (pose.mode ?? MODE.WALK) === MODE.WALK && pose.blend < 1) {
+    const idle = jointAngles(v, { ...pose, mode: MODE.IDLE, blend: undefined, air: 0, dip: 0, lean: 0 }, IDLE_J);
+    const b = Math.max(0, pose.blend);
+    for (const k of PAIRS) for (let q = 0; q < 2; q++) out[k][q] = idle[k][q] + (out[k][q] - idle[k][q]) * b;
+    for (const k of ['bob', 'lean', 'headPitch']) out[k] = idle[k] + (out[k] - idle[k]) * b;
+  }
+  if (pose.lean) out.lean += pose.lean;
+  const a = Math.min(1, Math.max(0, pose.air || 0));
+  if (a) { // knees up, arms out for balance
+    out.hip[0] += 0.55 * a; out.hip[1] += 0.25 * a;
+    out.knee[0] -= 0.95 * a; out.knee[1] -= 0.6 * a;
+    out.ankle[0] += 0.3 * a; out.ankle[1] += 0.2 * a;
+    out.abd[0] += 0.45 * a; out.abd[1] += 0.45 * a;
+    out.sh[0] += 0.3 * a; out.sh[1] += 0.3 * a;
+  }
+  const d = Math.min(1, Math.max(0, pose.dip || 0));
+  if (d) { // absorb a landing: hips drop, knees bend, chest leans in
+    const [hip, knee] = legIK(0.05, BODY.thigh + BODY.shin - 0.16 * d);
+    for (let q = 0; q < 2; q++) { out.hip[q] += hip * d; out.knee[q] += knee * d; out.ankle[q] -= (hip + knee) * d * 0.8; }
+    out.bob -= 0.16 * d; out.lean += 0.15 * d;
+  }
 }
 
 // Affine 4x4 matrices as Float32Array(16), column-major like three.js. Right-multiplying by a
@@ -135,6 +170,7 @@ function keys(v) {
 export function poseFigure(v, pose, emit, J = jointAngles(v, pose), lo = false) {
   const s = v.scale, w = v.width, K = keys(v), mode = pose.mode ?? MODE.WALK;
   const base = root(M[0], pose.x, pose.y, pose.z, pose.rotY || 0, s);
+  if (pose.bank) rz(base, pose.bank); // roll about the feet: lean into a turn
   const pelvis = tr(copy(M[1], base), 0, J.pelvisY + J.bob, 0);
   emit(lo ? 'lo:hips' : 'hips', sc(copy(M[2], pelvis), w, 1, w), 'bottom');
   const chest = rx(copy(M[3], pelvis), -J.lean);
