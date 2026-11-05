@@ -15,6 +15,7 @@ const CSS = `
 #rd-panel header h3 { margin: 0; font: 400 22px/1 'Anton', Impact, sans-serif; letter-spacing: .06em; flex: 1; }
 .rd-badge { font: 700 10px/1 system-ui, sans-serif; letter-spacing: .08em; padding: 4px 7px; border-radius: 5px; background: #3a3f63; color: #cfd3ea; }
 .rd-badge.live { background: #1f9d55; color: #fff; }
+.rd-plan { color: #F2A900; font: 600 12px system-ui, sans-serif; text-decoration: none; border: 1px solid #F2A900; border-radius: 6px; padding: 3px 7px; }
 #rd-panel .x { background: none; border: 0; color: #b9bcc4; font-size: 20px; cursor: pointer; padding: 0 4px; }
 .rd-tabs { display: flex; gap: 6px; padding: 0 14px 8px; }
 .rd-tabs button { flex: 1; background: rgba(255,255,255,.08); color: #f6f3ea; border: 0; border-radius: 8px; padding: 7px; cursor: pointer; font: 600 13px system-ui; }
@@ -73,7 +74,7 @@ export class RideUI {
     this.open = el('button', { id: 'rd-open', title: 'Buses and trains: see them live and ride along (T)' }, `${BUS_SVG}<span>Transit</span>`);
     this.open.addEventListener('click', () => h.onOpen(true));
     this.panel = el('div', { id: 'rd-panel', hidden: true },
-      `<header><h3>TRANSIT</h3><span class="rd-badge">SCHEDULED</span><button class="x" title="Close">✕</button></header>
+      `<header><h3>TRANSIT</h3><span class="rd-badge">SCHEDULED</span><a class="rd-plan" href="plan.html" title="Plan a trip (works on your phone)">Plan a trip</a><button class="x" title="Close">✕</button></header>
       <div class="rd-tabs"><button data-tab="now" class="on">Running now</button><button data-tab="stops">Stops</button></div>
       <div class="rd-lines"></div><input class="rd-search" placeholder="Search a stop, e.g. Markt" hidden>
       <div class="rd-list"></div>`);

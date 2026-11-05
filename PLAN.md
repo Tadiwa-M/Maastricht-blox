@@ -100,6 +100,16 @@ looking around the bus and out of the windows. Make it really easy."
   Pieces: an address/stop search box, the trip search (pure, tested), a results list, route
   drawing (bus legs in route colours via `ride/routes.js`, walk legs as the green chevron line
   on the ground), then follow-me while walking. Also: stop search and follow a vehicle on the map.
+  **Plan (owner 2026-11-05: phone first, Maastricht only):**
+  - R3a (current) engine + phone page: RAPTOR trip search over today's timetable with live delays
+    (`viewer/src/plan/`), walk access/egress, origin from GPS (browser location API, WGS84 -> RD
+    in the browser; the location never leaves the phone), a stop, a street or a tap; results
+    (leave/arrive, duration, walking, lines, transfers, "leave in"). A light `plan.html` in the
+    site that loads only the timetable and walk graph (no 3D city), installable on the home screen.
+  - R3b the chosen route on a simple 2D map on the phone page and on the 3D city (bus legs in line
+    colours, walk legs as the green chevron line), "Ride" boards, GPS dot follows you.
+  - R3c addresses and postcodes (BAG addresses from features.json, the old app's postcode CSV),
+    saved places (home, university), departure-board alerts.
 - Traffic rules (owner 2026-11-02, after the accuracy rebuild): buses, cars and bikes see each
   other (queue behind, give way at junctions, stop for people on crossings); today buses only
   push walkers aside and drive through cars and bikes.

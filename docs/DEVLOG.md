@@ -1190,3 +1190,25 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   jumps); turning gaits. Next candidates once the owner has felt the basic gait.
 - In the streamed city the link's walk position (`#mode=walk&at=`) is applied before the chunks
   load, so it is ignored there (only the diorama honours it); worth fixing for shareable links.
+
+## 2026-11-05: trip planner R3a (phone first)
+
+- Owner: at a bus stop, wants "how long from my location (or anywhere) to a destination"; phone
+  first, Maastricht only. Plan in PLAN.md R3a-c.
+- `viewer/src/plan/raptor.js`: RAPTOR over the existing timetable (`transit.json` v2) with live
+  delays, walking access/egress and transfers; returns the fastest, a fewer-transfers option and
+  the next departures. Chosen over the connection-scan search the plan named: one search gives
+  the fastest and fewest-transfer answers. `plan/geo.js`: GPS -> RD in the browser.
+- `plan.html` (+ `plan.js` 15 KB, web app manifest, icon) in every site build; the Transit panel
+  links to it. Location stays on the phone.
+- Checked on the real timetable (fresh OVapi GTFS, test area: 85 stops, 216 patterns, 2,319
+  trips): Markt -> station 9-10 min on lines 1/12/5 from Boschstraat/Markt; 3-14 ms per search.
+  Phone-sized browser test with a simulated GPS fix: found a real layout bug (the form overflowed
+  a 390 px screen and hid the location button), fixed.
+- Tests: viewer +8 (RAPTOR on a synthetic network: one bus, transfers, missed connections, walking,
+  next departures, days, after-midnight trips, live delays; GPS -> RD vs pyproj).
+
+**Open decisions**
+- Walking times are straight-line estimates until R3b routes walks on the walk graph.
+- Destinations are stops only until R3c (addresses, postcodes, places).
+- Needs a site build and publish from the workstation (the live timetable already has v2 stops).

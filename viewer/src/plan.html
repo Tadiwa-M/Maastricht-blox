@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10153a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Blox Plan">
+<link rel="manifest" href="plan.webmanifest">
+<link rel="icon" href="plan-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="plan-icon.svg">
+<title>Plan a trip · Maastricht Blox</title>
+<style>
+  :root { --bg: #0e1128; --card: #191d3d; --ink: #f6f3ea; --dim: #aeb2c6; --gold: #F2A900; --green: #1f9d55; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.4 system-ui, -apple-system, sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+  header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  h1 { font: 400 28px/1 'Anton', Impact, sans-serif; letter-spacing: .05em; margin: 0; }
+  header a { color: var(--gold); font-size: 14px; }
+  .box { background: var(--card); border-radius: 14px; padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .row { display: flex; gap: 8px; align-items: center; min-width: 0; }
+  label { flex: 0 0 auto; }
+  label { width: 44px; color: var(--dim); font-size: 14px; }
+  input { flex: 1 1 0; width: 0; min-width: 0; font: inherit; padding: 12px; border-radius: 10px; border: 0; background: #262b52; color: var(--ink); }
+  input[type=time] { flex: 0 0 auto; width: auto; }
+  button { font: 600 16px system-ui, sans-serif; border: 0; border-radius: 10px; padding: 12px 14px; cursor: pointer; background: #2c335f; color: var(--ink); }
+  #pl-go { background: var(--gold); color: #10153a; width: 100%; font-size: 18px; }
+  #pl-me { white-space: nowrap; }
+  #pl-status { margin: 10px 2px; color: var(--dim); }
+  #pl-status.err { color: #ff9c8a; }
+  #pl-results { display: grid; gap: 10px; margin-top: 14px; }
+  article { background: var(--card); border-radius: 14px; padding: 12px 14px; }
+  article .top { display: flex; justify-content: space-between; align-items: baseline; }
+  .leave { font-weight: 800; font-size: 18px; } .leave.soon { color: var(--gold); }
+  .dur { font-size: 20px; font-weight: 800; }
+  .mid { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: 8px 0 4px; }
+  .bot { color: var(--dim); font-size: 14px; }
+  .chip { display: inline-grid; place-items: center; min-width: 28px; height: 26px; padding: 0 7px; border-radius: 6px;
+    font: 800 14px/1 system-ui, sans-serif; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+  .arr { color: var(--dim); }
+  .live { font: 700 10px/1 system-ui; letter-spacing: .08em; padding: 4px 6px; border-radius: 5px; background: var(--green); color: #fff; margin-left: 6px; }
+  .legs { display: none; list-style: none; margin: 10px 0 0; padding: 10px 0 0; border-top: 1px solid #2c335f; }
+  article.open .legs { display: grid; gap: 10px; }
+  .legs li { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; }
+  .legs .ic { width: 28px; text-align: center; }
+  .none { color: var(--dim); }
+  .fine { color: #6f7491; font-size: 12px; margin-top: 20px; }
+</style>
+</head>
+<body>
+<header><h1>PLAN A TRIP</h1><a href="index.html">3D city →</a></header>
+<div class="box">
+  <div class="row"><label for="pl-from">From</label><input id="pl-from" list="pl-stops" placeholder="A stop" autocomplete="off"><button id="pl-me" type="button">📍 Me</button></div>
+  <div class="row"><label for="pl-to">To</label><input id="pl-to" list="pl-stops" placeholder="A stop" autocomplete="off"><button id="pl-swap" type="button" aria-label="Swap">⇅</button></div>
+  <div class="row"><label for="pl-time">Leave</label><input id="pl-time" type="time" aria-label="Leave at (empty: now)"><span style="color:var(--dim);font-size:14px">empty = now</span></div>
+  <button id="pl-go" type="button">Plan</button>
+</div>
+<datalist id="pl-stops"></datalist>
+<div id="pl-status" hidden></div>
+<div id="pl-results"></div>
+<p class="fine">Buses on the published timetable (OVapi), live delays where the operator shares them. Your location stays on this phone. Fan-made; not affiliated with Arriva or the Province of Limburg.</p>
+<script src="world.js"></script>
+<script type="module" src="plan.js"></script>
+</body>
+</html>

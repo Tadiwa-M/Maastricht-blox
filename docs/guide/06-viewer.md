@@ -460,3 +460,24 @@ is meaningless; compare triangles and draw calls.
 | `test/farbake.test.mjs` | coarse block -> 6 merged quads, top colour, owners + context culling, water/glass rules, BXF1 round trip (raw + deflate) into geometry ranges, bad input, the bake tool on the town fixture |
 | `test/citycam.test.mjs` | tilt limits by distance, target clamping, street spot on open ground beside a tower |
 | `test/island.test.mjs` | `.bxi` golden file (compressed + raw), bad input, pose vs `islands.json` through a THREE.Group, island picking + nearest hit, LOD wiring on the town fixture, islands on their paved plots |
+
+## Trip planner (`plan.html`, `src/plan/`, phase R3a, 2026-11-05)
+
+A phone-first page in every site build, next to the 3D city: `plan.html` + `plan.js` (15 KB) +
+`plan.webmanifest` (add to the home screen: it opens like an app). It loads only
+`world/life/transit.json` (no 3D city) and `world.js` (relay address, map origin).
+
+- **From:** "📍 Me" (the browser's location API; `plan/geo.js` converts GPS to RD with the standard
+  Dutch approximation polynomial, within 2 m of pyproj; the position never leaves the phone) or a
+  stop name. **To:** a stop name (suggestions from the timetable). **Leave:** now or a time.
+- **Search** (`plan/raptor.js`, RAPTOR): rounds of at most 4 buses over today's trips (after-
+  midnight trips of yesterday included), walking access/egress up to 1.2 km and transfers up to
+  350 m (straight line x 1.25 at 1.3 m/s; a same-stop transfer needs 60 s), live delays from the
+  relay shifting their trips. Results: the fastest, a fewer-transfers one if within 10 min, and the
+  next departures; each a card with "leave in", duration, lines, walking time, transfers and LIVE,
+  expanding to the legs. 3-14 ms per search on the test area. Refreshes every 30 s with live data.
+- The Transit panel in the 3D city links to it ("Plan a trip"). The last trip is remembered on the
+  phone (`localStorage`). The relay only answers the published site's origin, so local test builds
+  show scheduled times.
+- Next: R3b (the route on a 2D map and the 3D city, walking line, GPS dot), R3c (addresses,
+  postcodes, saved places).
