@@ -1410,3 +1410,9 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   people at the Station stand > 2.5 m above the ground within 5 m (platforms and the footbridge or
   real roofs: to check on the workstation); people still cross roads anywhere (no crossings yet).
 
+
+## 2026-11-06: start above the city, not above the map
+
+- Owner: the start is "way too zoomed out", "above the generation of the city". The default view
+  is now `above` (citymode presets): the Markt from 650 m at 38 degrees, old town and the Maas
+  filling the screen, the map's edges out of sight. `#view=city` keeps the whole-map view.

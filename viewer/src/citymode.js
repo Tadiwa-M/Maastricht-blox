@@ -34,7 +34,7 @@ function parseHash() {
   const p = new URLSearchParams(location.hash.replace(/^#/, ''));
   const at = p.get('at')?.split(',').map(Number);
   return {
-    view: p.get('view') || 'city',
+    view: p.get('view') || 'above', // the start: above the old town, not above the whole map
     time: p.has('t') ? +p.get('t') : 16.5,
     tilt: p.get('tilt') !== '0',
     ao: p.get('ao') !== '0',
@@ -115,6 +115,8 @@ export function cityPresets(index, box, approxGround) {
     city: (() => { const t = at(c.x, c.z); return { target: t, cam: t.clone().add(offset(200, 42, Math.max(150, r * 1.55))), fov: 40 }; })(),
     map: (() => { const t = at(c.x, c.z); return { target: t, cam: t.clone().add(offset(180, 89, Math.max(150, r * 2.3))), fov: 40 }; })(),
     hero: { target: focus, cam: focus.clone().add(offset(206, 17, Math.min(320, Math.max(90, r * 0.6)))), fov: 40 },
+    // the start view: over the old town and the Maas, close enough that the map's edges stay out of sight
+    above: { target: focus, cam: focus.clone().add(offset(206, 38, Math.min(650, Math.max(150, r * 0.8)))), fov: 40 },
     street: { target: focus.clone().setY(focus.y + 2), cam: focus.clone().setY(focus.y + 2).add(offset(200, 8, 26)), fov: 50 },
   };
   for (const [name, t] of Object.entries(places)) out[name] = { target: t, cam: t.clone().add(offset(206, 30, 160)), fov: 40 };
@@ -280,7 +282,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     onTime: applyTime, onTilt: (on) => stage.post.setTiltShift(on), onAO: (on) => stage.post.setAO(on),
     onAnim: () => {}, onQuality: setMode });
   ui.tier(mode, tierName);
-  ui.views(['city', 'hero', 'street', 'map', ...Object.keys(presets).filter((k) => !['city', 'hero', 'street', 'map'].includes(k)), 'gallery']);
+  ui.views(['above', 'city', 'hero', 'street', 'map', ...Object.keys(presets).filter((k) => !['above', 'city', 'hero', 'street', 'map'].includes(k)), 'gallery']);
   applyView(opts);
   applyTime(opts.time);
   stage.post.setTiltShift(opts.tilt);

@@ -233,7 +233,8 @@ GTA V: minimal UI, tips in one corner, a small spinner in the other).
 - Phases are the pure `loadState()`: index -> silhouette -> first ring (90%, settled or 8 s) ->
   8 drawn frames. Notices wait for `whenGone()`; load errors show on the screen. Skipped under
   `?shot=1` and webdriver, so the screenshot, perf and film tools are unchanged.
-- **After start:** you are at the city view and zoom in yourself (the owner prefers it to a
+- **After start:** you are above the old town (preset `above`: the Markt from 650 m, 38 degrees up,
+  so the map's edges stay out of sight; `#view=city` still shows the whole map) and zoom in yourself (the owner prefers it to a
   scripted start; a camera fly-in and a straight cut to the street were both tried on 2026-11-06
   and dropped).
 - **The settings panel** (sun, quality, views, stats) starts collapsed for everyone: the game
