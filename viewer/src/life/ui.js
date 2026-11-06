@@ -9,9 +9,9 @@ export function bindLifeUI(clock, { onNow, still = false } = {}) {
   const hud = document.getElementById('hud');
   const row = document.createElement('div');
   row.id = 'lifeClock';
-  row.style.cssText = 'display:flex;align-items:center;gap:6px;color:var(--muted);font-variant-numeric:tabular-nums';
+  row.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:6px;color:var(--muted);font-variant-numeric:tabular-nums';
   const label = document.createElement('b');
-  label.style.cssText = 'color:var(--text);min-width:6.5em';
+  label.style.cssText = 'color:var(--text);min-width:5.5em';
   row.append('Clock ', label);
   const buttons = SPEEDS.map((s) => {
     const b = document.createElement('button');

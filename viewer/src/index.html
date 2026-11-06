@@ -22,7 +22,8 @@
   html, body, body *:not(#view) { touch-action: manipulation; }
   .panel { position: fixed; background: var(--panel); backdrop-filter: blur(8px); border-radius: 10px;
     padding: 10px 14px; box-shadow: 0 4px 18px rgba(0,0,0,.25); }
-  #hud { top: 14px; left: 14px; display: grid; gap: 8px; min-width: 240px; }
+  #hud { top: 14px; left: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 240px;
+    max-width: calc(100vw - 28px - var(--sl, 0px) - var(--sr, 0px)); box-sizing: border-box; }
   #hud h1 { margin: 0; font-size: 15px; letter-spacing: .02em; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   #hudToggle { font: inherit; font-size: 11px; font-weight: 400; color: var(--muted); background: rgba(255,255,255,.1);
     border: 1px solid rgba(255,255,255,.25); border-radius: 5px; padding: 1px 8px; cursor: pointer; }
@@ -31,8 +32,11 @@
   #hud label { display: flex; align-items: center; gap: 8px; color: var(--muted); }
   #hud input[type=range] { flex: 1; accent-color: var(--accent); }
   #timeLabel { color: var(--text); font-variant-numeric: tabular-nums; min-width: 3em; text-align: right; }
-  #views a { color: var(--accent); margin-right: 10px; text-decoration: none; }
-  #stats { color: var(--muted); font-variant-numeric: tabular-nums; max-width: 300px; }
+  /* the view links come without spaces between them: wrap them as items, or one long line pushes
+     the panel (and its hide button) past the edge of a phone screen */
+  #views { display: flex; flex-wrap: wrap; column-gap: 10px; row-gap: 2px; }
+  #views a { color: var(--accent); text-decoration: none; }
+  #stats { color: var(--muted); font-variant-numeric: tabular-nums; max-width: 300px; overflow-wrap: anywhere; }
   #hud select { background: rgba(255,255,255,.1); color: var(--text); border: 1px solid rgba(255,255,255,.25); border-radius: 5px; padding: 1px 4px; }
   #hud select option { color: #111; }
   #tierLabel { color: var(--muted); }
@@ -137,7 +141,30 @@
   .notice { bottom: 64px; left: 50%; transform: translateX(-50%); z-index: 11; max-width: min(520px, calc(100vw - 32px));
     box-sizing: border-box; color: var(--text); }
   .notice button { margin-left: 8px; font: inherit; color: #111; background: var(--accent); border: 0; border-radius: 5px; padding: 2px 10px; cursor: pointer; }
-  @media (max-width: 600px) { #hud { right: 14px; min-width: 0; } #info { top: auto; bottom: 44px; left: 14px; } }
+  @media (max-width: 600px) { #hud { min-width: 0; width: 260px; font-size: 12px; padding: 8px 10px; gap: 6px; }
+    #hud.collapsed { width: auto; } #hud h1 { font-size: 14px; } #stats { font-size: 11px; } #info { top: auto; bottom: 44px; left: 14px; } }
+  /* Phones in full screen: keep everything out of the status bar, the camera cut-out and the
+     gesture bar (safe-area insets; 0 on laptops). "html" outranks the modules' own rules. */
+  :root { --st: env(safe-area-inset-top, 0px); --sb: env(safe-area-inset-bottom, 0px);
+    --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px); }
+  html #hud, html #tp-panel, html #rd-hud, html #pl-back, html #pl-street { top: calc(14px + var(--st)); }
+  html #rd-panel { top: calc(14px + var(--st)); bottom: calc(72px + var(--sb)); }
+  html #tp-hud { top: calc(52px + var(--st)); }
+  html #pl-toast { top: calc(54px + var(--st)); }
+  html #info { top: calc(14px + var(--st)); }
+  html #hud, html #tp-panel, html #rd-open, html #rd-panel { left: calc(14px + var(--sl)); }
+  html #pl-back, html #rp-open, html #pl-compass, html #foot { right: calc(14px + var(--sr)); }
+  html #rd-open, html #pl-bar { bottom: calc(14px + var(--sb)); }
+  html #pl-compass { bottom: calc(40px + var(--sb)); }
+  html #rp-open { bottom: calc(92px + var(--sb)); }
+  html #foot { bottom: calc(10px + var(--sb)); }
+  html #pl-stick { bottom: calc(90px + var(--sb)); left: calc(28px + var(--sl)); }
+  html #pl-jump { bottom: calc(100px + var(--sb)); right: calc(28px + var(--sr)); }
+  @media (max-width: 600px) {
+    html #info { top: auto; bottom: calc(44px + var(--sb)); }
+    /* the footer line sits above the Transit button, not under the walk bar */
+    html #foot { right: auto; left: calc(14px + var(--sl)); bottom: calc(66px + var(--sb)); font-size: 10px; padding: 3px 8px; }
+  }
 </style>
 </head>
 <body>

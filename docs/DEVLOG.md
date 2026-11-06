@@ -1434,3 +1434,11 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Owner: full screen worked on the laptop, not on their Android phone. The start listens to
   `pointerdown`, and for touch that is not a user activation (only `pointerup`/`touchend`/`click`
   are), so Chrome refused the request. It is now asked again on the finger's `pointerup`.
+- Owner (S23+ screenshot): full screen works now, but the settings panel sat under the status bar
+  and the walk bar covered the footer. Pinned UI now keeps to the safe-area insets; on phones the
+  footer line moves above the Transit button.
+- The settings panel was wider than a phone screen (the view links have no spaces between them, so
+  they never wrapped), pushing its hide button off the edge: the links wrap now and the panel is
+  capped at the screen width.
+- Phones: the settings panel is a compact 260 px box in the top-left corner (as on a laptop) with
+  smaller text, not a full-width sheet; the clock row wraps.

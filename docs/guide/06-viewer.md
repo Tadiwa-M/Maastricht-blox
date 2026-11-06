@@ -240,7 +240,10 @@ GTA V: minimal UI, tips in one corner, a small spinner in the other).
 - **Full screen (2026-11-06):** the title's start (key, click or tap) also asks for full screen on
   every device (`loading.js` `goFullscreen`: no address bar or tabs; Esc leaves it, as in any
   browser). On touch screens only the finger lifting counts as a tap for this (Chrome's user
-  activation), so it is asked again on that `pointerup`. iPhones' Safari has no page
+  activation), so it is asked again on that `pointerup`.
+  Full screen on a phone draws under the status bar and the gesture bar (`viewport-fit=cover`):
+  every pinned panel and button is offset by the safe-area insets (`--st/--sb/--sl/--sr` in
+  `index.html`); on phones the footer line sits above the Transit button. iPhones' Safari has no page
   full screen; "Add to Home Screen" opens the game full screen (`game.webmanifest`,
   `apple-mobile-web-app-capable`).
 - **The settings panel** (sun, quality, views, stats) starts collapsed for everyone: the game
