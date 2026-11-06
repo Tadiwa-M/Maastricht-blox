@@ -1428,3 +1428,9 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   Checked headless: GPS at the station -> standing on the Stationsplein, green line to the stop.
 - Full screen: the title's start (key, click or tap) asks for it on every device (laptops too); `game.webmanifest`
   (display fullscreen) for Add to Home Screen.
+
+## 2026-11-06: full screen on phones
+
+- Owner: full screen worked on the laptop, not on their Android phone. The start listens to
+  `pointerdown`, and for touch that is not a user activation (only `pointerup`/`touchend`/`click`
+  are), so Chrome refused the request. It is now asked again on the finger's `pointerup`.

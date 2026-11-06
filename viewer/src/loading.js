@@ -118,7 +118,10 @@ export class LoadingScreen {
       e?.preventDefault?.(); e?.stopImmediatePropagation?.(); // the start key must not also act in the game
       window.removeEventListener('keydown', go, true);
       el.removeEventListener('pointerdown', go);
-      goFullscreen(el.ownerDocument); // the game takes the whole screen (browsers need this tap or key press)
+      // the game takes the whole screen. Browsers allow it only from a key press, a mouse press, or on
+      // touch screens the finger lifting (pointerup, not this pointerdown): ask now and on that lift.
+      goFullscreen(el.ownerDocument);
+      window.addEventListener('pointerup', () => goFullscreen(el.ownerDocument), { once: true, capture: true });
       this.hide();
     };
     window.addEventListener('keydown', go, true);
