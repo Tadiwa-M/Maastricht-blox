@@ -233,6 +233,15 @@ GTA V: minimal UI, tips in one corner, a small spinner in the other).
 - Phases are the pure `loadState()`: index -> silhouette -> first ring (90%, settled or 8 s) ->
   8 drawn frames. Notices wait for `whenGone()`; load errors show on the screen. Skipped under
   `?shot=1` and webdriver, so the screenshot, perf and film tools are unchanged.
+- **Fly-in (`src/intro.js`, 2026-11-06):** on start the camera swoops from the city view down to
+  street level at the Markt in 5.5 s (target in a line, distance shrinking geometrically, compass
+  the short way, tilt flattening; smootherstep), streaming the landing spot first
+  (`city.focus`). Once the street there is in, the player stands on open ground
+  (`findStreetSpot`) and walk mode takes over; on a slow connection it waits up to 20 s, then
+  leaves you at street level on the map. Not for links to a view or spot (`#view=`, `#at=`,
+  `#mode=`), `?shot=1`/`?film=1` or webdriver; `#intro=1` forces it, `#intro=0` skips it.
+- **The settings panel** (sun, quality, views, stats) starts collapsed for everyone: the game
+  opens on the city, not on a map tool. "show" or U opens it; the choice is remembered.
 
 ### Panel (HUD) toggle
 The top-left panel collapses to its title with the **hide/show** button or the **U** key

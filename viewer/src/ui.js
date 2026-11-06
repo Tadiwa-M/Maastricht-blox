@@ -54,20 +54,19 @@ export function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 }
 
-/** Collapse the panel to its title (button or U key). Starts collapsed on phones; remembered per browser. */
+/** Collapse the panel to its title (button or U key). Starts collapsed (a game, not a map tool); remembered per browser. */
 export function bindHudToggle(doc = document) {
   const hud = doc.getElementById('hud'), btn = doc.getElementById('hudToggle');
   if (!hud || !btn) return;
   let saved = null;
-  try { saved = localStorage.getItem('blox.hud'); } catch { /* storage blocked: use the default */ }
-  const small = typeof matchMedia === 'function' && matchMedia('(max-width: 600px)').matches;
+  try { saved = localStorage.getItem('blox.hud2'); } catch { /* storage blocked: use the default */ }
   const set = (collapsed) => {
     hud.classList.toggle('collapsed', collapsed);
     btn.textContent = collapsed ? 'show' : 'hide';
     btn.setAttribute('aria-expanded', String(!collapsed));
-    try { localStorage.setItem('blox.hud', collapsed ? 'collapsed' : 'open'); } catch { /* ignore */ }
+    try { localStorage.setItem('blox.hud2', collapsed ? 'collapsed' : 'open'); } catch { /* ignore */ }
   };
-  set(saved ? saved === 'collapsed' : small);
+  set(saved ? saved === 'collapsed' : true);
   btn.addEventListener('click', () => set(!hud.classList.contains('collapsed')));
   doc.addEventListener('keydown', (e) => {
     if (e.code === 'KeyU' && !e.repeat && !/^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName || '')) set(!hud.classList.contains('collapsed'));

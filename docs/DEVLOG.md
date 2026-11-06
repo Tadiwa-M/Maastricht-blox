@@ -1323,3 +1323,15 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   (`user-scalable=no`, `touch-action: manipulation` outside the canvas).
 - Checked headless (walk, board, press W): before fov 40 / near 1.36 / controls on / camera moved;
   after fov 78 / near 0.15 / controls off / camera on the seat.
+
+## 2026-11-06: the game opens on the street, not on a map tool
+
+- Owner: loves the title screen and how the game loads into the city, but the static city
+  overview with the settings panel open after it "takes it out of the experience".
+- `src/intro.js` + `citymode.js`: pressing start flies the camera from the city view down to the
+  Markt (5.5 s), streams the landing spot first and hands over to the player in walk mode on open
+  ground. Skipped for links to a view/spot, screenshots, films and automated browsers (`#intro=1`
+  forces it).
+- The settings panel starts collapsed for everyone (new storage key, so old "open" choices reset).
+- Checked headless (`#intro=1`, 1280x720): 3.6 km -> 24 m over 5.5 s, then walk mode next to the
+  town hall. Tests: viewer +4 (path, yaw, when it runs).

@@ -26,6 +26,7 @@ import { bindUI, escapeHtml } from './ui.js';
 
 const DEG = Math.PI / 180;
 import { PLACES_RD, placeChunk } from './places.js';
+import { INTRO, flyPose, lookYaw, wantsIntro } from './intro.js';
 import { loadingScreen, loadState } from './loading.js';
 import { gpuInfo, autoTierFor } from './gpu.js';
 import { showNotice, bindPerfToggle } from './ui.js';
@@ -318,6 +319,40 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     ui.info(`${featureHead(f)}<small>${escapeHtml(t.name)} · ${escapeHtml(col?.name ?? '?')} · ${where} · faces ${FACING_NAMES[rot]} (rot ${rot})</small>`);
   });
 
+  // The fly-in after the title screen: from the city view down to the street at the Markt, then
+  // the player takes over in walk mode (src/intro.js). Skipped for links to a view or spot.
+  const intro = { on: false, pending: false, t: 0, wait: 0, from: null, to: null };
+  function startIntro() {
+    const p = presets.street;
+    if (!window.__bloxPlayer) return; // the player hook isn't up yet: try again next frame
+    intro.pending = false;
+    if (!p || window.__bloxPlayer.mode === 'walk') return;
+    Object.assign(intro, { on: true, t: 0, wait: 0,
+      from: { cam: stage.camera.position.toArray(), target: controls.target.toArray() },
+      to: { cam: p.cam.toArray(), target: p.target.toArray() } });
+    controls.enabled = false;
+    city.focus(p.target.x, p.target.z); // stream the landing spot first
+  }
+  function endIntro() { intro.on = false; controls.enabled = true; city.focus(null, null); }
+  function stepIntro(dt) {
+    intro.t += dt;
+    const { cam: c, target: t } = flyPose(intro.from, intro.to, intro.t / INTRO.seconds);
+    stage.camera.position.set(...c); controls.target.set(...t); stage.camera.lookAt(controls.target);
+    if (intro.t < INTRO.seconds) return;
+    // landed: once the street is streamed in, stand the player on open ground there
+    intro.wait += dt;
+    const spot = findStreetSpot(city, intro.to.target[0], intro.to.target[2]);
+    if (spot) {
+      endIntro();
+      const yaw = lookYaw(spot.cam.toArray(), spot.target.toArray());
+      if (!window.__bloxPlayer.enterAtUnity(spot.target.x, -spot.target.z, yaw, yaw, true)) applyView({ ...opts, view: 'street' });
+    } else if (intro.wait > INTRO.waitMax) endIntro(); // slow connection: stay at street level on the map
+  }
+  if (!still && !film && wantsIntro(location.hash, location.search, typeof navigator !== 'undefined' && navigator.webdriver)) {
+    cover.whenGone(() => { intro.pending = true; });
+  }
+  window.__bloxIntro = intro;
+
   // Attract mode behind the title screen: the camera circles the start view slowly (like a
   // console game's live title scene) until someone presses start; then it simply stays there.
   const ATTRACT_RAD_S = 0.045;
@@ -347,6 +382,8 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     if (!cover.done && boot.silhouette) attract(dt);
     controls.update();
     const dist = cam.update();
+    if (intro.pending) startIntro();
+    if (intro.on) stepIntro(dt);
     for (const h of hooks) h.update?.(dt, now);
     stage.camera.updateMatrixWorld();
     pv.multiplyMatrices(stage.camera.projectionMatrix, stage.camera.matrixWorldInverse);
