@@ -51,6 +51,17 @@ export class TripPlanner {
       }
     }
     this.day = null;
+    this.ok = new Uint8Array(this.n).fill(1); // stops a journey may use (setUsable)
+  }
+
+  /**
+   * Limit journeys to stops where usable(stopIndex) is true: no walking to, boarding at, getting
+   * off at or transferring at the others (buses still drive through them). The game uses it to
+   * keep trips inside the built part of the city. null: every stop.
+   */
+  setUsable(usable) {
+    for (let s = 0; s < this.n; s++) this.ok[s] = !usable || usable(s, this.tt.stops[s]) ? 1 : 0;
+    return this;
   }
 
   /** Stops within r metres of (x, z) (Unity metres). */
@@ -120,11 +131,12 @@ export class TripPlanner {
     const label = [new Array(n).fill(null)];
     let marked = new Set();
     for (const s of this.near(from[0], from[1], o.accessM)) {
+      if (!this.ok[s]) continue;
       const t = sec + this.walkSecM(Math.hypot(this.sx[s] - from[0], this.sz[s] - from[1]));
       if (t < tau[0][s]) { tau[0][s] = best[s] = t; label[0][s] = { mode: 'walk', from: null, dep: sec, arr: t }; marked.add(s); }
     }
     const egress = new Map();
-    for (const s of this.near(to[0], to[1], o.accessM)) egress.set(s, this.walkSecM(Math.hypot(this.sx[s] - to[0], this.sz[s] - to[1])));
+    for (const s of this.near(to[0], to[1], o.accessM)) if (this.ok[s]) egress.set(s, this.walkSecM(Math.hypot(this.sx[s] - to[0], this.sz[s] - to[1])));
     const direct = sec + this.walkSecM(Math.hypot(to[0] - from[0], to[1] - from[1]));
     const front = [];
     let bestTarget = INF; // walking all the way is offered on its own: it must not prune the buses
@@ -142,7 +154,7 @@ export class TripPlanner {
           const s = stops[i];
           if (trip) {
             const [arr] = this.times(pi, trip, i);
-            if (arr < Math.min(best[s], bestTarget)) {
+            if (this.ok[s] && arr < Math.min(best[s], bestTarget)) {
               tau[k][s] = best[s] = arr;
               label[k][s] = { mode: 'bus', pattern: pi, trip, fromI: boardI, toI: i, fromStop: boardStop, dep: boardDep, arr };
               improved.add(s);
@@ -164,7 +176,7 @@ export class TripPlanner {
       for (const a of improved) {
         for (const [b, w] of this.foot[a]) {
           const t = tau[k][a] + w;
-          if (t < Math.min(best[b], bestTarget)) {
+          if (this.ok[b] && t < Math.min(best[b], bestTarget)) {
             tau[k][b] = best[b] = t;
             label[k][b] = { mode: 'walk', from: a, dep: tau[k][a], arr: t };
             walked.add(b);

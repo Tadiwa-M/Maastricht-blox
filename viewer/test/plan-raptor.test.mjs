@@ -88,3 +88,17 @@ test('summaries: walking time, duration, leave time', () => {
   assert.ok(j.walkSec >= 0 && j.dep >= 7 * H);
   assert.equal(summarise({ legs: [{ mode: 'walk', dep: 0, arr: 10 }] }).walkSec, 10);
 });
+
+test('usable stops: no boarding, getting off or walking at stops outside (the built city)', () => {
+  const p = new TripPlanner(timetable({ east: [8 * H] }));
+  const [j] = p.plan([1000, 50], [3000, 60], DAY, 8 * H - 300);
+  assert.equal(j.legs.find((l) => l.mode === 'bus').from.name, 'B');
+  p.setUsable((k, s) => s.name !== 'B'); // B is past the edge
+  const js = p.plan([1000, 50], [3000, 60], DAY, 8 * H - 300);
+  for (const x of js) for (const l of x.legs) if (l.mode === 'bus') assert.notEqual(l.from.name, 'B');
+  p.setUsable((k, s) => s.name !== 'D');
+  const bus = p.plan([0, 0], [3000, 60], DAY, 8 * H - 300)[0].legs.find((l) => l.mode === 'bus');
+  assert.ok(!bus || bus.to.name !== 'D', 'never gets off at an unusable stop');
+  p.setUsable(null);
+  assert.equal(p.plan([0, 50], [3000, 60], DAY, 8 * H - 300)[0].legs.find((l) => l.mode === 'bus').to.name, 'D');
+});

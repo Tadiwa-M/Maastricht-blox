@@ -104,7 +104,9 @@ export function initPlayer(ctx) {
     if (e.code !== 'KeyC' || e.repeat || /INPUT|TEXTAREA|SELECT/.test(e.target?.tagName || '')) return;
     if (creator.open) closeCreator(); else openCreator();
   });
-  const touch = new TouchControls(canvas, () => { jumpQueued = true; }, (x, y) => mode === 'map' && enterAt(screenRay(x, y)));
+  // riding a bus or train (src/ride/): the ride owns the camera; walk/map input stands down
+  const riding = () => !!window.__bloxRide?.state?.ride;
+  const touch = new TouchControls(canvas, () => { jumpQueued = true; }, (x, y) => mode === 'map' && !riding() && enterAt(screenRay(x, y)));
   const input = new Input(canvas, {
     touch, settings,
     onLock: (locked) => hud.setLocked(locked),
@@ -115,7 +117,7 @@ export function initPlayer(ctx) {
     },
   });
   canvas.addEventListener('pointermove', (e) => { hover = [e.clientX, e.clientY]; });
-  canvas.addEventListener('dblclick', (e) => { if (mode === 'map' && !tween) enterAt(screenRay(e.clientX, e.clientY)); });
+  canvas.addEventListener('dblclick', (e) => { if (mode === 'map' && !tween && !riding()) enterAt(screenRay(e.clientX, e.clientY)); });
   // walk mode: a click on the world captures the mouse (open-world look)
   canvas.addEventListener('click', (e) => {
     if (mode === 'walk' && e.pointerType !== 'touch' && !isTouchDevice()) { hud.toggleHelp(false); input.requestLock(); }
@@ -177,13 +179,25 @@ export function initPlayer(ctx) {
     else { tween = null; setCamera(position, focus, fov); }
   }
 
-  function exitWalk() {
+  /** Back to the map: a short flight up, or instant (no camera move) when something else takes
+   * the camera over, e.g. boarding a bus: the map's lens and controls come back at once. */
+  function exitWalk(instant = false) {
     if (mode !== 'walk') return;
     mode = 'map';
     input.lookActive = false;
     input.releaseLock();
     touch.show(false);
     hud.setMode('map', padCount > 0);
+    if (instant === true) {
+      tween = null;
+      character.group.visible = false;
+      camera.near = mapView?.near ?? 0.3; camera.fov = mapView?.fov ?? 40;
+      camera.updateProjectionMatrix();
+      controls.target.set(...ctrl.pos);
+      controls.enabled = true;
+      orbit.enabled = true;
+      return;
+    }
     const t = new THREE.Vector3(...ctrl.pos);
     const back = new THREE.Vector3(-Math.sin(follow.yaw), 0, Math.cos(follow.yaw));
     const pos = t.clone().addScaledVector(back, 32).add(new THREE.Vector3(0, 38, 0));
@@ -255,6 +269,9 @@ export function initPlayer(ctx) {
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
     last = now;
     const frame = input.poll(dt);
+    // the player tick runs at draw time, after the ride hook: while riding it must not touch the
+    // camera (no map pan/zoom/orbit, no tween), or pinches and stray input pull it off the seat
+    if (riding()) { tween = null; return; }
     if (frame.pressed.has('help')) toggleMenu();
     if (mode === 'map') {
       if (frame.pressed.has('menu')) toggleMenu(false);

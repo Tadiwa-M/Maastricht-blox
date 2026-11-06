@@ -1294,3 +1294,32 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   view uses the same fit.
 - "Start trip" spawned you facing north; it now faces the first leg (stop or destination).
 - Tests: viewer +1 (fitFov/shoulderScale). Screens checked at 390x844 and 1280x720.
+
+## 2026-11-05: trips stay inside the built city
+
+- Owner (phone): "Teleport onto the bus" showed only sky and green baseplate. The bus network
+  reaches past the built city: 126 of 309 stops (Malberg, Laathofruwe, Vendelplein, outer villages)
+  are outside the world's chunks, and a GPS start there planned a trip on a bus driving over empty
+  baseplate.
+- `TripPlanner.setUsable(fn)`: journeys only walk to, board, get off and transfer at usable stops
+  (buses still drive through the others). The in-game planner marks stops usable where the
+  streamed city has a chunk (`CityQuery.bounded` + `hasChunk`), leaves stops outside out of the
+  place search, and refuses a GPS start outside the built part with a message. The phone page
+  (`plan.html`) keeps every stop: it plans real trips, not game ones.
+- Open: buses ridden from the Transit panel can still drive out of the city.
+- Tests: viewer +1 (usable stops).
+
+## 2026-11-06: the ride camera owns the camera
+
+- Owner (phone): after jumping onto a ride the camera broke: zoomed-in outside view, a grey wall
+  for the inside view, the ride panel cut off at the left.
+- Cause: the player hook runs at draw time, after the ride hook. Boarding while walking started
+  the 1.1 s fly-out to the map; it overrode the seat camera, then restored the map lens (fov 40,
+  near up to 8 m, clipping the cabin) and switched the map controls back on, so pinches, map keys
+  and the map orbit pulled the camera off the seat, and a tap could even start walking mid-ride.
+  Pinches and double taps on the panels zoomed the page itself (the cut-off panel).
+- Fixes: `exitWalk(true)` leaves walk mode instantly (boarding uses it); the player tick, tap and
+  double-click to walk stand down while riding; the page can't be browser-zoomed
+  (`user-scalable=no`, `touch-action: manipulation` outside the canvas).
+- Checked headless (walk, board, press W): before fov 40 / near 1.36 / controls on / camera moved;
+  after fov 78 / near 0.15 / controls off / camera on the seat.

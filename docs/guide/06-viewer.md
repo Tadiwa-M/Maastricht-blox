@@ -517,4 +517,10 @@ A phone-first page in every site build, next to the 3D city: `plan.html` + `plan
 - **Start trip** puts you facing the first leg (the stop or the destination). The walk camera
   fits the screen: on portrait phones the view widens (`fitFov`) and the shoulder offset shrinks
   (`shoulderScale`, `player/camera.js`).
+- **Built city only (in the game):** the bus network runs past the built part of the city, so
+  the in-game planner only uses stops that have city around them (`TripPlanner.setUsable`, from
+  the streaming index's chunks); 📍 Me outside the built part says so instead of planning there.
+- **Riding owns the camera:** boarding leaves walk mode instantly (`exitWalk(true)`), and the
+  player's draw-time tick ignores input while `__bloxRide.state.ride` is set; the page itself never
+  zooms (pinch/double tap on panels).
 - Next: postcodes, saved places (home, university).

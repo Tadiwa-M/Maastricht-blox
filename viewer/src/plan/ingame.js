@@ -63,7 +63,7 @@ export async function initTrip(ctx) {
   function ready() {
     const tt = life.timetable;
     if (!tt?.stops?.length) return false;
-    if (!s.planner) s.planner = new TripPlanner(tt);
+    if (!s.planner) s.planner = new TripPlanner(tt).setUsable((k, st) => built(st.x, st.y)); // the bus network reaches past the built city
     if (!s.walk && life.walkDoc) s.walk = new WalkRouter(life.walkDoc);
     return true;
   }
@@ -76,12 +76,19 @@ export async function initTrip(ctx) {
     const t = controls?.target;
     return t ? [t.x, -t.z] : [0, 0];
   }
+  /** Is (x, z) (Unity metres) in the built part of the city? Stops past its edge are open baseplate. */
+  function built(x, z) {
+    const c = ctx.city;
+    if (!c?.bounded) return true; // the single embedded world: no streaming index to ask
+    const CM = (c.chunkStuds || 64) * (c.studM || 0.5);
+    return c.hasChunk(Math.floor(x / CM), Math.floor(z / CM));
+  }
   /** Shops, cafés, streets, addresses (the world's features) and the timetable's stops. */
   function places() {
     const n = ctx.features?.size || 0;
     if (!s.places || s.placesN !== n) {
       const studM = ctx.world?.studM || 0.5;
-      s.places = new PlaceIndex(n ? placesFromFeatures(ctx.features.values(), studM) : [], life.timetable.stops);
+      s.places = new PlaceIndex(n ? placesFromFeatures(ctx.features.values(), studM) : [], life.timetable.stops.filter((st) => built(st.x, st.y)));
       s.placesN = n;
     }
     return s.places;
@@ -92,7 +99,9 @@ export async function initTrip(ctx) {
     if (!navigator.geolocation) { done(null, 'This browser has no location.'); return; }
     navigator.geolocation.getCurrentPosition((pos) => {
       const p = gpsToUnity(pos.coords.latitude, pos.coords.longitude, originRD());
-      done(s.planner.near(p[0], p[1], 1500).length ? p : null, 'You seem to be outside the city in this game.');
+      done(built(p[0], p[1]) ? p : null, s.planner.near(p[0], p[1], 1500).length
+        ? 'You are outside the part of Maastricht built so far (west and outer districts are next). Type a start place instead.'
+        : 'You seem to be outside the city in this game.');
     }, (e) => done(null, e.code === 1 ? 'Location blocked: allow it in the browser.' : 'Could not get your location.'),
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
   }

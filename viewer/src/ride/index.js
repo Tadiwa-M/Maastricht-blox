@@ -93,7 +93,7 @@ export async function initRide(ctx) {
   function board(id) {
     const v = (life.vehicles || []).find((x) => x.id === id);
     if (!v) return;
-    window.__bloxPlayer?.exitWalk?.();
+    window.__bloxPlayer?.exitWalk?.(true); // instant: no fly-out fighting the seat camera
     s.open = false; ui.showPanel(false); routeLines.show(null); ui.placeMarks([]);
     s.ride = { id, yaw: null, look: 0, pitch: -0.05, outside: false, wantOff: false, offK: -1, nextK: -1,
       near: camera.near, fov: camera.fov };
