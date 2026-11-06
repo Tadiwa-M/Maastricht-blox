@@ -26,8 +26,6 @@ import { bindUI, escapeHtml } from './ui.js';
 
 const DEG = Math.PI / 180;
 import { PLACES_RD, placeChunk } from './places.js';
-import { INTRO, wantsIntro } from './intro.js';
-import { openSpot } from './player/spot.js';
 import { loadingScreen, loadState } from './loading.js';
 import { gpuInfo, autoTierFor } from './gpu.js';
 import { showNotice, bindPerfToggle } from './ui.js';
@@ -283,9 +281,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     onAnim: () => {}, onQuality: setMode });
   ui.tier(mode, tierName);
   ui.views(['city', 'hero', 'street', 'map', ...Object.keys(presets).filter((k) => !['city', 'hero', 'street', 'map'].includes(k)), 'gallery']);
-  // a plain load starts in the street (behind the title slides), see startInStreet below
-  const startStreet = !still && !film && wantsIntro(location.hash, location.search, typeof navigator !== 'undefined' && navigator.webdriver);
-  applyView(startStreet ? { ...opts, view: 'street' } : opts);
+  applyView(opts);
   applyTime(opts.time);
   stage.post.setTiltShift(opts.tilt);
   stage.post.setAO(opts.ao);
@@ -322,23 +318,6 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     ui.info(`${featureHead(f)}<small>${escapeHtml(t.name)} · ${escapeHtml(col?.name ?? '?')} · ${where} · faces ${FACING_NAMES[rot]} (rot ${rot})</small>`);
   });
 
-  // Start in the street: behind the title slides the camera already waits at street level at the
-  // Markt (so that is what streams in first); on start the player stands there in walk mode, a
-  // straight cut, no overview of the whole city. Not for links to a view or spot (src/intro.js).
-  const intro = { pending: false, wait: 0 };
-  function startInStreet(dt) {
-    const P = window.__bloxPlayer, p = presets.street;
-    if (!P) return; // the player hook isn't up yet
-    if (!p || P.mode === 'walk') { intro.pending = false; return; }
-    const spot = openSpot(city, p.target.x, p.target.z); // the most open place on the square
-    if (spot) {
-      intro.pending = false;
-      P.enterAtUnity(spot.x, -spot.z, spot.yaw, spot.yaw, false);
-    } else if ((intro.wait += dt) > INTRO.waitMax) intro.pending = false; // slow connection: stay at street level
-  }
-  if (startStreet) cover.whenGone(() => { intro.pending = true; });
-  window.__bloxIntro = intro;
-
   const r = stage.renderer;
   r.info.autoReset = false;
   const clock = new THREE.Clock();
@@ -357,7 +336,6 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     const ms = meter.tick(now);
     controls.update();
     const dist = cam.update();
-    if (intro.pending) startInStreet(dt);
     for (const h of hooks) h.update?.(dt, now);
     stage.camera.updateMatrixWorld();
     pv.multiplyMatrices(stage.camera.projectionMatrix, stage.camera.matrixWorldInverse);

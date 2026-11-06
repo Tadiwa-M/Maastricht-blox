@@ -80,10 +80,11 @@ export function renderSheet(canvas, { palette, types }, kind = 'figures') {
     r.setViewport(0, 0, W, H); r.setScissor(0, 0, W, H); r.render(scene, cam);
     return {};
   }
-  if (kind === 'vehicles') { // cars and a bike, three-quarter view
+  if (kind === 'vehicles') { // cars, the police car (light bar lit on one side) and a bike, three-quarter view
     const fleet = new VehicleFleet({});
     scene.add(fleet.group, floorAndDoor(palette, types, 12, 9));
     fleet.begin();
+    fleet.addCar('police', -2.2, 0.2, 5.2, -0.6, { colour: '#F4F4F2', beacons: [true, false] });
     fleet.addCar('hatch', -4.2, 0.2, 0, -0.6, { colour: '#A33A2B' });
     fleet.addCar('saloon', 0, 0.2, 0, -0.6, { colour: '#22385A' });
     fleet.addCar('van', 4.4, 0.2, 0, -0.6, { colour: '#F2F0EA' });

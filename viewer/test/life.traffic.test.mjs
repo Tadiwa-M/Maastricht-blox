@@ -198,7 +198,8 @@ test('roundabout: entering cars give way to cars on it', () => {
 test('four cars at an equal junction: nobody is stuck for ever', () => {
   const g = cross();
   const cars = [car(g, 3, 0, 45, 3), car(g, 2, 0, 45, 3), car(g, 1, 0, 45, 3), car(g, 4, 0, 45, 3)];
-  for (let q = 0; q < 30 * (YIELD_MAX_S + 10); q++) stepTraffic(g, cars, 1 / 30, () => 0.5, { t: 0 });
+  // crossing paths: one at a time through the box (the box rule), so give them a little longer
+  for (let q = 0; q < 30 * (YIELD_MAX_S + 18); q++) stepTraffic(g, cars, 1 / 30, () => 0.5, { t: 0 });
   assert.ok(cars.every((c) => g.from[c.e] === 0 || c.gone), cars.map((c) => `${g.from[c.e]}->${g.to[c.e]}@${c.s.toFixed(1)}`).join(' '));
 });
 

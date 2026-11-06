@@ -1,6 +1,8 @@
 // Smooth toy vehicles for city life: a Dutch step-through bicycle and three car bodies
 // (hatchback, saloon, van), each drawn through a few InstancedMeshes (frame, wheels; body,
-// glass + lights, wheels): 9 draw calls for every bike and car in view.
+// glass + lights, wheels): 9 draw calls for every bike and car in view. Plus the police car (an
+// original toy design: white saloon, blue side stripes, a light bar whose two lenses flash
+// blue in turn; life/police.js): 3 more draw calls while one is in view.
 // Origins: ground. Bike: under the saddle (the rider's root, see rig.js SADDLE); car: centre.
 // Front = -z. Wheels spin about their axle (local x).
 import * as THREE from 'three';
@@ -54,7 +56,11 @@ export const CAR_TYPES = {
   hatch: { L: 3.9, W: 1.74, H: 1.48, cabin: [1.58, 0.62, 2.1, 0.35] },
   saloon: { L: 4.55, W: 1.8, H: 1.44, cabin: [1.62, 0.58, 2.3, 0.2] },
   van: { L: 5.0, W: 1.96, H: 2.15, cabin: [1.9, 1.15, 3.75, 0.56], van: true },
+  police: { L: 4.55, W: 1.8, H: 1.6, cabin: [1.62, 0.58, 2.3, 0.2], police: true, cap: 4 },
 };
+// the light bar's two lenses (left, right): car-local [x, y, z] and colours lit / dark (linear, lit > 1 glows)
+export const BEACON = { x: 0.27, y: 1.47, z: 0.2, on: [0.2, 0.5, 3.4], off: [0.06, 0.1, 0.32] };
+const STRIPE = [0.06, 0.2, 0.62], STRIPE_LIGHT = [0.4, 0.66, 0.98];
 const WHEEL_R = 0.32;
 
 function carBody(t) {
@@ -67,6 +73,11 @@ function carBody(t) {
     place(rbox(W + 0.03, 0.12, 0.2, 0.05, 0.25), { at: [0, y0 + 0.12, L / 2 - 0.06] }),
   ];
   if (!t.van) parts.push(place(rbox(W * 0.5, 0.05, 0.28, 0.02, 0.85), { at: [0, y0 + low + 0.01, -L / 2 + 0.55] })); // bonnet line
+  if (t.police) { // a broad blue band along both sides with a thin light-blue line above it, a blue bonnet stripe
+    parts.push(place(rbox(W + 0.05, 0.22, L * 0.86, 0.03, STRIPE), { at: [0, y0 + low * 0.5, 0] }),
+      place(rbox(W + 0.056, 0.05, L * 0.86, 0.015, STRIPE_LIGHT), { at: [0, y0 + low * 0.5 + 0.16, 0] }),
+      place(rbox(0.32, 0.03, L * 0.24, 0.012, STRIPE), { at: [0, y0 + low + 0.02, -L / 2 + 0.62] }));
+  }
   return merge(parts);
 }
 
@@ -78,7 +89,8 @@ function carGlass(t) {
     ? place(rbox(cw + 0.025, gh, 1.1, 0.12, G), { at: [0, gy, cz - cl / 2 + 0.5] })
     : place(rbox(cw + 0.025, gh, cl + 0.03, 0.14, G), { at: [0, gy, cz] });
   const lamp = (x, z, c) => place(rbox(0.32, 0.12, 0.06, 0.03, c), { at: [x, y0 + low - 0.16, z] });
-  return merge([glass,
+  const bar = t.police ? [place(rbox(1.12, 0.08, 0.32, 0.03, 0.12), { at: [0, BEACON.y - 0.09, BEACON.z] })] : []; // light bar base
+  return merge([glass, ...bar,
     lamp(-W / 2 + 0.3, -L / 2 - 0.005, [1.4, 1.35, 1.2]), lamp(W / 2 - 0.3, -L / 2 - 0.005, [1.4, 1.35, 1.2]),
     lamp(-W / 2 + 0.25, L / 2 + 0.005, [0.9, 0.08, 0.06]), lamp(W / 2 - 0.25, L / 2 + 0.005, [0.9, 0.08, 0.06]),
     place(rbox(0.5, 0.14, 0.03, 0.02, [0.95, 0.85, 0.2]), { at: [0, y0 + 0.28, -L / 2 - 0.02] })]); // number plate (yellow, NL)
@@ -92,7 +104,7 @@ function carWheel() {
 let geoCache = null;
 export function VEHICLE_GEOS() {
   if (geoCache) return geoCache;
-  geoCache = { bikeFrame: bikeFrame(), bikeWheel: bikeWheel(), carWheel: carWheel() };
+  geoCache = { bikeFrame: bikeFrame(), bikeWheel: bikeWheel(), carWheel: carWheel(), beacon: rbox(0.42, 0.11, 0.26, 0.04, 1) };
   for (const [k, t] of Object.entries(CAR_TYPES)) { geoCache[`body:${k}`] = carBody(t); geoCache[`glass:${k}`] = carGlass(t); }
   return geoCache;
 }
@@ -107,8 +119,8 @@ export class VehicleFleet {
     this.group = new THREE.Group();
     this.group.name = 'vehicles';
     const G = VEHICLE_GEOS();
-    const caps = { bikeFrame: bikes, bikeWheel: bikes * 2, carWheel: cars * 4 };
-    for (const k of Object.keys(CAR_TYPES)) { caps[`body:${k}`] = cars; caps[`glass:${k}`] = cars; }
+    const caps = { bikeFrame: bikes, bikeWheel: bikes * 2, carWheel: cars * 4, beacon: 2 * CAR_TYPES.police.cap };
+    for (const [k, t] of Object.entries(CAR_TYPES)) { caps[`body:${k}`] = t.cap || cars; caps[`glass:${k}`] = t.cap || cars; }
     this.meshes = new Map();
     for (const [key, cap] of Object.entries(caps)) {
       const mesh = new THREE.InstancedMesh(G[key], this.material, cap);
@@ -122,6 +134,7 @@ export class VehicleFleet {
     this._root = new THREE.Matrix4(); this._w = new THREE.Matrix4(); this._t = new THREE.Matrix4();
     this._q = new THREE.Quaternion(); this._v = new THREE.Vector3(); this._one = new THREE.Vector3(1, 1, 1);
     this._up = new THREE.Vector3(0, 1, 0); this._col = new THREE.Color();
+    this._on = new THREE.Color(...BEACON.on); this._off = new THREE.Color(...BEACON.off);
   }
 
   begin() { for (const e of this.meshes.values()) e.n = 0; }
@@ -146,10 +159,19 @@ export class VehicleFleet {
     }
   }
 
-  /** A car of `type` (CAR_TYPES key) at three.js (x, y, z), heading rotY. */
-  addCar(type, x, y, z, rotY, { colour = '#A33A2B', spin = 0 } = {}) {
+  /**
+   * A car of `type` (CAR_TYPES key) at three.js (x, y, z), heading rotY. opts.beacons: the police
+   * car's light bar, [left lit, right lit] (life/police.js beacons).
+   */
+  addCar(type, x, y, z, rotY, { colour = '#A33A2B', spin = 0, beacons = null } = {}) {
     const t = CAR_TYPES[type] || CAR_TYPES.hatch;
     const root = this.root(x, y, z, rotY);
+    if (t.police) {
+      for (const k of [0, 1]) { // left (-x), right (+x)
+        this._w.multiplyMatrices(root, this._t.makeTranslation((k ? 1 : -1) * BEACON.x, BEACON.y, BEACON.z));
+        this.put('beacon', this._w, beacons?.[k] ? this._on : this._off);
+      }
+    }
     this.put(`body:${type}`, root, colour instanceof THREE.Color ? colour : this._col.set(colour));
     this.put(`glass:${type}`, root, WHITE);
     for (const sx of [-1, 1]) for (const az of [-1, 1]) {

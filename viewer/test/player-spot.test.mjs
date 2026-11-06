@@ -19,18 +19,3 @@ test('standSpot: nothing streamed in -> null', () => {
   const c = synthCity({ size: 80, unknownX: -1 });
   assert.equal(standSpot(c, 10, -10), null);
 });
-
-test('openSpot: the open middle of a square, facing a long view with room behind', async () => {
-  const { openSpot } = await import('../src/player/spot.js');
-  const c = synthCity({ size: 120 }); // 60 x 60 m
-  // a square ringed by buildings, 20..40 m, with a narrow gap on the east side
-  c.fill(30, 30, 5, 89, 39, 60); // south row (north 15..20 m)
-  c.fill(30, 80, 5, 89, 89, 60); // north row (north 40..45 m)
-  c.fill(30, 40, 5, 39, 79, 60); // west row
-  c.fill(80, 40, 5, 89, 57, 60); c.fill(80, 62, 5, 89, 79, 60); // east row, gap at north 29..31 m
-  const s = openSpot(c, 30, -30, { search: 12 });
-  assert.ok(s, 'found');
-  assert.ok(Math.abs(s.x - 30) <= 6 && Math.abs(-s.z - 30) <= 6, `near the middle of the square, got ${s.x}, ${-s.z}`);
-  assert.equal(c.groundHeight(s.x, s.z), c.floorY);
-  assert.ok(s.yaw >= 0 && s.yaw < 2 * Math.PI);
-});

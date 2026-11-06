@@ -268,14 +268,17 @@ synthetic GTFS zip and OSM file in `tests/life_fixture.py`.
 | `clock.js` | `LifeClock`: weekday + seconds, speed 1x / 10x / 60x, wraps Sunday -> Monday; starts at real Maastricht time (`Intl`, Europe/Amsterdam) or the URL `#t=8.25&day=sat&speed=60` |
 | `ui.js` | HUD row: clock, 1x/10x/60x, "now". Dragging the sun slider sets the clock's time; the running clock moves the slider (and the sun) in quarter-hour steps |
 | `schedule.js` | `Timetable.activeAt(day, sec)`, `tripDistAt` (pure) |
-| `buses.js` | `TimetableBuses`: poses, LOD, livery colours, signs |
+| `buses.js` | `TimetableBuses`: poses (with speed, footprint, sweep), LOD, livery colours, signs, `hold` |
+| `busflow.js` | bus/train sweep from the timetable, `aheadGap`, hold-back lag `nextLag` (pure) |
 | `livery.js` | `liveryFor(route)`: bus body colour by operator (Arriva blue) |
 | `density.js` | counts by tier, day curves (people, traffic, terraces), weekend, market schedule, `liveWeights` (pure) |
 | `walkgraph.js` | `WalkGraph`, `Walker`, `avoid`, `rng` (pure) |
 | `walkers.js` | `Pedestrians`: groups, pauses, umbrellas, `clearVehicles` |
 | `cyclists.js` | `Cyclists` on the cycle graph; `parkedBikes` rows |
-| `traffic.js` | `RoadGraph`, car following (IDM), junction slow-down, `carPose` (pure) |
-| `cars.js` | `Cars`: spawn/recycle near the camera, drawn as toy cars |
+| `traffic.js` | `RoadGraph`, car following (IDM), traffic rules, `carPose` (pure) |
+| `junctions.js` | junction boxes: movements, conflicts, lane corners, bus sweeps (pure) |
+| `police.js` | the police car easter egg: when, lights, who pulls over (pure) |
+| `cars.js` | `Cars`: spawn/recycle near the camera, the police car, drawn as toy cars |
 | `terraces.js` | `terraceLayout` (pure), `Terraces`: tables, chairs, parasols, seated people |
 | `market.js` | `stallLayout`, `vanSpots` (pure), `Market`: stalls, vendors, shoppers, parked vans |
 | `boats.js` | `Boats`: river loop |
@@ -410,6 +413,25 @@ the edges and turns smoothly, spawn, avoidance, crowd curve, vehicle clearance, 
 `life.pool.test.mjs` (LOD caps, instanced counts and placement, bus pose/lane/heading, colours,
 river loop).
 
+### People and bikes keep their space (2026-11-06)
+- **Personal space** (`walkgraph.js` `separate`): every walker group is a disc as wide as the group
+  (`w.hw`); overlapping groups step apart through their lateral offset (it eases back afterwards)
+  and whoever has someone right in front slows to a near stop. `avoid()` counts group widths and
+  treats people standing still (a chat, waiting at the kerb: `w.stopped`) as an obstacle to walk
+  round.
+- **Narrow pavements** (`walkers.js` `fitRoom`): a group whose members would stand in a wall falls
+  into single file (`g.file` 0..1, 0.75 m apart) and spreads out again where there is room; a leader
+  against a wall drifts to the path's middle. `room(x, z, y)` (life/index.js) asks the city whether
+  1 m and 1.6 m above the feet are clear. Nobody is drawn more than 1.2 m above the leader.
+- **Vehicles**: people wait at the kerb when a moving bus or car is about to cross their path
+  (`inVehiclePath`: its footprint plus the road it covers in ~2.5 s), at most 8 s; anyone inside a
+  footprint still steps out (`clearVehicles`). Bikes queue behind the bike in front (`queue`), brake
+  for vehicles in the way and step aside for good (lateral offset).
+- **Audit** (`life/audit.js`, `tools/life-audit.mjs --url <site> | --site <dir> [--quality high]`):
+  counts people through people, people in vehicles, people on roofs, bikes in vehicles, bikes
+  through bikes, cars in buses and cars through cars in the running game. Run it before and after
+  any change to street life.
+
 ## Walk mode (Unity)
 
 Press **C** in Play mode to take control of the figure (`Gameplay/Locomotion/CharacterWalker.cs`):
@@ -438,8 +460,8 @@ snapped to road-graph nodes) and `roundabout` (edges of `junction=roundabout` wa
 as OSM defines them; they were two-way before). Older viewers ignore the new keys.
 
 - **Traffic lights:** one city-wide 60 s cycle (`SIGNAL`): approaches running north-south
-  (bearing within 45° of the axis) have 26 s green, 3 s amber, then red, while east-west approaches
-  have the opposite half, with a 1 s all-red gap: crossing directions are never green together. A
+  (bearing within 45° of the axis) have 25 s green, 3 s amber, then red, while east-west approaches
+  have the opposite half, with a 2 s all-red gap: crossing directions are never green together. A
   car stops at red, and at amber if it can brake comfortably (3 m/s²).
 - **Junctions without lights** (3+ roads): within 25 m a car checks the cars approaching the same
   node; it gives way to cars on a bigger road (`CLASS_RANK`), to cars from its right on an equal
@@ -449,6 +471,56 @@ as OSM defines them; they were two-way before). Older viewers ignore the new key
 - **Lane obstacles:** buses (three circles along their length), cyclists and the player in the
   lane up to 30 m ahead are queued behind. Braking is capped at 7 m/s², so a car can still hit
   someone who steps out right in front of it (the player then pops apart: player/bump.js).
-- Not yet: buses run on the timetable and don't yield (their positions come from the schedule).
+- ~~Not yet: buses run on the timetable and don't yield~~: see the next section.
 - Checked on the real test-area roads (12 lights, 19 crossings, 42 roundabout edges): 80 cars for
   4 minutes, no car through a red light, no standoff (longest wait 32.7 s = one red phase).
+
+## Junction boxes, buses in traffic, the police car (2026-11-06)
+
+Owner's videos: no traffic laws visible, buses through bikes, a car through the bus being ridden,
+vehicles phasing through each other at junctions. Causes found and what replaced them:
+
+- **Junction boxes** (`junctions.js`). Every node with 3+ roads has a box (radius = widest lane
+  offset + 2.4 m, at least 3.5 m). A car's path through it is a *movement*: in-lane, the corner
+  where the two lanes meet, out-lane. Two movements conflict when their centre lines come closer
+  than both half widths (0.95 m straight, 1.5 m turning) + 0.1 m; cars from the same lane to the
+  same exit just follow. Before the box a car **commits**; it may not while a committed car on a
+  conflicting movement is still in the box, while a bus/train sweep crosses its path before it is
+  across, or while the exit has no room for the whole car (keep the box clear). A committed car
+  never stops for a light or right of way: it drives out. Before, only cars still *approaching*
+  were checked, so a car already in the box was invisible to cross traffic.
+- **Two junctions ahead.** Rules are checked for the next two nodes on the route (`next2` is
+  picked early). Before, a short OSM edge before a light hid the red until braking (7 m/s²) could
+  no longer stop the car. The front now stops ~1 m before the box, not 1.5 m from the node centre
+  (which was inside the crossing lane).
+- **Right of way** additionally needs a conflicting movement; on green a left turn gives way to
+  oncoming traffic going straight on or right; a ring of cars all waiting for each other lets one
+  go at once (before: everyone waited 6 s). All-red gap now 2 s (green 25 s).
+- **Lane corners** (`routePoint`). Lane lines meet at a corner, not at the node: a right turn's
+  in-lane ends before the node, a left turn's after it. `carPose` jumped between them (a right
+  turn showed yaw 304° for a moment and swung across the oncoming lane); it now bends through the
+  corner from 3 m before to 3 m after the node.
+- **Buses and trains** (`buses.js`, `busflow.js`). Each pose carries speed, footprint and a
+  **sweep**: its body now and its front every 0.25 s for 8 s, *from the timetable* (so a bus about
+  to pull out of a stop counts). Cars treat the first 1.2 s of it as standing in their lane, wait
+  at junctions for it, ignore a bus behind them in their own lane (stopping would not help) and
+  ignore its future when they are already in its way (they drive on out of it). Trains were not
+  obstacles at all before (only `buses` went into the env).
+- **Bus hold-back.** A trip may run up to 120 s (and at most 20 % of the time left to its last
+  stop) behind its timetable: `hold` looks 3.5 m + 1.5 s ahead of the front for cars, bikes and
+  the player and slows or stops; afterwards it runs 25 % faster (shorter stops) until on time.
+  Only at clock speed 1x, only within 250 m of the camera. The ride, panel and trip planner read
+  the lagged pose and `tRel`, so the cabin stays with the bus.
+- **The police car** (`police.js`): one at a time, every 75-225 s, spawned near the camera; an
+  original toy design (white saloon, blue side band, light bar with two lenses, `CAR_TYPES.police`,
+  3 extra draw calls only while one is in view). 40 % arrive with lights on, else they switch on
+  at random (mean 90 s) for 25-45 s. Lights on: lenses flash left/right at 2.5 Hz, 30 % faster,
+  no stopping at red, priority at junctions (cars within 40 m on conflicting movements wait), cars
+  ahead in its lane pull 1.2 m right and slow to 35 %, and it passes them 0.9 m left of its lane.
+  It still never enters a box that is not clear.
+- **Measured** (a 6x6 grid of 60 m blocks with a signalled main road, 70 cars, 3 buses, 240 s, old
+  rules vs new): car-car overlap frames 870 -> 0, car-bus 550 -> 0, distance driven -5 %. With 110
+  cars the grid jams, buses reach the 120 s lag cap and then go on, so some car-bus overlap
+  remains there. Tests: `life.junctions.test.mjs` (fails on the old rules), `life.busflow.test.mjs`.
+- Open: buses do not stop for red lights (they are not on the road graph); people and bikes
+  giving way to vehicles is walkers.js/cyclists.js work.

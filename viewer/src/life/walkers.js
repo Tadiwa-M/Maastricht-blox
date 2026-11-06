@@ -6,7 +6,7 @@
 // recycled to a busy node near it (spawn weights: walkways.json, boosted by density.js).
 import { MODE } from '../figure/rig.js';
 import { makeVariant } from '../figure/variants.js';
-import { Walker, avoid, rng, turnToward } from './walkgraph.js';
+import { Walker, avoid, separate, rng, turnToward } from './walkgraph.js';
 import { crowdFactor as dayCrowd, FIGURES_BY_TIER } from './density.js';
 
 export const WALKERS_BY_TIER = FIGURES_BY_TIER;
@@ -15,7 +15,23 @@ export const crowdFactor = (hours, day = 2) => Math.min(1, dayCrowd(hours, day))
 
 const GROUP_SIZES = [[1, 0.5], [2, 0.34], [3, 0.12], [4, 0.04]];
 const SIDE = 0.62; // metres between people walking side by side
+const FILE = 0.75; // metres between people walking one behind the other (narrow pavements)
 const STRIDE = 0.78; // metres per step at scale 1
+const LOOK_M = 2.5; // a walker checks this far ahead for a vehicle coming across
+const VEHICLE_AHEAD_M = 7; // a vehicle's path ahead that people don't step into
+const WAIT_MAX_S = 8; // after that they go anyway (a parked car in the way)
+
+/**
+ * Is (px, pz) on the path of vehicle f within `ahead` m (its footprint grown, extended forward)?
+ * A vehicle that knows its speed (f.v, m/s) only claims the road it covers in ~2.5 s.
+ */
+export function inVehiclePath(f, px, pz, ahead = VEHICLE_AHEAD_M, margin = 0.6) {
+  if (Number.isFinite(f.v)) ahead = Math.min(ahead, f.v * 2.5);
+  const r = (f.yaw * Math.PI) / 180, fx = Math.sin(r), fz = Math.cos(r);
+  const dx = px - f.x, dz = pz - f.z;
+  const along = dx * fx + dz * fz, across = dx * fz - dz * fx;
+  return along >= -f.halfL - margin && along <= f.halfL + ahead && Math.abs(across) <= f.halfW + margin;
+}
 
 /**
  * Step out of the way of vehicles: a walker inside a vehicle's footprint (+ margin) is moved
@@ -52,9 +68,12 @@ function umbrella(m, share) {
 }
 
 export class Pedestrians {
-  /** graph: WalkGraph. ground(x, z) -> y (Unity metres). cap: most people. */
-  constructor({ graph, ground, cap = FIGURES_BY_TIER.high, seed = 7 }) {
-    Object.assign(this, { graph, ground, cap });
+  /**
+   * graph: WalkGraph. ground(x, z) -> y (Unity metres). cap: most people.
+   * room(x, z, y) -> false where a person standing at height y would be inside a wall (life/index.js).
+   */
+  constructor({ graph, ground, room = () => true, cap = FIGURES_BY_TIER.high, seed = 7 }) {
+    Object.assign(this, { graph, ground, room, cap });
     this.rand = rng(seed);
     this.groups = [];
     this.people = 0; // people in active groups
@@ -86,7 +105,8 @@ export class Pedestrians {
     const walker = new Walker(this.graph, n, r, { speed, lateral });
     walker.baseLateral = lateral;
     walker.place();
-    Object.assign(g, { walker, members, size, pause: 0, nextPause: 15 + r() * 60, chat: r() < 0.6 });
+    Object.assign(g, { walker, members, size, pause: 0, nextPause: 15 + r() * 60, chat: r() < 0.6, file: 0, fileGoal: 0, roomT: r() * 0.3, wait: 0 });
+    walker.hw = ((size - 1) / 2) * SIDE;
     return true;
   }
 
@@ -122,11 +142,26 @@ export class Pedestrians {
     this.t += dt;
     this.dt = dt;
     const active = this.groups.slice(0, this.active ?? 0);
-    avoid(active.map((g) => g.walker));
+    const ws = active.map((g) => g.walker);
+    avoid(ws);
+    separate(ws); // personal space: never through another group
     const r = this.rand;
     for (const g of active) {
       const k = g.walker;
       if (Math.hypot(k.x - target[0], k.z - target[1]) > radius * 1.25) this.spawn(g, target[0], target[1], radius * 0.5);
+      this.fitRoom(g, dt);
+      // a bus or car coming across: wait at the kerb (don't walk into it), but not forever
+      const ax = k.x + (k.dirX ?? 0) * LOOK_M, az = k.z + (k.dirZ ?? 1) * LOOK_M;
+      if (g.pause <= 0 && vehicles.length && g.wait < WAIT_MAX_S && vehicles.some((f) => inVehiclePath(f, ax, az) && !inVehiclePath(f, k.x, k.z, 0, 0.3))) {
+        g.wait += dt;
+        g.travelled = 0;
+        k.stopped = true;
+        k.place();
+        clearVehicles([k], vehicles, g.size > 1 ? 1.9 : 0.9);
+        continue;
+      }
+      k.stopped = g.pause > 0;
+      if (g.wait > 0) g.wait = Math.max(0, g.wait - dt * 0.5);
       if (g.pause > 0) {
         g.pause -= dt;
         g.travelled = 0;
@@ -144,24 +179,69 @@ export class Pedestrians {
     }
   }
 
+  /**
+   * Narrow pavements: a group whose people would stand in a wall falls into single file (and
+   * spreads out again where there is room); a leader against a wall drifts to the path's middle.
+   * Checked a few times a second per group.
+   */
+  fitRoom(g, dt) {
+    g.roomT -= dt;
+    if (g.roomT <= 0) {
+      g.roomT = 0.3;
+      const k = g.walker, y = this.ground(k.x, k.z);
+      g.y = y;
+      if (!this.room(k.x, k.z, y)) { k.baseLateral *= 0.5; if (Math.abs(k.baseLateral) < 0.1) k.baseLateral = 0; }
+      if (g.size > 1) {
+        const side = g.members.some((m) => { const p = this.memberAt(g, m, 0); return !this.room(p.x, p.z, y); });
+        g.fileGoal = side ? 1 : (g.fileGoal && g.members.some((m) => { const p = this.memberAt(g, m, 1, 0); return !this.room(p.x, p.z, y); }) ? 1 : 0);
+      }
+    }
+    g.file += (g.fileGoal - g.file) * Math.min(1, dt * 2.5);
+    g.walker.hw = ((g.size - 1) / 2) * SIDE * (1 - g.file);
+  }
+
+  /** Where member m stands: side by side (file 0) .. one behind the other (file 1). */
+  memberAt(g, m, file = g.file, fileTo = file) {
+    const k = g.walker, fx = k.dirX ?? 0, fz = k.dirZ ?? 1, rx = fz, rz = -fx;
+    const rank = g.members.indexOf(m), side = m.off * (1 - fileTo), back = m.back + rank * FILE * file;
+    return { x: k.x + rx * side - fx * back, z: k.z + rz * side - fz * back };
+  }
+
+  /** Ground under a member: never a roof (a person in a wall stays at the leader's height). */
+  memberY(g, x, z) {
+    const y = this.ground(x, z), base = g.y ?? this.ground(g.walker.x, g.walker.z);
+    return Number.isFinite(y) && y - base <= 1.2 ? y : base;
+  }
+
   /** Add every visible person to the crowd (FigureCrowd). Ground from this.ground. */
   draw(crowd) {
     const t = this.t;
     for (let q = 0; q < (this.active ?? 0); q++) {
       const g = this.groups[q], k = g.walker;
-      const fx = k.dirX ?? 0, fz = k.dirZ ?? 1; // walking direction (Unity x/z)
-      const rx = fz, rz = -fx; // right
-      const walking = g.pause <= 0;
+      const walking = g.pause <= 0 && !(g.wait > 0 && g.travelled === 0);
       for (const m of g.members) {
-        const x = k.x + rx * m.off - fx * m.back, z = k.z + rz * m.off - fz * m.back;
+        const { x, z } = this.memberAt(g, m);
         let yaw = k.yaw;
-        if (!walking && g.size > 1 && g.chat) yaw = (k.yaw + (m.off < 0 ? 70 : -70) + 360) % 360; // turn to each other
+        if (g.pause > 0 && g.size > 1 && g.chat) yaw = (k.yaw + (m.off < 0 ? 70 : -70) + 360) % 360; // turn to each other
         m.yaw = turnToward(m.yaw, yaw, 400 * Math.max(this.dt || 0, 1 / 60));
         if (walking) m.phase += (g.travelled / (STRIDE * m.v.scale)) * Math.PI;
-        crowd.add(m.v, { x, y: this.ground(x, z), z: -z, rotY: (-m.yaw * Math.PI) / 180,
+        crowd.add(m.v, { x, y: this.memberY(g, x, z), z: -z, rotY: (-m.yaw * Math.PI) / 180,
           mode: walking ? MODE.WALK : MODE.IDLE, phase: m.phase, speed: walking ? k.speed * k.slow : 0, t: t + m.phase });
       }
     }
+  }
+
+  /** Every person's position [{ x, z, y, g }] (Unity metres; g: group index) for the audit. */
+  members() {
+    const out = [];
+    for (let q = 0; q < (this.active ?? 0); q++) {
+      const g = this.groups[q];
+      for (const m of g.members) {
+        const { x, z } = this.memberAt(g, m);
+        out.push({ x, z, y: this.memberY(g, x, z), g: q });
+      }
+    }
+    return out;
   }
 
   /** Walker positions (for vehicles clearing, tests). */

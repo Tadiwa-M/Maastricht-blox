@@ -25,6 +25,7 @@ import { PropSet } from '../figure/props.js';
 import { figureMaterial } from '../figure/parts.js';
 import { Boats } from './boats.js';
 import { makeGround, makeDeck, cityOf } from './ground.js';
+import { auditLife } from './audit.js';
 import { loadLifeData } from './data.js';
 import { walkwaysFromWorld, islandBlocker } from './fallback.js';
 import { bindLifeUI } from './ui.js';
@@ -78,15 +79,13 @@ export function initialClock(hash = typeof location !== 'undefined' ? location.h
 
 /**
  * What the traffic rules see this frame (life/traffic.js stepTraffic env): the light clock (game
- * seconds of the day), people who may be on a crossing (walker groups, the player), and obstacles
- * in the lanes (buses as three circles along their length, cyclists, the player).
+ * seconds of the day), people who may be on a crossing (walker groups, the player), obstacles in
+ * the lanes (cyclists, the player) and the buses and trains (footprint, speed and timetable
+ * sweep, buses.js: cars give way to them, also where paths cross at junctions).
  */
-function trafficEnvFor(state, clock, buses, busHalf) {
+function trafficEnvFor(state, clock, buses) {
   const obstacles = [], people = [];
-  for (const b of buses) {
-    const r = (b.yaw * Math.PI) / 180, fx = Math.sin(r), fz = Math.cos(r), h = busHalf ? busHalf[1] * 0.66 : 4;
-    for (const k of [-1, 0, 1]) obstacles.push({ x: b.x + fx * h * k, z: b.z + fz * h * k, r: busHalf ? busHalf[0] : 1.3 });
-  }
+  const vehicles = state.vehicles || buses;
   if (state.cyclists) state.cyclists.positions(obstacles);
   for (const g of state.walkers?.groups || []) if (g.walker) people.push({ x: g.walker.x, z: g.walker.z });
   const pl = typeof window !== 'undefined' ? window.__bloxPlayer : null;
@@ -94,7 +93,26 @@ function trafficEnvFor(state, clock, buses, busHalf) {
     const p = { x: pl.ctrl.pos[0], z: -pl.ctrl.pos[2], r: 0.4 };
     obstacles.push(p); people.push(p);
   }
-  return { t: clock.sec, people, obstacles };
+  return { t: clock.sec, people, obstacles, vehicles };
+}
+
+/**
+ * Buses and trains hold back for what is right in front of them (cars, bikes, the player) and
+ * make the lag up afterwards (buses.js hold). Only at normal clock speed; fast-forward just
+ * catches up.
+ */
+function holdTransit(state, clock, dt, at) {
+  if (!state.buses && !state.trains) return;
+  const blockers = [];
+  if (clock.speed === 1) {
+    if (state.cars) blockers.push(...state.cars.footprints(null, 1000));
+    if (state.cyclists) state.cyclists.positions(blockers);
+    const pl = typeof window !== 'undefined' ? window.__bloxPlayer : null;
+    if (pl?.mode === 'walk') blockers.push({ x: pl.ctrl.pos[0], z: -pl.ctrl.pos[2], r: 0.4 });
+  }
+  const gdt = dt * (clock.speed || 1);
+  state.buses?.hold(gdt, blockers, at);
+  state.trains?.hold(gdt, blockers, at);
 }
 
 /** Unity y of the water surface: water tops along the river in the world, else 44.1 m NAP. */
@@ -175,7 +193,9 @@ export async function initLife(ctx) {
     const graph = new WalkGraph(clipWalkways(walkDoc, rect));
     if (graph.buckets.size) {
       walkGraph = graph;
-      state.walkers = new Pedestrians({ graph, ground, cap: FIGURES_BY_TIER.high });
+      // a person standing at y there: is the body (1 m and 1.6 m up) clear of walls? unknown: yes
+      const room = (x, z, y) => { const c = cityOf(ctx); return !c?.isSolid || (c.isSolid(x, y + 1.0, -z) !== true && c.isSolid(x, y + 1.6, -z) !== true); };
+      state.walkers = new Pedestrians({ graph, ground, room, cap: FIGURES_BY_TIER.high });
       hideDemo(models.character.name);
     }
   }
@@ -271,25 +291,27 @@ export async function initLife(ctx) {
     const buses = state.buses ? state.buses.update(clock, camera) : [];
     // every scheduled vehicle this frame (Ride: the transit panel and the passenger camera read this)
     state.vehicles = state.trains ? buses.concat(state.trains.update(clock, camera)) : buses;
+    holdTransit(state, clock, dt, at); // (the lag shows from the next frame on)
     const traffic = trafficFactor(clock.hours, clock.day);
     if (state.cars) {
       state.cars.setCount(Math.round(by(CARS_BY_TIER) * traffic), at);
       state.cars.update(dt, at, Math.max(R, 150), trafficEnv(buses));
     }
+    // every vehicle's footprint near the action: people and bikes wait for them and keep clear
+    const trainHalf = [models.train.size[0] * world.studM / 2, models.train.size[1] * world.studM / 2];
+    state.trainHalf = trainHalf;
+    const vehicles = state.vehicles.map((b) => (b.mode === 'rail'
+      ? { x: b.x, z: b.z, yaw: b.yaw, halfW: trainHalf[0], halfL: trainHalf[1], v: b.v }
+      : { x: b.x, z: b.z, yaw: b.yaw, halfW: busHalf[0], halfL: busHalf[1], v: b.v }));
+    if (state.cars) vehicles.push(...state.cars.footprints(at, 40));
     if (state.cyclists) {
       state.cyclists.setCount(Math.round(by(CYCLISTS_BY_TIER) * traffic), at);
-      state.cyclists.update(dt, at, Math.max(R, 120));
+      state.cyclists.update(dt, at, Math.max(R, 120), vehicles);
     }
     if (state.walkers) {
       reweigh();
       state.walkers.setRain(rainNow());
       state.walkers.setCount(Math.round(by(FIGURES_BY_TIER) * crowdFactor(clock.hours, clock.day)), at);
-      const trainHalf = [models.train.size[0] * world.studM / 2, models.train.size[1] * world.studM / 2];
-      state.trainHalf = trainHalf;
-      const vehicles = state.vehicles.map((b) => (b.mode === 'rail'
-        ? { x: b.x, z: b.z, yaw: b.yaw, halfW: trainHalf[0], halfL: trainHalf[1] }
-        : { x: b.x, z: b.z, yaw: b.yaw, halfW: busHalf[0], halfL: busHalf[1] }));
-      if (state.cars) vehicles.push(...state.cars.footprints(at, 30));
       state.walkers.update(dt, at, R, vehicles);
     }
     let dirty = state.terraces ? state.terraces.refresh(at) : false;
@@ -320,6 +342,26 @@ export async function initLife(ctx) {
     }
   }
   state.step = step; // screenshots: re-place everything after moving the camera
+  // tools/life-audit.mjs: what looks broken right now (life/audit.js)
+  state.audit = () => {
+    const city = cityOf(ctx);
+    const street = city?.groundHeight ? (x, z) => { // the lowest walkable top within 5 m: street level
+      let low = Infinity;
+      for (let a = 0; a < 8; a++) for (const d of [0, 2.5, 5]) {
+        const g = city.groundHeight(x + d * Math.cos(a * 0.785), -(z + d * Math.sin(a * 0.785)));
+        if (Number.isFinite(g)) low = Math.min(low, g);
+      }
+      return low === Infinity ? null : low;
+    } : null;
+    const half = (b) => (b.mode === 'rail' ? state.trainHalf : state.busHalf) || state.busHalf;
+    return auditLife({
+      people: state.walkers?.members() || [],
+      buses: (state.vehicles || []).map((b) => ({ x: b.x, z: b.z, yaw: b.yaw, halfW: half(b)[0], halfL: half(b)[1] })),
+      cars: state.cars ? state.cars.footprints(null, 1000) : [],
+      bikes: state.cyclists ? state.cyclists.riders.slice(0, state.cyclists.count).map((c) => ({ x: c.walker.x, z: c.walker.z, yaw: c.yaw ?? c.walker.yaw ?? 0 })) : [],
+      street,
+    });
+  };
   step(0);
   for (let q = 0; q < 4; q++) { // spread the walk cycles and let traffic settle
     state.walkers?.update(0.4, target(), livingRadius());

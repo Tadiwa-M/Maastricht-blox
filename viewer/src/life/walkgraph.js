@@ -170,7 +170,9 @@ export function turnToward(from, to, maxDeg) {
  * and step aside (to the right) for oncoming ones. Uses a uniform grid; O(n).
  */
 export function avoid(walkers, radius = 1.1) {
-  const cell = radius, grid = new Map();
+  // w.hw: half the width of what walks there (a group side by side) beyond one person
+  const wide = walkers.reduce((m, w) => Math.max(m, w.hw || 0), 0);
+  const cell = radius + 2 * wide, grid = new Map();
   const k = (i, j) => i * 73856093 ^ j * 19349663;
   for (const w of walkers) {
     w.slow = 1;
@@ -184,15 +186,53 @@ export function avoid(walkers, radius = 1.1) {
     for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) {
       for (const o of grid.get(k(i, j)) || []) {
         if (o === w) continue;
-        const dx = o.x - w.x, dz = o.z - w.z, d = Math.hypot(dx, dz);
-        if (d > radius || d === 0) continue;
+        const dx = o.x - w.x, dz = o.z - w.z, d = Math.hypot(dx, dz), R = radius + (w.hw || 0) + (o.hw || 0);
+        if (d > R || d === 0) continue;
         const ahead = (dx * w.dirX + dz * w.dirZ) / d;
         if (ahead < 0.3) continue;
+        if (o.stopped) { // people standing (a chat, waiting at the kerb): walk round them, don't through
+          side = 1;
+          w.slow = Math.min(w.slow, Math.max(0, (d - 0.6) / R));
+          continue;
+        }
         const same = o.dirX * w.dirX + o.dirZ * w.dirZ;
-        if (same > 0.5) w.slow = Math.min(w.slow, Math.max(0.3, d / radius * Math.min(1, o.speed / w.speed)));
+        if (same > 0.5) w.slow = Math.min(w.slow, Math.max(d < R * 0.55 ? 0 : 0.3, d / R * Math.min(1, o.speed / w.speed)));
         else side = 1;
       }
     }
-    w.lateralGoal = side ? Math.min(2, w.baseLateral + 0.9) : w.baseLateral ?? w.lateralGoal;
+    w.lateralGoal = side ? Math.min(2.5, (w.baseLateral ?? 0) + 0.9 + (w.hw || 0)) : w.baseLateral ?? w.lateralGoal;
+  }
+}
+
+/**
+ * Personal space: groups (a disc of radius `body` + their half width w.hw) that overlap step
+ * apart sideways (their lateral offset, which eases back afterwards), and a walker with someone
+ * right in front slows nearly to a stop. Run after avoid(); O(n) with a grid.
+ */
+export function separate(walkers, body = 0.3, maxLateral = 3) {
+  const wide = walkers.reduce((m, w) => Math.max(m, w.hw || 0), 0);
+  const cell = 2 * (body + wide) || 1, grid = new Map(), key = (i, j) => i * 73856093 ^ j * 19349663;
+  for (const w of walkers) {
+    const k = key(Math.floor(w.x / cell), Math.floor(w.z / cell));
+    if (!grid.has(k)) grid.set(k, []);
+    grid.get(k).push(w);
+  }
+  const seen = new Set();
+  for (const w of walkers) {
+    const i0 = Math.floor(w.x / cell), j0 = Math.floor(w.z / cell);
+    seen.add(w);
+    for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) {
+      for (const o of grid.get(key(i, j)) || []) {
+        if (seen.has(o)) continue;
+        const dx = o.x - w.x, dz = o.z - w.z, d = Math.hypot(dx, dz) || 1e-3, R = 2 * body + (w.hw || 0) + (o.hw || 0);
+        if (d >= R) continue;
+        const nx = dx / d, nz = dz / d, push = (R - d) / 2;
+        for (const [a, s] of [[w, -1], [o, 1]]) {
+          const fx = a.dirX ?? 0, fz = a.dirZ ?? 1;
+          a.lateral = Math.max(-maxLateral, Math.min(maxLateral, a.lateral + s * (nx * fz - nz * fx) * push));
+          if (s * (nx * fx + nz * fz) < -0.5 && !a.stopped) a.slow = Math.min(a.slow ?? 1, 0.15); // someone right in front
+        }
+      }
+    }
   }
 }

@@ -223,7 +223,7 @@ GTA V: minimal UI, tips in one corner, a small spinner in the other).
   rendering) a 1080p view of the city takes hours.
 - **Key art all the way (2026-11-06):** the slides (rotating in-game shots of the city) stay up
   until start; the 3D city no longer shows behind the logo (the owner: a whole-city overview in
-  3D "takes you out of it"). Behind the slides the camera already waits at street level.
+  3D "takes you out of it"); the city appears when you press start.
 - **Corners:** "DID YOU KNOW" tips bottom-left, crossfading every 5.5 s (`TIPS`); a flipping brick
   spinner with the phase message bottom-right; a thin progress line along the bottom edge.
 - **Ready:** PRESS ANY KEY (TAP TO START on touch) with button prompts (Drag: Explore,
@@ -233,14 +233,9 @@ GTA V: minimal UI, tips in one corner, a small spinner in the other).
 - Phases are the pure `loadState()`: index -> silhouette -> first ring (90%, settled or 8 s) ->
   8 drawn frames. Notices wait for `whenGone()`; load errors show on the screen. Skipped under
   `?shot=1` and webdriver, so the screenshot, perf and film tools are unchanged.
-- **Start in the street (`src/intro.js`, 2026-11-06):** a plain load puts the hidden camera at
-  street level at the Markt, so that is what streams in first; on start the player stands on the
-  most open spot of the square (`player/spot.js` `openSpot`: street-level ground with the most clear
-  space at eye height, facing the longest view with room behind for the camera), a straight cut in
-  walk mode. On a slow connection it waits up to 20 s for the street, then leaves you at street
-  level. Not for links to a view or spot (`#view=`, `#at=`, `#mode=`), `?shot=1`/`?film=1` or
-  webdriver; `#intro=1` forces it, `#intro=0` skips it. (A camera fly-in from the city view was
-  tried and dropped the same day: it clipped through buildings.)
+- **After start:** you are at the city view and zoom in yourself (the owner prefers it to a
+  scripted start; a camera fly-in and a straight cut to the street were both tried on 2026-11-06
+  and dropped).
 - **The settings panel** (sun, quality, views, stats) starts collapsed for everyone: the game
   opens on the city, not on a map tool. "show" or U opens it; the choice is remembered.
 

@@ -1362,3 +1362,51 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   `makeDeck` also moves a vehicle whose route line runs beside a deck over the water onto it.
 - Seen in the videos, still open: buses drive through crowds on shared streets (pedestrians don't
   give way), and "next stop · now" can stay up while the bus is still driving.
+
+## 2026-11-06: traffic that keeps to the rules; buses in traffic; the police car
+
+- Owner (videos): no traffic laws visible, buses through bikes, a car body through the passenger
+  cabin of the bus being ridden, vehicles phasing through each other at junctions. Wants cars that
+  behave like cars and respect buses and the rules, and a police car as an easter egg.
+- Causes found: (1) right of way only looked at cars still approaching a junction, so a car
+  already in the box was invisible to cross traffic, and a car on green had no check at all;
+  (2) rules only looked at the end of the current edge, so a short OSM edge before a light hid
+  the red until it was too late to stop; (3) the signal stop line sat 1.5 m from the node centre,
+  inside the crossing lane; (4) buses were three circles seen only once in front of a car, no
+  prediction, trains not at all; (5) buses, being timetable-driven, drove into cars queuing in
+  front of them; (6) `carPose` jumped between lane lines at corners (a right turn showed yaw 304°).
+- Changed: junction boxes with movements and commit (`life/junctions.js`), two-node lookahead,
+  stop line before the box, conflict-aware right of way, left turns yield on green, ring
+  detection, lane-corner poses; buses/trains carry a timetable sweep the cars give way to; a
+  per-trip hold-back lag for buses (max 120 s, made up at 1.25x; `life/busflow.js`); the police
+  car (`life/police.js`, `CAR_TYPES.police`, light bar lenses in `figure/vehicles.js`, also on the
+  vehicles design sheet). Guide: 05, "Junction boxes, buses in traffic, the police car".
+- Measured on a synthetic grid (70 cars, 3 buses, 240 s): car-car overlap frames 870 -> 0,
+  car-bus 550 -> 0, distance driven -5 %. Tests: viewer +13 (`life.junctions`, `life.busflow`);
+  the four-way standoff test now allows 24 s (cars cross one at a time).
+- Open: buses ignore red lights; with very dense traffic a bus reaches its lag cap and goes on.
+
+## 2026-11-06: people behave like people; the street-life audit
+
+- Owner: back to starting at the city view (the fly-in and the street cut are gone; the title
+  slides and the bus fixes stay). Then: people walking through each other and on roofs, buses
+  driving through bikes, nobody giving way.
+- `src/life/audit.js` + `tools/life-audit.mjs`: counts, per snapshot of the running game, people
+  through people, people inside vehicles, people on roofs (> 2.5 m above the street within 5 m),
+  bikes inside vehicles, bikes through bikes, cars inside buses, cars through cars.
+- People (`walkers.js`, `walkgraph.js`): `separate()` gives every group its personal space (a disc
+  as wide as the group) through the lateral offset, and slows whoever has someone right in front;
+  `avoid()` counts group widths and walks round people standing still; groups fall into single
+  file where a member would stand in a wall (`fitRoom`), and nobody is drawn more than 1.2 m above
+  the group's leader; people wait at the kerb for a moving bus or car about to cross their path
+  (`inVehiclePath`, the road it covers in ~2.5 s), up to 8 s.
+- Bikes (`cyclists.js`): queue behind the bike in front (`queue()`), avoid each other, brake for a
+  vehicle in the way, and step aside from one for good (lateral offset).
+- Measured with the audit at high quality (900 people, 109 bikes; Markt, Vrijthof, Station,
+  60 s each; average per snapshot, before -> after together with the junction work above):
+  cars through cars 11.9 -> 0.56, cars in buses 0.03 -> 0, people through people 46.6 -> 15.9,
+  people in vehicles 0.49 -> 0.06, bikes through bikes 11.5 -> 3.6, bikes in vehicles 14.6 -> 10.4.
+- Open: bikes in vehicles (cars and buses don't wait for bikes crossing their path yet); about 45
+  people at the Station stand > 2.5 m above the ground within 5 m (platforms and the footbridge or
+  real roofs: to check on the workstation); people still cross roads anywhere (no crossings yet).
+

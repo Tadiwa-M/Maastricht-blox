@@ -5,10 +5,35 @@
 import { MODE } from '../figure/rig.js';
 import { makeVariant } from '../figure/variants.js';
 import { BIKE } from '../figure/vehicles.js';
-import { Walker, rng, turnToward } from './walkgraph.js';
+import { Walker, avoid, rng, turnToward } from './walkgraph.js';
+import { clearVehicles, inVehiclePath } from './walkers.js';
+
+const LOOK_M = 3.5; // a rider checks this far ahead for a vehicle in the way
 
 const BIKE_COLOURS = ['#1E1F21', '#1E1F21', '#22385A', '#2F5A3C', '#A33A2B', '#5C6062', '#6E8798', '#F2F0EA', '#C0643A', '#88A891', '#5B8DB8', '#7A2A22'];
 const CRANK_M = 5.2; // metres ridden per pedal turn
+
+/**
+ * Bikes queue: a rider stops behind the bike in front (same direction, same lane) instead of
+ * riding through it; GAP_M nose to tail at a standstill, full speed from GAP_M + 3 m.
+ */
+const GAP_M = 2.0;
+export function queue(riders) {
+  const cell = 6, grid = new Map(), key = (x, z) => `${Math.floor(x / cell)},${Math.floor(z / cell)}`;
+  for (const w of riders) { const k = key(w.x, w.z); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(w); }
+  for (const w of riders) {
+    const fx = w.dirX ?? 0, fz = w.dirZ ?? 1, i0 = Math.floor(w.x / cell), j0 = Math.floor(w.z / cell);
+    for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) {
+      for (const o of grid.get(`${i},${j}`) || []) {
+        if (o === w) continue;
+        const dx = o.x - w.x, dz = o.z - w.z, along = dx * fx + dz * fz, across = Math.abs(dx * fz - dz * fx);
+        if (along <= 0 || along > GAP_M + 3 || across > 0.9) continue;
+        if ((o.dirX ?? 0) * fx + (o.dirZ ?? 1) * fz < 0.3) continue; // oncoming: avoid() steps aside
+        w.slow = Math.min(w.slow, Math.max(0, (along - GAP_M) / 3));
+      }
+    }
+  }
+}
 
 export class Cyclists {
   /** graph: WalkGraph of the cycle network. ground(x, z) -> y. */
@@ -45,12 +70,26 @@ export class Cyclists {
     this.count = Math.min(n, this.riders.length);
   }
 
-  update(dt, target, radius = this.radius) {
+  /** vehicles: footprints (buses, trains, cars) to wait for and keep clear of. */
+  update(dt, target, radius = this.radius, vehicles = []) {
     this.radius = radius;
-    for (const c of this.riders.slice(0, this.count)) {
+    const riders = this.riders.slice(0, this.count);
+    avoid(riders.map((c) => c.walker), 2.2); // slow down behind a slower bike, pass on the side
+    queue(riders.map((c) => c.walker)); // and never ride into the one in front
+    for (const c of riders) {
       const k = c.walker;
       if (Math.hypot(k.x - target[0], k.z - target[1]) > radius * 1.25) this.spawn(c, target[0], target[1], radius * 0.5);
+      // a bus or car in the way (ahead of the bike, or about to cross): brake and wait
+      const ax = k.x + (k.dirX ?? 0) * LOOK_M, az = k.z + (k.dirZ ?? 1) * LOOK_M;
+      if (vehicles.some((f) => inVehiclePath(f, ax, az, 5, 0.4))) k.slow = 0;
       c.dist += k.step(dt);
+      if (vehicles.length) { // never inside one (a bike is ~1.7 m long): step aside, and stay aside
+        const x0 = k.x, z0 = k.z;
+        if (clearVehicles([k], vehicles, 1.0)) {
+          const fx = k.dirX ?? 0, fz = k.dirZ ?? 1;
+          k.lateral = Math.max(-3.5, Math.min(3.5, k.lateral + (k.x - x0) * fz - (k.z - z0) * fx));
+        }
+      }
       c.yaw = turnToward(c.yaw, k.yaw, 200 * Math.max(dt, 1 / 60));
     }
   }
