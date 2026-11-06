@@ -2,7 +2,7 @@
 // frame) and save them as JPEGs for the title screen's slideshow (src/title/, copied to the site by
 // build.mjs). The views recreate classic Maastricht postcard angles in bricks.
 // Usage: node tools/keyart.mjs --site <city site dir> | --url <live site> [outDir=src/title] [--only maas,brug]
-//        [--quality high|medium] [--headless]
+//        [--quality high|medium] [--headless] [--size 960x540 (previews; default 1920x1080)]
 // --url renders from the published site (no world files needed), e.g.
 //   node tools/keyart.mjs --url https://tadiwa-m.github.io/Maastricht_larper/
 // Without --headless a browser window opens so the GPU renders (about a minute a view; software
@@ -18,8 +18,13 @@ export const VIEWS = [
   { name: 'vrijthof', place: 'Vrijthof', t: 10.5, day: 'sat', cam: [1545, 38, -3735], target: [1440, 18, -3688], fov: 55 },
   { name: 'stadhuis', place: 'Stadhuis · Markt', t: 9.5, day: 'wed', cam: [1668, 1.7, -3915], target: [1722, 16, -3990], fov: 60 },
   { name: 'maas', place: 'De Maas', t: 17.8, day: 'fri', cam: [2320, 170, -3640], target: [1760, 0, -3860], fov: 45 },
+  { name: 'olv', place: 'Onze Lieve Vrouweplein', t: 15.5, day: 'sun', cam: [1960, 55, -3440], target: [1825, 14, -3560], fov: 50 },
+  { name: 'brug', place: 'Sint Servaasbrug', t: 17.2, day: 'sat', cam: [2050, 25, -3550], target: [2048, 6, -3786], fov: 50 },
+  { name: 'station', place: 'Station Maastricht', t: 8.5, day: 'mon', cam: [2470, 45, -3835], target: [2703, 6, -3800], fov: 55 },
+  { name: 'bonnefanten', place: 'Bonnefanten · Céramique', t: 15.5, day: 'thu', cam: [2120, 80, -3180], target: [2340, 12, -3098], fov: 50 },
+  { name: 'helpoort', place: 'Helpoort · Jekerkwartier', t: 11, day: 'tue', cam: [1900, 30, -3290], target: [1838, 6, -3362], fov: 55 },
+  { name: 'enci', place: 'ENCI-groeve · Sint-Pietersberg', t: 16.2, day: 'sun', cam: [1849, 220, -1180], target: [1849, -30, -820], fov: 50 },
 ];
-// Bridges (Sint Servaasbrug, Wilhelminabrug) are left out until they are modelled properly.
 const STREAM_S = 240; // longest wait for a view to stream in
 
 async function main() {
@@ -30,14 +35,15 @@ async function main() {
   const root = live ? null : siteArg(argv, null);
   if (!root && !live) throw new Error('--site <dir> (a scripts/site build of the city) or --url <site> is required');
   const headless = flag('--headless'), only = opt('--only')?.split(','), quality = opt('--quality') || 'high';
+  const [W, H] = (opt('--size') || '1920x1080').split('x').map(Number);
   const out = resolve(argv[0] || join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'title'));
   await mkdir(out, { recursive: true });
   const { server, url } = live ? { server: null, url: live.endsWith('/') ? live : `${live}/` } : await serve(root);
-  const browser = await chromium.launch({ headless,
+  const browser = await chromium.launch({ headless, executablePath: process.env.BLOX_CHROMIUM || undefined, // as screenshot.mjs
     args: headless ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--ignore-gpu-blocklist'] });
   try {
     for (const v of VIEWS.filter((x) => !only || only.includes(x.name))) {
-      const p = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+      const p = await browser.newPage({ viewport: { width: W, height: H } });
       p.on('pageerror', (e) => console.log(`[${v.name}] ${e.message}`));
       console.log(`[${v.name}] loading the city (the window stays dark until it is in)...`);
       await p.goto(`${url}index.html?film=1#quality=${quality}&view=markt&t=${v.t}&day=${v.day}`);

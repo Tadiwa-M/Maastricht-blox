@@ -24,7 +24,7 @@ import { VehicleFleet } from '../figure/vehicles.js';
 import { PropSet } from '../figure/props.js';
 import { figureMaterial } from '../figure/parts.js';
 import { Boats } from './boats.js';
-import { makeGround, cityOf } from './ground.js';
+import { makeGround, makeDeck, cityOf } from './ground.js';
 import { loadLifeData } from './data.js';
 import { walkwaysFromWorld, islandBlocker } from './fallback.js';
 import { bindLifeUI } from './ui.js';
@@ -157,10 +157,11 @@ export async function initLife(ctx) {
     state.timetable = new Timetable(data.transit);
     const relay = typeof window !== 'undefined' ? window.BLOX_SITE?.relay : '';
     if (relay && !ctx.still) { state.live = new LiveFeed(relay, state.timetable); state.live.start(); }
-    state.buses = new TimetableBuses({ timetable: state.timetable, model: models.bus, opts, ground, modes: ['bus', 'tram', 'other'] });
+    const deck = makeDeck(ctx);
+    state.buses = new TimetableBuses({ timetable: state.timetable, model: models.bus, opts, ground, deck, modes: ['bus', 'tram', 'other'] });
     group.add(state.buses.group);
     if (state.timetable.routes.some((r) => r.mode === 'rail')) { // trains on the rails, no lane offset
-      state.trains = new TimetableBuses({ timetable: state.timetable, model: models.train, opts, ground, modes: ['rail', 'metro'],
+      state.trains = new TimetableBuses({ timetable: state.timetable, model: models.train, opts, ground, deck, modes: ['rail', 'metro'],
         laneM: 0, caps: { full: 8, box: 40 } });
       group.add(state.trains.group);
     }

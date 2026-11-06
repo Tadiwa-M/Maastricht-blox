@@ -5,6 +5,7 @@
 // destination. "Teleport" skips the walk: the clock jumps to the first bus's departure and you sit
 // on it. "End trip" stops guiding. The step logic is trip.js; the search is raptor.js.
 
+import { builtAt } from '../player/spot.js';
 import { TripPlanner } from './raptor.js';
 import { WalkRouter } from './walk.js';
 import { TripGuide } from './trip.js';
@@ -77,12 +78,7 @@ export async function initTrip(ctx) {
     return t ? [t.x, -t.z] : [0, 0];
   }
   /** Is (x, z) (Unity metres) in the built part of the city? Stops past its edge are open baseplate. */
-  function built(x, z) {
-    const c = ctx.city;
-    if (!c?.bounded) return true; // the single embedded world: no streaming index to ask
-    const CM = (c.chunkStuds || 64) * (c.studM || 0.5);
-    return c.hasChunk(Math.floor(x / CM), Math.floor(z / CM));
-  }
+  const built = (x, z) => builtAt(ctx.city, x, z);
   /** Shops, cafés, streets, addresses (the world's features) and the timetable's stops. */
   function places() {
     const n = ctx.features?.size || 0;
@@ -171,7 +167,7 @@ export async function initTrip(ctx) {
       const [x, z] = s.from; // start walking where the trip starts (your GPS position, or the place you typed)
       const to = j.legs[0]?.to; // face the first leg (compass yaw: 0 north, + clockwise)
       const yaw = to && Math.hypot(to.x - x, to.z - z) > 1 ? Math.atan2(to.x - x, to.z - z) : 0;
-      p.enterAtUnity(x, z, yaw, yaw, true);
+      p.enterNearUnity(x, z, yaw, yaw, true);
     }
     s.routeFor = null;
     showHud();

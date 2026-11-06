@@ -1335,3 +1335,30 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - The settings panel starts collapsed for everyone (new storage key, so old "open" choices reset).
 - Checked headless (`#intro=1`, 1280x720): 3.6 km -> 24 m over 5.5 s, then walk mode next to the
   town hall. Tests: viewer +4 (path, yaw, when it runs).
+
+## 2026-11-06: start in the street; rides that stay on the map; more key art
+
+- Owner (videos from the workstation): the fly-in clipped through buildings and the whole-city
+  3D shot behind the title "takes you out of it"; jumping on a ride sometimes dropped them off the
+  map; getting off at Bouillonstraat put the player on the roofs.
+- The fly-in is gone. The title slides stay up until start (no 3D city behind the logo, no attract
+  orbit); behind them the camera waits at street level at the Markt, and start cuts straight to
+  the player on the most open spot of the square (`player/spot.js` `openSpot`).
+- Rides: buses outside the built city (or leaving it) can't be boarded (Running now shows
+  "Outside the built city"), stop search lists stops inside only, a bus about to leave drops you
+  at its last stop inside, the ride pins its lens every frame, and getting off lands beside the
+  doors on open pavement (`standSpot`; stop points often sit inside building footprints).
+- Key art: six new views (Onze Lieve Vrouweplein, Sint Servaasbrug, Station, Bonnefanten, Helpoort,
+  ENCI), framed with low-res previews here; the final 1080p renders are made on the GPU
+  workstation (`tools/keyart.mjs --size`, `BLOX_CHROMIUM`). Slides without an image are skipped.
+- Checked headless on the city data: start -> walk on the open Markt; outside bus refused; ride +
+  get off -> feet at street level beside the bus. Tests: viewer +3 (spots), intro tests trimmed.
+- Owner: a bus to the station "drove on the water, after driving on the bridge for a bit". The
+  life ground lookup starts 2.5 m above the area's baked ground (so tree crowns aren't taken for
+  the ground); over the river that baked ground is the water, so the high middle of the
+  Wilhelminabrug deck was above the search start and the water under it was returned: 1,242 of
+  3,608 bus line points near the bridge. `life/ground.js` now looks again up to 25 m higher when
+  the answer is water and takes a dry deck (0 left); walkers and cyclists on bridges get it too.
+  `makeDeck` also moves a vehicle whose route line runs beside a deck over the water onto it.
+- Seen in the videos, still open: buses drive through crowds on shared streets (pedestrians don't
+  give way), and "next stop · now" can stay up while the bus is still driving.

@@ -221,9 +221,9 @@ GTA V: minimal UI, tips in one corner, a small spinner in the other).
   build. The browser encodes the JPEGs (no ffmpeg needed). Each view waits in real time (up to
   240 s) until it has streamed in, printing progress every 10 s; `--quality medium` for weaker PCs. In a GPU-less container (software
   rendering) a 1080p view of the city takes hours.
-- **Live title:** once the baked skyline is in (`live()`), the backdrop clears to a vignette and
-  the real city plays behind the logo. `citymode.js` attract mode circles the camera around the
-  start view (0.045 rad/s) until start.
+- **Key art all the way (2026-11-06):** the slides (rotating in-game shots of the city) stay up
+  until start; the 3D city no longer shows behind the logo (the owner: a whole-city overview in
+  3D "takes you out of it"). Behind the slides the camera already waits at street level.
 - **Corners:** "DID YOU KNOW" tips bottom-left, crossfading every 5.5 s (`TIPS`); a flipping brick
   spinner with the phase message bottom-right; a thin progress line along the bottom edge.
 - **Ready:** PRESS ANY KEY (TAP TO START on touch) with button prompts (Drag: Explore,
@@ -233,13 +233,14 @@ GTA V: minimal UI, tips in one corner, a small spinner in the other).
 - Phases are the pure `loadState()`: index -> silhouette -> first ring (90%, settled or 8 s) ->
   8 drawn frames. Notices wait for `whenGone()`; load errors show on the screen. Skipped under
   `?shot=1` and webdriver, so the screenshot, perf and film tools are unchanged.
-- **Fly-in (`src/intro.js`, 2026-11-06):** on start the camera swoops from the city view down to
-  street level at the Markt in 5.5 s (target in a line, distance shrinking geometrically, compass
-  the short way, tilt flattening; smootherstep), streaming the landing spot first
-  (`city.focus`). Once the street there is in, the player stands on open ground
-  (`findStreetSpot`) and walk mode takes over; on a slow connection it waits up to 20 s, then
-  leaves you at street level on the map. Not for links to a view or spot (`#view=`, `#at=`,
-  `#mode=`), `?shot=1`/`?film=1` or webdriver; `#intro=1` forces it, `#intro=0` skips it.
+- **Start in the street (`src/intro.js`, 2026-11-06):** a plain load puts the hidden camera at
+  street level at the Markt, so that is what streams in first; on start the player stands on the
+  most open spot of the square (`player/spot.js` `openSpot`: street-level ground with the most clear
+  space at eye height, facing the longest view with room behind for the camera), a straight cut in
+  walk mode. On a slow connection it waits up to 20 s for the street, then leaves you at street
+  level. Not for links to a view or spot (`#view=`, `#at=`, `#mode=`), `?shot=1`/`?film=1` or
+  webdriver; `#intro=1` forces it, `#intro=0` skips it. (A camera fly-in from the city view was
+  tried and dropped the same day: it clipped through buildings.)
 - **The settings panel** (sun, quality, views, stats) starts collapsed for everyone: the game
   opens on the city, not on a map tool. "show" or U opens it; the choice is remembered.
 
@@ -529,6 +530,16 @@ A phone-first page in every site build, next to the 3D city: `plan.html` + `plan
 - **Built city only (in the game):** the bus network runs past the built part of the city, so
   the in-game planner only uses stops that have city around them (`TripPlanner.setUsable`, from
   the streaming index's chunks); 📍 Me outside the built part says so instead of planning there.
+- **Rides stay in the built city (2026-11-06):** the Transit panel's Running now list marks buses
+  outside the built city (or about to leave it) "Outside the built city" with no Ride button, stop
+  search lists only stops inside, and `board()` refuses a vehicle out on the baseplate. A bus whose
+  next stop is outside drops you at its last stop inside (`wantOff` at the edge). Getting off puts
+  you beside the doors on open pavement (`player.enterNearUnity` -> `player/spot.js` `standSpot`):
+  GTFS stop points often fall inside a building's footprint, which put people on roofs. The ride
+  re-applies its own lens (fov, near) every frame.
+- **Bridges:** vehicles and people never stand on the river under a bridge: the ground lookup
+  (`life/ground.js`) retries higher when it lands on water and takes the dry deck above; route
+  lines that run beside a deck over the water snap across onto it (`makeDeck`).
 - **Riding owns the camera:** boarding leaves walk mode instantly (`exitWalk(true)`), and the
   player's draw-time tick ignores input while `__bloxRide.state.ride` is set; the page itself never
   zooms (pinch/double tap on panels).

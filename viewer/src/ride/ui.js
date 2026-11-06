@@ -50,6 +50,7 @@ const CSS = `
 #rd-hud .btns button { background: rgba(255,255,255,.1); color: #fff; border: 0; border-radius: 8px; padding: 8px 11px; font: 600 12px system-ui; cursor: pointer; }
 #rd-hud .btns button.main { background: #F2A900; color: #10153a; }
 #rd-hud .btns button.on { outline: 2px solid #F2A900; }
+.rd-out { color: #8d91ad; font-size: 11px; white-space: nowrap; }
 #rd-hud .hint { color: #8d91ad; font-size: 11px; margin-top: 8px; }
 body.riding #pl-bar, body.riding #pl-back, body.riding #rd-open, body.riding #pl-compass, body.riding #hud, body.riding #info { display: none !important; }
 body.title #rd-open, body.title #rd-panel, body.title .rd-mark { visibility: hidden; }
@@ -117,13 +118,15 @@ export class RideUI {
     }
   }
 
-  /** rows: [{ id, route, head, next, inSec }] (vehicles running now). */
+  /** rows: [{ id, route, head, next, inSec, outside }] (vehicles running now; outside: past the built city, no riding). */
   fillVehicles(rows) {
     if (!rows.length) { this.list.innerHTML = '<div class="rd-empty">Nothing running right now on this line.</div>'; return; }
     this.list.innerHTML = rows.map((r) => `<div class="rd-row" data-id="${esc(r.id)}">${chipHtml(r.route)}
       <div class="t"><b>→ ${esc(r.head)}</b><span>${r.next ? `Next: ${esc(r.next)} · ${waitLabel(r.inSec)}` : 'On the way'}</span></div>
-      <button class="rd-go">Ride</button></div>`).join('');
-    for (const row of this.list.querySelectorAll('.rd-row')) row.addEventListener('click', () => this.h.onRide(row.dataset.id));
+      ${r.outside ? '<span class="rd-out">Outside the built city</span>' : '<button class="rd-go">Ride</button>'}</div>`).join('');
+    for (const row of this.list.querySelectorAll('.rd-row')) {
+      if (!row.querySelector('.rd-out')) row.addEventListener('click', () => this.h.onRide(row.dataset.id));
+    }
   }
 
   /** stops: [name] matching the search. */

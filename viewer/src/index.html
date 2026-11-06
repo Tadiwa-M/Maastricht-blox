@@ -37,9 +37,8 @@
   /* title screen up: no game UI behind it */
   body.title .panel, body.title #pl-bar, body.title #pl-back, body.title #pl-compass, body.title #pl-street,
   body.title #pl-toast, body.title .pl-touch { visibility: hidden; }
-  /* Title screen, console-game style: while the city loads it is a dark key-art screen; once the
-     skyline is in (.live) the background clears and the real city plays behind the logo, the camera
-     circling slowly (citymode.js attract mode). Limburg flag colours as accents. */
+  /* Title screen, console-game style: a dark key-art screen with rotating in-game shots of the
+     city, up until start (the city streams in behind it). Limburg flag colours as accents. */
   #loading { --lb-blue: #10069F; --lb-yellow: #F2A900; --lb-red: #EF3340; --ink: #f6f3ea;
     --display: 'Anton', Impact, 'Arial Narrow Bold', 'Helvetica Neue Condensed Bold', sans-serif;
     position: fixed; inset: 0; z-index: 10; overflow: hidden; color: var(--ink); user-select: none; cursor: default;
@@ -57,7 +56,6 @@
     font: 400 clamp(16px, 2vw, 22px)/1 var(--display); letter-spacing: .16em; text-transform: uppercase;
     padding-left: 12px; border-left: 3px solid var(--lb-yellow); text-shadow: 0 2px 10px rgba(0,0,0,.7); transition: opacity .6s; }
   #loading .place:empty, #loading.ready .place { opacity: 0; }
-  #loading.ready .slides { opacity: 0; } /* the live city takes over at PRESS ANY KEY */
   #loading .shade { position: absolute; inset: 0; pointer-events: none; opacity: 1; transition: opacity 1.4s ease;
     background: linear-gradient(180deg, rgba(4,5,16,.75) 0%, rgba(4,5,16,0) 30%, rgba(4,5,16,0) 55%, rgba(4,5,16,.9) 100%),
       radial-gradient(ellipse at 50% 45%, transparent 45%, rgba(0,0,0,.55) 100%); }
@@ -143,6 +141,12 @@
     <div class="slide" style="--img: url(title/vrijthof.jpg); --x: -2%; --y: 1%" data-place="Vrijthof"></div>
     <div class="slide" style="--img: url(title/stadhuis.jpg); --x: 0%; --y: 2%" data-place="Stadhuis · Markt"></div>
     <div class="slide" style="--img: url(title/maas.jpg); --x: 2%; --y: -1%" data-place="De Maas"></div>
+    <div class="slide" style="--img: url(title/olv.jpg); --x: -1%; --y: 2%" data-place="Onze Lieve Vrouweplein"></div>
+    <div class="slide" style="--img: url(title/brug.jpg); --x: 2%; --y: 1%" data-place="Sint Servaasbrug"></div>
+    <div class="slide" style="--img: url(title/station.jpg); --x: -2%; --y: -1%" data-place="Station Maastricht"></div>
+    <div class="slide" style="--img: url(title/bonnefanten.jpg); --x: 1%; --y: 2%" data-place="Bonnefanten · Céramique"></div>
+    <div class="slide" style="--img: url(title/helpoort.jpg); --x: -2%; --y: 1%" data-place="Helpoort · Jekerkwartier"></div>
+    <div class="slide" style="--img: url(title/enci.jpg); --x: 2%; --y: -2%" data-place="ENCI-groeve · Sint-Pietersberg"></div>
   </div>
   <div class="place" aria-hidden="true"></div>
   <div class="shade"></div>

@@ -17,6 +17,7 @@
 // URL hash: #mode=walk&at=x,z[&yaw=deg][&camyaw=deg][&pitch=deg][&dist=m]
 //   at = Unity metres (x east, z north; CONTRACT 1), yaw = compass degrees the player faces,
 //   camyaw = compass degrees the camera looks toward (default: same as yaw).
+import { standSpot } from './spot.js';
 import * as THREE from 'three';
 import { cityFromWorld } from './city-adapter.js';
 import { CharacterController } from './controller.js';
@@ -143,6 +144,13 @@ export function initPlayer(ctx) {
     const yaw = Math.atan2(ray.dir[0], -ray.dir[2]); // face away from the viewer
     startWalk(spawnPoint(hit, ray.dir), yaw, yaw, !still);
     return true;
+  }
+
+  /** Enter on open street ground near Unity (x, z): a point inside a building's footprint (a bus
+   * stop, a trip start) puts you on the pavement beside it, not on the roof (player/spot.js). */
+  function enterNearUnity(x, z, yaw = 0, camYaw = yaw, animate = true) {
+    const s = standSpot(city, x, -z);
+    return s ? enterAtUnity(s.x, -s.z, yaw, camYaw, animate) : enterAtUnity(x, z, yaw, camYaw, animate);
   }
 
   /** Enter at Unity metres (x east, z north); y from the city's column top. */
@@ -368,7 +376,7 @@ export function initPlayer(ctx) {
     get mode() { return mode; },
     state: () => ({ mode, pos: [...ctrl.pos], yaw: ctrl.yaw, grounded: ctrl.grounded, frozen: ctrl.frozen,
       cam: camera.position.toArray(), camDist: follow.dist, street: hud.street.textContent }),
-    enterAtUnity, exitWalk, enterAt, ctrl, follow, city, orbit, input, settings, knockDown,
+    enterAtUnity, enterNearUnity, exitWalk, enterAt, ctrl, follow, city, orbit, input, settings, knockDown,
   };
   window.__bloxPlayer = api;
   return api;

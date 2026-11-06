@@ -15,6 +15,7 @@ import { Cabin } from './cabin.js';
 import { seatPosition, lookTarget, outsideView, smoothYaw, doorSide, SEATS } from './seat.js';
 import { upcomingCalls } from '../life/schedule.js';
 import { fitFov } from '../player/camera.js';
+import { builtAt } from '../player/spot.js';
 
 const MARK_MAX = 80;
 const LOOK_RAD_PX = 0.004, KEY_RAD_S = 1.6, PAD_RAD_S = 2.4;
@@ -30,6 +31,9 @@ export async function initRide(ctx) {
     const g = ctx.city?.groundHeight?.(x, zThree);
     return typeof g === 'number' ? g : (ctx.city?.approxGround?.(x, zThree) ?? 0);
   };
+  // the bus network runs past the built city: no riding (or getting off) out on the baseplate
+  const built = (x, zUnity) => builtAt(ctx.city, x, zUnity);
+  const stopInside = (k) => { const st = tt()?.stops?.[k]; return !st || built(st.x, st.y); };
   const routeLines = new RouteLines(stage.scene, groundAt);
   const cabin = new Cabin(stage.scene);
   const fleets = () => [life.buses, life.trains].filter(Boolean);
@@ -75,7 +79,8 @@ export async function initRide(ctx) {
       ui.fillLines(routes, s.line);
       const rows = vehicles.filter((v) => s.line === null || v.pattern.route === s.line).map((v) => {
         const next = upcomingCalls(v.pattern, v.tRel)[0];
-        return { id: v.id, route: v.route, head: v.pattern.head, next: next ? stopName(next.stop) : '', inSec: next?.inSec ?? 0 };
+        return { id: v.id, route: v.route, head: v.pattern.head, next: next ? stopName(next.stop) : '', inSec: next?.inSec ?? 0,
+          outside: !built(v.x, v.z) || (!!next && !stopInside(next.stop)) };
       }).sort((a, b) => String(a.route?.short).localeCompare(String(b.route?.short), 'nl', { numeric: true }) || a.inSec - b.inSec);
       ui.fillVehicles(rows);
     } else if (s.stop) {
@@ -84,7 +89,7 @@ export async function initRide(ctx) {
       ui.fillDepartures(s.stop, deps);
     } else {
       const q = s.query.trim().toLowerCase();
-      const names = q ? [...new Set(t.stops.map((st) => st.name))].filter((n) => n.toLowerCase().includes(q)).sort().slice(0, 30) : [];
+      const names = q ? [...new Set(t.stops.filter((st) => built(st.x, st.y)).map((st) => st.name))].filter((n) => n.toLowerCase().includes(q)).sort().slice(0, 30) : [];
       ui.fillStops(names, s.query.trim());
     }
   }
@@ -92,7 +97,7 @@ export async function initRide(ctx) {
   // ------------------------------------------------------------------ boarding
   function board(id) {
     const v = (life.vehicles || []).find((x) => x.id === id);
-    if (!v) return;
+    if (!v || !built(v.x, v.z)) return; // out on the baseplate: nothing to see from the seat
     window.__bloxPlayer?.exitWalk?.(true); // instant: no fly-out fighting the seat camera
     s.open = false; ui.showPanel(false); routeLines.show(null); ui.placeMarks([]);
     s.ride = { id, yaw: null, look: 0, pitch: -0.05, outside: false, wantOff: false, offK: -1, nextK: -1,
@@ -100,7 +105,8 @@ export async function initRide(ctx) {
     controls.enabled = false;
     hideVehicle(id);
     camera.near = 0.05;
-    camera.fov = fitFov(70, camera.aspect); // wider on portrait phones
+    s.ride.lens = { fov: fitFov(70, camera.aspect), near: 0.05 }; // wider on portrait phones
+    camera.fov = s.ride.lens.fov;
     camera.updateProjectionMatrix();
     ui.showHud({ route: v.route, head: v.pattern.head, next: '', inSec: 0, strip: [], live: false });
   }
@@ -128,7 +134,7 @@ export async function initRide(ctx) {
     if (life.clock && life.clock.speed > 1) life.clock.speed = 1;
     if (at) { // get off: walk from the stop
       const yaw = (at.yaw * Math.PI) / 180; // the player's yaw is compass radians
-      if (window.__bloxPlayer?.enterAtUnity?.(at.x, at.z, yaw, yaw, false)) return;
+      if (window.__bloxPlayer?.enterNearUnity?.(at.x, at.z, yaw, yaw, false)) return;
     }
     const p = r.last;
     if (p) { // back to the map above the vehicle (its ground can be NaN where nothing streamed in)
@@ -167,7 +173,7 @@ export async function initRide(ctx) {
   const v3 = new THREE.Vector3();
   function placeMarks() {
     if (!s.open || s.tab !== 'now') { ui.placeMarks([]); return; }
-    const list = (life.vehicles || []).filter((v) => s.line === null || v.pattern.route === s.line);
+    const list = (life.vehicles || []).filter((v) => (s.line === null || v.pattern.route === s.line) && built(v.x, v.z));
     const cp = camera.position;
     const items = [];
     for (const v of list) {
@@ -218,6 +224,9 @@ export async function initRide(ctx) {
       to = lookTarget(from, r.yaw + r.look, r.pitch);
     }
     if (![...from, ...to].every(Number.isFinite)) return; // never hand the renderer a NaN camera
+    // the ride owns the lens: whatever else touched it (a map tween, a resize), put it back
+    const lens = r.lens;
+    if (lens && (camera.fov !== lens.fov || camera.near !== lens.near)) { camera.fov = lens.fov; camera.near = lens.near; camera.updateProjectionMatrix(); }
     camera.position.set(...from);
     controls.target.set(...to);
     camera.lookAt(controls.target);
@@ -225,11 +234,14 @@ export async function initRide(ctx) {
     const calls = upcomingCalls(v.pattern, v.tRel);
     const next = calls[0];
     r.nextK = next ? next.k : -1;
+    // the bus is about to leave the built city: get off at its last stop inside
+    const outIdx = calls.findIndex((c) => !stopInside(c.stop));
+    if (outIdx === 0 || !built(v.x, v.z)) { leave(built(v.x, v.z) ? doorSide(pose, v.mode) : null); return; }
+    if (outIdx === 1 && (!r.wantOff || r.offK !== next.k)) { r.wantOff = true; r.offK = next.k; r.edge = true; }
     // arrived at (or already past) the stop we asked for: step off there and walk
     if (r.wantOff && (!next || next.k > r.offK || (next.k === r.offK && next.inSec === 0))) {
-      // v2 timetables know where the stop is; v1 ones don't: step off beside the doors
-      const stop = tt().stops?.[v.pattern.stops?.[r.offK]];
-      leave(stop ? { x: stop.x, z: stop.y, yaw: r.yaw } : doorSide(pose, v.mode));
+      // step off beside the doors (the bus is at the stop), onto open pavement (player/spot.js)
+      leave(doorSide(pose, v.mode));
       return;
     }
     ui.showHud({ route: v.route, head: v.pattern.head, next: next ? stopName(next.stop) : '', hasNext: !!next, inSec: next?.inSec ?? 0,

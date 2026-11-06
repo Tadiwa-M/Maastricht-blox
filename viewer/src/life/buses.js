@@ -58,11 +58,12 @@ export class TimetableBuses {
    * timetable: Timetable. model: bus model JSON. opts: { palette, types, mats, studM, plateM }.
    * ground(x, z) -> y. caps: { full, box, fullDist, farDist }.
    */
-  constructor({ timetable, model, opts, ground, caps = {}, modes = null, laneM = LANE_M }) {
+  constructor({ timetable, model, opts, ground, deck = null, caps = {}, modes = null, laneM = LANE_M }) {
     this.tt = timetable;
     this.modes = modes; // e.g. ['bus'] or ['rail']: one fleet per vehicle model; null = all
     this.laneM = laneM; // buses keep right of the shape's centre line; trains run on it
     this.ground = ground;
+    this.deck = deck; // (x, z, yaw) -> bridge deck beside a route line that runs over the water, or null
     this.caps = { full: 24, box: 300, fullDist: 180, farDist: 900, ...caps };
     this.palette = opts.palette;
     this.clip = opts.mats.clippingPlanes || null;
@@ -122,7 +123,9 @@ export class TimetableBuses {
     return list.map((a) => {
       const pose = this.mover(a.shape).poseAt(a.dist - a.shape.d0);
       const r = (pose.yaw * Math.PI) / 180;
-      const x = pose.position[0] + Math.cos(r) * this.laneM, z = pose.position[2] - Math.sin(r) * this.laneM;
+      let x = pose.position[0] + Math.cos(r) * this.laneM, z = pose.position[2] - Math.sin(r) * this.laneM;
+      const deck = this.deck?.(x, z, pose.yaw); // never drive on the river: onto the bridge beside the line
+      if (deck) ({ x, z } = deck);
       return { x, y: this.ground(x, z), z, yaw: pose.yaw, dist: a.dist, route: a.route, id: a.id,
         trip: a.trip, pattern: a.pattern, tRel: a.tRel, mode: a.route?.mode || 'bus' };
     });
