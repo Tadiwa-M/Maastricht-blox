@@ -41,6 +41,18 @@ export function loadState(s) {
   return { frac: 0.85 + 0.15 * warm, msg: MSG.warm, done: s.frames >= WARM_FRAMES };
 }
 
+/**
+ * Full screen on every device: hides the browser's address bar, tabs and the system navigation.
+ * Browsers only allow it from a tap or key press (the title screen's start). iPhones' Safari has
+ * no full screen for pages; there, "Add to Home Screen" opens the game full screen
+ * (game.webmanifest, apple-mobile-web-app-capable).
+ */
+export function goFullscreen(doc = typeof document !== 'undefined' ? document : null) {
+  const root = doc?.documentElement;
+  if (!root?.requestFullscreen || doc.fullscreenElement) return;
+  root.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+}
+
 export class LoadingScreen {
   constructor(el = typeof document !== 'undefined' ? document.getElementById('loading') : null) {
     this.el = el;
@@ -106,6 +118,7 @@ export class LoadingScreen {
       e?.preventDefault?.(); e?.stopImmediatePropagation?.(); // the start key must not also act in the game
       window.removeEventListener('keydown', go, true);
       el.removeEventListener('pointerdown', go);
+      goFullscreen(el.ownerDocument); // the game takes the whole screen (browsers need this tap or key press)
       this.hide();
     };
     window.addEventListener('keydown', go, true);

@@ -1416,3 +1416,15 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Owner: the start is "way too zoomed out", "above the generation of the city". The default view
   is now `above` (citymode presets): the Markt from 650 m at 38 degrees, old town and the Maas
   filling the screen, the map's edges out of sight. `#view=city` keeps the whole-map view.
+
+## 2026-11-06: trips start at your GPS position; full screen on phones
+
+- Owner (phone video): "Start trip" from My real location showed the trip HUD but no avatar: the
+  start was outside the streamed area, `enterAtUnity` refused ("not loaded") and nothing retried.
+  Now the map moves there, streams it and the player stands there once the ground is in.
+- `standSpot` was too loose: at the station it picked a sunken spot inside the building (the
+  lowest top within 14 m), squeezing the camera into walls. A spot now needs street level among
+  open spots, open sky up to 6 m and room for the camera (3 of 8 directions clear), within 30 m.
+  Checked headless: GPS at the station -> standing on the Stationsplein, green line to the stop.
+- Full screen: the title's start (key, click or tap) asks for it on every device (laptops too); `game.webmanifest`
+  (display fullscreen) for Add to Home Screen.

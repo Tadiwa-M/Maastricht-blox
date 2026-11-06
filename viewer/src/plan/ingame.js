@@ -167,14 +167,32 @@ export async function initTrip(ctx) {
       const [x, z] = s.from; // start walking where the trip starts (your GPS position, or the place you typed)
       const to = j.legs[0]?.to; // face the first leg (compass yaw: 0 north, + clockwise)
       const yaw = to && Math.hypot(to.x - x, to.z - z) > 1 ? Math.atan2(to.x - x, to.z - z) : 0;
-      p.enterNearUnity(x, z, yaw, yaw, true);
+      if (!placeAt(x, z, yaw)) { // that part of the city isn't loaded yet: go there, load it, then stand there
+        if (p.mode === 'walk') p.exitWalk(true);
+        const c = ctx.city, g = c?.approxGround?.(x, -z) ?? 0;
+        controls.target.set(x, g, -z);
+        stage.camera.position.set(x + 60, g + 80, -z + 60);
+        controls.update();
+        c?.focus?.(x, -z);
+        s.enterAt = { x, z, yaw, t: 0, k: 0 };
+      }
     }
     s.routeFor = null;
     showHud();
   }
 
+  /** Stand the player at (x, z) Unity metres if that ground is loaded (no 'not loaded' toast). */
+  function placeAt(x, z, yaw) {
+    const c = ctx.city;
+    if (typeof c?.groundHeight?.(x, -z) !== 'number') return false;
+    if (!player()?.enterNearUnity(x, z, yaw, yaw, true)) return false;
+    s.enterAt = null;
+    c.focus?.(null, null);
+    return true;
+  }
+
   function end() {
-    s.guide = null; s.path = null;
+    s.guide = null; s.path = null; s.enterAt = null;
     line.set(null);
     hud.hidden = true;
   }
@@ -200,7 +218,14 @@ export async function initTrip(ctx) {
     open,
     end,
     get guide() { return s.guide; },
+    get state() { return s; }, // tests
     update(dt) {
+      if (s.enterAt) { // waiting for the trip's start to stream in (GPS start far from the camera)
+        const e = s.enterAt;
+        e.t += dt; e.k += dt;
+        if (e.k > 0.4) { e.k = 0; placeAt(e.x, e.z, e.yaw); }
+        if (s.enterAt && e.t > 45) { s.enterAt = null; ctx.city?.focus?.(null, null); } // slow connection: stay on the map there
+      }
       if (s.guide) {
         const rs = ride()?.state?.ride || null;
         const r = s.guide.update({ pos: here(), sec: life.clock.sec, riding: rs?.id || null,

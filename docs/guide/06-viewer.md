@@ -237,6 +237,11 @@ GTA V: minimal UI, tips in one corner, a small spinner in the other).
   so the map's edges stay out of sight; `#view=city` still shows the whole map) and zoom in yourself (the owner prefers it to a
   scripted start; a camera fly-in and a straight cut to the street were both tried on 2026-11-06
   and dropped).
+- **Full screen (2026-11-06):** the title's start (key, click or tap) also asks for full screen on
+  every device (`loading.js` `goFullscreen`: no address bar or tabs; Esc leaves it, as in any
+  browser). iPhones' Safari has no page
+  full screen; "Add to Home Screen" opens the game full screen (`game.webmanifest`,
+  `apple-mobile-web-app-capable`).
 - **The settings panel** (sun, quality, views, stats) starts collapsed for everyone: the game
   opens on the city, not on a map tool. "show" or U opens it; the choice is remembered.
 
@@ -523,6 +528,10 @@ A phone-first page in every site build, next to the 3D city: `plan.html` + `plan
 - **Start trip** puts you facing the first leg (the stop or the destination). The walk camera
   fits the screen: on portrait phones the view widens (`fitFov`) and the shoulder offset shrinks
   (`shoulderScale`, `player/camera.js`).
+- **Start where the trip starts:** "Start trip" from 📍 Me (or a typed start) far from the camera
+  moves the map there, streams it (`city.focus`) and then stands the player on open ground near
+  it (`player/spot.js` `standSpot`: street level, open sky, room for the camera, within 30 m);
+  up to 45 s on a slow connection. `window.__bloxTrip.state` exposes the planner for tests.
 - **Built city only (in the game):** the bus network runs past the built part of the city, so
   the in-game planner only uses stops that have city around them (`TripPlanner.setUsable`, from
   the streaming index's chunks); 📍 Me outside the built part says so instead of planning there.

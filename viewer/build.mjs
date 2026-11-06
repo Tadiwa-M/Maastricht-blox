@@ -140,7 +140,7 @@ async function bundle(out) {
   await copyFile(join(here, 'src', 'index.html'), join(out, 'index.html'));
   // the phone trip planner (plan.html): its own small bundle, no 3D city
   await build({ ...common, entryPoints: [join(here, 'src', 'plan', 'app.js')], format: 'esm', outfile: join(out, 'plan.js') });
-  for (const f of ['plan.html', 'plan.webmanifest', 'plan-icon.svg']) await copyFile(join(here, 'src', f), join(out, f));
+  for (const f of ['plan.html', 'plan.webmanifest', 'plan-icon.svg', 'game.webmanifest']) await copyFile(join(here, 'src', f), join(out, f));
   await copyFile(join(here, 'node_modules', 'leaflet', 'dist', 'leaflet.css'), join(out, 'leaflet.css'));
   // title-screen key art (rendered from the city by tools/keyart.mjs)
   const art = join(here, 'src', 'title');
