@@ -253,6 +253,7 @@ async function initHooks(ctx) {
   try { out.push(await (await import('./plan/ingame.js')).initTrip?.(ctx)); } catch (e) { console.error('trip', e); }
   // [report hook] the "Report a mistake" button (src/report/)
   try { out.push(await (await import('./report/index.js')).initReport?.(ctx)); } catch (e) { console.error('report', e); }
+  try { out.push(await (await import('./audio/index.js')).initAudio?.(ctx)); } catch (e) { console.error('audio', e); }
   return out.filter((h) => h && typeof h === 'object');
 }
 

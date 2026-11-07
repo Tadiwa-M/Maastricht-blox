@@ -1462,3 +1462,14 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   within 2.6 km (far l1/l2/l3 15/134/352 -> 64/285/352, 4 -> 8 M triangles on High; auto drops a
   tier when frames slow down). High already renders at 2x pixels (smooth edges).
 - Next ideas for High: reflections on the Maas, softer shadows.
+
+## 2026-11-07: the city has sound
+
+- Everything synthesised with Web Audio, no files: traffic near cars and buses plus a hum by the
+  hour, crowd by nearby walkers, birds (dawn chorus, parks, none at night or in rain), Vrijthof
+  bells on the game clock's hours and half hours, footsteps by stride and surface, jump and land
+  thuds, bus engine, ridden-bus doors, rain from `ctx.weather.rain` or `#rain=`.
+- Starts on the first gesture. Volume 60% by default; slider and mute in the settings panel, V
+  mutes, saved in localStorage. Suspended when muted or hidden. About 23 nodes, gain and pan only,
+  10 Hz updates. Guide 14.
+- Open: towers and parks are placed by hand; real surfaces need a ground-colour query.
