@@ -1,7 +1,11 @@
 // How busy the city is: counts by quality tier, day curves for people, bikes and cars, the
 // weekend, terrace occupancy and the market schedule. Pure, tested in test/life.density.test.mjs.
 
-export const FIGURES_BY_TIER = { high: 900, medium: 500, low: 200, lite: 80 }; // walkers within ~200 m of the camera
+// The quality tier does not make the streets busier or emptier: every tier keeps the same density
+// near you (about 0.9 people per 100 m²). It only decides how far out people, bikes and cars live
+// (LIFE_RADIUS_BY_TIER); the counts below are that density over each tier's area.
+export const LIFE_RADIUS_BY_TIER = { high: 180, medium: 135, low: 85, lite: 54 }; // metres around the camera target
+export const FIGURES_BY_TIER = { high: 900, medium: 500, low: 200, lite: 80 }; // walkers within the tier's radius
 export const CYCLISTS_BY_TIER = { high: 140, medium: 80, low: 30, lite: 12 };
 export const CARS_BY_TIER = { high: 110, medium: 65, low: 25, lite: 10 };
 // parked bikes: ~2,200 triangles each (and again for shadows); only the nearest within a range

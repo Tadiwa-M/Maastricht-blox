@@ -249,6 +249,10 @@ GTA V: minimal UI, tips in one corner, a small spinner in the other).
   `index.html`); on phones the footer line sits above the Transit button. iPhones' Safari has no page
   full screen; "Add to Home Screen" opens the game full screen (`game.webmanifest`,
   `apple-mobile-web-app-capable`).
+- **Quality tiers** (`quality.js` TIERS) change detail, never how busy it is: render resolution,
+  near brick detail, stream and far-level distances (High shows the finest far city out to 800 m,
+  so the map view is crisp), shadows, ambient occlusion, bloom. People, bikes and cars keep the same
+  density on every tier; the tier only sets how far out they live (`LIFE_RADIUS_BY_TIER`).
 - **The settings panel** (sun, quality, views, stats) is one 600 px wide rectangle in the top-left
   corner on every screen; on small screens it keeps that layout and is scaled down (`ui.js` `fitHud`:
   at most 70 % of the width and 50 % of the height), never re-flowed into a column. It starts collapsed for everyone: the game

@@ -1449,3 +1449,16 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Owner: the settings box must stay a rectangle covering the same top-left part of the screen.
   It keeps the laptop layout (600 px) everywhere and is scaled to fit (`fitHud`: at most 70 % of the
   width, 50 % of the height): phone portrait 70 x 19 %, landscape 37 x 50 %, laptop 42 x 41 %.
+
+## 2026-11-07: quality tiers change detail, not how busy the streets are; High from above
+
+- Owner: tiers should not change the crowd. Each tier had a fixed count crammed into a radius set
+  by camera height (~50 m at street level), so High was ~4.5x denser around you than Low. Life now
+  lives within a radius per tier (`LIFE_RADIUS_BY_TIER`: 180 / 135 / 85 / 54 m) with the same
+  counts, so every tier has the same density near you (~0.9 people per 100 m²); Low just stops
+  simulating far away. Test: `life.tiers.test.mjs`.
+- High from the map view: the finest baked far level only showed within 380 m of the camera, but
+  the start view is ~420 m up, so it never showed. High now shows level 1 within 800 m and level 2
+  within 2.6 km (far l1/l2/l3 15/134/352 -> 64/285/352, 4 -> 8 M triangles on High; auto drops a
+  tier when frames slow down). High already renders at 2x pixels (smooth edges).
+- Next ideas for High: reflections on the Maas, softer shadows.

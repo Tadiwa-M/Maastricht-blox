@@ -18,7 +18,7 @@ import { Cyclists, parkedBikes } from './cyclists.js';
 import { Cars } from './cars.js';
 import { Terraces } from './terraces.js';
 import { Market } from './market.js';
-import { FIGURES_BY_TIER, CYCLISTS_BY_TIER, CARS_BY_TIER, PARKED_BIKES_BY_TIER, nearestWithin, crowdFactor, trafficFactor, liveWeights, marketState } from './density.js';
+import { FIGURES_BY_TIER, LIFE_RADIUS_BY_TIER, CYCLISTS_BY_TIER, CARS_BY_TIER, PARKED_BIKES_BY_TIER, nearestWithin, crowdFactor, trafficFactor, liveWeights, marketState } from './density.js';
 import { FigureCrowd } from '../figure/crowd.js';
 import { VehicleFleet } from '../figure/vehicles.js';
 import { PropSet } from '../figure/props.js';
@@ -243,10 +243,8 @@ export async function initLife(ctx) {
     const t = ctx.controls?.target || new THREE.Vector3();
     return [t.x, -t.z];
   };
-  const livingRadius = () => {
-    const t = ctx.controls?.target, h = t ? camera.position.distanceTo(t) : 100;
-    return Math.max(50, Math.min(220, h * 1.1));
-  };
+  // how far out life is simulated: by quality tier only (the same density near you on every tier)
+  const livingRadius = () => LIFE_RADIUS_BY_TIER[tier()] ?? LIFE_RADIUS_BY_TIER.medium;
   let night = -1, statT = 0, t = 0;
   const busHalf = [models.bus.size[0] * world.studM / 2, models.bus.size[1] * world.studM / 2];
   state.busHalf = busHalf; // the player's vehicle contacts (player/bump.js) use the same footprints
@@ -295,7 +293,7 @@ export async function initLife(ctx) {
     const traffic = trafficFactor(clock.hours, clock.day);
     if (state.cars) {
       state.cars.setCount(Math.round(by(CARS_BY_TIER) * traffic), at);
-      state.cars.update(dt, at, Math.max(R, 150), trafficEnv(buses));
+      state.cars.update(dt, at, R, trafficEnv(buses));
     }
     // every vehicle's footprint near the action: people and bikes wait for them and keep clear
     const trainHalf = [models.train.size[0] * world.studM / 2, models.train.size[1] * world.studM / 2];
@@ -306,7 +304,7 @@ export async function initLife(ctx) {
     if (state.cars) vehicles.push(...state.cars.footprints(at, 40));
     if (state.cyclists) {
       state.cyclists.setCount(Math.round(by(CYCLISTS_BY_TIER) * traffic), at);
-      state.cyclists.update(dt, at, Math.max(R, 120), vehicles);
+      state.cyclists.update(dt, at, R, vehicles);
     }
     if (state.walkers) {
       reweigh();
@@ -365,8 +363,8 @@ export async function initLife(ctx) {
   step(0);
   for (let q = 0; q < 4; q++) { // spread the walk cycles and let traffic settle
     state.walkers?.update(0.4, target(), livingRadius());
-    state.cars?.update(0.5, target(), Math.max(livingRadius(), 150));
-    state.cyclists?.update(0.4, target(), Math.max(livingRadius(), 120));
+    state.cars?.update(0.5, target(), livingRadius());
+    state.cyclists?.update(0.4, target(), livingRadius());
   }
   step(0);
   state.ready = true;
