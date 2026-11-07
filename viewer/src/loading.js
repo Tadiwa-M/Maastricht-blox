@@ -42,7 +42,8 @@ export function loadState(s) {
 }
 
 /**
- * Full screen on every device: hides the browser's address bar, tabs and the system navigation.
+ * Full screen on every device: hides the browser's address bar, tabs and the system navigation;
+ * phones turn to landscape while full screen.
  * Browsers only allow it from a tap or key press (the title screen's start). iPhones' Safari has
  * no full screen for pages; there, "Add to Home Screen" opens the game full screen
  * (game.webmanifest, apple-mobile-web-app-capable).
@@ -50,7 +51,18 @@ export function loadState(s) {
 export function goFullscreen(doc = typeof document !== 'undefined' ? document : null) {
   const root = doc?.documentElement;
   if (!root?.requestFullscreen || doc.fullscreenElement) return;
-  root.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+  root.requestFullscreen({ navigationUI: 'hide' }).then(() => {
+    // phones play full screen in landscape (portrait stays for the normal browser view); only
+    // allowed while full screen, released again when you leave it (back swipe, Esc)
+    const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    if (!touch || !screen.orientation?.lock) return;
+    screen.orientation.lock('landscape').catch(() => {});
+    doc.addEventListener('fullscreenchange', function off() {
+      if (doc.fullscreenElement) return;
+      doc.removeEventListener('fullscreenchange', off);
+      try { screen.orientation.unlock?.(); } catch { /* not locked */ }
+    });
+  }).catch(() => {});
 }
 
 export class LoadingScreen {

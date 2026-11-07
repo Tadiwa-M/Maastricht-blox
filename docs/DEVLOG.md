@@ -1442,3 +1442,10 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   capped at the screen width.
 - Phones: the settings panel is a compact 260 px box in the top-left corner (as on a laptop) with
   smaller text, not a full-width sheet; the clock row wraps.
+- Owner: on a phone, full screen should be landscape; portrait without full screen is fine.
+  `goFullscreen` locks landscape on touch screens once full screen (unlocks on exit); the
+  manifest asks for landscape; short (landscape phone) screens get the compact settings panel too,
+  scrollable when open.
+- Owner: the settings box must stay a rectangle covering the same top-left part of the screen.
+  It keeps the laptop layout (600 px) everywhere and is scaled to fit (`fitHud`: at most 70 % of the
+  width, 50 % of the height): phone portrait 70 x 19 %, landscape 37 x 50 %, laptop 42 x 41 %.

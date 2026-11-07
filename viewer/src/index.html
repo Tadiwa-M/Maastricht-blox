@@ -22,8 +22,11 @@
   html, body, body *:not(#view) { touch-action: manipulation; }
   .panel { position: fixed; background: var(--panel); backdrop-filter: blur(8px); border-radius: 10px;
     padding: 10px 14px; box-shadow: 0 4px 18px rgba(0,0,0,.25); }
-  #hud { top: 14px; left: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 240px;
-    max-width: calc(100vw - 28px - var(--sl, 0px) - var(--sr, 0px)); box-sizing: border-box; }
+  /* the settings panel: one wide rectangle in the top-left corner on every screen; on small screens
+     it keeps this layout and is scaled down to fit (ui.js fitHud), never re-flowed into a column */
+  #hud { top: 14px; left: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; width: 600px;
+    box-sizing: border-box; transform-origin: top left; transform: scale(var(--hud-scale, 1)); }
+  #hud.collapsed { width: auto; transform: none; }
   #hud h1 { margin: 0; font-size: 15px; letter-spacing: .02em; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   #hudToggle { font: inherit; font-size: 11px; font-weight: 400; color: var(--muted); background: rgba(255,255,255,.1);
     border: 1px solid rgba(255,255,255,.25); border-radius: 5px; padding: 1px 8px; cursor: pointer; }
@@ -141,8 +144,7 @@
   .notice { bottom: 64px; left: 50%; transform: translateX(-50%); z-index: 11; max-width: min(520px, calc(100vw - 32px));
     box-sizing: border-box; color: var(--text); }
   .notice button { margin-left: 8px; font: inherit; color: #111; background: var(--accent); border: 0; border-radius: 5px; padding: 2px 10px; cursor: pointer; }
-  @media (max-width: 600px) { #hud { min-width: 0; width: 260px; font-size: 12px; padding: 8px 10px; gap: 6px; }
-    #hud.collapsed { width: auto; } #hud h1 { font-size: 14px; } #stats { font-size: 11px; } #info { top: auto; bottom: 44px; left: 14px; } }
+  @media (max-width: 600px) { #info { top: auto; bottom: 44px; left: 14px; } }
   /* Phones in full screen: keep everything out of the status bar, the camera cut-out and the
      gesture bar (safe-area insets; 0 on laptops). "html" outranks the modules' own rules. */
   :root { --st: env(safe-area-inset-top, 0px); --sb: env(safe-area-inset-bottom, 0px);
