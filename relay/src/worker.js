@@ -4,10 +4,14 @@
 //   GET  /trains?stations=MT,MTR     NS departures with delays (needs the NS_KEY secret)
 //   POST /report                     a "Report a mistake" -> GitHub issue (needs GITHUB_TOKEN)
 //   GET  /health                     what is configured
+//   /room, /room/<code>              multiplayer rooms (rooms.js; BloxRoom Durable Objects, room.js)
 // Secrets: GITHUB_TOKEN (fine-grained, this repo only: Contents + Issues read/write), NS_KEY.
 import { OVAPI, lineKeys, journeyDelays } from './ovapi.js';
 import { NS_DEPARTURES, STATIONS, stationCodes, departures } from './ns.js';
 import { checkReport, bodyWithImages, rateLimiter } from './report.js';
+import { rooms } from './rooms.js';
+
+export { BloxRoom } from './room.js';
 
 const CACHE_S = 20;
 const allowReport = rateLimiter(5);
@@ -101,7 +105,8 @@ export default {
       if (req.method === 'GET' && url.pathname === '/live') return await live(url, env, ctx, h);
       if (req.method === 'GET' && url.pathname === '/trains') return await trains(url, env, ctx, h);
       if (req.method === 'POST' && url.pathname === '/report') return await report(req, env, h);
-      if (url.pathname === '/health') return json({ ok: true, reports: !!env.GITHUB_TOKEN, trains: !!env.NS_KEY }, 200, h);
+      if (url.pathname === '/room' || url.pathname.startsWith('/room/')) return await rooms(req, env, url, h);
+      if (url.pathname === '/health') return json({ ok: true, reports: !!env.GITHUB_TOKEN, trains: !!env.NS_KEY, rooms: !!env.ROOMS }, 200, h);
       return json({ error: 'not found' }, 404, h);
     } catch (err) {
       return json({ error: String(err.message || err) }, 502, h);

@@ -161,7 +161,8 @@
   html #rp-open { bottom: calc(92px + var(--sb)); }
   html #foot { bottom: calc(10px + var(--sb)); }
   html #pl-stick { bottom: calc(90px + var(--sb)); left: calc(28px + var(--sl)); }
-  html #pl-jump { bottom: calc(100px + var(--sb)); right: calc(28px + var(--sr)); }
+  /* JUMP sits left of the right-hand column (compass, report flag, journal, multiplayer buttons) */
+  html #pl-jump { bottom: calc(40px + var(--sb)); right: calc(72px + var(--sr)); }
   @media (max-width: 600px) {
     html #info { top: auto; bottom: calc(44px + var(--sb)); }
     /* the footer line sits above the Transit button, not under the walk bar */

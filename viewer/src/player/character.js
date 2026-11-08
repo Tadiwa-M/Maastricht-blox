@@ -60,6 +60,8 @@ export class Character {
    * blend, air, landing); without it the figure still walks, just without those layers.
    */
   update(feet, yaw, speed, travelled, dt, body = null) {
+    const o = this.override?.(feet, yaw, speed, travelled, dt); // a held pose (src/activities/: sitting, cycling)
+    if (o) { this.pose = o; this.crowd.begin(); this.crowd.add(this.variant, o); this.crowd.end(); return; }
     const m = this.motion.update(dt, { speed, travelled, angVel: 0, accel: 0, steer: 0, grounded: true, vy: 0, ...body },
       this.variant.scale);
     Object.assign(this.pose, { x: feet[0], y: feet[1], z: feet[2], rotY: -yaw }, m);

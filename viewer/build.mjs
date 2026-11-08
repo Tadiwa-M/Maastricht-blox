@@ -142,6 +142,7 @@ async function bundle(out) {
   await build({ ...common, entryPoints: [join(here, 'src', 'plan', 'app.js')], format: 'esm', outfile: join(out, 'plan.js') });
   for (const f of ['plan.html', 'plan.webmanifest', 'plan-icon.svg', 'game.webmanifest']) await copyFile(join(here, 'src', f), join(out, f));
   await copyFile(join(here, 'node_modules', 'leaflet', 'dist', 'leaflet.css'), join(out, 'leaflet.css'));
+  await (await import('./src/interiors/copy-data.mjs')).copyPlaces(join(here, 'src', 'interiors', 'data'), join(out, 'interiors')); // interiors: place files, no world rebuild
   // title-screen key art (rendered from the city by tools/keyart.mjs)
   const art = join(here, 'src', 'title');
   if (existsSync(art)) {

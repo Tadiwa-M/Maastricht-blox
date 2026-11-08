@@ -53,12 +53,17 @@ export class WalkGraph {
   neighbours(q) { return this.adj.subarray(this.off[q], this.off[q + 1]); }
   dist(a, b) { return Math.hypot(this.x[b] - this.x[a], this.z[b] - this.z[a]); }
 
-  /** Next node after walking prev -> cur. prev < 0: any neighbour. */
-  pickNext(prev, cur, rand) {
+  /**
+   * Next node after walking prev -> cur. prev < 0: any neighbour. goal { x, z } (optional):
+   * neighbours towards it are favoured (a group heading somewhere; routines.js).
+   */
+  pickNext(prev, cur, rand, goal = null) {
     const nb = this.neighbours(cur);
     if (nb.length === 0) return prev >= 0 ? prev : cur;
     let dx = 0, dz = 0;
     if (prev >= 0) { const L = this.dist(prev, cur) || 1; dx = (this.x[cur] - this.x[prev]) / L; dz = (this.z[cur] - this.z[prev]) / L; }
+    let gx = 0, gz = 0;
+    if (goal) { const L = Math.hypot(goal.x - this.x[cur], goal.z - this.z[cur]) || 1; gx = (goal.x - this.x[cur]) / L; gz = (goal.z - this.z[cur]) / L; }
     let total = 0;
     const ws = new Float64Array(nb.length);
     for (let q = 0; q < nb.length; q++) {
@@ -67,6 +72,7 @@ export class WalkGraph {
       const L = this.dist(cur, m) || 1;
       const cos = prev >= 0 ? ((this.x[m] - this.x[cur]) * dx + (this.z[m] - this.z[cur]) * dz) / L : 0;
       ws[q] = Math.sqrt(this.w[m]) * (0.25 + 2 * Math.max(0, cos) ** 2);
+      if (goal) ws[q] *= 0.3 + 2 * Math.max(0, ((this.x[m] - this.x[cur]) * gx + (this.z[m] - this.z[cur]) * gz) / L) ** 2;
       total += ws[q];
     }
     let r = rand() * total;
@@ -107,6 +113,7 @@ export class Walker {
     this.c = graph.pickNext(this.a, this.b, rand);
     this.s = rand() * graph.dist(this.a, this.b);
     this.x = 0; this.z = 0; this.yaw = 0; this.heading = null;
+    this.goal = null; // { x, z } a place the walker is heading for (set by Pedestrians)
   }
 
   cornerR(a, b, c) {
@@ -123,13 +130,27 @@ export class Walker {
     while (this.s >= L && guard++ < 64) {
       this.s -= L;
       this.p = this.a; this.a = this.b; this.b = this.c;
-      this.c = g.pickNext(this.a, this.b, this.rand);
+      this.c = g.pickNext(this.a, this.b, this.rand, this.goal);
       L = g.dist(this.a, this.b);
       if (L === 0) { this.s = 0; break; }
     }
     this.lateral += (this.lateralGoal - this.lateral) * Math.min(1, dt * 1.5);
     this.place();
     return move;
+  }
+
+  /**
+   * Turn round on the spot: walk the current edge back the way it came. The lateral offset is
+   * mirrored so the walker stays where it is (it is measured to the right of the heading).
+   */
+  reverse() {
+    const g = this.g, L = g.dist(this.a, this.b);
+    const back = this.p >= 0 && this.p !== this.b ? this.p : g.pickNext(this.b, this.a, this.rand, this.goal);
+    [this.p, this.a, this.b, this.c] = [this.c, this.b, this.a, back];
+    this.s = Math.max(0, L - this.s);
+    this.lateral = -this.lateral; this.lateralGoal = -this.lateralGoal;
+    if (this.baseLateral !== undefined) this.baseLateral = -this.baseLateral;
+    this.place();
   }
 
   /** Position (x, z) and heading (yaw degrees clockwise from north) from the edge state. */

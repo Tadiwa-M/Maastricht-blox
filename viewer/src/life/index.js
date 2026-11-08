@@ -5,6 +5,8 @@
 // ctx = { stage, camera, controls, city, models, ui, world, islands, box, demo, quality, still }.
 // Data: life/*.json from `blox life` (data.js); without it, walkers use the world's paved
 // cells and the demo bus/boat (src/demo.js) stay. Guide: docs/guide/05-movers-and-models.md.
+// The city's day: routines (routines.js: who is where when), events by date (calendar.js), the
+// real weather near real time (weather.js), people reacting to the player (reactions.js).
 import * as THREE from 'three';
 import { MaterialSet } from '../materials.js';
 import { placeholderModels } from '../placeholders.js';
@@ -29,6 +31,11 @@ import { auditLife } from './audit.js';
 import { loadLifeData } from './data.js';
 import { walkwaysFromWorld, islandBlocker } from './fallback.js';
 import { bindLifeUI } from './ui.js';
+import { parseYmd, weekdayOf, zonedDayNumber, clockDate, eventsAt } from './calendar.js';
+import { placesUnity, spotPulls, spotWeights, goalPlan, nightFactor, eventCrowd, eventOutfit } from './routines.js';
+import { WeatherFeed, weatherState, hashWeather } from './weather.js';
+import { dress } from './outfits.js';
+import { PlayerWatch, playerSample, hitByVehicle } from './reactions.js';
 
 /** Keep only walk-graph nodes inside rect [x0, z0, x1, z1] (Unity metres). */
 export function clipWalkways(doc, rect) {
@@ -66,15 +73,26 @@ export function clipRoads(doc, rect) {
 
 const inRect = (pois, rect) => (rect ? pois.filter((p) => p.x > rect[0] && p.x < rect[2] && p.z > rect[1] && p.z < rect[3]) : pois);
 
-/** Initial clock from the URL (#t=16.5&day=sat) or real Maastricht time. */
+/**
+ * Initial clock from the URL (#t=16.5&day=sat, #date=2027-02-07 for a date's events) or real
+ * Maastricht time. anchor { dn, t }: a day number at a week time, for calendar.js clockDate.
+ */
 export function initialClock(hash = typeof location !== 'undefined' ? location.hash : '', now = new Date()) {
   const p = new URLSearchParams(String(hash).replace(/^#/, ''));
   const real = zonedWeekTime(now);
-  const day = parseDay(p.get('day')) ?? real.day;
+  const date = parseYmd(p.get('date'));
+  const day = parseDay(p.get('day')) ?? (date !== null ? weekdayOf(date) : real.day);
   const fixed = p.has('t');
   const sec = fixed ? Math.round(+p.get('t') * 3600) : real.sec;
   const speed = [1, 10, 60].includes(+p.get('speed')) ? +p.get('speed') : 1;
-  return { clock: new LifeClock({ day, sec, speed }), fixed };
+  const anchor = date !== null ? { dn: date, t: weekdayOf(date) * 86400 + 43200 }
+    : { dn: zonedDayNumber(now), t: real.day * 86400 + real.sec };
+  return { clock: new LifeClock({ day, sec, speed }), fixed, anchor };
+}
+
+/** Seconds between the game clock and real Maastricht time (the short way round the week). */
+export function clockOffset(clock, real) {
+  return Math.abs(((clock.day * 86400 + clock.sec) - (real.day * 86400 + real.sec) + 302400 + 604800) % 604800 - 302400);
 }
 
 /**
@@ -166,7 +184,7 @@ export async function initLife(ctx) {
 
   const data = await loadLifeData(ctx);
   state.source = data ? 'export' : 'world';
-  const { clock, fixed } = initialClock();
+  const { clock, fixed, anchor } = initialClock();
   state.clock = clock;
   const tier = () => (typeof ctx.quality === 'function' ? ctx.quality() : 'medium');
   const hideDemo = (name) => { for (const a of ctx.demo?.actors || []) if (a.obj.userData.model?.name === name || a.obj.name === `model:${name}`) a.obj.visible = false; };
@@ -211,15 +229,37 @@ export async function initLife(ctx) {
     state.market = new Market({ market: streets.market, ground, keep: near });
   }
   const parked = parkedBikes((streets?.bikes || []).filter(([x, z]) => !rect || (x > rect[0] && x < rect[2] && z > rect[1] && z < rect[3])));
+  state.parked = parked; // (activities: a bike the player takes is not drawn at its rack too)
+  // the day's routines and events at Maastricht's named places (routines.js, calendar.js)
+  const originRD = ctx.originRD || (typeof window !== 'undefined' ? window.BLOX_SITE?.originRD : null)
+    || ctx.world?.manifest?.originRD || [175700, 316500];
+  const places = placesUnity(originRD);
+  state.events = [];
   let marketWas = null;
-  /** Spawn weights for the moment: busy squares by day, the market square when it is on. */
+  /**
+   * Spawn weights and goals for the moment: busy squares by day, the market square when it is on,
+   * the routines' places (students, shoppers, commuters, nightlife) and the date's events.
+   * Recomputed every game quarter-hour.
+   */
   function reweigh() {
+    const dn = clockDate(clock.t, anchor.dn, anchor.t);
+    const events = eventsAt(dn, clock.hours);
+    state.events = events;
+    state.date = dn;
     if (!walkGraph) return;
     const open = state.market ? marketState(streets.market, clock.day, clock.sec) === 'open' : false;
-    const key = `${open}|${clock.hours >= 9 && clock.hours <= 19}`;
+    const key = `${open}|${clock.hours >= 9 && clock.hours <= 19}|${Math.floor(clock.t / 900)}|${dn}|${Math.round((state.weather?.tempC ?? 15) / 3)}`;
     if (key === marketWas) return;
     marketWas = key;
-    walkGraph.w = liveWeights(walkGraph.base, walkGraph.x, walkGraph.z, { market: streets?.market, open, hours: clock.hours });
+    const pulls = spotPulls(clock.hours, clock.day, events);
+    state.routine = pulls;
+    const w = liveWeights(walkGraph.base, walkGraph.x, walkGraph.z, { market: streets?.market, open, hours: clock.hours });
+    walkGraph.w = spotWeights(w, walkGraph.x, walkGraph.z, places, pulls);
+    if (state.walkers) {
+      state.walkers.plan = goalPlan(places, pulls);
+      const outfit = eventOutfit(events), tempC = state.weather?.tempC ?? null;
+      state.walkers.dressFor = outfit || (Number.isFinite(tempC) && tempC < 8) ? (v) => dress(v, { outfit, tempC }) : null;
+    }
   }
   function rebuildProps() {
     props.begin();
@@ -249,9 +289,23 @@ export async function initLife(ctx) {
   const busHalf = [models.bus.size[0] * world.studM / 2, models.bus.size[1] * world.studM / 2];
   state.busHalf = busHalf; // the player's vehicle contacts (player/bump.js) use the same footprints
   const by = (table) => table[tier()] ?? table.medium;
-  // weather: ctx.weather?.rain (0..1) when a weather source exists, else #rain=0..1 in the URL
-  const hashRain = typeof location !== 'undefined' ? +(new URLSearchParams(location.hash.replace(/^#/, '')).get('rain') || 0) : 0;
-  const rainNow = () => Math.max(0, Math.min(1, ctx.weather?.rain ?? hashRain));
+  // weather (weather.js): #rain= / #temp= in the URL, else the real Maastricht weather while the
+  // clock shows the real time, else ctx.weather?.rain or a dry, mild day. state.weather is read
+  // by the terraces and the HUD: { rain, tempC, cloud, wind, live, terrace, crowd }.
+  const hashW = typeof location !== 'undefined' ? hashWeather(location.hash) : {};
+  const weatherFeed = !still && typeof fetch !== 'undefined' && !('rain' in hashW) ? new WeatherFeed() : null;
+  weatherFeed?.start();
+  let nearReal = false;
+  const updateWeather = () => {
+    state.weather = weatherState({ hash: hashW, live: weatherFeed?.now, near: nearReal, ctxRain: ctx.weather?.rain });
+  };
+  updateWeather();
+  const rainNow = () => state.weather.rain;
+  // people reacting to the player (reactions.js): a knock-down is seen here (a fast vehicle's
+  // footprint on the player, as player/bump.js) or announced with a 'blox:knockdown' event
+  const watch = new PlayerWatch();
+  let knockedAt = -Infinity, knockSignal = false;
+  if (typeof window !== 'undefined') window.addEventListener?.('blox:knockdown', () => { knockSignal = true; });
   // From far away people and vehicles are a pixel or less, yet they were half of all triangles
   // drawn on the overview (and again in the shadow pass): hide them beyond LIFE_VIEW_M, cull
   // single figures beyond FIGURE_CULL_M, and let only the higher tiers' life cast shadows.
@@ -275,11 +329,11 @@ export async function initLife(ctx) {
   let liveCheck = -Infinity;
   function step(dt) {
     budget();
-    if (state.timetable && performance.now() - liveCheck > 1000) { // live delays only while the game clock shows the real time
+    if (performance.now() - liveCheck > 1000) { // live delays and weather only while the game clock shows the real time
       liveCheck = performance.now();
-      const real = zonedWeekTime();
-      const off = Math.abs(((clock.day * 86400 + clock.sec) - (real.day * 86400 + real.sec) + 302400 + 604800) % 604800 - 302400);
-      state.timetable.delaysOn = off < 300 && clock.speed === 1;
+      nearReal = clockOffset(clock, zonedWeekTime()) < 300 && clock.speed === 1;
+      if (state.timetable) state.timetable.delaysOn = nearReal;
+      updateWeather();
     }
     if (stage.night !== undefined && stage.night !== night) { night = stage.night; mats.setNight(night); }
     clock.advance(dt);
@@ -306,10 +360,19 @@ export async function initLife(ctx) {
       state.cyclists.setCount(Math.round(by(CYCLISTS_BY_TIER) * traffic), at);
       state.cyclists.update(dt, at, R, vehicles);
     }
+    reweigh();
     if (state.walkers) {
-      reweigh();
       state.walkers.setRain(rainNow());
-      state.walkers.setCount(Math.round(by(FIGURES_BY_TIER) * crowdFactor(clock.hours, clock.day)), at);
+      // the day curve x the night (routines.js) x the events x the weather, at most 1.6
+      const out = Math.min(1.6, crowdFactor(clock.hours, clock.day) * nightFactor(clock.hours, clock.day) * eventCrowd(state.events) * state.weather.crowd);
+      state.walkers.setCount(Math.round(by(FIGURES_BY_TIER) * out), at);
+      const seen = watch.sample(playerSample(typeof window !== 'undefined' ? window.__bloxPlayer : null), dt, false);
+      if (seen) {
+        const hit = knockSignal || hitByVehicle(seen.x, seen.z, vehicles);
+        knockSignal = false;
+        if (hit && t - knockedAt > 3) { knockedAt = t; seen.events.push({ kind: 'knock', x: seen.x, z: seen.z }); }
+      }
+      state.walkers.react(seen, dt);
       state.walkers.update(dt, at, R, vehicles);
     }
     let dirty = state.terraces ? state.terraces.refresh(at) : false;
@@ -317,7 +380,7 @@ export async function initLife(ctx) {
     if (dirty || !props.built) { rebuildProps(); props.built = true; }
     crowd.begin(camera.position); fleet.begin();
     state.walkers?.draw(crowd);
-    state.terraces?.draw(crowd, clock, t, rainNow());
+    state.terraces?.draw(crowd, clock, t, rainNow()); // terraces.js reads state.weather itself (cold, cloud): don't count it twice
     state.market?.draw(crowd, t);
     state.cyclists?.draw(crowd, fleet);
     state.cars?.draw(fleet);
@@ -336,7 +399,8 @@ export async function initLife(ctx) {
         cars: state.cars?.count || 0, carsMoving: state.cars ? state.cars.cars.slice(0, state.cars.count).filter((c) => c.v > 0.5).length : 0, seated: state.terraces?.seated || 0, market: state.market?.state || 'none',
         drawCalls: crowd.drawCalls() + fleet.drawCalls() + props.drawCalls() };
       ui.stats([b ? `${b.active} buses (${b.full} near)` : 'no timetable', `${crowd.count} people`,
-        `${state.stats.cyclists} bikes`, `${state.stats.cars} cars`, `${state.boats?.items.length || 0} boats`].join(' · '));
+        `${state.stats.cyclists} bikes`, `${state.stats.cars} cars`, `${state.boats?.items.length || 0} boats`,
+        ...state.events.slice(0, 1).map((e) => e.name), ...(state.weather.live ? [`${Math.round(state.weather.tempC)}°C${state.weather.rain > 0 ? ' rain' : ''}`] : [])].join(' · '));
     }
   }
   state.step = step; // screenshots: re-place everything after moving the camera

@@ -21,8 +21,10 @@
 // (triangles of near looks: one big island can hold 30k bricks, so items alone are no budget),
 // shadowRange (m: the sun's shadow box never grows past this around the orbit target; the shadow
 // pass draws everything inside it a second time, so on the overview it doubled the city's cost).
+// nearDetail 'lite' on every tier: one bevel step and 12-sided studs is the chunkier toy look the
+// owner prefers (and cheaper); High keeps its resolution, distances and shadows.
 export const TIERS = Object.freeze({
-  high: { name: 'high', nearDetail: 'full', pixelRatio: 2, ao: 'full', bloom: 'always', shadowMap: 4096, nearDist: 70, maxNear: 9, studCap: 80000,
+  high: { name: 'high', nearDetail: 'lite', pixelRatio: 2, ao: 'full', bloom: 'always', shadowMap: 4096, nearDist: 70, maxNear: 9, studCap: 80000,
     streamRadius: 300, farDist: [800, 2600], aoDist: 400, nearTriCap: 8e6, shadowRange: 1600 }, // farDist: the map view gets the finest far city
   medium: { name: 'medium', nearDetail: 'lite', pixelRatio: 1, ao: 'half', bloom: 'night', shadowMap: 2048, nearDist: 40, maxNear: 3, studCap: 20000,
     streamRadius: 200, farDist: [280, 900], aoDist: 250, nearTriCap: 2.5e6, shadowRange: 1000 },

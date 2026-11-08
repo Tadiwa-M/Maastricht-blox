@@ -1,5 +1,6 @@
 // River cruise boats on the Maas: a loop up one side of the river and back down the other
 // (keeping right), from life/river.json's centreline. Boat pivot = waterline (CONTRACT 7.1).
+// The player can ride along (src/activities/): nearest() finds the boat to board.
 import { PathMover, poseToObject } from '../mover.js';
 import { buildModel } from '../models.js';
 
@@ -33,6 +34,16 @@ export class Boats {
       obj.name = 'life:boat';
       this.items.push({ obj, mover: new PathMover({ path: loop, loop: true, speed: 3 + q * 0.4, turnRadius: 14, start: (L0 * q) / count + 40 }) });
     }
+  }
+
+  /** Nearest boat to three.js (x, z): { item, d } (horizontal metres) or null. */
+  nearest(x, z) {
+    let best = null;
+    for (const item of this.items) {
+      const d = Math.hypot(item.obj.position.x - x, item.obj.position.z - z);
+      if (!best || d < best.d) best = { item, d };
+    }
+    return best;
   }
 
   update(dt) {

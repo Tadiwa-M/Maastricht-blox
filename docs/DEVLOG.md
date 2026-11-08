@@ -1473,3 +1473,73 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   mutes, saved in localStorage. Suspended when muted or hidden. About 23 nodes, gain and pan only,
   10 Hz updates. Guide 14.
 - Open: towers and parks are placed by hand; real surfaces need a ground-colour query.
+
+## 2026-11-07: exploration: plaques, golden studs, journal, photo mode
+
+- `viewer/src/explore/`: 24 plaques at real landmarks show one or two lines of history within 8 m
+  and count as discovered; 42 golden studs to collect in squares, courtyards, parks, on bridges and
+  the Sint-Pietersberg. The journal (J) lists places and studs, with a dark map that lights up where
+  you walked. Photo mode (P) makes framed postcards, shared or downloaded. Saved in localStorage.
+- Positions picked from the built city (feature centroids, then the nearest open street spot).
+- Open: the character creator should offer the gold-colour unlocks. Guide 15.
+
+## 2026-11-07: quiet activities on foot
+
+- G (gamepad X, or the pill above the walk bar): sit on a free terrace chair (relaxed camera, the
+  clock at 10x); take a parked bike (cycling pose, faster, same collision; G leaves it where you
+  are); board a passing river boat from the bank (off at the next open quay); feed the ducks (seven
+  brick ducks on water near you swim to the bread). Terraces thin out in rain, cold and cloud when
+  `__bloxLife.weather` exists. Guide 16.
+
+## 2026-11-07: light goals, navigation cues, the first minute
+
+- `viewer/src/goals/`: optional one-at-a-time goals from real data: a tourist asks for a nearby
+  landmark or café; catch bus N to a stop a few calls on (checked against the ride); golden hour at a
+  viewpoint before sunset. Hints: a faint golden beam over the rooftops, an edge glint and "320 m
+  north-east"; the green ground line only on "Show route". Tiny far labels on Sint-Jan and
+  Sint-Servaas. First visit: one "double-tap the Markt" prompt; first offer ~20 s into the first
+  walk. One top-right card, O folds it. Guide 17.
+
+## 2026-11-07: interiors: walk into real places
+
+- Places are data: one JSON per place in `viewer/src/interiors/data/`, validated and copied into the
+  site by `build.mjs`; adding one needs only the site build and publish, no world rebuild.
+- Walk into a door: a fade, then a brick-built room 40 m below the door with seated people, staff
+  and a closer camera; walk into the doorway to leave. Collision through a city-query wrapper.
+- Café De Steen and Lounge 22 are made-up examples on the Markt, to replace with permitted places
+  (guide 19: what to photograph and measure).
+
+## 2026-11-07: the toy look on every quality tier
+
+- Owner: Low looked better: bolder studs. Two causes: ambient occlusion darkens the gap round every
+  stud and seam, and High built smoother bricks (two bevel steps, 20-sided studs). Now every tier
+  uses the chunkier bricks (one bevel step, 12-sided studs; cheaper too), and ambient occlusion is
+  drawn only from 40 m above the street (it still gives buildings depth from the map view).
+
+## 2026-11-07: multiplayer capture the flag (first playable)
+
+- 2 to 8 players in a room with a 4-letter code; blue defends the Markt, yellow the Vrijthof. First
+  to 3 captures or most in 8 minutes; running into a carrier knocks them down and drops the flag
+  (home after 20 s or when a teammate touches it). Leaving the old town sends you back to your
+  base after 5 s.
+- Each room is a Cloudflare Durable Object (`relay/src/room.js`, rules `ctf.js`) that decides flags
+  and score; clients send positions about 10 times a second, as RD metres. A dropped connection
+  keeps its place for 30 s.
+- The site shows "Multiplayer coming soon" until the relay is deployed with the `ROOMS` binding
+  (`cd relay && npx wrangler deploy`). Guide 18.
+- Open: no speed checks (fine among friends), players pass through each other, one arena.
+
+## 2026-11-07: living city 2.0
+
+- Maastricht lives through its day (`life/routines.js`): people are drawn by hour and weekday to 13
+  places: students to the university in the morning, shoppers on Grote Staat, Kleine Staat and
+  Maastrichter Brugstraat by day, commuters at the station at 8 and 17, nightlife on the Markt,
+  Platielstraat and Vrijthof Thursday to Saturday, almost nobody out at 3 am. Up to 45 % of groups
+  head somewhere rather than wander.
+- Events by date (`life/calendar.js`): carnaval, 11-11, Preuvenemint, Magisch Maastricht,
+  Koningsdag, with outfits; `#date=` tests them.
+- Real weather (`life/weather.js`, Open-Meteo, near real time only): rain thins the crowd and sends
+  people to the walls to shelter, cold empties terraces and brings out coats. `#rain=`/`#temp=`.
+- People react to the player (`life/reactions.js`): look at jumps, step aside from a runner,
+  scatter after a knock-down. Audit unchanged or better.
+- Merge note: terraces read `state.weather` themselves, so index.js passes them plain rain.

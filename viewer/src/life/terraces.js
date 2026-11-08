@@ -2,10 +2,28 @@
 // restaurants (life/streets.json `pois`: position + unit vector `f` toward the street, `d`
 // metres to it), with people sitting at them (how many: density.js terraceFactor). Only the
 // terraces near the camera are built; the set is rebuilt when the camera target moves.
+// Weather (window.__bloxLife.weather = { rain, tempC, cloud }, when a source sets it) thins the
+// sitters out: rain and cold empty the chairs (terraceShare). The player can take a free chair
+// (freeSeat / taken: src/activities/).
 import { MODE } from '../figure/rig.js';
 import { makeVariant } from '../figure/variants.js';
 import { rng } from './walkgraph.js';
 import { terraceFactor } from './density.js';
+
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+/**
+ * Share of terrace chairs taken (0..1, pure): the time of day and week (density.js), less in the
+ * rain (`rain`, or weather.rain when larger), on cold days (full from 16 C, a few hardy sitters
+ * near freezing) and a little under a grey sky. weather may be null/undefined.
+ */
+export function terraceShare(hours, day, rain = 0, weather = null) {
+  const wet = clamp01(Math.max(rain || 0, Number.isFinite(weather?.rain) ? weather.rain : 0));
+  let s = terraceFactor(hours, day) * (1 - 0.85 * wet);
+  if (Number.isFinite(weather?.tempC)) s *= Math.max(0.12, Math.min(1, (weather.tempC - 2) / 14));
+  if (Number.isFinite(weather?.cloud)) s *= 1 - 0.15 * clamp01(weather.cloud);
+  return s;
+}
 
 const PARASOL = ['#F2F0EA', '#C8102E', '#2F5A3C', '#22385A', '#EFE3C2', '#D6A445'];
 const FURNITURE = ['#5C6062', '#1E1F21', '#8F7A57', '#F2F0EA', '#6E4A33'];
@@ -48,6 +66,25 @@ export class Terraces {
     this.center = null;
     this.dirty = true;
     this.seated = 0;
+    this.share = 0; // share of chairs taken at the last draw
+    this.taken = null; // { id: poi id, q: chair index }: the player's chair (nobody else sits there)
+  }
+
+  /**
+   * Nearest free chair within r metres of Unity (x, z): { poi, chair, q, d } or null. A chair is
+   * free when its table stands on the pavement and nobody is drawn on it at the current share.
+   */
+  freeSeat(x, z, r = 1.6) {
+    let best = null;
+    for (const { poi, layout, ok } of this.active) {
+      if (Math.hypot(poi.x - x, poi.z - z) > r + 20) continue;
+      layout.chairs.forEach((c, q) => {
+        if (!ok[c.table] || c.u <= this.share) return;
+        const d = Math.hypot(c.x - x, c.z - z);
+        if (d <= r && (!best || d < best.d)) best = { poi, chair: c, q, d };
+      });
+    }
+    return best;
   }
 
   /** Rebuild the set near target when it moved > 40 m. Returns true when props must be rebuilt. */
@@ -83,13 +120,16 @@ export class Terraces {
     }
   }
 
-  /** Seated people into the crowd; share of chairs taken from the clock (and the rain). */
+  /** Seated people into the crowd; share of chairs taken from the clock, the rain and the weather. */
   draw(crowd, clock, t, rain = 0) {
-    const share = terraceFactor(clock.hours, clock.day) * (1 - 0.85 * rain); // rain empties the terraces (bar the parasols)
+    const weather = typeof window !== 'undefined' ? window.__bloxLife?.weather : null;
+    const share = this.share = terraceShare(clock.hours, clock.day, rain, weather); // rain empties the terraces (bar the parasols)
+    const mine = this.taken;
     let n = 0;
     for (const { poi, layout, ok } of this.active) {
       layout.chairs.forEach((c, q) => {
         if (!ok[c.table] || c.u > share) return;
+        if (mine && mine.id === poi.id && mine.q === q) return; // the player sits there
         const v = c.v || (c.v = makeVariant(poi.id * 37 + q * 5 + 1000));
         if (v.acc === 'umbrella') v.acc = 'none';
         crowd.add(v, { x: c.x, y: this.ground(c.x, c.z), z: -c.z, rotY: (-c.yaw * Math.PI) / 180, mode: MODE.SIT, t: t + q * 3.1 });

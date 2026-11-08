@@ -254,6 +254,11 @@ async function initHooks(ctx) {
   // [report hook] the "Report a mistake" button (src/report/)
   try { out.push(await (await import('./report/index.js')).initReport?.(ctx)); } catch (e) { console.error('report', e); }
   try { out.push(await (await import('./audio/index.js')).initAudio?.(ctx)); } catch (e) { console.error('audio', e); }
+  try { out.push(await (await import('./explore/index.js')).initExplore?.(ctx)); } catch (e) { console.error('explore', e); }
+  try { out.push(await (await import('./activities/index.js')).initActivities?.(ctx)); } catch (e) { console.error('activities', e); }
+  try { out.push(await (await import('./goals/index.js')).initGoals?.(ctx)); } catch (e) { console.error('goals', e); }
+  try { out.push(await (await import('./interiors/index.js')).initInteriors?.(ctx)); } catch (e) { console.error('interiors', e); }
+  try { out.push(await (await import('./mp/index.js')).initMultiplayer?.(ctx)); } catch (e) { console.error('mp', e); }
   return out.filter((h) => h && typeof h === 'object');
 }
 

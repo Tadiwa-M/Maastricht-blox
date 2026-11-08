@@ -376,7 +376,7 @@ export function initPlayer(ctx) {
     get mode() { return mode; },
     state: () => ({ mode, pos: [...ctrl.pos], yaw: ctrl.yaw, grounded: ctrl.grounded, frozen: ctrl.frozen,
       cam: camera.position.toArray(), camDist: follow.dist, street: hud.street.textContent }),
-    enterAtUnity, enterNearUnity, exitWalk, enterAt, ctrl, follow, city, orbit, input, settings, knockDown,
+    enterAtUnity, enterNearUnity, exitWalk, enterAt, ctrl, follow, city, orbit, input, settings, knockDown, character,
   };
   window.__bloxPlayer = api;
   return api;

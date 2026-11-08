@@ -432,6 +432,74 @@ river loop).
   through bikes, cars in buses and cars through cars in the running game. Run it before and after
   any change to street life.
 
+### The city's day: routines, events, weather, reactions (2026-11-07)
+
+| File | Does |
+|---|---|
+| `routines.js` | named places (RD metres from OSM: Markt, Vrijthof, Platielstraat, Onze Lieve Vrouweplein, Grote Staat, Kleine Staat, Maastrichter Brugstraat, Tongersestraat, Minderbroedersberg, Grote Gracht, Randwyck, station, Wycker Brugstraat); `pull(kind, hour, day)`, `nightFactor`, `spotPulls`, `spotWeights`, `goalPlan`, `pickGoal` (pure) |
+| `calendar.js` | day numbers, Easter, `eventsAt(date, hour)`, `clockDate` (pure) |
+| `weather.js` | Open-Meteo parsing, `WeatherFeed`, `weatherState`, crowd and terrace factors (pure but the fetch) |
+| `outfits.js` | `dress(variant, { outfit, tempC })`: carnaval, orange, coats and beanies in the cold (pure) |
+| `reactions.js` | `PlayerWatch` (jumps, landings, running, knock-downs), `dodgeSide`, `hitByVehicle` (pure) |
+
+**Routines.** Each kind of place has a pull (x spawn weight) by hour and weekday: *study*
+(university buildings, weekdays, peak 8:30 and lunch), *shop* (shopping streets 10:30-17:30;
+Monday from 11-13, Thursday until 21, Sunday 12-17), *commute* (station and the Wycker Brugstraat,
+Randwyck: 8:00 and 17:15), *night* (Markt, Platielstraat, Vrijthof, OLV-plein: evening into the
+small hours on Thursday, Friday and Saturday; weeknights home by 2). `spotWeights` multiplies the
+walk graph's weights within a place's radius (fading over half a radius beyond); it is
+recomputed every game quarter-hour (`reweigh` in index.js), on top of `liveWeights`. `goalPlan`
+turns the pulls into goals: a share of new groups (0.08 per unit of pull above 1, at most 45 %)
+gets a goal, picked by pull; `pickNext` then favours neighbours towards it (x 0.3..2.3, still a
+random walk, so streams look natural) until the group is within the place's radius or 300 s
+have passed. Far places (Randwyck) work as directions: students stream that way.
+`nightFactor` empties the city at night (3 am on a weeknight: ~3 % of the daytime crowd) and keeps
+the nights out busy (x1.25 until 2:30). Walkers wanted = tier count x `crowdFactor` x
+`nightFactor` x events x weather, at most x1.6; `LIFE_RADIUS_BY_TIER` and the tier counts are
+unchanged.
+
+**Events** (`calendar.js`, hours may run past 24 = the night after): carnaval (Friday 11:00 -
+Tuesday midnight before Ash Wednesday, crowd x1.6, Markt and Vrijthof x3, 85 % dressed up in
+red, yellow and green with hats), 11 November (Markt x3.5 from 10:00), Preuvenemint
+(Thursday-Sunday ending on the last Sunday of August, 12-24, Vrijthof x4), Magisch Maastricht
+(last Friday of November - 4 January, 11-22/23, Vrijthof x2.5, Markt x1.5; Christmas Eve and New
+Year's Eve until 17), Koningsdag (27 April, 26th when a Sunday, orange). Strength ramps over the
+first and last hour. The weekly market stays data (`streets.json`, `market.js`). The date: the
+clock only has a weekday, so `clockDate` takes the date within half a week of an anchor, today
+(real time) or `#date=2027-02-06` (which also sets the weekday). Example:
+`#date=2027-02-06&t=15` is carnaval Saturday.
+
+**Weather** (`weather.js`). `WeatherFeed` polls Open-Meteo (`current=precipitation,rain,
+cloud_cover,wind_speed_10m,temperature_2m` for 50.85 N 5.69 E, no key) every 15 min; the
+reading is used only while the clock is within 5 min of real time at 1x (the same rule as live
+bus delays, `clockOffset`), else a dry, mild day (15 °C). `#rain=0..1` and `#temp=<°C>` win
+over everything (and stop the feed). Offline or a bad answer: the last reading is kept for 3 h,
+then forgotten; nothing is logged. Rain (mm/h -> 0..1: drizzle 0.3, 1 mm/h 0.6, 4 mm/h 1) gives
+umbrellas, x(1 - 0.4 rain) people out, and above 0.25 people **keep to the walls**: about once a
+second a group feels 0.7-3.1 m to each side of its path (`room`) and moves its lateral place to
+just clear of the nearer wall, never onto a different street level (a stoop, an awning). Above
+0.5 a group stopping by a wall shelters there 6-20 s longer, facing the street. Cold: below
+3 °C fewer people out, below 8 °C more coats and beanies. Terraces: `state.weather.terrace`
+(1 at >= 14 °C, 0.2 at <= 2 °C, x0.75 above 40 km/h wind) is folded into the rain value handed to
+`Terraces.draw` (`terraceRain`: 1 - 0.85 x = (1 - 0.85 rain) x terrace).
+`window.__bloxLife.weather = { rain, tempC, cloud, wind, live, terrace, crowd }`.
+
+**Reactions** (walk mode; `PlayerWatch.sample` once a frame from `window.__bloxPlayer`): a jump
+(take-off at > 2 m/s up) or a landing (after > 0.3 s in the air) within 7 m: three in four groups
+stop 1.2-2.6 s and turn to look. A player running (> 2.6 m/s) at a group within ~3 m: it steps off
+the runner's line sideways at 2.2 m/s (its lateral offset, easing back afterwards). A knock-down
+within 10 m: groups startle (0.6 s, looking), turn round if they were walking towards it and
+hurry away at x1.7 for 2.8 s. The knock-down is seen by life itself (a vehicle moving > 1.5 m/s
+whose footprint covers the player, the test of `player/bump.js`) or announced with a
+`blox:knockdown` window event. Costs: a few squared distances per group per event.
+
+**Audit** (`tools/life-audit.mjs` method on samples/markt_v3 + the synthetic life export, high
+tier, 60 snapshots each), averaged over 11 moments (Saturday 11-17, weekday rush hours, Friday
+market, Saturday rain): people through people 4.5 -> 3.6, people in vehicles 6.7 -> 6.5, people on
+roofs 1.5 -> 1.1 per snapshot (single moments vary +-30 % either way: different random paths).
+Tests: `life.calendar.test.mjs`, `life.routines.test.mjs`, `life.weather.test.mjs`,
+`life.reactions.test.mjs`.
+
 ## Walk mode (Unity)
 
 Press **C** in Play mode to take control of the figure (`Gameplay/Locomotion/CharacterWalker.cs`):

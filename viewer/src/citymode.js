@@ -25,6 +25,7 @@ import { FACING_NAMES } from './rotation.js';
 import { bindUI, escapeHtml } from './ui.js';
 
 const DEG = Math.PI / 180;
+const AO_FROM_M = 40; // camera height above the street from which ambient occlusion is drawn
 import { PLACES_RD, placeChunk } from './places.js';
 import { loadingScreen, loadState } from './loading.js';
 import { gpuInfo, autoTierFor } from './gpu.js';
@@ -342,7 +343,8 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     stage.camera.updateMatrixWorld();
     pv.multiplyMatrices(stage.camera.projectionMatrix, stage.camera.matrixWorldInverse);
     frustum.setFromProjectionMatrix(pv);
-    applyRadii(stage.camera.position.y - approxGround(stage.camera.position.x, stage.camera.position.z));
+    const camH = stage.camera.position.y - approxGround(stage.camera.position.x, stage.camera.position.z);
+    applyRadii(camH);
     if (far.silhouetteReady()) loader.update(stage.camera.position, inView); // silhouette first
     if (times.silhouette === undefined && far.silhouetteReady()) times.silhouette = performance.now() - t0;
     if (streetWanted && loader.settled()) {
@@ -368,7 +370,9 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     const sr = THREE.MathUtils.clamp(dist * 1.1, 45, Math.max(45, TIERS[tierName].shadowRange ?? 1600));
     shadowBox.min.set(t.x - sr, t.y - 10, t.z - sr); shadowBox.max.set(t.x + sr, t.y + Math.min(140, sr), t.z + sr);
     stage.setShadowFocus(shadowBox);
-    stage.post.setAOInRange(dist < TIERS[tierName].aoDist);
+    // the toy look: no ambient occlusion near the ground (it darkens the gaps round every stud and
+    // seam, so the bricks read flat); from higher up it gives the buildings their depth
+    stage.post.setAOInRange(dist < TIERS[tierName].aoDist && camH > AO_FROM_M);
     if (mats.waterUniforms) mats.update(now / 1000);
     const draw = far.silhouetteReady() && (!still || ready);
     if (draw) {
