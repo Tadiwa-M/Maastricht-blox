@@ -1,20 +1,14 @@
-// Web Audio voices for the city, all synthesised (no sound files). A small fixed graph runs all
-// the time: traffic rumble (brown noise, low-passed), crowd murmur (band-passed noise whose band and
-// level wander like voices), rain (high-passed noise) and a bus engine (two oscillators). Short
-// sounds are built per event and drop themselves when done: footsteps, landings, bird calls, bell
-// strokes, bus doors. Spatial sound is a gain and a stereo pan per layer (no HRTF, no reverb), so
-// phones keep up. The numbers come from mix.js; index.js sets them ~10 times a second.
+// Web Audio voices for the city, all synthesised (no sound files): rain (high-passed noise, the one
+// layer that runs all the time) and short sounds built per event that drop themselves when done:
+// footsteps, landings, bell strokes. (Traffic, crowd, birds and buses were taken out on the owner's
+// request.) Spatial sound is a gain and a stereo pan (no HRTF, no reverb), so phones keep up.
 import { SURFACES } from './mix.js';
 
 const TAU_S = 0.12; // smoothing of the 10 Hz layer updates
 
-function noiseBuffer(ac, seconds, brown = false) {
+function noiseBuffer(ac, seconds) {
   const n = Math.floor(ac.sampleRate * seconds), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
-  let b = 0;
-  for (let q = 0; q < n; q++) {
-    const w = Math.random() * 2 - 1;
-    if (brown) { b = (b + 0.02 * w) / 1.02; d[q] = b * 3.5; } else d[q] = w;
-  }
+  for (let q = 0; q < n; q++) d[q] = Math.random() * 2 - 1;
   return buf;
 }
 
@@ -48,31 +42,14 @@ export class CitySynth {
   constructor(ac) {
     this.ac = ac;
     this.master = gainNode(ac, 0);
-    const comp = ac.createDynamicsCompressor(); // a gentle limiter: bells + a bus + rain never clip
+    const comp = ac.createDynamicsCompressor(); // a gentle limiter: bells + rain never clip
     comp.threshold.value = -10; comp.knee.value = 10; comp.ratio.value = 5; comp.attack.value = 0.004; comp.release.value = 0.3;
     this.master.connect(comp).connect(ac.destination);
     this.white = noiseBuffer(ac, 2);
-    const brown = noiseBuffer(ac, 3, true);
-
-    this.traffic = { f: filter(ac, 'lowpass', 220, 0.6), g: gainNode(ac), p: panner(ac) };
-    loop(ac, brown).connect(this.traffic.f).connect(this.traffic.g).connect(this.traffic.p).connect(this.master);
-
-    this.crowd = { f: filter(ac, 'bandpass', 700, 1.4), g: gainNode(ac), p: panner(ac) };
-    loop(ac, this.white).connect(this.crowd.f).connect(this.crowd.g).connect(this.crowd.p).connect(this.master);
-
     this.rain = { g: gainNode(ac) };
     const rainSrc = loop(ac, this.white);
-    rainSrc.playbackRate.value = 0.93; // not in step with the crowd's copy of the noise
     rainSrc.connect(filter(ac, 'highpass', 1100, 0.5)).connect(filter(ac, 'lowpass', 9000, 0.5)).connect(this.rain.g).connect(this.master);
 
-    const e = { f: filter(ac, 'lowpass', 300, 2), g: gainNode(ac), p: panner(ac), a: ac.createOscillator(), b: ac.createOscillator() };
-    e.a.type = 'sawtooth'; e.b.type = 'square';
-    e.a.frequency.value = 40; e.b.frequency.value = 20;
-    const mixB = gainNode(ac, 0.6);
-    e.a.connect(e.f); e.b.connect(mixB).connect(e.f);
-    e.f.connect(e.g).connect(e.p).connect(this.master);
-    e.a.start(); e.b.start();
-    this.engine = e;
     this.resetBuses();
   }
 
@@ -92,25 +69,10 @@ export class CitySynth {
 
   setVolume(v, tau = 0.08) { this.set(this.master.gain, v, tau); }
 
-  /**
-   * Layer levels (mix.js): { traffic: { level, pan, cut }, crowd: { level, pan }, rain,
-   * engine: { level, pan, freq, cut }, bells: { level, pan, cut } }.
-   */
+  /** Layer levels: { rain 0..1, bells: { level, pan, cut } }. */
   mix(m) {
-    const { traffic: t, crowd: c, engine: e, bells: b } = m;
-    this.set(this.traffic.g.gain, 0.9 * t.level);
-    this.set(this.traffic.p.pan, t.pan, 0.3);
-    this.set(this.traffic.f.frequency, t.cut, 0.3);
-    // murmur: the band and the level wander a little every update, like voices coming and going
-    this.set(this.crowd.g.gain, 1.0 * c.level * (0.65 + 0.6 * Math.random()), 0.06);
-    this.set(this.crowd.f.frequency, 420 + 700 * Math.random(), 0.08);
-    this.set(this.crowd.p.pan, c.pan, 0.3);
+    const b = m.bells;
     this.set(this.rain.g.gain, 0.2 * m.rain, 0.5);
-    this.set(this.engine.g.gain, 0.3 * e.level, 0.2);
-    this.set(this.engine.p.pan, e.pan, 0.2);
-    this.set(this.engine.a.frequency, e.freq, 0.3);
-    this.set(this.engine.b.frequency, e.freq / 2, 0.3);
-    this.set(this.engine.f.frequency, e.cut, 0.3);
     this.set(this.bellBus.g.gain, b.level, 0.3);
     this.set(this.bellBus.p.pan, b.pan, 0.3);
     this.set(this.bellBus.f.frequency, b.cut, 0.3);
@@ -157,29 +119,6 @@ export class CitySynth {
     this.burst(when, { type: 'lowpass', f: Math.min(1400, s.f), q: 0.7, len: s.len * 1.8, vol: 0.12 + 0.25 * strength });
   }
 
-  /** One bird call (a trill or a fluting phrase), pan -1..1, vol 0..1. */
-  chirp(pan = 0, vol = 0.5, when = this.now) {
-    const ac = this.ac, o = ac.createOscillator(), g = gainNode(ac), p = panner(ac);
-    p.pan.value = pan;
-    const trill = Math.random() < 0.6;
-    const n = trill ? 3 + Math.floor(Math.random() * 6) : 2 + Math.floor(Math.random() * 3);
-    const step = trill ? 0.055 + Math.random() * 0.03 : 0.16 + Math.random() * 0.08;
-    const base = trill ? 3200 + Math.random() * 2600 : 1500 + Math.random() * 1200;
-    const amp = 0.13 * vol;
-    g.gain.setValueAtTime(0, when);
-    for (let q = 0; q < n; q++) {
-      const t = when + q * step, f0 = base * (0.9 + 0.25 * Math.random()), f1 = f0 * (trill ? 0.7 + 0.5 * Math.random() : 0.85 + 0.3 * Math.random());
-      o.frequency.setValueAtTime(f0, t);
-      o.frequency.exponentialRampToValueAtTime(f1, t + step * 0.8);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.linearRampToValueAtTime(amp, t + 0.008);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + step * 0.85);
-    }
-    o.connect(g).connect(p).connect(this.fx);
-    o.start(when); o.stop(when + n * step + 0.05);
-    dropAfter(o, [o, g, p]);
-  }
-
   /**
    * One bell stroke: f = the strike note (nominal, Hz). Partials of a church bell (hum, prime,
    * minor-third tierce, nominal, superquint, octave), the low ones ringing longest. small: 3 partials.
@@ -190,19 +129,6 @@ export class CitySynth {
       : [[0.25, 0.32, 1.4], [0.5, 0.42, 1.1], [0.6, 0.3, 0.9], [1, 0.55, 0.7], [1.5, 0.16, 0.4], [2, 0.14, 0.3]];
     for (const [r, a, d] of P) {
       this.tone(when, { f: f * r * (1 + (Math.random() - 0.5) * 0.002), len: ring * d, vol: 0.55 * vol * a, out: this.bellBus.g, attack: 0.003 });
-    }
-  }
-
-  /** A ridden bus's doors: 'open' (hiss, then a two-tone chime) or 'close' (three beeps, then a hiss). */
-  door(kind, when = this.now) {
-    const hiss = (t, len) => this.burst(t, { type: 'highpass', f: 2600, q: 0.6, len, vol: 0.12, attack: 0.04 });
-    if (kind === 'open') {
-      hiss(when, 0.6);
-      this.tone(when + 0.25, { f: 988, len: 0.7, vol: 0.09 });
-      this.tone(when + 0.6, { f: 784, len: 0.9, vol: 0.09 });
-    } else {
-      for (let q = 0; q < 3; q++) this.tone(when + q * 0.22, { f: 1320, len: 0.1, vol: 0.05, type: 'triangle' });
-      hiss(when + 0.75, 0.45);
     }
   }
 }

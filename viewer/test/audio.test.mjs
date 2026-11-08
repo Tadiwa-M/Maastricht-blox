@@ -1,9 +1,9 @@
-// City sound: the pure mix (levels, pan, birds, surfaces, rain), the event state machines
-// (bells, steps, landing, doors), the remembered prefs and the sound places (src/audio/).
+// City sound: the pure mix (levels, pan, surfaces, rain), the event state machines
+// (bells, steps, landing), the remembered prefs and the sound places (src/audio/).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { att, earFrom, placeOf, busyLevel, addLevels, heightFade, curveAt, birdCurve, greenAt, birdRate, surfaceAt, rainLevel, engineVoice, SURFACES } from '../src/audio/mix.js';
-import { bellStrikes, StepClock, AirWatch, DoorWatch, eventsInTick, PRELUDE } from '../src/audio/events.js';
+import { att, earFrom, placeOf, greenAt, surfaceAt, rainLevel, SURFACES } from '../src/audio/mix.js';
+import { bellStrikes, StepClock, AirWatch, PRELUDE } from '../src/audio/events.js';
 import { loadPrefs, savePrefs, masterGain, PREFS_KEY, PREFS_DEFAULTS } from '../src/audio/prefs.js';
 import { audioPlaces, DEFAULT_ORIGIN_RD } from '../src/audio/places.js';
 
@@ -30,38 +30,6 @@ test('pan: east of a north-facing ear is right, behind-left is left, overhead is
   near(placeOf(ear, 0, 0).pan, 0);
   const facingEast = earFrom([0, 1.6, 0], [0, 0, 1], 0); // three.js +z = south: right is south
   assert.ok(placeOf(facingEast, 0, -30).pan > 0.7);
-});
-
-test('busy level: more and nearer sources are louder, bounded, panned toward them', () => {
-  const ear = earFrom([0, 1.6, 0], [1, 0, 0], 0);
-  const one = busyLevel(ear, [{ x: 10, z: 0 }], () => 1, 10);
-  const many = busyLevel(ear, Array.from({ length: 20 }, (_, q) => ({ x: 10, z: q - 10 })), () => 1, 10);
-  const far = busyLevel(ear, [{ x: 400, z: 0 }], () => 1, 10);
-  assert.ok(many.level > one.level && one.level > far.level && many.level < 1);
-  assert.ok(one.pan > 0.5);
-  assert.deepEqual(busyLevel(ear, [], () => 1, 10), { level: 0, pan: 0, near: 0 });
-  near(addLevels(0.3, 0.4), 0.5);
-});
-
-test('street detail fades with height', () => {
-  near(heightFade(1.6), 1);
-  assert.ok(heightFade(300) < 0.2 && heightFade(300) > 0.1);
-});
-
-test('birds: dawn chorus, quiet day, silent night; wrapped curve', () => {
-  assert.equal(birdCurve(2), 0);
-  assert.equal(birdCurve(23), 0);
-  assert.ok(birdCurve(6.5) > birdCurve(13));
-  assert.ok(birdCurve(13) > 0);
-  near(curveAt([[0, 0], [12, 1], [24, 0]], 30), 0.5);
-});
-
-test('bird rate: more in the green, none in the rain or at night, less over traffic', () => {
-  const park = birdRate({ hours: 7, green: 1 }), street = birdRate({ hours: 7, green: 0 });
-  assert.ok(park > 4 * street && street > 0);
-  assert.equal(birdRate({ hours: 7, green: 1, rain: 1 }), 0);
-  assert.equal(birdRate({ hours: 1, green: 1 }), 0);
-  assert.ok(birdRate({ hours: 7, green: 1, traffic: 1 }) < park);
 });
 
 test('places: the Vrijthof bells at Unity ~(1485, 3717) for the default origin; parks nearby', () => {
@@ -94,12 +62,6 @@ test('rain: a weather source first, else #rain= from the URL, clamped', () => {
   assert.equal(rainLevel(null, '#rain=abc'), 0);
   assert.equal(rainLevel(null, ''), 0);
   assert.equal(rainLevel({ rain: 0.3 }, '#rain=1'), 0.3);
-});
-
-test('engine: faster buses are higher, brighter and louder', () => {
-  const idle = engineVoice(0), fast = engineVoice(12);
-  assert.ok(fast.freq > idle.freq && fast.cut > idle.cut && fast.loud > idle.loud);
-  assert.deepEqual(engineVoice(-12), fast);
 });
 
 test('bells: the hour strikes its count, half hours once, nights quiet', () => {
@@ -143,23 +105,6 @@ test('air: a jump, a landing by fall speed; stepping off a kerb is no landing', 
   assert.ok(land.strength > 0.9);
   a.update(false, -0.3, 0.016); // a kerb
   assert.equal(a.update(true, 0, 0.016), null);
-});
-
-test('doors: open after stopping, close when moving off, once each', () => {
-  const d = new DoorWatch(), evs = [];
-  const run = (v, s) => { for (let t = 0; t < s; t += 0.1) { const e = d.update(v, 0.1); if (e) evs.push(e); } };
-  run(8, 2); run(0.05, 0.2); assert.deepEqual(evs, []);
-  run(0, 3); run(3, 2); run(0, 0.2); run(9, 1);
-  assert.deepEqual(evs, ['open', 'close']);
-});
-
-test('events per tick: about rate x dt on average', () => {
-  let s = 1;
-  const rand = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-  let n = 0;
-  for (let q = 0; q < 10000; q++) n += eventsInTick(2, 0.1, rand);
-  assert.ok(n > 1800 && n < 2200, String(n));
-  assert.equal(eventsInTick(0, 0.1, rand), 0);
 });
 
 test('prefs: defaults, stored values, bad data, throwing storage', () => {

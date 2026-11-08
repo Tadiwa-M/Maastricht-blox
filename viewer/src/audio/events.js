@@ -63,27 +63,3 @@ export class AirWatch {
     return ev;
   }
 }
-
-/**
- * A ridden bus's doors: stopped (slower than 0.15 m/s for 0.4 s) after driving -> 'open' (hiss,
- * chime); moving off again (faster than 0.6 m/s) -> 'close'. update(v, dt) -> null | 'open' | 'close'.
- */
-export class DoorWatch {
-  constructor() { this.state = 'moving'; this.still = 0; }
-  update(v, dt) {
-    const s = Math.abs(v || 0);
-    if (this.state === 'moving') {
-      this.still = s < 0.15 ? this.still + dt : 0;
-      if (this.still >= 0.4) { this.state = 'open'; return 'open'; }
-    } else if (s > 0.6) { this.state = 'moving'; this.still = 0; return 'close'; }
-    return null;
-  }
-  reset() { this.state = 'moving'; this.still = 0; }
-}
-
-/** Events due in a tick of dt seconds for a Poisson rate (per s), with rand() in [0, 1). */
-export function eventsInTick(rate, dt, rand = Math.random) {
-  let n = 0, p = rate * dt;
-  while (p > 0 && n < 4) { if (rand() < Math.min(1, p)) n++; p -= 1; }
-  return n;
-}

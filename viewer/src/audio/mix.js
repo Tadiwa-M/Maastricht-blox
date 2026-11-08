@@ -31,43 +31,6 @@ export function placeOf(ear, x, z) {
   return { d, pan };
 }
 
-/**
- * Many sources -> one layer: items [{ x, z, ... }], loud(item) amplitude at the source, ref the
- * falloff distance. -> { level 0..1, pan (intensity-weighted), near (the loudest one's amplitude) }.
- */
-export function busyLevel(ear, items, loud, ref) {
-  let I = 0, P = 0, near = 0;
-  for (const it of items) {
-    const a = loud(it);
-    if (!(a > 0)) continue;
-    const { d, pan } = placeOf(ear, it.x, it.z);
-    const amp = a * att(d, ref), i = amp * amp;
-    I += i; P += i * pan;
-    if (amp > near) near = amp;
-  }
-  return { level: 1 - Math.exp(-Math.sqrt(I) * 1.2), pan: I > 0 ? P / I : 0, near };
-}
-
-/** Two layers' amplitudes combined (as intensities). */
-export const addLevels = (a, b) => Math.sqrt(a * a + b * b);
-
-/** Street detail fades as the camera rises: 1 at street level, ~0.15 at 300 m. */
-export const heightFade = (h) => att(Math.max(0, h - 3), 50);
-
-/** Piecewise-linear curve over hours [[h, v], ...] (sorted, 0..24). */
-export function curveAt(table, hours) {
-  const h = ((hours % 24) + 24) % 24;
-  for (let q = 1; q < table.length; q++) {
-    const [h1, v1] = table[q];
-    if (h <= h1) { const [h0, v0] = table[q - 1]; return v0 + (v1 - v0) * ((h - h0) / (h1 - h0 || 1)); }
-  }
-  return table[table.length - 1][1];
-}
-
-/** Birdsong by hour: the dawn chorus, a quieter day, a little dusk song, silent nights. */
-export const BIRDS = [[0, 0], [4.5, 0], [5.5, 0.8], [6.5, 1], [8, 0.7], [10, 0.4], [17, 0.4], [19.5, 0.55], [21, 0.15], [22, 0], [24, 0]];
-export const birdCurve = (hours) => curveAt(BIRDS, hours);
-
 /** How green it is at (x, z): the strongest park around, fading over its edge. */
 export function greenAt(x, z, parks = []) {
   let g = 0;
@@ -77,14 +40,6 @@ export function greenAt(x, z, parks = []) {
     g = Math.max(g, p.g * clamp((p.r + edge - d) / (2 * edge)));
   }
   return g;
-}
-
-/**
- * Bird calls per second: the hour, how green it is, rain (none), height and the street's own
- * noise (birds are drowned out next to a busy road).
- */
-export function birdRate({ hours, green = 0, rain = 0, h = 1.6, traffic = 0 }) {
-  return birdCurve(hours) * (0.12 + 1.4 * green) * (1 - clamp(rain)) * heightFade(h) * (1 - 0.6 * clamp(traffic));
 }
 
 /**
@@ -111,10 +66,4 @@ export function rainLevel(weather, hash = '') {
   if (Number.isFinite(weather?.rain)) return clamp(weather.rain);
   const v = +(new URLSearchParams(String(hash).replace(/^#/, '')).get('rain') || 0);
   return Number.isFinite(v) ? clamp(v) : 0;
-}
-
-/** Bus engine: firing note (Hz), filter cutoff (Hz) and loudness factor by speed (m/s). */
-export function engineVoice(v = 0) {
-  const s = clamp(Math.abs(v) / 10);
-  return { freq: 34 + 26 * s, cut: 260 + 640 * s, loud: 0.55 + 0.45 * s };
 }

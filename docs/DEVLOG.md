@@ -1543,3 +1543,9 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - People react to the player (`life/reactions.js`): look at jumps, step aside from a runner,
   scatter after a knock-down. Audit unchanged or better.
 - Merge note: terraces read `state.weather` themselves, so index.js passes them plain rain.
+
+## 2026-11-08: fewer sounds
+
+- Owner: didn't like the sounds. Kept the Vrijthof bells, rain, footsteps and jumps; took out the
+  synthetic traffic rumble, crowd murmur, birds, bus engines and doors (code and tests removed,
+  not just muted). If they come back it should be with real recordings.

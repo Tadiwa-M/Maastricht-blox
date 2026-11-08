@@ -37,8 +37,7 @@ function fakeContext() {
 }
 
 const MIX = {
-  traffic: { level: 0.5, pan: 0.2, cut: 400 }, crowd: { level: 0.3, pan: -0.1 }, rain: 0.4,
-  engine: { level: 0.2, pan: 0, freq: 45, cut: 500 }, bells: { level: 0.3, pan: 0.5, cut: 3000 },
+  rain: 0.4, bells: { level: 0.3, pan: 0.5, cut: 3000 },
 };
 
 test('synth: the always-on graph is small and every voice schedules cleanly', () => {
@@ -50,11 +49,9 @@ test('synth: the always-on graph is small and every voice schedules cleanly', ()
   s.mix(MIX);
   for (const surface of ['cobble', 'stone', 'gravel', 'grass', 'nope']) s.step(surface, 1);
   s.thud('cobble', 1); s.thud('grass', 0);
-  for (let q = 0; q < 20; q++) s.chirp(0.5, 1);
   s.bell(2, 233, 1, 4.5); s.bell(2, 1047, 0.4, 1.6, true);
-  s.door('open'); s.door('close');
   const transient = ac.made.sources.slice(loops);
-  assert.ok(transient.length > 30);
+  assert.ok(transient.length > 10);
   for (const src of transient) {
     assert.ok(src.started, 'started');
     assert.ok(Number.isFinite(src.stopAt) || src.buffer, 'stops itself');
@@ -69,5 +66,5 @@ test('synth: no stereo panner (old browsers) still works', () => {
   const ac = fakeContext();
   delete ac.createStereoPanner;
   const s = new CitySynth(ac);
-  s.mix(MIX); s.chirp(-0.5, 1);
+  s.mix(MIX); s.bell(0, 233);
 });
