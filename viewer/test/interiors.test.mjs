@@ -20,7 +20,8 @@ import { MODE } from '../src/figure/rig.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = join(here, '..', 'src', 'interiors', 'data');
 const raw = (f) => JSON.parse(readFileSync(join(DATA, f), 'utf8'));
-const examples = readdirSync(DATA).filter((f) => f.endsWith('.json'));
+const files = readdirSync(DATA).filter((f) => f.endsWith('.json'));
+const examples = files.filter((f) => raw(f).example === true);
 
 /** A small valid place for edits in tests. */
 function mini(over = {}) {
@@ -30,12 +31,12 @@ function mini(over = {}) {
 }
 const parse = (r) => parsePlace(r, 't.json').place;
 
-test('the example places parse without warnings and are marked as examples', () => {
-  assert.ok(examples.length >= 2);
-  for (const f of examples) {
+test('every place file parses without warnings; the two templates are marked as examples', () => {
+  assert.deepEqual(examples.sort(), ['cafe-de-steen.json', 'lounge-22.json']);
+  for (const f of files) {
     const { place, warnings } = parsePlace(raw(f), f);
     assert.deepEqual(warnings, [], f);
-    assert.equal(place.example, true, `${f} is a template`);
+    assert.equal(place.example, examples.includes(f), `${f}: example flag`);
     assert.ok(place.props.length > 10 && seatsOf(place).length >= 6, f);
   }
 });

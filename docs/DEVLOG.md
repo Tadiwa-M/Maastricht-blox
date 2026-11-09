@@ -1549,3 +1549,28 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Owner: didn't like the sounds. Kept the Vrijthof bells, rain, footsteps and jumps; took out the
   synthetic traffic rumble, crowd murmur, birds, bus engines and doors (code and tests removed,
   not just muted). If they come back it should be with real recordings.
+
+## 2026-11-09: Maastricht University interiors
+
+- Eight faculty and library buildings are enterable (`viewer/src/interiors/data/um-*.json`): SBE,
+  Law, FASoS, UCM, FSE, UNS40 (FHML + FPN), the Inner City Library and the Randwyck Library.
+  Generic ground floors: a hall with reception, study tables, coffee bar or sofa corner; a lecture,
+  seminar or tutorial room behind a glass or brick wall; book stacks in the libraries.
+- Doors from OSM entrance nodes where mapped (UCM), otherwise the BAG address point on the
+  footprint's street side, each ~1 m out from the 3D BAG facade on level street ground.
+- New campus furniture kit (`kit-campus.js`), screen slides, bigger wrapped name signs (no logos),
+  stone-slab floors, up to 72 people per room.
+- Open: not surveyed (photos per building make them accurate); doors still to be walked up to in a
+  full-city build.
+
+## 2026-11-09: stadium stands
+
+- De Geusselt's pitch side was a brick wall with windows; now it is a seating rake
+  (`voxelise/stands.py`): rows 1 m deep rising one brick from 1 m above the pitch, seats in MVV red
+  and white with patterns per block, aisles every 20 m, the roof kept from 3D BAG and open toward
+  the pitch, outer facades unchanged.
+- Detection from data: a 3D BAG ring with a hole of at least 2,500 m² plus an OSM `leisure=stadium`
+  area or `building=stadium` (no id list; an `osm_tags` correction is the override). Works on
+  islands (De Geusselt is 27 degrees off the grid). Brick count 57.6k -> 50.0k.
+- Open: the north stand's lower front roof crosses in front of its upper rows (3D BAG has two roof
+  levels there). Needs a world rebuild to show.

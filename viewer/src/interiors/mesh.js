@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { rotToYaw, frontDir } from '../rotation.js';
-import { roomBoxes, roomFrame } from './layout.js';
+import { roomBoxes, roomFrame, signBoard } from './layout.js';
 
 export const STUD = { pitch: 0.25, r: 0.075, h: 0.045 }; // furniture-scale studs (half the city's)
 const AMBIENT = 0.22; // the room's own light (emissive share of every colour): rooms are lit indoors
@@ -66,6 +66,36 @@ export function textTexture(title, lines = [], { w = 512, h = 384, bg = '#1F2B24
   return tex;
 }
 
+/**
+ * A sign face: title lines (bold, as large as fits) over smaller lines, centred. Name as data,
+ * plain text on a plain board (no logos).
+ */
+export function signTexture(title, lines = [], { w = 768, h = 384, bg = '#1F2B24', fg = '#F6F3EA', accent = '#F6F3EA', frame = 'rgba(255,255,255,0.35)' } = {}) {
+  if (typeof document === 'undefined') return null;
+  const cv = Object.assign(document.createElement('canvas'), { width: w, height: h });
+  const g = cv.getContext('2d');
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  g.strokeStyle = frame; g.lineWidth = Math.max(2, h * 0.012);
+  g.strokeRect(h * 0.04, h * 0.04, w - h * 0.08, h - h * 0.08);
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  const subH = lines.length ? 0.15 : 0, titleH = (1 - 0.16 - subH * lines.length) / Math.max(1, title.length);
+  const fit = (text, px, weight) => {
+    let size = px;
+    g.font = `${weight} ${size}px system-ui, sans-serif`;
+    while (g.measureText(text).width > w * 0.88 && size > 10) { size -= 2; g.font = `${weight} ${size}px system-ui, sans-serif`; }
+  };
+  let y = h * 0.08;
+  g.fillStyle = accent;
+  const tPx = Math.round(Math.min(h * titleH * 0.78, h * 0.42));
+  for (const t of title) { fit(t, tPx, 700); g.fillText(t, w / 2, y + (h * titleH) / 2); y += h * titleH; }
+  g.fillStyle = fg;
+  for (const l of lines) { fit(l, Math.round(h * subH * 0.62), 500); g.fillText(l, w / 2, y + (h * subH) / 2); y += h * subH; }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
 /** The room as a group in room-local three.js space (x right, y up, -z into the room). */
 export function buildRoomGroup(place) {
   const group = new THREE.Group();
@@ -87,12 +117,15 @@ export function buildRoomGroup(place) {
   studGeo.dispose();
   mesh.castShadow = false; mesh.receiveShadow = false;
   group.add(mesh);
-  // menu boards: the text on a plane just in front of the board's face
+  // menu boards and screens: the text on a plane just in front of the face
   for (const b of texBoxes) {
-    const tex = textTexture(place.name, place.menu.length ? place.menu : ['Welcome'], { bg: '#1F2B24' });
-    if (!tex) continue;
     const [fx, fz] = frontDir(b.face);
     const w = fx ? b.max[2] - b.min[2] : b.max[0] - b.min[0], h = b.max[1] - b.min[1];
+    // a slide: big title over a few lines, drawn at the screen's own aspect
+    const tex = b.tex === 'slide'
+      ? signTexture([place.slide[0] || place.name], place.slide.slice(1, 4), { w: 1024, h: Math.round((1024 * h) / w), bg: '#F4F6F8', fg: '#22313F', accent: '#1F3F6E', frame: 'rgba(31,63,110,0.25)' })
+      : textTexture(place.name, place.menu.length ? place.menu : ['Welcome'], { bg: '#1F2B24' });
+    if (!tex) continue;
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.96, h * 0.96),
       new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
     const c = [(b.min[0] + b.max[0]) / 2 + fx * 0.012, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2 + fz * 0.012];
@@ -120,14 +153,16 @@ export function buildSign(place, groundY) {
   const fr = roomFrame(place);
   const group = new THREE.Group();
   group.name = `interior-sign:${place.id}`;
-  const tex = textTexture(place.sign.text, [], { w: 512, h: 256, bg: place.sign.colour });
+  const sb = signBoard(place);
+  const tex = sb.w < 1 ? textTexture(sb.title[0], [], { w: 512, h: 256, bg: place.sign.colour })
+    : signTexture(sb.title, sb.lines, { w: 768, h: Math.round((768 * sb.h) / sb.w), bg: place.sign.colour });
   // both broad faces show the name (BoxGeometry lays each face's texture out readable from outside)
   const face = new THREE.MeshStandardMaterial({ map: tex, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.35, roughness: 0.6 });
   const edge = new THREE.MeshStandardMaterial({ color: '#1E1F21', roughness: 0.5 });
-  const board = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 0.95), [face, face, edge, edge, edge, edge]);
-  board.position.set(0, -0.32, 0.55);
-  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 1.15), new THREE.MeshStandardMaterial({ color: '#1E1F21', roughness: 0.4, metalness: 0.6 }));
-  arm.position.set(0, 0, 0.55);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(0.05, sb.h, sb.w), [face, face, edge, edge, edge, edge]);
+  board.position.set(0, -0.07 - sb.h / 2, 0.08 + sb.w / 2);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, sb.w + 0.2), new THREE.MeshStandardMaterial({ color: '#1E1F21', roughness: 0.4, metalness: 0.6 }));
+  arm.position.set(0, 0, (sb.w + 0.2) / 2);
   group.add(board, arm);
   // beside the door (to its left seen from the street), against the facade, 3 m up; the board
   // points out along the door's facing (local +z -> outward)

@@ -123,7 +123,7 @@ def prepare_buildings(buildings: list[Building], osm: OsmData, registry: Feature
         named = idx.overlapping_named(fp)
         lm = match_landmark(fp, named, b.bag_id)
         osm_b = idx.best_osm_building(fp)
-        name = lm.display_name if lm else (osm_b.name if osm_b and osm_b.name else None)
+        name = lm.display_name if lm else (osm_b.name if osm_b and osm_b.name else _stadium_name(named))
         top, ground = b.roof_max_z, b.ground_z
         height = (top - ground) if top is not None and ground is not None else None
         fid = registry.add(
@@ -136,6 +136,11 @@ def prepare_buildings(buildings: list[Building], osm: OsmData, registry: Feature
         pb.shop = idx.has_shop(fp)
         out.append(pb)
     return out
+
+
+def _stadium_name(named: list[OsmFeature]) -> str | None:
+    """A stadium's OSM building is often unnamed; the ``leisure=stadium`` area around it has the name."""
+    return next((f.name for f in named if f.tags.get("leisure") == "stadium"), None)
 
 
 def _wikidata(osm_b: OsmFeature | None) -> dict[str, str]:

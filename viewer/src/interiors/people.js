@@ -4,6 +4,7 @@
 import { MODE } from '../figure/rig.js';
 import { roomFrame, seatsOf } from './layout.js';
 import { RIG_SEAT_H } from './kit.js';
+import { MAX_PEOPLE } from './format.js';
 
 /** Stable 32-bit hash of a string (place ids -> seeds). */
 export function strHash(s) {
@@ -17,18 +18,20 @@ const unit = (seed, q) => { let h = Math.imul(seed ^ Math.imul(q + 1, 0x9e3779b1
 
 /**
  * The room's people: [{ seed (figure variant), x, z (room metres), facing, mode, lift (m the feet
- * sit above the floor: stools are higher than the rig's chair) }]. share: place.people.share.
+ * sit above the floor: stools are higher than the rig's chair, tiers lift a whole row) }].
+ * share: place.people.share. At most MAX_PEOPLE: staff and standing first, then the seated in
+ * seat order (a big lecture room simply has a few more empty seats).
  */
-export function roomPeople(place) {
+export function roomPeople(place, max = MAX_PEOPLE) {
   const base = strHash(place.id);
   const out = [];
-  seatsOf(place).forEach((s, q) => {
-    if (unit(base, q) >= place.people.share) return;
-    out.push({ seed: (base % 100000) + q * 7 + 11, x: s.x, z: s.z, facing: s.facing, mode: MODE.SIT, lift: s.height - RIG_SEAT_H });
-  });
   for (const [q, s] of place.people.staff.entries()) out.push({ seed: (base % 100000) + 5000 + q * 13, x: s.x, z: s.z, facing: s.facing, mode: MODE.IDLE, lift: 0, staff: true });
   for (const [q, s] of place.people.standing.entries()) out.push({ seed: (base % 100000) + 7000 + q * 17, x: s.x, z: s.z, facing: s.facing, mode: MODE.IDLE, lift: 0 });
-  return out;
+  seatsOf(place).forEach((s, q) => {
+    if (out.length >= max || unit(base, q) >= place.people.share) return;
+    out.push({ seed: (base % 100000) + q * 7 + 11, x: s.x, z: s.z, facing: s.facing, mode: MODE.SIT, lift: s.height - RIG_SEAT_H });
+  });
+  return out.slice(0, max);
 }
 
 /** Crowd poses (three.js) for people in a room whose floor is at floorY; t = seconds (idle motion). */

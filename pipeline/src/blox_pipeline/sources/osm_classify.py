@@ -101,6 +101,8 @@ def classify_area(tags: dict[str, str]) -> list[str]:
         out.append("road_areas")
     if is_poi(tags) and "landuse" not in out and "water" not in out:
         out.append("pois")  # named parks/water become park/water features instead
+    if tags.get("leisure") == "stadium":
+        out.append("stadiums")  # voxelise/stands.py: which 3D BAG rings get seating rakes
     return out
 
 

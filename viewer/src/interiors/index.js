@@ -9,7 +9,7 @@
 // fades back out onto the pavement, facing the street.
 //
 // URL hash: #interior=<id> starts inside that place (with #mode=walk&at=... or on its own).
-import { parsePlace } from './format.js';
+import { parsePlace, MAX_PEOPLE } from './format.js';
 import { roomFrame, entrySpot, exitSpot, DEPTH } from './layout.js';
 import { roomVolume, installVolumes } from './volume.js';
 import { nearestDoor, exitCheck, Fader, doorHere } from './door.js';
@@ -122,7 +122,7 @@ export async function initInteriors(ctx) {
     const [ux, uz] = fr.toUnity(s.x, s.z);
     cameraInside(true);
     if (!teleport(ux, uz, fr.yawIn)) { volumes.set(null); cameraInside(false); group.visible = false; return false; }
-    if (!crowd) { crowd = new FigureCrowd(48, { lod: false, shadows: false }); stage.scene.add(crowd.group); }
+    if (!crowd) { crowd = new FigureCrowd(MAX_PEOPLE, { lod: false, shadows: false }); stage.scene.add(crowd.group); }
     const people = roomPeople(place).map((p) => {
       const v = makeVariant(p.seed, { kind: 'adult' });
       v.acc = 'none';

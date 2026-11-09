@@ -14,6 +14,8 @@ export const FORMAT = 'blox-interior';
 export const VERSION = 1;
 export const LIMITS = { width: [3, 30], depth: [3, 30], height: [2.4, 6], floor: [-0.4, 0.4] };
 export const DOOR_W = 1.0; // the doorway opening (m)
+export const MAX_PEOPLE = 72; // figures drawn in one room at most (people.js keeps the first ones)
+export const PATTERNS = ['planks', 'tiles', 'slabs'];
 const HEX = /^#[0-9a-fA-F]{6}$/;
 export const LOOK_DEFAULTS = { walls: '#C9A27E', floor: '#6E4A33', ceiling: '#EFE6D6', trim: '#3B2A20', windows: '#FFE9B8', door: '#5C3A24' };
 
@@ -67,7 +69,8 @@ function point(file, p, name, room) {
  * place = { id, name, address, bagId, example, notes, door: { x, z, facing, fromLeft },
  *   room: { width, depth, height, floor }, look: { walls, floor, ceiling, trim, windows, door, pattern, beams },
  *   props: [{ kind, x, z, facing, size, colour, trim, y }], seats: [{ x, z, facing, height }],
- *   people: { share, staff: [{ x, z, facing }], standing: [...] }, menu: [text], sign: { text, colour } }
+ *   people: { share, staff: [{ x, z, facing }], standing: [...] }, menu: [text], slide: [text],
+ *   sign: { text, lines: [text], colour } }
  */
 export function parsePlace(raw, file = '') {
   const warnings = [];
@@ -93,7 +96,8 @@ export function parsePlace(raw, file = '') {
   const look = {};
   for (const [k, def] of Object.entries(LOOK_DEFAULTS)) look[k] = colour(file, raw.look?.[k], `look.${k}`, def);
   look.pattern = raw.look?.pattern ?? 'planks';
-  if (!['planks', 'tiles'].includes(look.pattern)) fail(file, 'look.pattern must be "planks" or "tiles"');
+  if (!PATTERNS.includes(look.pattern)) fail(file, `look.pattern must be ${PATTERNS.map((p) => `"${p}"`).join(', ')}`);
+  const lookColour = (c) => (typeof c === 'string' && c.startsWith('@') ? look[c.slice(1)] : c); // kit defaults like '@walls'
   look.beams = raw.look?.beams === true;
 
   const entry = entryZone(room, door);
@@ -112,8 +116,8 @@ export function parsePlace(raw, file = '') {
     if (fp[0] < -0.01 || fp[1] < -0.01 || fp[2] > room.width + 0.01 || fp[3] > room.depth + 0.01) fail(file, `${tag} (${p.kind}) sticks out of the room`);
     if (!kit.ceiling && y + size[1] > room.height) fail(file, `${tag} (${p.kind}) is taller than the room`);
     if (kit.solid && y < 1.9 && overlaps(fp, entry)) fail(file, `${tag} (${p.kind}) blocks the way in at the door`);
-    return { kind: p.kind, x, z, facing: f, size, y, colour: colour(file, p.colour, `${tag}.colour`, kit.colour),
-      trim: colour(file, p.trim, `${tag}.trim`, kit.trim) };
+    return { kind: p.kind, x, z, facing: f, size, y, colour: colour(file, p.colour, `${tag}.colour`, lookColour(kit.colour)),
+      trim: colour(file, p.trim, `${tag}.trim`, lookColour(kit.trim)) };
   });
   for (let a = 0; a < props.length; a++) for (let b = a + 1; b < props.length; b++) {
     const A = props[a], B = props[b];
@@ -130,10 +134,12 @@ export function parsePlace(raw, file = '') {
     staff: (pe.staff || []).map((s, q) => point(file, s, `people.staff[${q}]`, room)),
     standing: (pe.standing || []).map((s, q) => point(file, s, `people.standing[${q}]`, room)) };
   const menu = (raw.menu || []).slice(0, 14).map((m, q) => str(file, m, `menu[${q}]`, 34));
-  const sign = { text: str(file, raw.sign?.text, 'sign.text', 24, name), colour: colour(file, raw.sign?.colour, 'sign.colour', '#1F2B24') };
+  const slide = (raw.slide || []).slice(0, 8).map((m, q) => str(file, m, `slide[${q}]`, 40));
+  const sign = { text: str(file, raw.sign?.text, 'sign.text', 48, name), colour: colour(file, raw.sign?.colour, 'sign.colour', '#1F2B24'),
+    lines: (raw.sign?.lines || []).slice(0, 3).map((m, q) => str(file, m, `sign.lines[${q}]`, 48)) };
   return {
     place: { id, name, address: str(file, raw.address, 'address', 80, ''), bagId, example: raw.example === true,
-      notes: typeof raw.notes === 'string' ? raw.notes : '', door, room, look, props, seats, people, menu, sign },
+      notes: typeof raw.notes === 'string' ? raw.notes : '', door, room, look, props, seats, people, menu, slide, sign },
     warnings,
   };
 }

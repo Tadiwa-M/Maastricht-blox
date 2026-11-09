@@ -13,6 +13,7 @@ from .street_props import plan_props
 from .bridges import prepare_bgt_bridges
 from .canopies import plan_canopies
 from .shelters import plan_shelters, shelter_blocked, shelter_roads
+from .stands import plan_stadiums
 from .prepare_bgt import carriageways, prepare_bgt_ground, prepare_bgt_water
 from .prepare_osm import P_RAIL, island_paving, outside_bgt, prepare_landuse, prepare_roads, prepare_trees, prepare_water, register_pois
 from .streets import street_context
@@ -45,6 +46,8 @@ def prepare_world(src: SourceData, cfg: VoxelConfig | None = None) -> PreparedWo
     reg = FeatureRegistry()
     # registration order fixes the ids: buildings (by BAG id), then OSM groups (by osm id)
     buildings = prepare_buildings(src.buildings, src.osm, reg)
+    if cfg.stands:  # stadiums: the pitch side becomes a seating rake (before islands copy them)
+        plan_stadiums(buildings, src.osm, src.dtm)
     islands: list = []
     if cfg.islands:  # turned buildings leave the world grid; their footprint is paved instead
         from ..islands.group import plan_islands

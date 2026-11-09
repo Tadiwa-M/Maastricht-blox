@@ -5,9 +5,13 @@ brick-built room with people at the tables and the bar, and walk back out onto t
 Every place is **one JSON file** in `viewer/src/interiors/data/`. Adding or changing a place
 needs only the site build and publish, never a world rebuild.
 
-> The two places that ship now, **Café De Steen** and **Lounge 22**, are **made-up examples** at
-> made-up spots on the Markt (south side and west side). They are templates: replace them with
-> the real places that gave permission, and delete them once the first real ones are in.
+> **Café De Steen** and **Lounge 22** are **made-up examples** at made-up spots on the Markt
+> (south side and west side). They are templates: replace them with the real places that gave
+> permission, and delete them once the first real ones are in.
+>
+> The **Maastricht University** buildings (eight files `um-*.json`, see "Maastricht University"
+> below) are real doors with a **generic** ground floor each: the door is on the real facade,
+> the inside is a plausible hall, lecture room or library, not a survey.
 
 ## Playing
 
@@ -58,6 +62,41 @@ screenshots and checking a new file). In the browser console, `__bloxInteriors.e
    The world is not rebuilt: the build copies `data/*.json` into the site's `interiors/` folder and
    writes `interiors/index.json`.
 
+## Maastricht University
+
+Eight buildings, one file each, `"example": false`. The ground floors are generic for the kind of
+building (entrance hall with a reception, study tables, a coffee bar or sofa corner; a lecture,
+seminar or tutorial room behind a glass or brick inner wall; book stacks for the libraries), sized
+14-20 m so a room stays one cheap mesh. The sign outside shows the faculty's name in plain text
+(and "Maastricht University" under it); no logos.
+
+| File | Building | Door (Unity m) | Inside |
+|---|---|---|---|
+| `um-sbe` | School of Business and Economics, Tongersestraat 53 | 1268.0, 3324.4, N | hall, coffee bar, tiered lecture room (64 seats) |
+| `um-law` | Faculty of Law, Bouillonstraat 1-3 | 1480.2, 3544.1, W | hall with law books, flat lecture room behind brick |
+| `um-fasos` | Faculty of Arts and Social Sciences, Grote Gracht 90-92 | 1317.0, 3822.6, S | hall, sofa corner, seminar room behind glass |
+| `um-ucm` | University College Maastricht, Zwingelput 4 | 1550.4, 3214.3, E | common room, coffee bar, two tutorial rooms |
+| `um-fse` | Faculty of Science and Engineering, Paul-Henri Spaaklaan 1 | 3411.0, 2699.1, N | hall with computer tables, tiered lecture room |
+| `um-uns40` | UNS40: Health, Medicine and Life Sciences + Psychology and Neuroscience, Universiteitssingel 40 | 3496.0, 2391.6, N | big hall, stairs, tiered lecture room |
+| `um-inner-city-library` | Inner City Library, Grote Looiersstraat 17 | 1618.3, 3293.6, N | loan desk, book stacks, study tables, old stairs |
+| `um-randwyck-library` | Randwyck Library, Universiteitssingel 50 (UNS50) | 3538.1, 2195.4, E | loan desk, coffee corner, stacks, computer tables |
+
+**How the doors were placed**: OpenStreetMap entrance nodes where mapped (only UCM's Zwingelput
+entrance is), otherwise the street side of the building at its BAG address point (the address
+nodes `BOU1-3`, `GG90`, `PHS1`, `GL17`, `UNS40`, `UNS50` sit just inside the main entrance), and
+the porch / recess in the footprint where there is one (SBE, UNS40). Each door spot is about 1 m
+out from the **3D BAG** footprint edge (what the city is built from), on open level street ground
+with headroom (checked in the city world's chunks), and outside every other building. The door's
+facing is the compass direction nearest the facade's outward normal; the facades are 0-45
+degrees off the compass, inside the 50-degree walk-in cone. `viewer/test/interiors-campus.test.mjs`
+keeps each door within 0.5-2 m in front of its BAG facade edge. The Randwyck Library's `bagId` is
+the hospital's (BAG counts UNS50 as part of that building).
+
+**Making one accurate** (owner, later): photos of the entrance hall and the main room (same list
+as "Adding a real place" below), then change `room`, `look` and `props` in the file. Keep `door`
+unless the real entrance is elsewhere (then use `__bloxInteriors.here()` on the spot). A building
+whose faculty gives permission can add a real slide text (`slide`) and its own colours.
+
 ## The place file
 
 ```json
@@ -79,7 +118,8 @@ screenshots and checking a new file). In the browser console, `__bloxInteriors.e
   "seats": [{ "x": 6.5, "z": 1.0, "facing": "W", "height": 0.46 }],
   "people": { "share": 0.6, "staff": [{ "x": 6.3, "z": 5.6, "facing": "W" }], "standing": [] },
   "menu": ["Koffie  2.90", "Limburgse vlaai  4.20"],
-  "sign": { "text": "De Steen", "colour": "#3B2A20" }
+  "slide": ["Lecture title", "a line", "another line"],
+  "sign": { "text": "De Steen", "lines": ["a smaller line"], "colour": "#3B2A20" }
 }
 ```
 
@@ -90,13 +130,14 @@ screenshots and checking a new file). In the browser console, `__bloxInteriors.e
 | `door.fromLeft` | metres from the left wall to the door's middle (default: the middle of the wall) |
 | `room.width / depth / height` | metres; width 3-30, depth 3-30, height 2.4-6 (default 3) |
 | `room.floor` | room floor above the pavement, -0.4..0.4 (a step in the doorway) |
-| `look.*` | colours `#rrggbb`; `pattern` `planks` or `tiles` (tiles use `floor` and `trim`); `beams` true/false |
+| `look.*` | colours `#rrggbb`; `pattern` `planks`, `tiles` (uses `floor` and `trim`) or `slabs` (1 m stone slabs); `beams` true/false |
 | `props[]` | `kind` from the kit, `x`/`z` its middle in room metres, `facing` (default N), optional `size` [w, h, d], `colour`, `trim`, `y` (height above the floor) |
 | `seats[]` | extra places to sit (benches, window sills); chairs, stools, sofas and armchairs are seats already |
-| `people.share` | share of the seats taken, 0..1 (the same people every visit) |
+| `people.share` | share of the seats taken, 0..1 (the same people every visit); at most 72 figures per room (staff and standing first) |
 | `people.staff[]`, `people.standing[]` | standing figures (behind the bar, at the counter) |
 | `menu[]` | up to 14 short lines for `menu` boards |
-| `sign` | the blade sign outside: `text` (default the name), `colour` |
+| `slide[]` | up to 8 lines (40 characters) for `screen`s: the first is the title, the next three show under it (default: the name) |
+| `sign` | the blade sign outside: `text` (default the name, up to 48 characters), `lines` (up to 3 smaller lines under it), `colour`. Names over 16 characters, or with `lines`, get a bigger board with the name wrapped over 2-3 lines |
 | `address`, `bagId`, `notes` | for you and the reports; `bagId` is the BAG id from the info panel when you click the building |
 
 **Room coordinates**: stand in the doorway looking in. `x` runs from the left wall (0) to the
@@ -124,6 +165,26 @@ the side a sitter faces (chairs, stools, sofas), the open side (shelves), the cu
 | `menu` | 1.0 x 0.8 x 0.06 | wall board at 1.3 m with the `menu` lines |
 | `rug` | 2.0 x 0.02 x 1.4 | walk-through |
 | `machine` | 0.6 x 0.45 x 0.45 | espresso machine, sits on the bar (y 1.08) |
+
+University pieces (`kit-campus.js`; same rules, a front as noted):
+
+| kind | size | notes |
+|---|---|---|
+| `seatrow` | 3.6 x 0.9 x 0.85 | lecture seats with a writing ledge, one seat per 0.6 m; set `size` for the row length; front = where they look |
+| `tier` | 6.0 x 0.3 x 0.95 | a riser: set `size` [width, its height, depth]; walkable (steps of up to 0.4 m); put the row on it with `y` = its height |
+| `lectern` | 0.7 x 1.15 x 0.55 | front = toward the audience (the speaker stands behind) |
+| `desk` | 1.6 x 0.76 x 0.75 | lecture / office desk, modesty panel on the front |
+| `reception` | 3.0 x 1.1 x 0.85 | high counter on the visitors' side (front), worktop and screens behind |
+| `studytable` | 3.2 x 0.75 x 1.2 | long table with a power strip; put chairs on both sides |
+| `screen` | 3.2 x 1.8 x 0.06 | wall screen at 0.95 m showing `slide` |
+| `noticeboard` | 1.4 x 0.9 x 0.04 | cork board with notes, at 1.1 m |
+| `bookcase` | 1.0 x 2.2 x 0.38 | tall, full of books; 0.55 m deep or more = a double-sided stack |
+| `stairs` | 1.2 x 3.0 x 4.6 | a flight rising toward the back from its front (bottom step); scenery, solid, not climbable; make it as tall as the room |
+| `coffeebar` | 2.6 x 1.08 x 0.7 | counter with a lit pastry case and cups |
+| `partition` | 4.0 x 3.0 x 0.2 | inner brick wall in the room's `walls` colour; leave a gap for a doorway and put a piece with `y` 2.4 over it |
+| `glasswall` | 4.0 x 3.0 x 0.1 | glazed inner wall (frame, mullions, pale panes) |
+| `monitor` | 0.55 x 0.42 x 0.18 | computer screen, sits on a table (y 0.75) |
+| `bench` | 1.6 x 0.46 x 0.4 | seats one per 0.6 m |
 
 The build refuses a file whose pieces stick out of the room, are taller than it, block the way in
 at the door (1.1 m wide, 1.5 m deep) or use an unknown kind; overlapping pieces only warn.
@@ -158,11 +219,16 @@ at the door (1.1 m wide, 1.5 m deep) or use an unknown kind; overlapping pieces 
   `<site>/interiors/` and writes `interiors/index.json`; the game fetches them at start.
 
 Tests: `viewer/test/interiors.test.mjs` (format, room frame for every facing, collision volume,
-the controller walking into walls and furniture, doors, fade, people, the build copy).
+the controller walking into walls and furniture, doors, fade, people, the build copy) and
+`viewer/test/interiors-campus.test.mjs` (the eight faculty files, their doors against the BAG
+facades, the campus kit, walking up the tiers, signs, the people cap).
 
 ## Open ends
 
 - Real places: replace the two examples (owner: permission + photos + measurements).
+- Faculty interiors are generic; photos per building would make them match (see "Maastricht University").
+- A big room is one merged mesh: the Inner City Library (14 book stacks) is ~6,700 boxes, ~100k triangles;
+  more stacks than that should share instanced books instead.
 - One room per place, ground floor only; upstairs rooms or a terrace inside would need a second room.
 - Photos are references for building the file; nothing reads them. A later step could take wall
   colours straight from a photo.

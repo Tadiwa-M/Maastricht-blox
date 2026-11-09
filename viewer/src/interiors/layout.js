@@ -53,7 +53,7 @@ export function pieceBoxes(prop, roomH) {
     const [ex, ez] = rotatedExtent(w, d, rot);
     const col = p.col === 'main' ? prop.colour : p.col === 'trim' ? prop.trim : p.col;
     return { min: [cx - ex / 2, y0 + y - h / 2, cz - ez / 2], max: [cx + ex / 2, y0 + y + h / 2, cz + ez / 2], col,
-      studs: !!p.studs, glow: p.glow || 0, tex: p.tex || null, face: p.tex ? rot : undefined };
+      studs: !!p.studs, glow: p.glow || 0, tex: p.tex || null, face: p.tex ? rot : undefined, ...(p.shade ? { shade: p.shade } : {}) };
   });
 }
 
@@ -76,9 +76,13 @@ export function shellBoxes(place) {
   const { room: { width: W, depth: D, height: H, floor: step }, look, door } = place;
   const out = [], T = WALL, course = 0.24;
   const box = (min, max, col, extra = {}) => out.push({ min, max, col, studs: false, glow: 0, ...extra });
-  // floor slab and its surface (planks along z, or chequered tiles)
+  // floor slab and its surface (planks along z, chequered tiles, or large stone slabs)
   box([-T, -0.3, 0], [W + T, -0.02, D + T], look.trim);
-  if (place.look.pattern === 'tiles') {
+  if (place.look.pattern === 'slabs') {
+    for (let x = 0, q = 0; x < W; x += 1.0, q++) for (let z = (q % 2) * -0.5, r = 0; z < D; z += 1.0, r++) {
+      box([x, -0.02, Math.max(0, z)], [Math.min(W, x + 1.0), 0, Math.min(D, z + 1.0)], look.floor, { shade: 0.93 + hash(q, r, 7) * 0.1 });
+    }
+  } else if (place.look.pattern === 'tiles') {
     for (let x = 0; x < W; x += 0.5) for (let z = 0; z < D; z += 0.5) {
       const k = (Math.round(x * 2) + Math.round(z * 2)) % 2;
       box([x, -0.02, z], [Math.min(W, x + 0.5), 0, Math.min(D, z + 0.5)], k ? look.floor : look.trim, { shade: shadeOf(x * 2, z * 2, 1) * 0.5 + 0.5 });
@@ -165,6 +169,32 @@ export function seatsOf(place) {
   }
   for (const s of place.seats) out.push({ ...s, kind: 'seat' });
   return out;
+}
+
+/** Words of `text` wrapped into lines of at most `max` characters (a longer word stays whole). */
+export function wrapWords(text, max) {
+  const out = [];
+  for (const word of String(text).split(/\s+/).filter(Boolean)) {
+    const last = out.length - 1;
+    if (last >= 0 && out[last].length + 1 + word.length <= max) out[last] += ` ${word}`;
+    else out.push(word);
+  }
+  return out;
+}
+
+/**
+ * The blade sign outside the door: { w (board length out from the facade), h (m), title (lines),
+ * lines (smaller lines under it) }. Short names keep the small cafe board; long names (a
+ * faculty) get a bigger board with the name over two or three lines.
+ */
+export function signBoard(place) {
+  const { text, lines = [] } = place.sign;
+  if (text.length <= 16 && !lines.length) return { w: 0.95, h: 0.5, title: [text], lines: [] };
+  // as few lines as a 22-character width needs (3 at most), balanced: the narrowest width that fits
+  const n = Math.min(3, wrapWords(text, 22).length);
+  let max = Math.ceil(text.length / n), title;
+  while ((title = wrapWords(text, max)).length > n) max++;
+  return { w: 1.5, h: lines.length || title.length > 2 ? 0.9 : 0.75, title, lines };
 }
 
 /** Room spot just inside the door (walking in) and Unity spot on the pavement (walking out). */

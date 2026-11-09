@@ -156,7 +156,7 @@ def apply_corrections(fixes: list[dict[str, Any]], buildings: list[Building], os
         elif kind == "osm_tags":
             found = False
             for lst in (osm.roads, osm.road_areas, osm.railways, osm.water, osm.waterways, osm.landuse,
-                        osm.buildings, osm.pois):
+                        osm.buildings, osm.pois, osm.stadiums):
                 for feat in lst:
                     if feat.osm_id == f["osm"]:
                         feat.tags.update({k: str(v) for k, v in (f.get("set") or {}).items()})

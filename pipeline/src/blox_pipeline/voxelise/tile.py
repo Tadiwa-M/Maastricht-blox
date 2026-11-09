@@ -16,6 +16,7 @@ from .layers import NONE, Layers, shifted
 from .canopies import SLAB_PLATES
 from .railings import RAILING_PLATES, paint_railings
 from .ramps import paint_ramps
+from .stands import fill_stands
 from .trees import tree_cells
 from .world import PreparedWorld, TreeSpec
 
@@ -62,6 +63,7 @@ def voxelise_tile(world: PreparedWorld, layers: Layers, box: CellBox) -> VoxelTi
     _fill_water(tile, L, kk)
     _fill_buildings(tile, L, kk)
     _fill_windows(tile, ext, L, kk, cfg.storey_plates, cfg.window_band)
+    fill_stands(tile, L, kk, _roof_band(L))
     _fill_decks(tile, L, kk)
     _fill_canopies(tile, L, kk)
     for cells in tree_vox:

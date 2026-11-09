@@ -35,6 +35,7 @@ class VoxelConfig:
     railings: bool = True  # railing pieces along bridge deck edges (railings.py)
     canopies: bool = True  # free-standing roofs from the BGT (canopies.py)
     shelters: bool = True  # bus shelters at OSM stops tagged shelter=yes (shelters.py)
+    stands: bool = True  # seating rakes on the pitch side of stadiums (stands.py)
     island_min_yaw_deg: float = 3.0  # buildings turned more than this become islands
 
 
@@ -80,6 +81,8 @@ class PreparedBuilding:
     shop: bool = False    # an OSM shop/amenity POI lies inside
     centre: bool = False  # old-centre look (colours.old_centre): limestone, plaster, slate
     hero: str | None = None  # hand-authored landmark model replacing the 3D BAG shape (heroes.py)
+    pitch: BaseGeometry | None = None  # a stadium's open pitch (stands.py): its inner side is stands
+    pitch_z: float | None = None       # ground of the pitch, m NAP
 
 
 @dataclass

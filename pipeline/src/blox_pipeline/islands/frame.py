@@ -143,7 +143,8 @@ def local_building(b: PreparedBuilding, pose: IslandPose) -> PreparedBuilding:
     accent = None
     if b.accent is not None:
         accent = Accent(_turn(pose, *b.accent.centre), b.accent.radius_m, b.accent.wall, b.accent.roof)
-    return replace(b, footprint=grown, roofs=roofs, accent=accent)
+    pitch = affinity.affine_transform(b.pitch, m) if b.pitch is not None else None  # stands.py
+    return replace(b, footprint=grown, roofs=roofs, accent=accent, pitch=pitch)
 
 
 def local_dtm(world: PreparedWorld, frame: IslandFrame) -> HeightGrid:

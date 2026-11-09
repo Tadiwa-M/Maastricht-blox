@@ -119,6 +119,7 @@ class OsmData:
     addresses: list[OsmFeature] = field(default_factory=list)  # Point with addr:*
     pois: list[OsmFeature] = field(default_factory=list)  # named Point/Polygon
     traffic: list[OsmFeature] = field(default_factory=list)  # Point: traffic signals, crossings, give way / stop
+    stadiums: list[OsmFeature] = field(default_factory=list)  # (Multi)Polygon leisure=stadium (named or not)
 
 
 @dataclass

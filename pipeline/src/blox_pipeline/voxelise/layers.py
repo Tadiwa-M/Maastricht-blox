@@ -16,6 +16,7 @@ from ..geo import CellBox
 from . import palette
 from .grid import FULL, RIDGE_I, RIDGE_J, SLOPE_E, SLOPE_N, SLOPE_S, SLOPE_W, SLOPE_STACK
 from .canopies import paint_canopy
+from .stands import paint_stands
 from .prepare_buildings import roof_pitch_ok
 from .raster import cell_hash, cover, sub
 from .world import PreparedBuilding, PreparedWorld, SurfacePatch
@@ -50,6 +51,10 @@ class Layers:
     canopy_k: NDArray[np.int32]  # top K of a canopy roof slab (canopies.py), open underneath
     canopy_color: NDArray[np.uint8]
     canopy_post: NDArray[np.uint8]  # palette idx of a post under the canopy here, 0 = none
+    stand_k: NDArray[np.int32]  # top K of a stadium stand's rake here (stands.py), NONE = no stand
+    stand_roof_k: NDArray[np.int32]  # first roof cell above the stand: open air in between
+    stand_color: NDArray[np.uint8]  # colour of the rake's top cells (seat, tread or aisle)
+    stand_cap: NDArray[np.uint8]  # how many top cells take ``stand_color``
 
     @classmethod
     def empty(cls, box: CellBox) -> "Layers":
@@ -81,8 +86,12 @@ def build_layers(world: PreparedWorld, box: CellBox) -> Layers:
     _water(world, L, area)  # first, so bridge decks compare against the lowered river bed
     for p in world.patches_in(area):
         _patch(p, L)
-    for b in world.buildings_in(area):
+    buildings = world.buildings_in(area)
+    for b in buildings:
         _building(world, b, L)
+    for b in buildings:  # after all buildings: a stand only where its stadium won the column
+        if b.pitch is not None:
+            paint_stands(b, L)
     _islands(world, L, area)
     for c in world.canopies_in(area):
         paint_canopy(c, L)

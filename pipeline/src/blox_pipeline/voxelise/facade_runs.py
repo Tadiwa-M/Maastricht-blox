@@ -36,6 +36,7 @@ from ..facade.spec import GROUND_H, STOREY_H, GroundFloor
 from . import palette
 from .facade_style import FacadeStyle, facade_style
 from .layers import NONE, Layers, build_layers, shifted
+from .raster import cover, sub
 from .grid import SLOPE_STACK
 from .streets import PROBE_M, StreetContext
 from .world import PreparedBuilding, PreparedWorld
@@ -47,6 +48,7 @@ EDGE_SLACK_M = 0.25  # an axis-aligned edge may drift this much across its lengt
 EDGE_COVER = 0.75   # share of the run that must lie on axis-aligned footprint edges
 MARGIN = 4          # cells around a building for its layers (run depth -1..2 + neighbours)
 PAINT_MARGIN = 3    # cells around a run that its painting can touch
+PITCH_SLACK_M = 1.0  # cells this close to a stadium's pitch count as pitch (no facade faces it)
 
 
 @dataclass(frozen=True)
@@ -153,6 +155,10 @@ def plan_building(world: PreparedWorld, b: PreparedBuilding, ctx: StreetContext)
     style = facade_style(b.bag_id, b.year, palette.entries()[b.wall][1], b.centre)
     plans = []
     open_ = (L.bld_top == NONE) & (L.island_k == NONE)  # an island next door is not a street
+    if b.pitch is not None:  # a stadium's pitch side is its stands (stands.py), not a facade
+        hit = cover(b.pitch.buffer(PITCH_SLACK_M), box)
+        if hit is not None:
+            sub(open_, box, hit[0])[hit[1]] = False
     for raw in extract_runs(own, open_, box, b.feature_id):
         plans.append(_plan(raw, L, own, wall_top, edges, b, style, ctx))
     return plans

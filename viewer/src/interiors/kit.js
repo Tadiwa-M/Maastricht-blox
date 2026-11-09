@@ -6,7 +6,11 @@
 //
 // A part: { c: [a, y, b] centre, s: [w, h, d] size, col: 'main' | 'trim' | '#rrggbb',
 //           studs?: true (studs on its top face), glow?: 0..1 (lit: lamp shades, screens),
-//           tex?: 'menu' (the place's menu drawn on its front face) }
+//           tex?: 'menu' | 'slide' (the place's menu / slide drawn on its front face),
+//           shade?: brightness factor (brick courses) }
+// The university pieces (lecture rooms, libraries, halls) live in kit-campus.js and are merged
+// in below. A kind's default colour or trim '@walls' / '@trim' means "the room's look colour".
+import { campusKit } from './kit-campus.js';
 
 /** Seat height (m) of the figure rig's sitting pose (figure/rig.js SEAT_H). */
 export const RIG_SEAT_H = 0.46;
@@ -135,6 +139,7 @@ export const KIT = {
   menu: { size: [1.0, 0.8, 0.06], colour: '#1F2B24', trim: '#5C3A24', parts: menu, solid: true, y: 1.3 },
   rug: { size: [2.0, 0.02, 1.4], colour: '#8A3B2A', trim: '#8A3B2A', parts: rug, solid: false },
   machine: { size: [0.6, 0.45, 0.45], colour: '#B9BCC4', trim: '#1E1F21', parts: machine, solid: true, y: 1.08 },
+  ...campusKit({ seatH: RIG_SEAT_H, table }),
 };
 
 export const KIT_KINDS = Object.freeze(Object.keys(KIT));

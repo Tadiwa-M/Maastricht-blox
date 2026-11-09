@@ -8,7 +8,7 @@ The full source list is in `pipeline/README.md`; this page explains the flow.
 ```bash
 cd pipeline
 uv sync
-uv run pytest                                                   # 453 tests (2026-10-19)
+uv run pytest                                                   # 606 tests (2026-11-09)
 uv run python -m blox_pipeline.testscene --out ../build/testscene   # look-test chunk (no downloads)
 uv run python -m blox_pipeline.models                           # rewrite contract/models/*.json
 uv run blox fetch --bbox 176000,317500,176500,318000            # real data: AHN, 3D BAG, BGT, OSM
@@ -49,7 +49,7 @@ blox build:  sources/  load           -> AHN HeightGrid, 3D BAG Buildings, OsmDa
 | `rotation.py` | the facing rule ([guide 01](01-coordinates-and-rotation.md)) |
 | `catalogue.py`, `palette.py` | load `contract/*.json`; stud offsets and extents per type/rot |
 | `sources/` | downloads (`http.py`: resumable, idempotent), `config.py` holds **all** endpoints; readers for AHN GeoTIFF, CityJSON, BGT pages (`bgt.py`), OSM PBF, aerial photo |
-| `voxelise/` | turn sources into a dense `VoxelTile`: terrain, water, BGT ground (`prepare_bgt.py`), bridges (`bridges.py`, railings `railings.py`), canopies (`canopies.py`), buildings (roof planes → slope stacks), trees, colours (`colours.py`, `landmarks.py`), features (`features.py`); facades: runs (`facade_runs.py`), style (`facade_style.py`), street context (`streets.py`), painting + placed pieces (`facade_paint.py`); glass-cell windows as the fallback |
+| `voxelise/` | turn sources into a dense `VoxelTile`: terrain, water, BGT ground (`prepare_bgt.py`), bridges (`bridges.py`, railings `railings.py`), canopies (`canopies.py`), buildings (roof planes → slope stacks), stadium stands (`stands.py`), trees, colours (`colours.py`, `landmarks.py`), features (`features.py`); facades: runs (`facade_runs.py`), style (`facade_style.py`), street context (`streets.py`), painting + placed pieces (`facade_paint.py`); glass-cell windows as the fallback |
 | `facade/` | the facade grammar: facade runs (`run.py`, `frame.py`) used by test-scene houses and real buildings ([guide 04](04-facades-and-pieces.md)) |
 | `testscene/` | hand-authored look-test chunk (`scene.py`), the `Canvas` painter (`canvas.py`), build script (`build.py`) |
 | `layout/` | voxels → bricks (below) |
@@ -170,6 +170,41 @@ carriageway (BGT inside its area, OSM road buffers outside), long side along the
 to the grid axes), front edge at least 0.75 m off the kerb; a stop node on the carriageway steps
 out at its nearest edge. A spot touching a building, water or another roof is skipped (logged).
 `VoxelConfig.shelters`. Test area 2026-11-03: 14 placed, 2 skipped.
+
+**Stadium stands** (`voxelise/stands.py`, `VoxelConfig.stands`). A 3D BAG stadium is a ring
+around an open pitch; voxelised like any building its pitch side was a brick wall with windows.
+Now that side is a seating rake.
+
+*Detection* (`plan_stadiums`, in `prepare_world` before islands): a building whose footprint has a
+hole of at least 2,500 m² (the pitch) **and** that OSM calls a stadium: a `leisure=stadium` area
+(kept named or not in `OsmData.stadiums`) or an OSM building tagged `building=stadium` /
+`leisure=stadium` covering at least 30% of the footprint. Both conditions come from data, so no
+list of ids. A stadium OSM does not tag is fixed with an `osm_tags` correction setting
+`building=stadium` on its OSM building. The hole becomes `PreparedBuilding.pitch`, the median DTM
+inside it `pitch_z`; `islands/frame.local_building` turns the pitch with the footprint, so a turned
+stadium (De Geusselt is 27° off the grid, an island split in four `.bxi` tiles) is built the same
+way in its own frame. The building's feature takes the name of the `leisure=stadium` area when its
+OSM building has none ("Stadion de Geusselt").
+
+*Rake* (`paint_stands` → `Layers.stand_k/stand_roof_k/stand_color/stand_cap`, `fill_stands` in
+`voxelise_tile`). Per building cell: distance `d` to the pitch and position `s` along its
+outline. Rows are 1 m deep (tread stud + seat stud) and rise one brick (3 plates, ~31°); the
+first tread is 1 m above the pitch (a concrete front wall). Seats are 2 plates above their tread in
+MVV red and white with a pattern per block (plain red, white rows, plain red, a white band); a
+1 m aisle every 20 m along the outline has the same steps in paving colour. Rows follow the
+outline, so they curve round the corners.
+
+*Roof.* Under a 3D BAG roof the column is rake, open air, then a 4-plate slab (light grey
+underside, roof colour on top), so the roof stays where 3D BAG has it and the stand is open toward
+the pitch. A row needs 2.4 m headroom; where the roof is lower the stand has ended and the rest of
+the column is the solid back block up to the roof. Where 3D BAG's roof is at or below the rake (an
+open, uncovered stand) the rake is the top and is seen from above. A "roof" more than 15 m above
+the rake is a floodlight mast or a tower and stays solid. Cells within 2 m of the outer wall stay
+solid and `facade_runs` plans no run facing the pitch, so the outside keeps its facade.
+
+All voxels, no new pieces: chunk and island formats are unchanged; rows are strips of one colour
+that pack into long plates. De Geusselt (test slice 2026-11-09): 57.6k → 50.0k bricks (the inner
+facade pieces go, the rake and roof underside come in). Tests: `tests/test_voxelise_stands.py`.
 
 **Street props** keep clear of the BGT carriageways (`world.carriageways`) inside the extent and
 of OSM road buffers outside it. Still OSM-based (later phases): tree positions relative to the
