@@ -338,6 +338,8 @@ export function initPlayer(ctx) {
       }
       // smooth the followed height (step-ups and landings), keep x/z exact
       smoothFeet[0] = ctrl.pos[0]; smoothFeet[2] = ctrl.pos[2];
+      // the map's orbit point walks along: clip planes, shadows and haze are measured from it
+      controls.target.set(ctrl.pos[0], ctrl.pos[1], ctrl.pos[2]);
       smoothFeet[1] += (ctrl.pos[1] - smoothFeet[1]) * Math.min(1, dt * 10);
       follow.aspect = camera.aspect; // portrait phones: wider view, less shoulder offset
       if (!tween) {

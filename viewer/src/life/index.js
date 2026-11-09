@@ -279,7 +279,11 @@ export async function initLife(ctx) {
     still,
     onNow: () => { const r = zonedWeekTime(); clock.set(r.day, r.sec); },
   });
+  // where life is centred: on the walking player, else on the map's orbit point (the map target
+  // stays where you entered walk mode, so people would thin out as you walk away from it)
   const target = () => {
+    const pl = typeof window !== 'undefined' ? window.__bloxPlayer : null;
+    if (pl?.mode === 'walk' && pl.ctrl?.pos) return [pl.ctrl.pos[0], -pl.ctrl.pos[2]];
     const t = ctx.controls?.target || new THREE.Vector3();
     return [t.x, -t.z];
   };

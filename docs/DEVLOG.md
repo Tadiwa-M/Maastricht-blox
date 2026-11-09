@@ -1574,3 +1574,12 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   islands (De Geusselt is 27 degrees off the grid). Brick count 57.6k -> 50.0k.
 - Open: the north stand's lower front roof crosses in front of its upper rows (3D BAG has two roof
   levels there). Needs a world rebuild to show.
+
+## 2026-11-09: street life follows the walking player
+
+- Review find: life was centred on the map's orbit point, which stays where you entered walk mode.
+  With the per-tier radius (85 m on Low) the streets emptied as you walked away, and the camera's
+  near plane grew with the distance (up to 8 m: walls near the camera cut open). Life now centres on
+  the walking player, and the orbit point walks along with the player.
+- Checked headless on Low: Markt -> 400 m to the Vrijthof without touching the map: 49 people
+  within 60 m (before: the crowd stayed at the Markt).
