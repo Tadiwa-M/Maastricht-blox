@@ -105,3 +105,49 @@ count 20 to 1).
 - Players don't collide with each other, they pass through; a knock-down needs 1.5 m.
 - Ideas: a sprint stamina bar, a minimap with the flags, chat stickers, more arenas
   (Sint Pietersberg, the Maas bridges), a public room list.
+
+## Shooting, weapons and moving bases (2026-11-13)
+
+Capture the flag now has weapons. The room still decides everything that matters (health,
+knock-outs, flags); the client knows the walls, so it claims hits and the room checks each claim.
+
+- **Weapons** (`viewer/src/mp/weapons.js`, pure, `test/mp.combat.test.mjs`):
+
+  | weapon | how you get it | feel |
+  |---|---|---|
+  | Rifle | always | automatic, 30 rounds, 5 body hits or 3 with a head shot |
+  | Scout | pickup | bolt action with a scope (wheel: second zoom), 2 body hits or 1 head shot |
+  | Shotgun | pickup | 8 pellets, deadly within a few metres, 45 m at most |
+  | Knife | always | one stab knocks out; 2.3 m reach, in front of you |
+
+  Spread opens from the hip, while running, in the air and while spraying; aiming closes it. The
+  crosshair shows the spread. Recoil pushes the view up; a magazine reloads itself when empty.
+- **Controls:** left mouse fire, right mouse aim (hold), R reload, Q next weapon, 1/2/3 slots,
+  V or F a quick stab with whatever is in the hands. Touch: FIRE, AIM (toggle), SWAP, KNIFE
+  buttons. A click shorter than a frame still fires.
+- **Aiming** (`combat.js`): no second camera. The follow camera moves in to the eyes (its
+  `minDist`, `shoulder` and `fov` options are eased, and put back after the match), the figure
+  hides as it already did for a close camera, and a brick gun is drawn in the hands (a child of
+  the camera). From the hip the camera sits 3 m behind and the gun is drawn at the figure's side.
+  Turning is slower while zoomed. Shots take their ray from the camera as it was drawn
+  (`afterRender`), because the map controls move the camera between frames.
+- **Pickups:** four spots mirrored about the middle of the line between the bases
+  (`pickupSpots`: a scout and a shotgun at the middle, a shotgun near each base), snapped to the
+  nearest open street spot (`player/spot.js`), back 20 s after being taken. Client side only.
+- **The room** (`relay/src/ctf.js` `shoot`): message `{ t: 'shot', w, o, e, hit, head, n }`.
+  Checked: the shooter is up and near `o`, the weapon's fire rate, the target is a living enemy
+  seen in the last 2 s within 2.5 m of the shot's line, the weapon's range (knife: 3.5 m between
+  the players), at most 8 pellets. Events: `shot` (tracers for everyone), `hit` (health), `kill`
+  (knocked out 4 s, a carried flag drops, then back at the base). `kills`/`deaths` are in the
+  snapshot. `arenaConfig().version` is 2.
+- **Bases move:** the first round of a room is Markt against Vrijthof; every later round picks a
+  random pair from `PLACES` (12 landmarks) on the same side of the Maas, 250 to 550 m apart
+  (`pickBases`). The bases travel in every snapshot (`state.bases`); the client moves rings,
+  flags, spawns and pickups when they change.
+- **After the match:** the room panel shows a small heat map of where the knock-outs happened.
+- Checked with a browser player against a scripted second player on a local relay: rifle
+  knock-out in 5 hits, pickup, knife, being hurt, knocked out and back at the base.
+- Open: not played by two people on real devices yet (frame rate, touch layout, how the guns
+  feel); pickups are not shared state (two players can each take the same one); other players'
+  figures do not show a gun; no gamepad buttons for firing.
+

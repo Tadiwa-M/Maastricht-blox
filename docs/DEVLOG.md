@@ -1669,3 +1669,15 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Open: no measured frame times on a real GPU yet (headless is software rendering); check on the
   workstation and phones.
 
+## 2026-11-13: capture the flag gets weapons, pickups, a knife and moving bases
+
+- Owner: a good shooting mode (aiming, scopes, zoom), weapon variety and locations, a knife that
+  knocks out in one hit, bases in different parts of town, a heat map. Guide 18 has the details.
+- New `viewer/src/mp/weapons.js` (pure) and `combat.js`; `relay/src/ctf.js` `shoot`, `pickBases`,
+  `PLACES`. The relay must be redeployed (`npx wrangler deploy` in `relay/`): old clients still work
+  with the new room, new clients need the new room to shoot.
+- Found while testing: shots aimed from the camera before the player's own update went into the
+  ground (the map controls had moved it); they now use the camera as drawn. A straight click
+  between two slow frames was lost; it is latched now.
+- Open decisions: weapon balance after real play; whether pickups should be shared room state.
+

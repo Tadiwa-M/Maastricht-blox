@@ -186,3 +186,77 @@ test('a dropped connection keeps its place 30 s, then leaves and drops the flag;
   assert.ok(!expired(e, 1000));
   assert.ok(expired(e, CTF.idleRoomS * 1000));
 });
+
+test('shooting: damage, head shots, knock-out drops the flag and respawns; the room checks every claim', async () => {
+  const { shoot, pickBases, PLACES, BASE_GAP_M } = await import('../src/ctf.js');
+  const g = newGame('ABCD', 0);
+  join(g, { pid: 'aaaaaaaa1', name: 'A' }, 0); join(g, { pid: 'bbbbbbbb2', name: 'B' }, 0);
+  start(g, 1, 0);
+  const a = g.players[1], b = g.players[2];
+  move(g, 1, { p: [176300, 50, 317900] }, 1000); move(g, 2, { p: [176300, 50, 317930] }, 1000);
+  const shot = (over = {}) => ({ w: 'rifle', o: [176300, 51.5, 317900], e: [176300, 51, 317930], hit: 2, head: false, ...over });
+  let r = shoot(g, 1, shot(), 1100);
+  assert.deepEqual(r.events.map((e) => e.k), ['shot', 'hit']);
+  assert.equal(b.hp, CTF.hp - CTF.weapons.rifle.body);
+  assert.equal(shoot(g, 1, shot(), 1110).events.length, 0, 'faster than the gun fires');
+  assert.deepEqual(shoot(g, 1, shot({ e: [176340, 51, 317900] }), 1300).events.map((e) => e.k), ['shot'], 'the line misses the target');
+  assert.equal(shoot(g, 1, shot({ o: [176100, 51, 317900] }), 1500).events.length, 0, 'not from where the shooter is');
+  assert.deepEqual(shoot(g, 1, shot({ hit: 1 }), 1700).events.map((e) => e.k), ['shot'], 'not yourself or a teammate');
+  // carrying a flag when knocked out: it drops there
+  g.flags.blue = { st: 'carried', at: [0, 0], by: 2, since: 0, lock: 0 };
+  move(g, 2, { p: [176300, 50, 317930] }, 2900); // the room must have seen the target lately
+  r = shoot(g, 1, shot({ w: 'scout', head: true }), 3000);
+  assert.deepEqual(r.events.map((e) => e.k), ['shot', 'hit', 'drop', 'kill']);
+  assert.ok(r.changed);
+  assert.equal(g.flags.blue.st, 'dropped');
+  assert.deepEqual([a.kills, b.deaths, b.hp], [1, 1, CTF.hp]);
+  assert.equal(shoot(g, 2, shot({ o: [176300, 51, 317930], e: [176300, 51, 317900], hit: 1 }), 4000).events.length, 0, 'knocked out: no shooting');
+  assert.deepEqual(shoot(g, 1, shot(), 5000).events.map((e) => e.k), ['shot'], 'and no hits on someone who is down');
+  g.flags.blue = { st: 'home', at: [...g.bases.blue.at], by: 0, since: 0, lock: 0 };
+  move(g, 2, { p: [176300, 50, 317930] }, 3000 + CTF.respawnS * 1000);
+  assert.ok(shoot(g, 1, shot(), 3000 + CTF.respawnS * 1000 + 1).events.some((e) => e.k === 'hit'), 'up again after the respawn time');
+  const pub = publicState(g, 0);
+  assert.equal(pub.players[0].kills, 1);
+  assert.ok(pub.bases.blue.name);
+
+  // bases: Markt and Vrijthof first, then fair random pairs on one side of the Maas
+  assert.deepEqual(Object.values(pickBases(1)).map((p) => p.name), ['Markt', 'Vrijthof']);
+  const side = (n) => PLACES.find((p) => p.name === n).side;
+  const seen = new Set();
+  for (let i = 0; i < 200; i++) {
+    const p = pickBases(2, () => i / 200), d = Math.hypot(p.blue.at[0] - p.yellow.at[0], p.blue.at[1] - p.yellow.at[1]);
+    assert.ok(d >= BASE_GAP_M[0] && d <= BASE_GAP_M[1]);
+    assert.equal(side(p.blue.name), side(p.yellow.name));
+    seen.add(p.blue.name);
+  }
+  assert.ok(seen.size >= 8, 'many different places');
+  // the second round of a room moves; flags stand at the new bases
+  const g2 = newGame('ABCE', 0);
+  join(g2, { pid: 'aaaaaaaa1', name: 'A' }, 0); join(g2, { pid: 'bbbbbbbb2', name: 'B' }, 0);
+  start(g2, 1, 0, () => 0.99);
+  assert.equal(g2.bases.blue.name, 'Markt');
+  g2.phase = 'over';
+  start(g2, 1, 10, () => 0.99);
+  assert.notEqual(g2.bases.blue.name + g2.bases.yellow.name, 'MarktVrijthof');
+  assert.deepEqual(g2.flags.blue.at, g2.bases.blue.at);
+});
+
+test('shotgun and knife: pellets add up within range; a stab knocks out, but only at arm\'s length', async () => {
+  const { shoot } = await import('../src/ctf.js');
+  const g = newGame('ABCD', 0);
+  join(g, { pid: 'aaaaaaaa1', name: 'A' }, 0); join(g, { pid: 'bbbbbbbb2', name: 'B' }, 0);
+  start(g, 1, 0);
+  const b = g.players[2];
+  const place = (d, now) => { move(g, 1, { p: [176300, 50, 317900] }, now); move(g, 2, { p: [176300, 50, 317900 + d] }, now); };
+  const msg = (w, d, over = {}) => ({ w, o: [176300, 51.5, 317900], e: [176300, 51, 317900 + d], hit: 2, ...over });
+  place(10, 1000);
+  shoot(g, 1, msg('shotgun', 10, { n: 5 }), 1100);
+  assert.equal(b.hp, CTF.hp - 5 * CTF.weapons.shotgun.body);
+  shoot(g, 1, msg('shotgun', 10, { n: 99 }), 2000);
+  assert.equal(b.deaths, 1, 'never more than 8 pellets, still enough for the rest');
+  place(60, 9000);
+  assert.deepEqual(shoot(g, 1, msg('shotgun', 60, { n: 8 }), 9100).events.map((e) => e.k), ['shot'], 'too far for a shotgun');
+  assert.deepEqual(shoot(g, 1, msg('knife', 60), 10000).events.map((e) => e.k), ['shot'], 'no stabbing across the square');
+  place(2, 11000);
+  assert.ok(shoot(g, 1, msg('knife', 2), 11100).events.some((e) => e.k === 'kill'), 'one stab');
+});

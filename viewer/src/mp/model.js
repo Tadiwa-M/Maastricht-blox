@@ -8,7 +8,7 @@ export const TEAM_NAMES = { blue: 'Blue', yellow: 'Yellow' };
 export const TEAM_HEX = { blue: '#2F6FD6', yellow: '#F2C200' };
 
 export class MatchModel {
-  constructor() { this.me = 0; this.config = null; this.room = null; this.offset = 0; this.round = 0; }
+  constructor() { this.me = 0; this.config = null; this.room = null; this.offset = 0; this.round = 0; this.kills = []; }
 
   get phase() { return this.room?.phase || 'none'; }
   get players() { return this.room?.players || []; }
@@ -40,9 +40,10 @@ export class MatchModel {
       const first = msg.t === 'welcome';
       if (first) { this.me = msg.you; this.config = msg.config; }
       this.room = msg;
+      if (msg.bases && this.config) this.config = { ...this.config, bases: msg.bases }; // bases move between rounds
       this.offset = (msg.now || now) - now;
       const fresh = msg.phase === 'play' && msg.round !== this.round;
-      if (fresh) this.round = msg.round;
+      if (fresh) { this.round = msg.round; this.kills = []; }
       if (fresh && !(first && msg.rejoin)) out.push({ k: 'spawn', at: this.spawn() });
     } else if (msg.t === 'p') {
       if (msg.i !== this.me && Array.isArray(msg.p)) out.push({ k: 'pos', id: msg.i, p: msg.p, yaw: +msg.r || 0, speed: +msg.s || 0 });
@@ -50,6 +51,13 @@ export class MatchModel {
       if (msg.k === 'tag' && msg.id === this.me) out.push({ k: 'knock', by: msg.by });
       if (msg.k === 'tag' && msg.id !== this.me) out.push({ k: 'scatter', id: msg.id, by: msg.by });
       if (msg.k === 'over') out.push({ k: 'over', winner: msg.winner });
+      if (msg.k === 'shot' && msg.by !== this.me) out.push({ k: 'shot', by: msg.by, w: msg.w, o: msg.o, e: msg.e });
+      if (msg.k === 'hit' && msg.id === this.me) out.push({ k: 'hurt', hp: msg.hp, by: msg.by });
+      if (msg.k === 'hit' && msg.by === this.me) out.push({ k: 'hitmark', head: !!msg.head, kill: msg.hp <= 0 });
+      if (msg.k === 'kill') {
+        this.kills.push({ at: msg.at, team: this.player(msg.by)?.team || null }); // the after-match heat map
+        out.push(msg.id === this.me ? { k: 'killed', by: msg.by } : { k: 'scatter', id: msg.id, by: msg.by });
+      }
       const text = this.eventText(msg);
       if (text) out.push({ k: 'toast', text, big: ['capture', 'over', 'start'].includes(msg.k) });
     } else if (msg.t === 'error') out.push({ k: 'toast', text: msg.error });
@@ -71,6 +79,10 @@ export class MatchModel {
         if (e.id === me) return 'Knocked down! You dropped the flag';
         if (e.by === me) return `You knocked down ${this.name(e.id)}!`;
         return `${this.name(e.by)} knocked down ${this.name(e.id)}`;
+      case 'kill':
+        if (e.id === me) return `${this.name(e.by)} knocked you out`;
+        if (e.by === me) return e.head ? `Headshot! ${this.name(e.id)} is out` : `You knocked out ${this.name(e.id)}`;
+        return `${this.name(e.by)} knocked out ${this.name(e.id)}`;
       case 'drop': return `The ${e.team} flag was dropped`;
       case 'return':
         if (e.why === 'out' && e.id === me) return 'Out of bounds: the flag went home';

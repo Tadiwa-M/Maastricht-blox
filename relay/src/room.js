@@ -10,10 +10,11 @@
 //   GET  /                   { code, phase, players, full } or 404
 //   GET  / (Upgrade: websocket) ?pid=&name=&look=   join; 404 no room, 409 full
 // Messages, client -> room (JSON): { t: 'p', p: [east, height, north] RD metres, r: yaw, s: speed }, { t: 'start' },
+// { t: 'shot', w, o, e, hit, head } (ctf.js shoot),
 // { t: 'leave' }; the text 'ping' is answered 'pong' without waking the object.
 // Room -> client: { t: 'welcome', you, rejoin, config, ...state }, { t: 'state', ... },
 // { t: 'p', i: id, p, r, s }, { t: 'ev', k, ... }, { t: 'error', error }.
-import { CTF, newGame, join, disconnect, remove, start, move, tick, nextDeadline, expired, publicState,
+import { CTF, newGame, join, disconnect, remove, start, move, shoot, tick, nextDeadline, expired, publicState,
   arenaConfig, isEmpty, playerByPid } from './ctf.js';
 
 const MAX_MSG = 2000;
@@ -27,7 +28,7 @@ export class BloxRoom {
     this.state = state; this.env = env;
     this.game = null; this.alarmAt = 0; this.lastPos = new Map();
     this.ready = state.blockConcurrencyWhile
-      ? state.blockConcurrencyWhile(async () => { this.game = (await state.storage.get('game')) || null; })
+      ? state.blockConcurrencyWhile(async () => { this.game = (await state.storage.get('game')) || null; if (this.game && !this.game.bases) this.game.bases = CTF.bases; /* saved before bases moved */ })
       : Promise.resolve();
     if (typeof WebSocketRequestResponsePair !== 'undefined') {
       state.setWebSocketAutoResponse?.(new WebSocketRequestResponsePair('ping', 'pong'));
@@ -113,7 +114,7 @@ export class BloxRoom {
     }
     this.state.acceptWebSocket(ws);
     this.setId(ws, r.id);
-    this.send(ws, { ...publicState(this.game, now), t: 'welcome', you: r.id, rejoin: r.rejoin, config: arenaConfig() });
+    this.send(ws, { ...publicState(this.game, now), t: 'welcome', you: r.id, rejoin: r.rejoin, config: arenaConfig(this.game) });
     await this.commit({ events: r.events, changed: true }, now);
   }
 
@@ -133,6 +134,8 @@ export class BloxRoom {
       this.lastPos.set(id, now);
       res = move(g, id, msg, now);
       if (g.players[id]) this.broadcast({ t: 'p', i: id, p: msg.p, r: +msg.r || 0, s: +msg.s || 0 }, ws);
+    } else if (msg.t === 'shot') {
+      res = shoot(g, id, msg, now);
     } else if (msg.t === 'start') {
       res = start(g, id, now);
       if (!res.ok) this.send(ws, { t: 'error', error: res.error });

@@ -4,6 +4,7 @@
 // Tap or click only (no new keys); hidden on the title screen. Typing never walks the player.
 import { TEAM_HEX, TEAM_NAMES, clock } from './model.js';
 import { cleanNick, parseCode } from './protocol.js';
+import { heatProject } from './weapons.js';
 
 const CSS = `
 #mp-open { position: fixed; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(196px + env(safe-area-inset-bottom, 0px));
@@ -69,6 +70,24 @@ body.shot #mp-open, body.shot #mp-panel { visibility: hidden; }
 
 const el = (tag, props = {}, html = '') => Object.assign(document.createElement(tag), props, html ? { innerHTML: html } : {});
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/** The after-match heat map: knock-outs as glowing blobs between the two bases (north up). */
+function drawHeat(canvas, kills, cfg) {
+  const g = canvas.getContext('2d'), n = canvas.width, at = heatProject(cfg.bases, cfg.arenaR || 120, n);
+  g.fillStyle = '#0b0d2a'; g.fillRect(0, 0, n, n);
+  g.globalCompositeOperation = 'lighter';
+  for (const k of kills) {
+    const [x, y] = at(k.at), r = n * 0.09, grad = g.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, 'rgba(255,190,60,.75)'); grad.addColorStop(0.4, 'rgba(255,80,30,.35)'); grad.addColorStop(1, 'rgba(255,0,0,0)');
+    g.fillStyle = grad; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
+  g.globalCompositeOperation = 'source-over';
+  for (const t of ['blue', 'yellow']) {
+    const [x, y] = at(cfg.bases[t].at);
+    g.fillStyle = TEAM_HEX[t]; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill();
+    g.fillStyle = '#f6f3ea'; g.font = '10px system-ui'; g.textAlign = 'center'; g.fillText(cfg.bases[t].name, Math.max(40, Math.min(n - 40, x)), y > n - 24 ? y - 10 : y + 18);
+  }
+}
 
 export class MpUi {
   /** on: { open(), create(nick), join(nick, code), start(), leave() }. */
@@ -144,7 +163,7 @@ export class MpUi {
     const cfg = model.config || {};
     const teams = ['blue', 'yellow'].map((t) => {
       const names = room.players.filter((p) => p.team === t).map((p) =>
-        `<div class="${p.id === model.me ? 'you' : ''} ${p.on ? '' : 'off'}">${p.id === room.host ? '★ ' : ''}${esc(p.name)}${p.caps ? ` (${p.caps})` : ''}</div>`).join('');
+        `<div class="${p.id === model.me ? 'you' : ''} ${p.on ? '' : 'off'}">${p.id === room.host ? '★ ' : ''}${esc(p.name)}${p.caps ? ` ⚑${p.caps}` : ''}${p.kills || p.deaths ? ` <small>${p.kills || 0}/${p.deaths || 0}</small>` : ''}</div>`).join('');
       return `<div class="team" style="border-color:${TEAM_HEX[t]}"><b>${TEAM_NAMES[t]} · ${esc(cfg.bases?.[t]?.name || '')}</b>${names || '<div class="off">nobody yet</div>'}</div>`;
     }).join('');
     const n = room.players.filter((p) => p.on).length, min = cfg.minPlayers || 2;
@@ -154,12 +173,14 @@ export class MpUi {
       ${n < min ? `<div class="note">Waiting for at least ${min} players: send them the code.</div>` : ''}`;
     else action = '<div class="note">Waiting for the host to start.</div>';
     const over = room.phase === 'over' && room.winner
-      ? `<div class="msg">${room.winner === 'draw' ? 'A draw!' : room.winner === model.team ? 'Your team won!' : `${TEAM_NAMES[room.winner]} won`} ${room.score.blue}-${room.score.yellow}</div>` : '';
+      ? `<div class="msg">${room.winner === 'draw' ? 'A draw!' : room.winner === model.team ? 'Your team won!' : `${TEAM_NAMES[room.winner]} won`} ${room.score.blue}-${room.score.yellow}</div>${model.kills?.length ? '<canvas class="heat" width="220" height="220" style="display:block;margin:8px auto;border-radius:10px"></canvas><div class="note">Where the knock-outs happened</div>' : ''}` : '';
     this.panel.innerHTML = `<h3>ROOM</h3><div class="code-big">${esc(room.code)}</div>
       <div class="note">Friends join with this code (Play, then Join). You are on <b style="color:${TEAM_HEX[model.team] || '#fff'}">${TEAM_NAMES[model.team] || '...'}</b>.</div>
       <div class="teams">${teams}</div>${over}${action}
       <div class="msg">${esc(status)}</div>
       <button class="leave">Leave the room</button>`;
+    const heat = this.panel.querySelector('.heat');
+    if (heat && cfg.bases) drawHeat(heat, model.kills, cfg);
     this.panel.querySelector('.start')?.addEventListener('click', () => this.on.start());
     this.panel.querySelector('.leave').addEventListener('click', () => this.on.leave());
   }

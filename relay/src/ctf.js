@@ -8,7 +8,7 @@
 // (toasts, knock-downs), changed means the snapshot (publicState) must be re-sent and saved.
 
 export const CTF = {
-  version: 1,
+  version: 2,
   teams: ['blue', 'yellow'],
   // blue defends the Markt (west of the Stadhuis's steps), yellow the Vrijthof (its middle)
   bases: { blue: { name: 'Markt', at: [176380, 317990] }, yellow: { name: 'Vrijthof', at: [176185, 317717] } },
@@ -27,10 +27,19 @@ export const CTF = {
   idleRoomS: 600, // an empty room is closed after this
   jumpM: 30, // a carrier moving farther than this in one update teleported: the flag goes home
   freshMs: 2000, // positions older than this don't tag anyone
+  // shooting: clients claim hits (they know the walls), the room checks who, how often and where
+  hp: 100,
+  respawnS: 4, // knocked out this long, then back at the base
+  shotRangeM: 170,
+  shotSlackM: 2.5, // a claimed hit must pass this close to where the room last saw the target
+  shotFromM: 8, // and start this close to where it last saw the shooter
+  // shotgun: damage per pellet that hit (msg.n of 8), short range; knife: one hit, arm's length
+  weapons: { rifle: { body: 24, head: 48, minMs: 80 }, scout: { body: 75, head: 150, minMs: 850 },
+    shotgun: { body: 15, head: 20, minMs: 650, pellets: 8, rangeM: 45 }, knife: { body: 1000, head: 1000, minMs: 450, rangeM: 3.5, melee: true } },
 };
 
 export const other = (team) => (team === 'blue' ? 'yellow' : 'blue');
-const home = (team) => ({ st: 'home', at: [...CTF.bases[team].at], by: 0, since: 0, lock: 0 });
+const home = (g, team) => ({ st: 'home', at: [...g.bases[team].at], by: 0, since: 0, lock: 0 });
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const result = (events = [], changed = events.length > 0) => ({ events, changed });
 
@@ -42,12 +51,37 @@ export function segDist(p, a, b) {
   return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dz);
 }
 
-export const inArena = (p, slack = 0) => segDist(p, CTF.bases.blue.at, CTF.bases.yellow.at) <= CTF.arenaR + slack;
+export const inArena = (p, slack = 0, bases = CTF.bases) => segDist(p, bases.blue.at, bases.yellow.at) <= CTF.arenaR + slack;
+
+// Places a base can stand: open ground at a landmark (RD metres), by side of the Maas (a pair is
+// always on one side, so the arena never needs a bridge).
+export const PLACES = [
+  { name: 'Markt', at: [176380, 317990], side: 'w' }, { name: 'Vrijthof', at: [176185, 317717], side: 'w' },
+  { name: 'Onze Lieve Vrouweplein', at: [176547, 317557], side: 'w' }, { name: 'Dinghuis', at: [176495, 317826], side: 'w' },
+  { name: 'Dominicanen', at: [176293, 317844], side: 'w' }, { name: 'Helpoort', at: [176639, 317365], side: 'w' },
+  { name: 'Stadspark', at: [176680, 317292], side: 'w' }, { name: 'Bisschopsmolen', at: [176522, 317427], side: 'w' },
+  { name: 'Kruisherenklooster', at: [175884, 317636], side: 'w' },
+  { name: 'Centre Céramique', at: [177065, 317415], side: 'e' }, { name: 'Station', at: [177380, 317790], side: 'e' },
+  { name: 'Bonnefanten', at: [177122, 316999], side: 'e' },
+];
+export const BASE_GAP_M = [250, 550];
+
+/** The bases of a round: Markt and Vrijthof first, then a random fair pair (same side, 250-550 m apart). */
+export function pickBases(round, rand = Math.random) {
+  const pairs = [];
+  for (const a of PLACES) for (const b of PLACES) {
+    const d = dist(a.at, b.at);
+    if (a !== b && a.side === b.side && d >= BASE_GAP_M[0] && d <= BASE_GAP_M[1]) pairs.push([a, b]);
+  }
+  const [a, b] = round <= 1 ? [PLACES[0], PLACES[1]] : pairs[Math.min(pairs.length - 1, Math.floor(rand() * pairs.length))];
+  return { blue: { name: a.name, at: [...a.at] }, yellow: { name: b.name, at: [...b.at] } };
+}
 
 /** What the clients need to draw the arena and run the soft boundary. */
-export function arenaConfig() {
-  const { version, teams, bases, arenaR, flagR, baseR, tagR, returnS, matchS, winCaps, minPlayers, maxPlayers } = CTF;
-  return { version, teams, bases, arenaR, flagR, baseR, tagR, returnS, matchS, winCaps, minPlayers, maxPlayers };
+export function arenaConfig(g) {
+  const bases = g?.bases || CTF.bases;
+  const { version, teams, arenaR, flagR, baseR, tagR, returnS, matchS, winCaps, minPlayers, maxPlayers, hp, respawnS, shotRangeM } = CTF;
+  return { version, teams, bases, arenaR, flagR, baseR, tagR, returnS, matchS, winCaps, minPlayers, maxPlayers, hp, respawnS, shotRangeM };
 }
 
 export const cleanName = (s) => String(s ?? '').replace(/[^\p{L}\p{N} _.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 12) || 'Player';
@@ -55,8 +89,9 @@ export const cleanLook = (s) => (/^[a-z0-9]{1,24}$/.test(String(s ?? '')) ? Stri
 export const validPid = (s) => /^[A-Za-z0-9_-]{8,40}$/.test(String(s ?? ''));
 
 export function newGame(code, now) {
-  return { code, created: now, phase: 'lobby', round: 0, host: 0, nextId: 1, players: {},
-    flags: { blue: home('blue'), yellow: home('yellow') }, score: { blue: 0, yellow: 0 }, endsAt: 0, winner: null };
+  const g = { bases: pickBases(1) };
+  return { ...g, code, created: now, phase: 'lobby', round: 0, host: 0, nextId: 1, players: {},
+    flags: { blue: home(g, 'blue'), yellow: home(g, 'yellow') }, score: { blue: 0, yellow: 0 }, endsAt: 0, winner: null };
 }
 
 const list = (g) => Object.values(g.players);
@@ -95,7 +130,7 @@ export function join(g, { pid, name, look }, now) {
   const c = teamCounts(g);
   const id = g.nextId++;
   g.players[id] = { id, pid, name: cleanName(name), look: cleanLook(look), team: c.yellow < c.blue ? 'yellow' : 'blue',
-    on: true, goneAt: 0, at: null, y: 0, t: 0, caps: 0, tags: 0, down: 0 };
+    on: true, goneAt: 0, at: null, y: 0, t: 0, caps: 0, tags: 0, down: 0, hp: CTF.hp, kills: 0, deaths: 0, shotAt: 0 };
   pickHost(g);
   return { ok: true, id, rejoin: false, ...result([{ k: 'join', id }]) };
 }
@@ -115,7 +150,7 @@ export function remove(g, id, now) {
   const events = [{ k: 'leave', id, name: p.name }];
   const f = carried(g, id);
   if (f) {
-    Object.assign(g.flags[f], { st: 'dropped', at: [...(p.at || CTF.bases[f].at)], by: 0, since: now, lock: now });
+    Object.assign(g.flags[f], { st: 'dropped', at: [...(p.at || g.bases[f].at)], by: 0, since: now, lock: now });
     events.push({ k: 'drop', team: f, id });
   }
   delete g.players[id];
@@ -135,14 +170,15 @@ export function rebalance(g) {
 }
 
 /** The host starts (or restarts) the match. -> { ok, error?, events, changed } */
-export function start(g, id, now) {
+export function start(g, id, now, rand = Math.random) {
   if (id !== g.host) return { ok: false, error: 'only the host can start', ...result() };
   if (g.phase === 'play') return { ok: false, error: 'already playing', ...result() };
   if (list(g).filter((p) => p.on).length < CTF.minPlayers) return { ok: false, error: `needs ${CTF.minPlayers} players`, ...result() };
   rebalance(g);
-  g.flags = { blue: home('blue'), yellow: home('yellow') };
+  g.bases = pickBases(g.round + 1, rand); // a new part of town every round after the first
+  g.flags = { blue: home(g, 'blue'), yellow: home(g, 'yellow') };
   g.score = { blue: 0, yellow: 0 };
-  for (const p of list(g)) { p.caps = 0; p.tags = 0; p.down = 0; }
+  for (const p of list(g)) { p.caps = 0; p.tags = 0; p.down = 0; p.hp = CTF.hp; p.kills = 0; p.deaths = 0; p.shotAt = 0; }
   g.phase = 'play'; g.round++; g.winner = null;
   g.endsAt = now + CTF.matchS * 1000;
   return { ok: true, ...result([{ k: 'start', round: g.round }]) };
@@ -150,7 +186,7 @@ export function start(g, id, now) {
 
 function end(g, winner, events) {
   g.phase = 'over'; g.winner = winner;
-  g.flags = { blue: home('blue'), yellow: home('yellow') };
+  g.flags = { blue: home(g, 'blue'), yellow: home(g, 'yellow') };
   events.push({ k: 'over', winner });
 }
 
@@ -175,8 +211,8 @@ export function move(g, id, msg, now) {
   const events = [];
   const mine = p.team, theirs = other(mine);
   // a carrier who teleported (a jump, a bus, the boundary) or left the arena: the flag goes home
-  if (carried(g, id) && ((prev && dist(prev, p.at) > CTF.jumpM) || !inArena(p.at, 10))) {
-    g.flags[theirs] = home(theirs);
+  if (carried(g, id) && ((prev && dist(prev, p.at) > CTF.jumpM) || !inArena(p.at, 10, g.bases))) {
+    g.flags[theirs] = home(g, theirs);
     events.push({ k: 'return', team: theirs, why: 'out', id });
   }
   const up = p.down <= now;
@@ -186,12 +222,12 @@ export function move(g, id, msg, now) {
     events.push({ k: 'pickup', team: theirs, id });
   }
   if (own.st === 'dropped' && own.lock <= now && dist(p.at, own.at) <= CTF.flagR) {
-    g.flags[mine] = home(mine);
+    g.flags[mine] = home(g, mine);
     events.push({ k: 'return', team: mine, why: 'touch', id });
   }
-  if (carried(g, id) === theirs && g.flags[mine].st === 'home' && dist(p.at, CTF.bases[mine].at) <= CTF.baseR) {
+  if (carried(g, id) === theirs && g.flags[mine].st === 'home' && dist(p.at, g.bases[mine].at) <= CTF.baseR) {
     g.score[mine]++; p.caps++;
-    g.flags[theirs] = home(theirs);
+    g.flags[theirs] = home(g, theirs);
     events.push({ k: 'capture', team: mine, id, score: { ...g.score } });
     if (g.score[mine] >= CTF.winCaps) end(g, mine, events);
   }
@@ -204,6 +240,41 @@ export function move(g, id, msg, now) {
     }
   }
   return result(events);
+}
+
+const vec3 = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => Number.isFinite(n) && Math.abs(n) < 1e7);
+
+/**
+ * A shot: msg { w: 'rifle' | 'scout', o: [east, height, north] where it left, e: where it ended,
+ * hit: player id | 0, head: bool }. Everyone gets a 'shot' event (tracers). A claimed hit counts
+ * when the target is a living enemy the room saw recently near the shot's line; at 0 health the
+ * target is knocked out (drops a carried flag, back at the base after respawnS).
+ */
+export function shoot(g, id, msg, now) {
+  const p = g.players[id], w = CTF.weapons[msg?.w];
+  if (!p || !w || g.phase !== 'play' || !p.at || p.down > now || !vec3(msg.o) || !vec3(msg.e)) return result();
+  if (now - (p.shotAt || 0) < w.minMs) return result();
+  const o = [msg.o[0], msg.o[2]], e = [msg.e[0], msg.e[2]];
+  if (dist(o, p.at) > CTF.shotFromM || dist(o, e) > CTF.shotRangeM) return result();
+  p.shotAt = now;
+  const events = [{ k: 'shot', by: id, w: msg.w, o: msg.o, e: msg.e }];
+  const q = g.players[msg.hit];
+  if (!q || q.team === p.team || !fresh(q, now) || q.down > now || segDist(q.at, o, e) > CTF.shotSlackM) return result(events, false);
+  if (w.rangeM && dist(w.melee ? p.at : o, q.at) > w.rangeM + (w.melee ? 0 : CTF.shotSlackM)) return result(events, false);
+  const head = !!msg.head;
+  const n = w.pellets ? Math.max(1, Math.min(w.pellets, Math.floor(+msg.n) || 1)) : 1;
+  q.hp = Math.max(0, (q.hp ?? CTF.hp) - (head ? w.head : w.body) * n);
+  events.push({ k: 'hit', id: q.id, by: id, hp: q.hp, head });
+  if (q.hp > 0) return result(events, false);
+  q.hp = CTF.hp; q.deaths = (q.deaths || 0) + 1; p.kills = (p.kills || 0) + 1;
+  q.down = now + CTF.respawnS * 1000;
+  const f = carried(g, q.id);
+  if (f) {
+    Object.assign(g.flags[f], { st: 'dropped', at: [...q.at], by: 0, since: now, lock: now + CTF.dropLockS * 1000 });
+    events.push({ k: 'drop', team: f, id: q.id });
+  }
+  events.push({ k: 'kill', id: q.id, by: id, head, w: msg.w, at: [...q.at] });
+  return result(events, true);
 }
 
 /** Timers: dropped flags home (after returnS, or a teammate on it after the lock), the clock, dropped connections. */
@@ -220,12 +291,12 @@ export function tick(g, now) {
   for (const t of CTF.teams) {
     const f = g.flags[t];
     if (f.st === 'dropped' && now - f.since >= CTF.returnS * 1000) {
-      g.flags[t] = home(t);
+      g.flags[t] = home(g, t);
       events.push({ k: 'return', team: t, why: 'time' });
     } else if (g.phase === 'play' && f.st === 'dropped' && f.lock <= now) {
       // a teammate already standing on it when the drop lock ends (standing still sends little)
       const q = list(g).find((p) => p.team === t && fresh(p, now) && dist(p.at, f.at) <= CTF.flagR);
-      if (q) { g.flags[t] = home(t); events.push({ k: 'return', team: t, why: 'touch', id: q.id }); }
+      if (q) { g.flags[t] = home(g, t); events.push({ k: 'return', team: t, why: 'touch', id: q.id }); }
     }
   }
   if (g.phase === 'play' && now >= g.endsAt) {
@@ -251,9 +322,9 @@ export const expired = (g, now) => isEmpty(g) && now - g.created >= CTF.idleRoom
 
 /** The snapshot every client gets (no pids: those let a player reconnect). */
 export function publicState(g, now) {
-  const players = list(g).map(({ id, name, look, team, on, caps, tags }) => ({ id, name, look, team, on, caps, tags }));
+  const players = list(g).map(({ id, name, look, team, on, caps, tags, kills, deaths }) => ({ id, name, look, team, on, caps, tags, kills: kills || 0, deaths: deaths || 0 }));
   const flags = {};
   for (const t of CTF.teams) { const f = g.flags[t]; flags[t] = { st: f.st, at: f.at, by: f.by }; }
-  return { t: 'state', code: g.code, phase: g.phase, round: g.round, host: g.host, players, flags,
+  return { t: 'state', bases: g.bases, code: g.code, phase: g.phase, round: g.round, host: g.host, players, flags,
     score: { ...g.score }, endsAt: g.endsAt, winner: g.winner, now };
 }
