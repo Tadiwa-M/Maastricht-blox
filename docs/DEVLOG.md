@@ -1656,3 +1656,16 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   not caused by this work, and it varies from run to run).
 - Open: a degree-2 signal node just behind a junction also shows a light for traffic leaving it; no
   stop-line paint; zebras at junction nodes are not drawn; the station "people on roofs".
+
+## 2026-11-13: the look by time of day (golden hour, blue hour, night), haze, grade
+
+- New `viewer/src/render/`: `look.js` (every light, sky and grade value from the sun state; pure,
+  tested), `haze.js` (the distance fog glows toward the sun), `grade.js` (final pass: tone mapping,
+  grade, vignette, and edge smoothing on High; replaces OutputPass, so no extra pass on any tier).
+- Twilight is longer and has a blue hour; the switch from sun to moon no longer pops (direct light,
+  its colour and the haze glow all fade out before the direction changes; the test caught a colour
+  jump there). Stars and a moon at night. Bloom threshold drops at night so windows glow.
+- Cost: the same number of passes as before; High adds up to 7 texture taps per edge pixel.
+- Open: no measured frame times on a real GPU yet (headless is software rendering); check on the
+  workstation and phones.
+

@@ -1,4 +1,5 @@
-// Post-processing chain: render -> ambient occlusion (GTAO) -> bloom -> tilt-shift -> output.
+// Post-processing chain: render -> ambient occlusion (GTAO) -> bloom -> tilt-shift -> grade
+// (tone mapping, colour grade, vignette and, on High, anti-aliasing in one pass: render/grade.js).
 //
 // AO: a small radius (0.18 m, under half a stud) darkens the crevices between bricks and
 // under studs; `thickness` stops occluders far in front of a surface from casting dark
@@ -13,7 +14,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { GradePass } from './render/grade.js';
 import { HorizontalTiltShiftShader } from 'three/examples/jsm/shaders/HorizontalTiltShiftShader.js';
 import { VerticalTiltShiftShader } from 'three/examples/jsm/shaders/VerticalTiltShiftShader.js';
 
@@ -42,7 +43,8 @@ export class Post {
     c.addPass(this.bloom);
     this.tilt = [new ShaderPass(HorizontalTiltShiftShader), new ShaderPass(VerticalTiltShiftShader)];
     for (const p of this.tilt) c.addPass(p);
-    c.addPass(new OutputPass());
+    this.grade = new GradePass();
+    c.addPass(this.grade);
     this.composer = c;
     this.tiltOn = true;
     this.aoWanted = true; // the HUD toggle
@@ -51,9 +53,10 @@ export class Post {
     this.resize(width, height);
   }
 
-  /** Tier settings: ao 'full' | 'half' | 'off', bloom 'always' | 'night'. */
-  setQuality({ ao, bloom }) {
+  /** Tier settings: ao 'full' | 'half' | 'off', bloom 'always' | 'night', aa (edge smoothing in the grade pass). */
+  setQuality({ ao, bloom, aa = false }) {
     this.quality = { ao, bloom };
+    this.grade.aa = aa;
     const scale = ao === 'half' ? 0.5 : 1;
     if (scale !== this.aoScale) { this.aoScale = scale; this.resize(this.width, this.height); }
     this.setAO(this.aoWanted);
@@ -75,9 +78,16 @@ export class Post {
   /** Night factor 0..1: bloom strength, and whether bloom runs at all on lower tiers. */
   setNight(n) {
     this.night = n;
-    this.bloom.strength = THREE.MathUtils.lerp(0.18, 0.7, n);
+    // by day a faint glow on sun glints; at night lamps and windows bloom (threshold drops so
+    // the warm windows, not just the lamp heads, get a halo)
+    this.bloom.strength = THREE.MathUtils.lerp(0.18, 0.55, n);
+    this.bloom.threshold = THREE.MathUtils.lerp(0.92, 0.82, n);
+    this.bloom.radius = THREE.MathUtils.lerp(0.4, 0.45, n);
     this.bloom.enabled = this.quality.bloom === 'always' || (this.quality.bloom !== 'off' && n > 0.05);
   }
+
+  /** Colour grade for the time of day (render/look.js lookAt().grade). */
+  setGrade(g) { this.grade.setGrade(g); }
 
   setPixelRatio(pr) {
     this.composer.setPixelRatio(pr);

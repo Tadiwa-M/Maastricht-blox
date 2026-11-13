@@ -454,9 +454,12 @@ is meaningless; compare triangles and draw calls.
 |---|---|---|
 | ambient occlusion | `src/post.js` | `AO = { radius: 0.18, distanceExponent, thickness: 0.35, scale: 1.9, samples }` |
 | tilt-shift | `src/post.js` | `TILT_NEAR = 15`, `TILT_FAR = 110` (m), `TILT_MAX = 2.4`; off below 15 m; `#tilt=0` |
-| bloom | `src/post.js` | `UnrealBloomPass(…, 0.18, 0.4, 0.92)` (strength, radius, threshold) |
+| bloom | `src/post.js` `setNight` | strength 0.18 (day) to 0.55 (night), threshold 0.92 to 0.82, radius 0.4 to 0.45 |
+| time-of-day look (light, sky, exposure, grade) | `src/render/look.js` | the colour keys in `C`, `lookAt` (day, golden, blue hour, night) |
+| colour grade, vignette, edge smoothing | `src/render/grade.js` | the final pass; values from `lookAt().grade`; `aa` per tier in `quality.js` |
+| sun glow in the haze | `src/render/haze.js` | the two weights in the patched fog chunk; strength = `lookAt().haze` |
 | sun path, shadows | `src/scene.js` | `MIN_DAY_ELEVATION` 22°, `MAX_ELEVATION` 52°, shadow map 4096, bias |
-| sky colours, reflections | `src/scene.js` (`DAY_*`, `DUSK_*`, `NIGHT_*`), `src/sky.js` (same shader feeds the PMREM env map) | |
+| sky colours, stars, moon, reflections | `src/render/look.js` (colours), `src/sky.js` (same shader feeds the PMREM env map; stars and moon only in the visible sky) | |
 | plastic, glass, metal | `src/materials.js` | roughness, clearcoat, `envMapIntensity` |
 | water ripples | `src/ripples.js` | wave count/size; water = `trans` palette entries named `water*` |
 | lit windows at night | `src/glow.js` | `LIT_SHARE = 0.6`, warm colours, TV-blue share |
@@ -562,3 +565,24 @@ A phone-first page in every site build, next to the 3D city: `plan.html` + `plan
   player's draw-time tick ignores input while `__bloxRide.state.ride` is set; the page itself never
   zooms (pinch/double tap on panels).
 - Next: postcodes, saved places (home, university).
+
+## The look by time of day (2026-11-13)
+
+`scene.js` `setTime` asks `render/look.js` `lookAt(sunAt(hours))` for every light and colour value;
+`look.js` is plain numbers (tested in `test/render-look.test.mjs`: sane at every hour, no jumps).
+
+- **Four keys, blended:** day (white-warm sun, vivid), golden hour (orange low sun, warm horizon),
+  blue hour (deep blue sky over a pink horizon, windows starting to glow) and night (cool moonlight
+  with readable shadows). Twilight is longer than before (`sunAt`: night 0 to 1 over about an hour).
+- **Sun to moon without a jump:** the light direction switches half way through twilight, where the
+  direct light is dimmed to almost nothing, its colour has already reached the moon's and the haze
+  glow is gone.
+- **Haze with sun glow** (`render/haze.js`): the distance fog brightens and warms toward the sun.
+  One patch of three.js's fog shader chunks before any material compiles; two shared uniforms
+  updated once per frame. Cost: a dot product and a pow per fogged pixel.
+- **Grade pass** (`render/grade.js`) replaces three.js's OutputPass: tone mapping, a little
+  saturation and contrast (an S-curve that keeps black: a straight line crushed the night), cool shadows and warm highlights, a soft vignette, and on High a compact
+  edge smoothing (the scene targets have no MSAA), all in the one pass that was already there.
+- **Sky:** stars (a few bright) and a moon disc fade in at night; not in the reflection map.
+- **Bloom** follows the night factor: by day a faint glow on glints, at night the threshold drops so
+  warm windows get a halo, not only the lamp heads.
