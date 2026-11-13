@@ -1705,3 +1705,10 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   Checked in the full city at Stationsstraat / Wilhelminasingel (guide 05).
 - Note: a roundabout has no lights in OSM; its zebras are drawn where OSM has crossing nodes.
 
+## 2026-11-13: people off the station roofs; queues at kerbs
+
+- Owner: roof-walkers and people through each other got worse with the traffic lights.
+- Roofs fixed: walkers go under canopies (`ground.walk`), 16.2 -> 1.3 per snapshot. Queueing
+  behind people waiting at a kerb added. Strangers through each other is not fixed (6.55 -> 6.2,
+  noise); guide 05 says what was measured, what was tried and what to try next.
+

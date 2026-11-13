@@ -11,6 +11,7 @@ export function cityOf(ctx) {
 }
 
 export const HEADROOM_M = 2.5;
+export const ROOF_M = 2.5; // a top this far above the street around it is a roof to people (steps and raised squares are lower)
 export const DECK_M = 25; // bridge decks are at most this far above the water
 
 /**
@@ -52,8 +53,33 @@ export function makeGround(ctx, world = ctx.world) {
     }
     return y;
   };
+  // People keep off roofs: where the top surface stands well above the street around it and there
+  // is standing room at street level underneath (a platform canopy, an arcade, an awning), walk
+  // under it. A wall walk or a hill keeps its top (solid underneath); a bridge over water too.
+  const under = new Map();
+  groundAt.walk = (x, z) => {
+    const y = groundAt(x, z);
+    const city = cityOf(ctx);
+    if (!Number.isFinite(y) || !city?.groundHeight || !city.isSolid) return y;
+    const key = Math.floor(x * 2) * 65536 + Math.floor(z * 2);
+    const hit = under.get(key);
+    if (hit !== undefined) return hit;
+    let low = Infinity, known = true;
+    for (let a = 0; a < 8; a++) for (const d of [6, 12]) {
+      const g = groundAt(x + d * Math.cos(a * 0.785), z + d * Math.sin(a * 0.785));
+      if (Number.isFinite(g)) low = Math.min(low, g); else known = false;
+    }
+    let out = y;
+    if (y - low > ROOF_M) {
+      const v = city.groundHeight(x, -z, low + HEADROOM_M);
+      if (Number.isFinite(v) && v < y - 2 && v >= low - 1.5 && city.isSolid(x, v + 1.2, -z) === false
+        && city.isWater?.(x, v - 0.05, -z) !== true) out = v;
+    }
+    if (known) { if (under.size > 200000) under.clear(); under.set(key, out); }
+    return out;
+  };
   groundAt.flat = flat;
-  groundAt.reset = () => cache.clear();
+  groundAt.reset = () => { cache.clear(); under.clear(); };
   return groundAt;
 }
 

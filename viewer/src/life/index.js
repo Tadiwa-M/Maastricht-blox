@@ -222,7 +222,7 @@ export async function initLife(ctx) {
       walkGraph = graph;
       // a person standing at y there: is the body (1 m and 1.6 m up) clear of walls? unknown: yes
       const room = (x, z, y) => { const c = cityOf(ctx); return !c?.isSolid || (c.isSolid(x, y + 1.0, -z) !== true && c.isSolid(x, y + 1.6, -z) !== true); };
-      state.walkers = new Pedestrians({ graph, ground, room, cap: FIGURES_BY_TIER.high });
+      state.walkers = new Pedestrians({ graph, ground: ground.walk, room, cap: FIGURES_BY_TIER.high });
       hideDemo(models.character.name);
     }
   }

@@ -185,3 +185,22 @@ test('people change pace over a few steps (Walker ease), bikes at once', () => {
   const bike = new Walker(g, 0, rng(1), { speed: 4 });
   assert.ok(Math.abs(bike.step(0.1) - 0.4) < 1e-9);
 });
+
+test('queueing: behind someone waiting at the kerb people stop short; passers-by the other way do not', async () => {
+  const { separate, QUEUE_M } = await import('../src/life/walkgraph.js');
+  const mk = (z, dirZ, stopped = false) => ({ x: 0, z, dirX: 0, dirZ, lateral: 0, hw: 0, stopped });
+  const front = mk(0, 1, true);
+  let back = mk(-0.6 - QUEUE_M / 2, 1);
+  separate([front, back]);
+  assert.ok(back.slow > 0.3 && back.slow < 0.7, `easing: ${back.slow}`);
+  back = mk(-0.61, 1);
+  separate([front, back]);
+  assert.ok(back.slow < 0.05, 'stopped a step short');
+  assert.equal(back.lateral, 0, 'not touching: no sideways shove');
+  back = mk(-1.2, 1);
+  separate([front, back]);
+  assert.equal(back.slow, undefined, 'far enough: walking on');
+  const other = mk(0.8, -1); // coming the other way, past the one who waits
+  separate([front, other]);
+  assert.equal(other.slow, undefined, 'the other direction is not held up');
+});

@@ -646,3 +646,24 @@ unchanged timing) drives every lamp and every rule.
 - Open: signal heads follow the rule's per-node logic, so a degree-2 signal node just behind a
   junction also shows (and enforces) a light for traffic leaving it; no stop-line paint; zebras at
   junction nodes are not drawn (stripes would lie in the middle).
+
+## People off the roofs, queues at the kerb (2026-11-13)
+
+- **Roofs.** People stood on the station's platform canopies: the ground lookup answers the top
+  surface, and a canopy is the top. Walkers now use `ground.walk` (`life/ground.js`): where the top
+  is more than 2.5 m above the street 6 to 12 m around and there is standing room at street level
+  underneath (not solid, not water), they walk under it. A wall walk or a building keeps its top
+  (solid underneath). Only people use it: cars and buses keep the plain lookup (viaducts).
+  A footbridge over land is treated like a canopy (people cross underneath); none is in the
+  walk data today.
+- **Queues.** `separate()` (`walkgraph.js`): behind someone standing still and facing the same way
+  (waiting for green, for a gap), a walker eases to a stop 0.35 m short (`QUEUE_M`) instead of
+  creeping into their back. People going the other way are not held.
+- Audit (high tier, markt/vrijthof/station, 40 s, average per snapshot): people on roofs
+  16.2 -> 1.3 (station 46 -> 1.5); strangers through each other 6.55 -> 6.2, which is within the
+  noise between runs: not fixed.
+- Open: who overlaps (probe at the Vrijthof): mostly groups passing groups (members of a row or
+  a file reach out of the group's disc) and people standing at a kerb. A person-by-person
+  sideways push was tried and did not move the number, so it was not kept; the next thing to try
+  is spacing along the heading (the one behind stops), not only sideways.
+

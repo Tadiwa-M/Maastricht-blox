@@ -315,9 +315,10 @@ export function steer(walkers, o = STEER) {
  * apart sideways (their lateral offset, which eases back afterwards), and a walker with someone
  * right in front slows nearly to a stop. Run after avoid(); O(n) with a grid.
  */
+export const QUEUE_M = 0.35; // people stop this far short of someone waiting in front of them
 export function separate(walkers, body = 0.3, maxLateral = 3) {
   const wide = walkers.reduce((m, w) => Math.max(m, w.hw || 0), 0);
-  const cell = 2 * (body + wide) || 1, grid = new Map(), key = (i, j) => i * 73856093 ^ j * 19349663;
+  const cell = 2 * (body + wide) + QUEUE_M || 1, grid = new Map(), key = (i, j) => i * 73856093 ^ j * 19349663;
   for (const w of walkers) {
     const k = key(Math.floor(w.x / cell), Math.floor(w.z / cell));
     if (!grid.has(k)) grid.set(k, []);
@@ -331,12 +332,19 @@ export function separate(walkers, body = 0.3, maxLateral = 3) {
       for (const o of grid.get(key(i, j)) || []) {
         if (seen.has(o)) continue;
         const dx = o.x - w.x, dz = o.z - w.z, d = Math.hypot(dx, dz) || 1e-3, R = 2 * body + (w.hw || 0) + (o.hw || 0);
-        if (d >= R) continue;
+        if (d >= R + QUEUE_M) continue;
         const nx = dx / d, nz = dz / d, push = (R - d) / 2;
-        for (const [a, s] of [[w, -1], [o, 1]]) {
+        for (const [a, s, b] of [[w, -1, o], [o, 1, w]]) {
           const fx = a.dirX ?? 0, fz = a.dirZ ?? 1;
+          const ahead = s * (nx * fx + nz * fz) < -0.5; // the other one is right in front
+          // queue: behind someone standing (at a kerb, waiting for green) and going the same way,
+          // ease to a stop a step short of them instead of creeping into their back
+          if (ahead && b.stopped && !a.stopped && fx * (b.dirX ?? 0) + fz * (b.dirZ ?? 1) > 0.3) {
+            a.slow = Math.min(a.slow ?? 1, Math.max(0, (d - R) / QUEUE_M));
+          }
+          if (d >= R) continue;
           a.lateral = Math.max(-maxLateral, Math.min(maxLateral, a.lateral + s * (nx * fz - nz * fx) * push));
-          if (s * (nx * fx + nz * fz) < -0.5 && !a.stopped) a.slow = Math.min(a.slow ?? 1, 0.15); // someone right in front
+          if (ahead && !a.stopped) a.slow = Math.min(a.slow ?? 1, 0.15); // someone right in front
         }
       }
     }

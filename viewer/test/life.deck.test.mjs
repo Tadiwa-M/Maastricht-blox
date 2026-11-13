@@ -38,3 +38,25 @@ test('ground: a high bridge deck over the river is the ground, not the water und
   assert.ok(Math.abs(ground(20, 32) - 9.0) < 0.21, `on the deck: ${ground(20, 32)}`);
   assert.ok(Math.abs(ground(20, 10) - 2.0) < 0.21, 'open river stays the water');
 });
+
+test('ground for people: under a canopy, not on its roof; a solid block keeps its top', async () => {
+  const { makeGround } = await import('../src/life/ground.js');
+  const c = synthCity({ size: 160 });
+  c.fill(0, 0, 0, 159, 159, 4); // the street: top at 1.0 m
+  c.fill(40, 40, 30, 79, 79, 30); // a canopy 20 x 20 m, 6 m up, open underneath
+  for (let K = 5; K <= 30; K++) c.fill(100, 40, K, 139, 79, K); // a building the same size
+  const real = c.groundHeight;
+  c.groundHeight = (x, z, fromY = Infinity) => { // the real one: the highest top at or below fromY
+    if (real(x, z) === 'unknown') return 'unknown';
+    for (let K = Math.floor(Math.min(fromY, 60) / c.P); K > 0; K--) {
+      if (c.isSolid(x, (K - 0.5) * c.P, z) === true && c.isSolid(x, (K + 0.5) * c.P, z) !== true) return K * c.P;
+    }
+    return null;
+  };
+  c.approxGround = (x, z) => c.groundHeight(x, z); // the baked ground knows only the top
+  const ground = makeGround({ city: c }, null);
+  assert.ok(ground(30, 30) > 6, 'the plain lookup finds the canopy roof');
+  assert.ok(Math.abs(ground.walk(30, 30) - 1.0) < 0.21, `people walk under it: ${ground.walk(30, 30)}`);
+  assert.ok(ground.walk(60, 30) > 6, 'a building is not walked through');
+  assert.ok(Math.abs(ground.walk(10, 10) - 1.0) < 0.21, 'the open street is unchanged');
+});
