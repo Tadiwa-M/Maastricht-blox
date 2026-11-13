@@ -1639,3 +1639,20 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   overlapping buttons, menu, settings, map, near and far fast travel, Esc and lock-loss paths.
 - Open: arriving at a landmark can put the camera close against a wall (follow camera); the map
   has no street names yet.
+
+## 2026-11-13: traffic lights and crossings you can see, and everyone keeps to them
+
+- Owner: lights and crossings should be visible and match the real ones. Poles and zebras stand at
+  the real OSM signal (335) and crossing (304) nodes; one city-wide cycle drives the lamps and the
+  rules. New `life/signals.js` (pure, tested) and `life/signalsdraw.js` (instanced, capped by tier).
+- Walkers wait at the kerb for the pedestrian green, give way at zebras, and prefer routes over
+  crossings; cyclists stop at red; buses and trains stop for red and for people on a zebra; cars
+  stop for people waiting at a zebra. Walkers and riders now see every car near them, not the
+  first 40 (most bikes inside cars came from that). Details: guide 05.
+- Audit (`tools/life-audit.mjs`, high tier, markt/vrijthof/station, 40 s, average per snapshot,
+  before -> after): people in vehicles 7.52 -> 0.10, bikes in vehicles 7.76 -> 0.60, car overlaps
+  0.39 -> 0.06, bike overlaps 0.34 -> 0.25, people overlaps 5.66 -> 6.55 (people now bunch at kerbs
+  waiting for green), people on roofs 12.9 -> 16.2 (all at the station; that is a known open problem,
+  not caused by this work, and it varies from run to run).
+- Open: a degree-2 signal node just behind a junction also shows a light for traffic leaving it; no
+  stop-line paint; zebras at junction nodes are not drawn; the station "people on roofs".

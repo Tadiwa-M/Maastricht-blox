@@ -27,11 +27,11 @@ const overlaps = (a, b) => points(a).some(([x, z]) => inFootprint(b, x, z)) || p
  * snap: { people: [{ x, z, y, g }] (g: group id), buses: [footprint], cars: [footprint],
  * bikes: [{ x, z, yaw }], street(x, z) -> street-level y near (x, z) | null }.
  * -> counts { people, peopleOverlap (pairs), peopleInVehicles, peopleOnRoofs, bikes,
- *    bikesInVehicles, bikesOverlap (pairs), carsInBuses, carsOverlap (pairs) }.
+ *    bikesInVehicles (bikesInBuses: of them in a bus or train), bikesOverlap (pairs), carsInBuses, carsOverlap (pairs) }.
  */
 export function auditLife({ people = [], buses = [], cars = [], bikes = [], street = null }) {
   const out = { people: people.length, peopleOverlap: 0, peopleInVehicles: 0, peopleOnRoofs: 0,
-    bikes: bikes.length, bikesInVehicles: 0, bikesOverlap: 0, carsInBuses: 0, carsOverlap: 0 };
+    bikes: bikes.length, bikesInVehicles: 0, bikesInBuses: 0, bikesOverlap: 0, carsInBuses: 0, carsOverlap: 0 };
   const cell = 2, grid = new Map(), key = (i, j) => `${i},${j}`;
   people.forEach((p, n) => {
     const k = key(Math.floor(p.x / cell), Math.floor(p.z / cell));
@@ -55,7 +55,11 @@ export function auditLife({ people = [], buses = [], cars = [], bikes = [], stre
     if (Number.isFinite(s) && Number.isFinite(p.y) && p.y - s > AUDIT.roofM) out.peopleOnRoofs++;
   }
   const bikeF = bikes.map((b) => ({ x: b.x, z: b.z, yaw: b.yaw ?? 0, halfW: AUDIT.bikeHalf[0], halfL: AUDIT.bikeHalf[1] }));
-  for (const b of bikeF) if (vehicles.some((f) => overlaps(f, b))) out.bikesInVehicles++;
+  for (const b of bikeF) {
+    if (!vehicles.some((f) => overlaps(f, b))) continue;
+    out.bikesInVehicles++;
+    if (buses.some((f) => overlaps(f, b))) out.bikesInBuses++;
+  }
   for (let a = 0; a < bikeF.length; a++) for (let b = a + 1; b < bikeF.length; b++) {
     if (Math.abs(bikeF[a].x - bikeF[b].x) < 2 && Math.abs(bikeF[a].z - bikeF[b].z) < 2 && overlaps(bikeF[a], bikeF[b])) out.bikesOverlap++;
   }

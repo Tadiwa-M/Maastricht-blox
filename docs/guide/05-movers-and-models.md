@@ -277,6 +277,8 @@ synthetic GTFS zip and OSM file in `tests/life_fixture.py`.
 | `cyclists.js` | `Cyclists` on the cycle graph; `parkedBikes` rows |
 | `traffic.js` | `RoadGraph`, car following (IDM), traffic rules, `carPose` (pure) |
 | `junctions.js` | junction boxes: movements, conflicts, lane corners, bus sweeps (pure) |
+| `signals.js` | lights and crossings for people, bikes, buses: pole and zebra positions, ped lights, kerb waits (pure) |
+| `signalsdraw.js` | instanced light poles (lamps showing the cycle) and zebra plates near the camera |
 | `police.js` | the police car easter egg: when, lights, who pulls over (pure) |
 | `cars.js` | `Cars`: spawn/recycle near the camera, the police car, drawn as toy cars |
 | `terraces.js` | `terraceLayout` (pure), `Terraces`: tables, chairs, parasols, seated people |
@@ -590,5 +592,54 @@ vehicles phasing through each other at junctions. Causes found and what replaced
   rules vs new): car-car overlap frames 870 -> 0, car-bus 550 -> 0, distance driven -5 %. With 110
   cars the grid jams, buses reach the 120 s lag cap and then go on, so some car-bus overlap
   remains there. Tests: `life.junctions.test.mjs` (fails on the old rules), `life.busflow.test.mjs`.
-- Open: buses do not stop for red lights (they are not on the road graph); people and bikes
-  giving way to vehicles is walkers.js/cyclists.js work.
+- ~~Open: buses do not stop for red lights; people and bikes giving way~~: see the next section.
+
+## Traffic lights you can see, crossings, everyone obeying them (2026-11-13)
+
+The lights and crossings were rules without anything on screen, and only cars kept to them.
+Positions are the real OSM nodes (`streets.json` `roads.signals`, 335, and `roads.crossings`,
+304, snapped to the road graph); one city-wide cycle (`traffic.js` `signalAt`/`signalPhase`,
+unchanged timing) drives every lamp and every rule.
+
+- **`signals.js`** (pure, `test/life.signals.test.mjs`): `CrossingMap` over the cars' `RoadGraph`
+  (a node grid and the road "arms" at each node). `heads()`: one light pole per approach on its
+  right-hand kerb (carriageway half width + 0.7 m out, just before the junction box), lamps facing
+  the traffic; `ped` when a walk-graph node lies within 2.5 m of the signal node (a footway crosses
+  there: `footwayAt`). `zebras()`: white stripes at crossings without lights that are not
+  junctions, 0.5 x 2.6 m, running along the road, spread across the carriageway.
+- **Pedestrian lights:** `pedSignal(walking bearing, t)` is green 1-19 s into the walking
+  direction's half of the cycle, so always while the traffic being crossed has red (it turns green
+  again at 30 s). A pedestrian head (red over green, no figure) hangs lower on the same pole,
+  facing across the road.
+- **People** (`walkers.js`, a few lines): `crossingHold` sees a walker about to step onto the
+  carriageway within 9 m of a crossing or signal node (`kerbStep`: the point 2.5 m ahead is on an
+  arm of the road, they are not, and they walk across it, not along). At lights they wait for
+  green (at most 45 s); at a zebra they wait only for a vehicle that cannot stop gently any more
+  (3 m/s²) and then step on. While at a zebra's kerb the group carries `zebra` = the node, and
+  cars (`traffic.js` crossing rule) and buses stop for that as well as for anyone within 4 m.
+  Walk routes prefer crossings: `walkBias` makes `WalkGraph.pickNext` weigh a walk edge over a
+  road x3 when it crosses within 6 m of a crossing node and x0.2 when it crosses 6-30 m from one.
+- **Bikes** (`cyclists.js`): `riderSlow` stops a rider before the box of a signal node ahead
+  (within 14 m, at most 5 m off its line) on red, and on amber unless too close to stop. Riders
+  also report where they will be in 0.8 s, so cars (lane obstacles) and buses (hold blockers)
+  wait for a bike crossing their path.
+- **Buses and trains** (`buses.js` `hold(..., rules)`, `transitGap`): a red light (amber as for
+  cars) or a zebra with someone on it or waiting is a stop line ahead; the existing lag mechanism
+  holds them there (same caps: 120 s, 20 % of the time left). While held for a stop line the bus
+  remembers where it stops (`stopAt`): its sweep and its reported speed end there (`v` 0), so
+  cars with green no longer wait for a bus that is standing at red, and people see it is waiting;
+  `vt` keeps the timetable speed for the hold logic. Trains use the same rules (they only meet
+  road lights at level crossings).
+- **People and bikes see every car.** The footprints walkers and riders keep clear of were the
+  first 40 cars within 80 m of the camera; now every car within the living radius (cap 200).
+  That was most of `bikesInVehicles`: bikes riding into the back of cars they could not see.
+- **Drawing** (`signalsdraw.js`): five instanced meshes (posts, stud caps, heads, lamps, zebra
+  plates); only the nearest poles and stripes by tier (`SIGNAL_CAPS`: high 64 poles / 600 stripes
+  within 160 m, lite 10 / 100 within 50 m), re-picked when the camera moves 12 m (and every ~90
+  frames, for ground that streams in late). Lamps are an unlit material: the lit one shows its full
+  colour (glows at night), the others 2.5 % (dark).
+- `audit.js` also counts `bikesInBuses` (of `bikesInVehicles`).
+- Measured (`tools/life-audit.mjs`, markt/vrijthof/station, 40 s): see DEVLOG 2026-11-13.
+- Open: signal heads follow the rule's per-node logic, so a degree-2 signal node just behind a
+  junction also shows (and enforces) a light for traffic leaving it; no stop-line paint; zebras at
+  junction nodes are not drawn (stripes would lie in the middle).

@@ -121,13 +121,13 @@ export class Cars {
     }
   }
 
-  /** Poses [{ x, z, yaw, halfW, halfL }] of the active cars (Unity metres) for walkers to step aside. */
-  footprints(near = null, max = 40) {
+  /** Poses [{ x, z, yaw, halfW, halfL, v }] of the active cars (Unity metres) within radius of near, for walkers to step aside. */
+  footprints(near = null, max = 40, radius = 80) {
     const out = [];
     for (const c of this.cars.slice(0, this.count)) {
       if (c.gone) continue;
       const p = carPose(this.g, c);
-      if (near && Math.hypot(p.x - near[0], p.z - near[1]) > 80) continue;
+      if (near && Math.hypot(p.x - near[0], p.z - near[1]) > radius) continue;
       out.push({ x: p.x, z: p.z, yaw: p.yaw, halfW: CAR_TYPES[c.type].W / 2, halfL: c.len / 2, v: c.v });
       if (out.length >= max) break;
     }

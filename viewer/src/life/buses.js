@@ -80,6 +80,7 @@ export class TimetableBuses {
     const L = model.size[1] * opts.studM, W = model.size[0] * opts.studM, H = model.size[2] * opts.plateM;
     this.halfL = L / 2; this.halfW = W / 2; // footprint (traffic)
     this.lag = new Map(); // trip id -> seconds behind its timetable (hold)
+    this.stopAt = new Map(); // trip id -> path distance its centre stops at (a red light, a zebra: hold rules)
     this.current = [];
     const boxGeo = new THREE.BoxGeometry(W, H, L).translate(0, H / 2, 0);
     this.boxes = new THREE.InstancedMesh(boxGeo, new THREE.MeshStandardMaterial({ roughness: 0.5, clippingPlanes: this.clip }), this.caps.box);
@@ -128,7 +129,8 @@ export class TimetableBuses {
 
   /**
    * Poses of the trips active at the clock: [{ x, y, z (Unity metres), yaw, dist, route, id, trip,
-   * pattern, tRel, mode, v (m/s, timetable speed), lag (s), halfW, halfL, sweep(), ahead(m) }].
+   * pattern, tRel, mode, v (m/s: timetable speed, 0 when it waits at a stop line), vt (timetable
+   * speed), lag (s), halfW, halfL, sweep(), ahead(m) }].
    * sweep() -> [{ x, z, t }] where it is and will be (busflow.js); ahead(m) -> [{ x, z, a }] its
    * path the next m metres ahead of its front. A held-back trip runs `lag` seconds late.
    */
@@ -138,11 +140,9 @@ export class TimetableBuses {
       const shape = a.shape, st = a.pattern.st, mover = this.mover(shape);
       const lag = this.lag.get(a.id) || 0, tRel = a.tRel - lag;
       const clampD = (d) => Math.max(shape.d0, Math.min(shape.d1, d));
-      const distAt = (t) => {
-        if (!lag && !t) return a.dist;
-        const d = tripDistAt(st, tRel + t);
-        return clampD(d ?? (tRel + t < st[0] ? st[2] : st[st.length - 1]));
-      };
+      const stopD = this.stopAt.get(a.id) ?? Infinity; // it will wait there: its sweep and speed end there
+      const rawAt = (t) => (!lag && !t ? a.dist : clampD(tripDistAt(st, tRel + t) ?? (tRel + t < st[0] ? st[2] : st[st.length - 1])));
+      const distAt = (t) => (t > 0 ? Math.max(Math.min(rawAt(t), stopD), rawAt(0)) : rawAt(0));
       const point = (d) => pathPoint(mover, clampD(d) - shape.d0, this.laneM); // sweeps (fast, corners not rounded)
       const dist = distAt(0);
       const pose = mover.poseAt(dist - shape.d0), yaw = pose.yaw, r = (yaw * Math.PI) / 180;
@@ -152,7 +152,7 @@ export class TimetableBuses {
       const front = dist + this.halfL;
       return { x, y: this.ground(x, z), z, yaw, dist, route: a.route, id: a.id,
         trip: a.trip, pattern: a.pattern, tRel, mode: a.route?.mode || 'bus',
-        v: Math.max(0, distAt(1) - dist), lag, halfW: this.halfW, halfL: this.halfL,
+        v: Math.max(0, distAt(1) - dist), vt: Math.max(0, rawAt(1) - dist), lag, halfW: this.halfW, halfL: this.halfL,
         sweep: () => sweepSamples(point, distAt, this.halfL),
         ahead: (m) => { const out = []; for (let s = 0; s <= m; s += 1.5) out.push({ ...point(front + s), a: s }); return out; } };
     });
@@ -160,22 +160,27 @@ export class TimetableBuses {
 
   /**
    * Hold back for what is in front: blockers = footprints { x, z, yaw, halfW, halfL } or circles
-   * { x, z, r } (cars, bikes, the player). Only trips within `radius` of `near` look; the rest
-   * make up their lag. dt: game seconds.
+   * { x, z, r } (cars, bikes, the player). rules(b, ahead) -> metres from its front to a stop
+   * line (a red light, a zebra: signals.js transitGap), Infinity if none. Only trips within
+   * `radius` of `near` look; the rest make up their lag. dt: game seconds.
    */
-  hold(dt, blockers = [], near = null, radius = 250) {
+  hold(dt, blockers = [], near = null, radius = 250, rules = null) {
     const seen = new Set();
+    this.stopAt.clear();
     for (const b of this.current) {
       seen.add(b.id);
-      let gap = Infinity;
-      if (blockers.length && dt > 0 && (!near || Math.hypot(b.x - near[0], b.z - near[1]) < radius)) {
-        const look = wantAhead(b.v) + 1, m = look + b.halfL + 6;
+      let gap = Infinity, rule = Infinity;
+      if ((blockers.length || rules) && dt > 0 && (!near || Math.hypot(b.x - near[0], b.z - near[1]) < radius)) {
+        const look = wantAhead(b.vt ?? b.v) + 1, m = look + b.halfL + 6;
         const close = blockers.filter((o) => Math.abs(o.x - b.x) < m && Math.abs(o.z - b.z) < m);
-        if (close.length) gap = aheadGap(b.ahead(look), this.halfW, close);
+        const ahead = close.length || rules ? b.ahead(look) : null;
+        if (close.length) gap = aheadGap(ahead, this.halfW, close);
+        if (rules) rule = rules(b, ahead);
       }
       const st = b.pattern.st, left = st[st.length - 3] - (b.tRel + b.lag); // timetable s to its last stop
-      const lag = nextLag(this.lag.get(b.id) || 0, gap, b.v, dt, lagCap(left));
+      const cap = lagCap(left), lag = nextLag(this.lag.get(b.id) || 0, Math.min(gap, rule), b.vt ?? b.v, dt, cap);
       if (lag > 1e-3) this.lag.set(b.id, lag); else this.lag.delete(b.id);
+      if (rule < Infinity && lag < cap) this.stopAt.set(b.id, b.dist + rule);
     }
     for (const id of [...this.lag.keys()]) if (!seen.has(id)) this.lag.delete(id);
   }

@@ -18,7 +18,8 @@
 //   not while a committed car on a crossing or merging path is still in the box, while a bus or
 //   train will sweep through its path before it is across, or while there is no room behind the
 //   junction (keep the box clear). A committed car drives through (no stopping in the box).
-// - Crossings: stop when someone is within CROSSING_M of the crossing.
+// - Crossings: stop when someone is within CROSSING_M of the crossing, or waits at its kerb to
+//   step on (people with `zebra` = that node; signals.js crossingHold).
 // - Anything in the lane ahead (buses and trains where they are and are about to be, bikes, the
 //   player): queue behind it. Braking is capped (MAX_BRAKE), so a car can still hit someone who
 //   steps out right in front of it.
@@ -138,13 +139,23 @@ export function desiredSpeed(g, e, s) {
   return v0;
 }
 
-/** Light for a car arriving along edge e at time t (s): 'green' | 'amber' | 'red'. */
-export function signalState(g, e, t) {
-  const a = g.bearing(e) % 180;
+/** Seconds into its own half of the cycle for traffic heading `bearing` (degrees) at time t (s). */
+export function signalPhase(bearing, t) {
+  const a = ((bearing % 180) + 180) % 180;
   const ns = a < 45 || a >= 135;
   const u = ((t % SIGNAL.cycle) + SIGNAL.cycle) % SIGNAL.cycle;
-  const half = SIGNAL.cycle / 2, k = ns ? u : (u + half) % SIGNAL.cycle;
+  return ns ? u : (u + SIGNAL.cycle / 2) % SIGNAL.cycle;
+}
+
+/** Light for anything heading `bearing` (degrees) into a signal at time t: 'green' | 'amber' | 'red'. */
+export function signalAt(bearing, t) {
+  const k = signalPhase(bearing, t);
   return k < SIGNAL.green ? 'green' : k < SIGNAL.green + SIGNAL.amber ? 'amber' : 'red';
+}
+
+/** Light for a car arriving along edge e at time t (s): 'green' | 'amber' | 'red'. */
+export function signalState(g, e, t) {
+  return signalAt(g.bearing(e), t);
 }
 
 /** Does car o (approaching the same junction) go before car c? */
@@ -210,9 +221,11 @@ function nodeRule(g, c, n, eIn, eOut, front, byNode, env, ctx) {
     if (st === 'red' || (st === 'amber' && toLine > (c.v * c.v) / (2 * COMFORT_B))) return hold;
   }
   if (g.crossing[n] && env.people?.length && front > CROSSING_M) {
+    // someone on the crossing or close to it, or waiting at its kerb to step on (walkers.js: zebra)
     const nx = g.x[n], nz = g.z[n];
     for (const p of env.people) {
-      if (Math.abs(p.x - nx) < CROSSING_M && Math.abs(p.z - nz) < CROSSING_M) return { stop: Math.max(0.1, front - CROSSING_M + IDM.s0 - 1.5), pass: false };
+      const waiting = p.zebra === n && front - CROSSING_M > (c.v * c.v) / (2 * COMFORT_B); // (too close to stop gently: they let it pass)
+      if (waiting || (Math.abs(p.x - nx) < CROSSING_M && Math.abs(p.z - nz) < CROSSING_M)) return { stop: Math.max(0.1, front - CROSSING_M + IDM.s0 - 1.5), pass: false };
     }
   }
   if (g.degree[n] <= 2 || isIn) return go;
@@ -282,7 +295,7 @@ export function stopLine(g, c, byNode, env = {}, ctx = null) {
 
 /**
  * Gap (m, bumper to obstacle) to the nearest obstacle in c's lane ahead; obstacles [{ x, z, r }].
- * pose: c's pose (carPose) if known; skip(o): obstacles to leave out.
+ * pose: c's pose (carPose) if known; skip(o, along): obstacles to leave out (along: metres ahead of c's centre).
  */
 export function laneGap(g, c, obstacles, pose = null, skip = null) {
   if (!obstacles?.length) return Infinity;
@@ -293,7 +306,7 @@ export function laneGap(g, c, obstacles, pose = null, skip = null) {
     const along = dx * fx + dz * fz;
     if (along <= 0 || along > LOOK_M) continue;
     if (Math.abs(dx * fz - dz * fx) > LANE_HALF + (o.r || 0.4)) continue;
-    if (skip?.(o)) continue;
+    if (skip?.(o, along)) continue;
     gap = Math.min(gap, along - c.len / 2 - (o.r || 0.4));
   }
   return gap;
@@ -392,7 +405,9 @@ export function stepTraffic(g, cars, dt, rand, env = {}) {
       if (!inPath.has(o.veh)) inPath.set(o.veh, vehObs.some((q) => q.veh === o.veh && q.t > 0 && Math.hypot(q.x - pose.x, q.z - pose.z) < q.r + c.len / 2));
       return inPath.get(o.veh);
     };
-    const obs = Math.min(laneGap(g, c, env.obstacles, pose), laneGap(g, c, vehObs, pose, skipVeh));
+    // where a bike will be (o.lead): only if the car can still stop for it gently (no emergency stop for a guess)
+    const skipLead = (o, along) => o.lead && along - c.len / 2 - (o.r || 0.4) < (c.v * c.v) / (2 * COMFORT_B);
+    const obs = Math.min(laneGap(g, c, env.obstacles, pose, skipLead), laneGap(g, c, vehObs, pose, skipVeh));
     if (obs < gap) { gap = Math.max(0.1, obs); lead = null; }
     let v0 = desiredSpeed(g, c.e, c.s) * (c.mood || 1);
     c.latWant = 0;

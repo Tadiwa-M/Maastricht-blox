@@ -18,6 +18,8 @@ import { TimetableBuses } from './buses.js';
 import { Pedestrians } from './walkers.js';
 import { Cyclists, parkedBikes } from './cyclists.js';
 import { Cars } from './cars.js';
+import { CrossingMap, footwayAt, walkBias } from './signals.js';
+import { SignalProps } from './signalsdraw.js';
 import { Terraces } from './terraces.js';
 import { Market } from './market.js';
 import { FIGURES_BY_TIER, LIFE_RADIUS_BY_TIER, CYCLISTS_BY_TIER, CARS_BY_TIER, PARKED_BIKES_BY_TIER, nearestWithin, crowdFactor, trafficFactor, liveWeights, marketState } from './density.js';
@@ -104,8 +106,8 @@ export function clockOffset(clock, real) {
 function trafficEnvFor(state, clock, buses) {
   const obstacles = [], people = [];
   const vehicles = state.vehicles || buses;
-  if (state.cyclists) state.cyclists.positions(obstacles);
-  for (const g of state.walkers?.groups || []) if (g.walker) people.push({ x: g.walker.x, z: g.walker.z });
+  if (state.cyclists) state.cyclists.positions(obstacles, 0.8); // (and where they will be: crossing a car's path)
+  for (const g of state.walkers?.groups || []) if (g.walker) people.push({ x: g.walker.x, z: g.walker.z, zebra: g.zebra ?? -1 });
   const pl = typeof window !== 'undefined' ? window.__bloxPlayer : null;
   if (pl?.mode === 'walk') {
     const p = { x: pl.ctrl.pos[0], z: -pl.ctrl.pos[2], r: 0.4 };
@@ -124,13 +126,20 @@ function holdTransit(state, clock, dt, at) {
   const blockers = [];
   if (clock.speed === 1) {
     if (state.cars) blockers.push(...state.cars.footprints(null, 1000));
-    if (state.cyclists) state.cyclists.positions(blockers);
+    if (state.cyclists) state.cyclists.positions(blockers, 0.8);
     const pl = typeof window !== 'undefined' ? window.__bloxPlayer : null;
     if (pl?.mode === 'walk') blockers.push({ x: pl.ctrl.pos[0], z: -pl.ctrl.pos[2], r: 0.4 });
   }
+  // red lights and people on zebras (signals.js): a stop line ahead
+  let rules = null;
+  if (state.crossings && clock.speed === 1) {
+    const people = [];
+    for (const g of state.walkers?.groups || []) if (g.walker && (g.zebra >= 0 || Math.hypot(g.walker.x - at[0], g.walker.z - at[1]) < 260)) people.push({ x: g.walker.x, z: g.walker.z, zebra: g.zebra ?? -1 });
+    rules = (b, ahead) => state.crossings.transitGap(b, ahead, people, clock.sec);
+  }
   const gdt = dt * (clock.speed || 1);
-  state.buses?.hold(gdt, blockers, at);
-  state.trains?.hold(gdt, blockers, at);
+  state.buses?.hold(gdt, blockers, at, 250, rules);
+  state.trains?.hold(gdt, blockers, at, 250, rules);
 }
 
 /** Unity y of the water surface: water tops along the river in the world, else 44.1 m NAP. */
@@ -223,6 +232,14 @@ export async function initLife(ctx) {
     if (graph.buckets.size) state.cyclists = new Cyclists({ graph, ground, cap: CYCLISTS_BY_TIER.high });
   }
   if (streets?.roads?.edges?.length) state.cars = new Cars({ doc: clipRoads(streets.roads, rect), ground, cap: CARS_BY_TIER.high });
+  if (state.cars) { // traffic lights and crossings at their real places (signals.js, signalsdraw.js)
+    state.crossings = new CrossingMap(state.cars.g, { footway: walkGraph ? (x, z) => footwayAt(walkGraph, x, z) : null });
+    state.signals = new SignalProps({ map: state.crossings, ground, clip: planes });
+    group.add(state.signals.group);
+    if (walkGraph) walkGraph.bias = walkBias(walkGraph, state.crossings); // walk routes use the crossings
+    if (state.walkers) state.walkers.crossings = state.crossings;
+    if (state.cyclists) state.cyclists.crossings = state.crossings;
+  }
   if (streets?.pois?.length) state.terraces = new Terraces({ pois: inRect(streets.pois, rect), ground });
   if (streets?.market?.poly?.length >= 6) {
     const near = walkGraph ? (x, z) => walkGraph.spawnNear(x, z, 4, () => 0.5) >= 0 : () => true;
@@ -347,6 +364,8 @@ export async function initLife(ctx) {
     const buses = state.buses ? state.buses.update(clock, camera) : [];
     // every scheduled vehicle this frame (Ride: the transit panel and the passenger camera read this)
     state.vehicles = state.trains ? buses.concat(state.trains.update(clock, camera)) : buses;
+    if (state.crossings) state.crossings.t = clock.sec; // the light clock for walkers and bikes
+    state.signals?.update([camera.position.x, -camera.position.z], clock.sec, tier());
     holdTransit(state, clock, dt, at); // (the lag shows from the next frame on)
     const traffic = trafficFactor(clock.hours, clock.day);
     if (state.cars) {
@@ -357,9 +376,9 @@ export async function initLife(ctx) {
     const trainHalf = [models.train.size[0] * world.studM / 2, models.train.size[1] * world.studM / 2];
     state.trainHalf = trainHalf;
     const vehicles = state.vehicles.map((b) => (b.mode === 'rail'
-      ? { x: b.x, z: b.z, yaw: b.yaw, halfW: trainHalf[0], halfL: trainHalf[1], v: b.v }
+      ? { x: b.x, z: b.z, yaw: b.yaw, halfW: trainHalf[0], halfL: trainHalf[1], v: b.v } // (v 0: waiting at a light or zebra)
       : { x: b.x, z: b.z, yaw: b.yaw, halfW: busHalf[0], halfL: busHalf[1], v: b.v }));
-    if (state.cars) vehicles.push(...state.cars.footprints(at, 40));
+    if (state.cars) vehicles.push(...state.cars.footprints(at, 200, R + 15)); // every car where the people and bikes are
     if (state.cyclists) {
       state.cyclists.setCount(Math.round(by(CYCLISTS_BY_TIER) * traffic), at);
       state.cyclists.update(dt, at, R, vehicles);
@@ -401,7 +420,7 @@ export async function initLife(ctx) {
       const b = state.buses?.stats;
       state.stats = { people: crowd.count, walkers: state.walkers?.people || 0, cyclists: state.cyclists?.count || 0,
         cars: state.cars?.count || 0, carsMoving: state.cars ? state.cars.cars.slice(0, state.cars.count).filter((c) => c.v > 0.5).length : 0, seated: state.terraces?.seated || 0, market: state.market?.state || 'none',
-        drawCalls: crowd.drawCalls() + fleet.drawCalls() + props.drawCalls() };
+        drawCalls: crowd.drawCalls() + fleet.drawCalls() + props.drawCalls() + (state.signals?.drawCalls() || 0) };
       ui.stats([b ? `${b.active} buses (${b.full} near)` : 'no timetable', `${crowd.count} people`,
         `${state.stats.cyclists} bikes`, `${state.stats.cars} cars`, `${state.boats?.items.length || 0} boats`,
         ...state.events.slice(0, 1).map((e) => e.name), ...(state.weather.live ? [`${Math.round(state.weather.tempC)}°C${state.weather.rain > 0 ? ' rain' : ''}`] : [])].join(' · '));

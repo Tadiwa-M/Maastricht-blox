@@ -28,7 +28,9 @@ export function queue(riders) {
         if (o === w) continue;
         const dx = o.x - w.x, dz = o.z - w.z, along = dx * fx + dz * fz, across = Math.abs(dx * fz - dz * fx);
         if (along <= 0 || along > GAP_M + 3 || across > 0.9) continue;
-        if ((o.dirX ?? 0) * fx + (o.dirZ ?? 1) * fz < 0.3) continue; // oncoming: avoid() steps aside
+        const dot = (o.dirX ?? 0) * fx + (o.dirZ ?? 1) * fz;
+        if (dot < -0.3) continue; // oncoming: avoid() steps aside
+        if (dot < 0.3 && ((o.pace ?? 1) > 0.3 || along > 2.2)) continue; // crossing: wait only for one standing right in the way (at a light, for a car)
         w.slow = Math.min(w.slow, Math.max(0, (along - GAP_M) / 3));
       }
     }
@@ -54,6 +56,8 @@ export class Cyclists {
     const walker = new Walker(this.graph, n, r, { speed: 3.5 + r() * 2.5, lateral, corner: 4 });
     walker.baseLateral = lateral;
     walker.place();
+    // not on top of another rider (two stuck in one place, both waiting for the same car)
+    for (const o of this.riders) if (o !== c && o.walker && Math.abs(o.walker.x - walker.x) < 2.5 && Math.abs(o.walker.z - walker.z) < 2.5) return false;
     const v = makeVariant(this.nextId++ * 53 + 11, { kind: 'adult' });
     if (v.acc === 'bag') v.acc = 'none';
     Object.assign(c, { walker, v, colour: BIKE_COLOURS[Math.floor(r() * BIKE_COLOURS.length)], dist: r() * 10, yaw: null });
@@ -62,10 +66,10 @@ export class Cyclists {
 
   setCount(n, target) {
     n = Math.min(n, this.cap);
-    while (this.riders.length < n) {
+    let tries = 0;
+    while (this.riders.length < n && tries++ < n * 3) {
       const c = {};
-      if (!this.spawn(c, target[0], target[1], 0)) break;
-      this.riders.push(c);
+      if (this.spawn(c, target[0], target[1], 0)) this.riders.push(c);
     }
     this.count = Math.min(n, this.riders.length);
   }
@@ -82,6 +86,7 @@ export class Cyclists {
       // a bus or car in the way (ahead of the bike, or about to cross): brake and wait
       const ax = k.x + (k.dirX ?? 0) * LOOK_M, az = k.z + (k.dirZ ?? 1) * LOOK_M;
       if (vehicles.some((f) => inVehiclePath(f, ax, az, 5, 0.4))) k.slow = 0;
+      else if (this.crossings) k.slow = Math.min(k.slow, this.crossings.riderSlow(k.x, k.z, k.dirX ?? 0, k.dirZ ?? 1, k.yaw, k.speed * k.pace)); // red light ahead (signals.js)
       c.dist += k.step(dt);
       if (vehicles.length) { // never inside one (a bike is ~1.7 m long): step aside, and stay aside
         const x0 = k.x, z0 = k.z;
@@ -94,9 +99,17 @@ export class Cyclists {
     }
   }
 
-  /** Where the riders are (Unity metres): obstacles for the cars' lanes. */
-  positions(out = []) {
-    for (const c of this.riders.slice(0, this.count)) out.push({ x: c.walker.x, z: c.walker.z, r: 0.5 });
+  /**
+   * Where the riders are (Unity metres): obstacles for the cars' lanes and the buses. leadS > 0:
+   * also where each will be that many seconds on (a bike about to cross a car's path counts).
+   */
+  positions(out = [], leadS = 0) {
+    for (const c of this.riders.slice(0, this.count)) {
+      const k = c.walker;
+      out.push({ x: k.x, z: k.z, r: 0.5 });
+      const d = leadS * k.speed * k.pace;
+      if (d > 0.5) out.push({ x: k.x + (k.dirX ?? 0) * d, z: k.z + (k.dirZ ?? 1) * d, r: 0.5, lead: true });
+    }
     return out;
   }
 

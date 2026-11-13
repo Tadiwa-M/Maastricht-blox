@@ -35,6 +35,7 @@ const HEAD_MAX = 1.15; // rad the head turns from the body
 const LOOK_M = 2.5; // a walker checks this far ahead for a vehicle coming across
 const VEHICLE_AHEAD_M = 7; // a vehicle's path ahead that people don't step into
 const WAIT_MAX_S = 8; // after that they go anyway (a parked car in the way)
+const XWAIT_MAX_S = 45; // at a crossing: longer than a red phase (signals.js)
 const WET = 0.25; // rain above this: people keep to the walls
 const HUG_PROBES = [0.7, 1.3, 1.9, 2.5, 3.1]; // metres to each side of the path felt for a wall
 const GOAL_MAX_S = 300; // a group gives up on its goal after this (and wanders)
@@ -181,6 +182,17 @@ export class Pedestrians {
       this.mind(g, dt);
       // a bus or car coming across: wait at the kerb (don't walk into it), but not forever
       const ax = k.x + (k.dirX ?? 0) * LOOK_M, az = k.z + (k.dirZ ?? 1) * LOOK_M;
+      // at a crossing (signals.js): the green man, or a gap at a zebra (where the cars stop for them)
+      const xh = this.crossings && g.pause <= 0 ? this.crossings.crossingHold(k.x, k.z, k.yaw, ax, az, vehicles) : null;
+      g.zebra = xh?.zebra ? xh.n : -1;
+      if (xh?.wait && (g.xwait = (g.xwait || 0) + dt) < XWAIT_MAX_S) {
+        k.stopped = true; k.slow = 0;
+        k.pace = Math.max(0, k.pace - 6 * dt);
+        g.travelled = k.step(dt);
+        if (vehicles.length) clearVehicles([k], vehicles, g.size > 1 ? 1.9 : 0.9);
+        continue;
+      }
+      if (!xh) g.xwait = 0;
       if (g.pause <= 0 && vehicles.length && g.wait < WAIT_MAX_S && vehicles.some((f) => inVehiclePath(f, ax, az) && !inVehiclePath(f, k.x, k.z, 0, 0.3))) {
         g.wait += dt;
         k.stopped = true;

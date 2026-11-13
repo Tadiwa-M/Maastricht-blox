@@ -73,6 +73,7 @@ export class WalkGraph {
       const cos = prev >= 0 ? ((this.x[m] - this.x[cur]) * dx + (this.z[m] - this.z[cur]) * dz) / L : 0;
       ws[q] = Math.sqrt(this.w[m]) * (0.25 + 2 * Math.max(0, cos) ** 2);
       if (goal) ws[q] *= 0.3 + 2 * Math.max(0, ((this.x[m] - this.x[cur]) * gx + (this.z[m] - this.z[cur]) * gz) / L) ** 2;
+      if (this.bias) ws[q] *= this.bias(cur, m); // e.g. cross roads at the crossings (signals.js walkBias)
       total += ws[q];
     }
     let r = rand() * total;
