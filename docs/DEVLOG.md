@@ -1616,3 +1616,26 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Owner: the blue ride box covered the screen on a phone. On narrow or short screens it is now a
   slim bar (line, next stop, small buttons; the stop strip and hint hidden): 19 % of a landscape
   phone screen. The multiplayer, journal and report buttons hide while riding.
+
+## 2026-11-13: pause menu, map and fast travel
+
+- New `viewer/src/menu/` (guide 20): a small pause button top-right on phones and PC, Esc and
+  gamepad Start open it, and on PC a pointer lock lost to the browser's Esc pauses the game too
+  (Resume catches the mouse again). While open the game stands still: keys and pointers go to the
+  menu, the player's tick returns early, the life clock runs at 0.001x.
+- Entries: Resume, Map & fast travel, Character, Journal, Photo mode, Plan a trip, Goals on/off,
+  Settings (the `#hud` panel moved into the menu; hidden on phones otherwise), Controls & help,
+  Multiplayer.
+- Full-screen canvas map: built-city mask, the Maas, walkways (tiled, only what is in view), bus
+  stops (platforms merged), landmarks, you with heading; drag/wheel/pinch. Tap a stop, landmark
+  or street to travel: fade, `enterNearUnity`, or (not loaded) move the map there, `city.focus`,
+  retry, give up after 45 s.
+- Small API additions: `__bloxPlayer.openCreator/closeCreator/creatorOpen/toggleHelp/busy` (Esc
+  and Start go through the menu when there is one), `__bloxExplore.landmarks()/journalOpen`,
+  `__bloxGoals.setOff`. Layout: the Map button and `#info` sit left of the menu button; the
+  empty `#info` panel no longer shows (its `display: grid` beat `hidden`); on short landscape
+  phones the goals card moves left of the button column (it covered the multiplayer button).
+- Checked in headless Chromium on the full city at 915x412, 412x915 (touch) and 1280x720: no
+  overlapping buttons, menu, settings, map, near and far fast travel, Esc and lock-loss paths.
+- Open: arriving at a landmark can put the camera close against a wall (follow camera); the map
+  has no street names yet.

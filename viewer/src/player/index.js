@@ -9,7 +9,7 @@
 //
 // Walk mode is an open-world third-person camera: clicking the canvas captures the mouse
 // (pointer lock) and mouse movement turns the camera with no button held; Esc frees the
-// mouse, Esc again (or H) opens the menu with the camera settings, M goes back to the map.
+// mouse, Esc again opens the pause menu (src/menu/; H the controls help with the camera settings), M goes back to the map.
 // Movement is camera-relative and the camera eases back behind the player after ~2 s of
 // walking without look input (setting). Map mode adds Ctrl/Alt-drag orbit, middle-drag tilt,
 // smooth Q/E turning and a compass (maporbit.js, hud.js).
@@ -271,6 +271,12 @@ export function initPlayer(ctx) {
     hud.toggleHelp(on);
     if (on) input.releaseLock(); // the sliders need a cursor
   }
+  // Esc / Start: close the help panel if it is up, else the pause menu (src/menu/) when there is one
+  function menuKey() {
+    if (!hud.help.hidden) toggleMenu(false);
+    else if (window.__bloxMenu) window.__bloxMenu.toggle();
+    else if (mode === 'walk') toggleMenu();
+  }
 
   let last = performance.now();
   function tick() {
@@ -281,9 +287,11 @@ export function initPlayer(ctx) {
     // the player tick runs at draw time, after the ride hook: while riding it must not touch the
     // camera (no map pan/zoom/orbit, no tween), or pinches and stray input pull it off the seat
     if (riding()) { tween = null; return; }
+    // the pause menu is open: the game stands still (Start closes it again)
+    if (window.__bloxMenu?.isOpen) { if (frame.pressed.has('menu')) menuKey(); return; }
     if (frame.pressed.has('help')) toggleMenu();
     if (mode === 'map') {
-      if (frame.pressed.has('menu')) toggleMenu(false);
+      if (frame.pressed.has('menu')) menuKey();
       if (frame.pressed.has('enter') && !tween) {
         const byKey = frame.kbHeld.has('enter') && hover; // F aims at the cursor, gamepad A at the centre
         enterAt(byKey ? screenRay(...hover) : centreRay());
@@ -291,7 +299,7 @@ export function initPlayer(ctx) {
       if (!tween) orbit.step(dt);
     } else {
       // Esc with a free mouse (the locked one only frees it) / Start: menu; M / B: map
-      if (frame.pressed.has('menu')) toggleMenu();
+      if (frame.pressed.has('menu')) menuKey();
       if (frame.pressed.has('map')) { hud.toggleHelp(false); exitWalk(); }
     }
     if (mode === 'walk' && !tween) { // scroll / pinch / LT past the farthest camera: back to the map
@@ -386,6 +394,8 @@ export function initPlayer(ctx) {
     state: () => ({ mode, pos: [...ctrl.pos], yaw: ctrl.yaw, grounded: ctrl.grounded, frozen: ctrl.frozen,
       cam: camera.position.toArray(), camDist: follow.dist, street: hud.street.textContent }),
     enterAtUnity, enterNearUnity, exitWalk, enterAt, ctrl, follow, city, orbit, input, settings, knockDown, character,
+    openCreator, closeCreator, get creatorOpen() { return creator.open; }, toggleHelp: (on) => toggleMenu(on),
+    get busy() { return !!tween; },
   };
   window.__bloxPlayer = api;
   return api;

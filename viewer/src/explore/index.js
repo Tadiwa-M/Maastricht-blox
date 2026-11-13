@@ -176,6 +176,9 @@ export async function initExplore(ctx) {
     unlocked: () => unlocked(unlocks, studCount()).map((u) => u.id),
     journal: setJournal,
     photo: setPhoto,
+    /** Landmarks in this world for the pause-menu map: { id, name, at: [x, z] Unity m, anchor (the building), found }. */
+    landmarks: () => landmarks.map((l) => ({ id: l.id, name: l.name, at: [...l.at], anchor: l.anchor ? [...l.anchor] : null, found: !!state.places[l.id] })),
+    get journalOpen() { return !!ui.journalOpen; },
   };
   return { update };
 }

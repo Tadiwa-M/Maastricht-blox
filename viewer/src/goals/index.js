@@ -336,6 +336,7 @@ export async function initGoals(ctx) {
     offerNow: () => findOne(),
     accept: () => accept(),
     drop: () => finish(false, ''),
+    setOff: (off) => setOff(off), // goal offers on/off (the pause menu)
     update(dt) {
       if ((groundT -= dt) <= 0) { groundT = 2; refreshData(); }
       const p = player();

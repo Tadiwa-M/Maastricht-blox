@@ -155,7 +155,13 @@
   html #pl-toast { top: calc(54px + var(--st)); }
   html #info { top: calc(14px + var(--st)); }
   html #hud, html #tp-panel, html #rd-open, html #rd-panel { left: calc(14px + var(--sl)); }
-  html #pl-back, html #rp-open, html #pl-compass, html #foot { right: calc(14px + var(--sr)); }
+  html #rp-open, html #pl-compass, html #foot { right: calc(14px + var(--sr)); }
+  /* the pause-menu button (src/menu/, 40 px) holds the top-right corner: the walk mode's Map
+     button and the info panel sit to its left; the goals card starts below it (60 px) */
+  html #pl-back, html #info { right: calc(62px + var(--sr)); }
+  #info[hidden] { display: none; } /* its display: grid would otherwise show an empty panel */
+  /* short landscape phones: the goals card would reach down over the right-hand button column */
+  @media (max-height: 520px) { html #gl-zone { right: calc(66px + var(--sr)); } }
   html #rd-open, html #pl-bar { bottom: calc(14px + var(--sb)); }
   html #pl-compass { bottom: calc(40px + var(--sb)); }
   html #rp-open { bottom: calc(92px + var(--sb)); }

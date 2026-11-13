@@ -259,6 +259,8 @@ async function initHooks(ctx) {
   try { out.push(await (await import('./goals/index.js')).initGoals?.(ctx)); } catch (e) { console.error('goals', e); }
   try { out.push(await (await import('./interiors/index.js')).initInteriors?.(ctx)); } catch (e) { console.error('interiors', e); }
   try { out.push(await (await import('./mp/index.js')).initMultiplayer?.(ctx)); } catch (e) { console.error('mp', e); }
+  // [menu hook] the pause menu, full-screen map and fast travel (src/menu/); last: it drives the others
+  try { out.push(await (await import('./menu/index.js')).initMenu?.(ctx)); } catch (e) { console.error('menu', e); }
   return out.filter((h) => h && typeof h === 'object');
 }
 
