@@ -14,7 +14,7 @@ export const GAIT_KEYS = ['hip0', 'hip1', 'knee0', 'knee1', 'ankle0', 'ankle1', 
   'elbow0', 'elbow1', 'lean', 'bob', 'pelvisYaw', 'chestYaw', 'pelvisRoll'];
 
 /** Brick-game exaggeration over the captured motion (1 = as captured). */
-export const FEEL = { arms: 1.25, bounce: 1.3, hips: 0.5, lean: 0.7 }; // hips: the captured twist and drop read oddly on a blocky hip piece
+export const FEEL = { arms: 1.25, bounce: 1.3, hips: 0.5, lean: 0.7, legs: [1.06, 1.22] }; // legs: thigh swing gain at a walk / a run (longer steps, calmer cadence); // hips: the captured twist and drop read oddly on a blocky hip piece
 
 const N = DATA.samples;
 const LEG = BODY.thigh + BODY.shin; // metres at scale 1
@@ -39,11 +39,59 @@ function average(a, b) {
 export const WALK = table(DATA.gaits.walk);
 export const RUN = DATA.gaits.jog ? average(table(DATA.gaits.jog), table(DATA.gaits.run)) : table(DATA.gaits.run);
 
-/** Metres per step at a speed (scale 1): interpolated between the captured gaits, extrapolated beyond. */
-export function strideAt(speed) {
+/** Metres per step at a speed (scale 1) as captured: interpolated between the gaits, extrapolated beyond. */
+export function capturedStride(speed) {
   const u = (speed - WALK.speed) / (RUN.speed - WALK.speed);
   const s = WALK.stride + (RUN.stride - WALK.stride) * u;
   return Math.max(0.45, Math.min(1.7, s));
+}
+
+// Feet that don't skate: the stride is measured on the posed legs, not assumed. While a foot is
+// on the ground it must stand still in the world, so the body has to advance exactly as fast as
+// that foot moves back under the hip. For a table of speeds, the backward travel of the
+// planted ankle per radian of phase (forward kinematics of the same angles the rig draws) gives
+// the metres per step that pin the stance foot (the median: least total slide); strideAt() interpolates it. A run's flight phase
+// needs no special case: only the planted part of the cycle is measured.
+const STRIDE_SPEEDS = [0.2, 0.45, 0.7, 1.0, 1.3, 1.7, 2.2, 2.8, 3.3, 4.0, 4.8, 5.6, 6.5];
+let STRIDES = null;
+
+function measureStride(speed) {
+  const T = BODY.thigh, S = BODY.shin, M = 64, J = {};
+  const fwd = new Float64Array(M + 1), low = new Float64Array(M + 1);
+  let floor = Infinity;
+  for (let i = 0; i <= M; i++) {
+    gaitPose((i / M) * 2 * Math.PI, speed, J);
+    const a = J.hip[0], b = a + J.knee[0];
+    fwd[i] = T * Math.sin(a) + S * Math.sin(b) + BODY.hipX * Math.sin(J.pelvisYaw); // the pelvis twist carries the hip joint
+    low[i] = J.bob - T * Math.cos(a) - S * Math.cos(b);
+    floor = Math.min(floor, low[i]);
+  }
+  let top = -Infinity;
+  for (let i = 0; i < M; i++) top = Math.max(top, low[i]);
+  const near = floor + 0.15 * (top - floor), h = M / 2; // the other foot is half a cycle away
+  const steps = []; // backward travel of the planted ankle per sample
+  for (let i = 0; i < M; i++) { // planted: the lower foot, near the ground
+    if (low[i] > near || low[i + 1] > near || low[i] > low[(i + h) % M]) continue;
+    steps.push(fwd[i] - fwd[i + 1]);
+  }
+  if (steps.length < 3) return capturedStride(speed);
+  // least total slide = the median planted speed (a mean would chase the heel strike and toe-off)
+  steps.sort((p, q) => p - q);
+  return Math.max(0.15, steps[steps.length >> 1] * (M / 2));
+}
+
+/** Metres per step at a speed (scale 1) that keep the planted foot still (see above). */
+export function strideAt(speed) {
+  if (!STRIDES) STRIDES = STRIDE_SPEEDS.map(measureStride);
+  const X = STRIDE_SPEEDS, n = X.length;
+  if (!(speed > X[0])) return STRIDES[0];
+  if (speed >= X[n - 1]) return capturedStride(speed);
+  let q = 1;
+  while (X[q] < speed) q++;
+  const pinned = STRIDES[q - 1] + (STRIDES[q] - STRIDES[q - 1]) * ((speed - X[q - 1]) / (X[q] - X[q - 1]));
+  // from a jog up the captured stride slides no more and keeps the calmer captured cadence
+  const k = Math.max(0, Math.min(1, (speed - 1.0) / 1.5));
+  return pinned + (capturedStride(speed) - pinned) * k;
 }
 
 function sample(c, f) {
@@ -61,7 +109,7 @@ export function gaitPose(phase, speed, out = {}) {
   const f = (((phase / (2 * Math.PI)) % 1) + 1) % 1 * N;
   const u = Math.max(0, Math.min(1, (speed - WALK.speed) / (RUN.speed - WALK.speed)));
   // swing amplitude: an amble below walking pace, a sprint beyond the run
-  const amp = speed < WALK.speed ? Math.max(0.35, speed / WALK.speed) : speed > RUN.speed ? 1 + Math.min(0.3, (speed - RUN.speed) * 0.12) : 1;
+  const amp = speed < WALK.speed ? Math.max(0.4, (speed / WALK.speed) ** 0.6) : speed > RUN.speed ? 1 + Math.min(0.3, (speed - RUN.speed) * 0.12) : 1;
   const val = (k) => {
     const w = sample(WALK.curves[k], f), r = sample(RUN.curves[k], f);
     const m = WALK.mean[k] + (RUN.mean[k] - WALK.mean[k]) * u;
@@ -70,6 +118,12 @@ export function gaitPose(phase, speed, out = {}) {
   for (const k of ['hip', 'knee', 'ankle', 'sh', 'abd', 'elbow']) {
     const p = out[k] || (out[k] = [0, 0]);
     p[0] = val(`${k}0`); p[1] = val(`${k}1`);
+  }
+  // longer steps: the thighs swing a little wider about their mean, more so in a run
+  const legs = FEEL.legs[0] + (FEEL.legs[1] - FEEL.legs[0]) * u;
+  for (const q of [0, 1]) {
+    const m = WALK.mean[`hip${q}`] + (RUN.mean[`hip${q}`] - WALK.mean[`hip${q}`]) * u;
+    out.hip[q] = m + (out.hip[q] - m) * legs;
   }
   // feel layer: arms swing wider (about their mean), more bounce, hips sway a touch more
   for (const q of [0, 1]) {

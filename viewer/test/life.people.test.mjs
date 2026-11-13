@@ -26,7 +26,7 @@ test('a walker waits at the kerb for a bus coming across, then walks on', () => 
   const bus = { x: k.x + dir[0] * 3, z: k.z + dir[1] * 3 - 5, yaw: 0, halfW: 1.25, halfL: 6 }; // driving north, crossing 3 m ahead
   const x0 = k.x;
   for (let i = 0; i < 10; i++) p.update(0.1, [100, 0], 120, [bus]);
-  assert.ok(Math.abs(k.x - x0) < 0.05, 'waited');
+  assert.ok(Math.abs(k.x - x0) < 0.3, 'waited (a step to come to a stop, no more)');
   for (let i = 0; i < 10; i++) p.update(0.1, [100, 0], 120, []); // the bus has gone
   assert.ok(Math.abs(k.x - x0) > 0.5, 'walks on');
 });
@@ -46,4 +46,45 @@ test('narrow pavement: a group falls into single file, and nobody stands on a ro
     assert.ok(Math.abs(m.z) < 0.6, `in the lane: z ${m.z.toFixed(2)}`);
     assert.equal(m.y, 0, 'on the street, not the roof');
   }
+});
+
+test('giving way never goes into a wall: the shift is cut to the room there is', () => {
+  const room = (x, z) => z > -0.9; // a facade 0.9 m south of the path
+  const p = new Pedestrians({ graph: street(), ground: () => 0, room, cap: 1, seed: 3 });
+  p.setCount(1, [100, 0]);
+  const g = p.groups[0], k = g.walker;
+  k.baseLateral = k.lateral = k.lateralGoal = 0; k.place();
+  const toWall = k.dirX > 0 ? 1 : -1; // right of an eastbound walker is south
+  k.shift = 1.6 * toWall; k.lateralGoal = k.shift;
+  p.fitShift(g, 0.1);
+  assert.ok(Math.abs(k.lateralGoal) < 0.6, `kept off the wall: ${k.lateralGoal}`);
+  k.shift = -1.6 * toWall; k.lateralGoal = k.shift;
+  p.fitShift(g, 0.1);
+  assert.equal(k.lateralGoal, k.shift, 'the open side is free to use');
+});
+
+test('drawn people: stopping eases walk into stand, they do something while standing, heads turn to the player', () => {
+  const p = new Pedestrians({ graph: street(), ground: () => 0, cap: 1, seed: 3 });
+  p.setCount(1, [100, 0]);
+  const g = p.groups[0], k = g.walker;
+  g.nextPause = 1e9;
+  const poses = [];
+  const crowd = { add: (v, pose) => poses.push(pose) };
+  for (let q = 0; q < 10; q++) { p.update(0.05, [100, 0], 120, []); p.draw(crowd); }
+  assert.ok(poses.at(-1).blend === undefined && poses.at(-1).mode === 0, 'walking: the plain walk');
+  const sp = poses.at(-1).speed;
+  g.pause = 6;
+  const blends = [];
+  for (let q = 0; q < 40; q++) { p.update(0.05, [100, 0], 120, []); p.draw(crowd); blends.push(poses.at(-1).blend ?? (poses.at(-1).mode === 0 ? 1 : 0)); }
+  assert.ok(blends.some((b) => b > 0.1 && b < 0.9), 'eased through a blend');
+  assert.equal(blends.at(-1), 0);
+  for (let q = 1; q < blends.length; q++) assert.ok(blends[q] <= blends[q - 1] + 1e-9 && blends[q - 1] - blends[q] < 0.4, 'no snap');
+  assert.ok(g.members.every((m) => m.act !== null && m.act !== undefined), 'picked something to do');
+  // the player walks by on the left: a curious person's head follows
+  g.members[0].u = 0.1;
+  const left = { x: k.x - k.dirZ * 2 + k.dirX * 2, z: k.z + k.dirX * 2 + k.dirZ * 2 };
+  let turned = 0;
+  for (let q = 0; q < 200; q++) { p.react({ x: left.x, z: left.z, vx: 0, vz: 0, running: false, events: [] }, 0.05); p.update(0.05, [100, 0], 120, []); p.draw(crowd); turned = Math.max(turned, poses.at(-1).look); }
+  assert.ok(turned > 0.4, `head turned to the player: ${turned}`);
+  assert.ok(sp > 0.5);
 });

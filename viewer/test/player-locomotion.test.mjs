@@ -10,11 +10,11 @@ const run = (l, s, want, speed) => { for (let t = 0; t < s; t += DT) l.update(DT
 test('speeds up and slows down with eased acceleration and braking', () => {
   const l = new Locomotion();
   run(l, 0.1, 0, 4);
-  assert.ok(l.speed > 0.4 && l.speed < 1.0, `after 0.1 s: ${l.speed}`);
+  assert.ok(l.speed > 0.8 && l.speed < 1.4, `after 0.1 s: ${l.speed}`);
   run(l, 1, 0, 4);
   assert.ok(Math.abs(l.speed - 4) < 1e-6);
   run(l, 0.2, null, 0);
-  assert.ok(l.speed > 1.5 && l.speed < 2.5, `braking: ${l.speed}`); // 10 m/s² for 0.2 s
+  assert.ok(l.speed > 0.8 && l.speed < 1.6, `braking: ${l.speed}`); // 14 m/s² for 0.2 s
   run(l, 1, null, 0);
   assert.equal(l.speed, 0);
 });
@@ -62,7 +62,7 @@ test('velocity always points along the heading (no sideways slide)', () => {
 test('in the air there is little grip; walls cut the speed', () => {
   const l = new Locomotion();
   for (let t = 0; t < 0.3; t += DT) l.update(DT, 0, 4, 0.25);
-  assert.ok(l.speed < 0.6, `air: ${l.speed}`);
+  assert.ok(l.speed < 0.9, `air: ${l.speed}`);
   run(l, 1, 0, 4);
   l.blocked(1.2);
   assert.equal(l.speed, 1.2);

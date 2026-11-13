@@ -33,7 +33,9 @@ export const BINDINGS = {
     triggerDeadzone: 0.08,
   },
   // rad per px (mouse/touch, x settings.mouseSens) / rad per s (keys); sticks: look.js StickLook
-  look: { mouse: 0.003, touch: 0.006, keys: 1.8 },
+  look: { mouse: 0.003, touch: 0.0052, touchPitch: 0.7, keys: 1.8 }, // touchPitch: share of the vertical drag used (thumbs wobble)
+  // touch stick: dead zone (share of the stick radius), run when pushed past `run`, ease out below `walk`
+  touch: { deadzone: 0.14, run: 0.82, smooth: 0.6 }, // smooth: share of a look drag applied per 60 Hz frame
   zoom: { wheel: 0.004, triggers: 8, keys: 6 }, // m per wheel unit / m per s
 };
 
@@ -113,10 +115,11 @@ export function combine({ kb, pads = [], touch = null, mouse = null, dt, prevHel
   look[0] += sx; look[1] += sy;
   const pointer = { sens: settings.mouseSens, invertY: settings.invertY };
   if (touch) {
-    const m = Math.hypot(...touch.move);
-    if (m > Math.hypot(...move)) { move = touch.move; analog = Math.min(1, m); padRun = m > 0.92; }
+    const raw = Math.hypot(...touch.move), T = b.touch || { deadzone: 0, run: 0.92 };
+    const tm = deadzone(touch.move[0], touch.move[1], T.deadzone), m = Math.hypot(...tm);
+    if (m > Math.hypot(...move)) { move = tm; analog = Math.min(1, m); padRun = raw > T.run; }
     const [tx, ty] = mouseLook(touch.look[0], touch.look[1], { base: b.look.touch, ...pointer });
-    look[0] += tx; look[1] += ty;
+    look[0] += tx; look[1] += ty * (b.look.touchPitch ?? 1);
     zoom += (touch.zoom || 0) * 0.02;
   }
   if (mouse) {
@@ -131,6 +134,19 @@ export function combine({ kb, pads = [], touch = null, mouse = null, dt, prevHel
   const run = held.has('run') || padRun;
   return { move, speed01: Math.min(1, analog), run, look, lookInput: Math.hypot(...look) > 1e-6, zoom, held,
     kbHeld: kb.held, pressed: pressedEdges(prevHeld, held) };
+}
+
+/**
+ * Touch look drags arrive in uneven bursts (a finger event is not a frame): keep what came in
+ * `pending` ([dx, dy] px, mutated) and hand out a frame-rate independent share of it, so the
+ * turn is even and nothing is lost (the whole drag is applied within a few frames).
+ */
+export function smoothTouchLook(pending, add, dt, share = BINDINGS.touch.smooth) {
+  pending[0] += add[0]; pending[1] += add[1];
+  const k = dt > 0 ? 1 - (1 - share) ** (dt * 60) : 1;
+  const out = [pending[0] * k, pending[1] * k];
+  for (const q of [0, 1]) { if (Math.abs(pending[q] - out[q]) < 0.25) out[q] = pending[q]; pending[q] -= out[q]; }
+  return out;
 }
 
 /** Speed in m/s for a frame: keyboard walk/run; analog sticks scale the walk speed, full tilt runs. */
@@ -153,6 +169,7 @@ export class Input {
     this.mouse = { look: [0, 0], wheel: 0 };
     this.prevHeld = new Set();
     this.touch = touch || null; // object with .read() -> { move, look, zoom }
+    this.touchLook = [0, 0]; // look drag (px) not yet applied (smoothTouchLook)
     this.lookActive = false; // mouse look (walk mode only)
     this.locked = false; this.lockedAt = 0; this.unlockedAt = -1e9;
     this.padNames = new Map();
@@ -212,10 +229,17 @@ export class Input {
     return list.filter((p) => p.mapping === 'standard' || p.axes.length >= 4);
   }
 
+  /** Touch state with the look drag spread over a few frames (smoothTouchLook). */
+  readTouch(dt) {
+    const t = this.touch?.read();
+    if (!t) return null;
+    return { ...t, look: smoothTouchLook(this.touchLook, t.look, dt) };
+  }
+
   /** One frame of input (consumes accumulated mouse/touch deltas). */
   poll(dt) {
     const frame = combine({
-      kb: readKeys(new Set([...this.codes, ...this.taps])), pads: this.pads().map((p) => readPad(p)), touch: this.touch?.read() || null,
+      kb: readKeys(new Set([...this.codes, ...this.taps])), pads: this.pads().map((p) => readPad(p)), touch: this.readTouch(dt),
       mouse: this.mouse, dt, prevHeld: this.prevHeld, settings: this.settings, stick: this.stick,
     });
     this.prevHeld = frame.held;

@@ -10,16 +10,19 @@
 // pullIn() marches a few parallel rays from the focus toward it through city.isSolid (centre +
 // 4 offsets, i.e. a small box around the near plane) and stops short of the first solid
 // sample, so walls between player and camera pull the camera in instead of being clipped.
-// Unknown (unloaded) space does not block the camera. Pulling in is instant, easing back out
-// is smooth (no popping when a wall passes).
-import { PITCH, clamp, wrapAngle, applyLook, smoothDamp, smoothDampAngle, recenterYaw } from './look.js';
+// Unknown (unloaded) space does not block the camera. Thin things (lamp posts, trunks, signs:
+// a solid run under `thin` metres with free space on both sides) are looked past, so walking by a pole does not punch the
+// camera in and out. Pulling in is quick but eased (pullRate), and the camera waits a moment
+// (outHold) before easing back out, so a wall passing by never pops the view.
+import { PITCH, clamp, wrapAngle, applyLook, smoothDamp, smoothDampAngle, recenterYaw, approach } from './look.js';
 
 export const CAM = {
   minDist: 1.2, maxDist: 14, dist: 5, pitch: 0.22, minPitch: PITCH.min, maxPitch: PITCH.max, margin: 0.3, focusY: 1.6,
   turnTime: 0.05, zoomTime: 0.14, // smoothDamp times (s): rotation, distance
   // God of War style: the player sits left of centre (camera over the right shoulder), the
   // camera trails the body a little, and pulls back and widens when sprinting
-  shoulder: 0.5, followTime: 0.09, sprintFrom: 3.0, sprintBack: 0.9, fov: 55, sprintFov: 7,
+  shoulder: 0.5, followTime: 0.09, sprintFrom: 3.0, sprintBack: 1.1, fov: 55, sprintFov: 9,
+  pullRate: 30, outHold: 0.3, outTime: 0.35, thin: 0.55, // collision pull-in (1/s), wait and ease back out (s), posts ignored (m)
 };
 
 /**
@@ -46,7 +49,7 @@ export function backDir(yaw, pitch) {
  * Largest free distance <= want along dir from focus. city.isSolid: three.js metres.
  * Returns the distance the camera may sit at (>= 0.2).
  */
-export function pullIn(city, focus, dir, want, { margin = CAM.margin, step = 0.1, spread = 0.18 } = {}) {
+export function pullIn(city, focus, dir, want, { margin = CAM.margin, step = 0.1, spread = 0.18, thin = 0 } = {}) {
   // perpendicular offsets: horizontal right and the "up" of the view
   const right = [dir[2], 0, -dir[0]];
   const rl = Math.hypot(right[0], right[2]) || 1;
@@ -58,7 +61,16 @@ export function pullIn(city, focus, dir, want, { margin = CAM.margin, step = 0.1
   for (const o of offs) {
     for (let t = step; t <= free + margin; t += step) {
       const x = focus[0] + o[0] + dir[0] * t, y = focus[1] + o[1] + dir[1] * t, z = focus[2] + o[2] + dir[2] * t;
-      if (city.isSolid(x, y, z) === true) { free = Math.min(free, t - margin); break; }
+      if (city.isSolid(x, y, z) !== true) continue;
+      if (thin > 0 && t + thin + margin < free) { // a post? look past it unless the camera would sit in it
+        let end = t + step;
+        while (end <= t + thin + 1e-9 && city.isSolid(focus[0] + o[0] + dir[0] * end, focus[1] + o[1] + dir[1] * end, focus[2] + o[2] + dir[2] * end) === true) end += step;
+        const mid = (t + end - step) / 2, px = focus[0] + o[0] + dir[0] * mid, py = focus[1] + o[1] + dir[1] * mid, pz = focus[2] + o[2] + dir[2] * mid;
+        // thin along the view and free on both sides: a post, not a thin wall
+        if (end <= t + thin + 1e-9 && city.isSolid(px + right[0] * 0.6, py, pz + right[2] * 0.6) !== true
+          && city.isSolid(px - right[0] * 0.6, py, pz - right[2] * 0.6) !== true) { t = end; continue; }
+      }
+      free = Math.min(free, t - margin); break;
     }
   }
   return Math.max(0.2, free);
@@ -74,6 +86,7 @@ export class FollowCamera {
     this.side = this.o.shoulder; // shoulder offset after wall checks
     this.trail = null; this.vtrail = [0, 0, 0]; // lagging follow point
     this.sprint = 0; this.fov = this.o.fov;
+    this.held = 0; this.vdist = 0; // s since the view was last blocked; ease-out velocity
     this.aspect = 16 / 9; // screen width / height (index.js keeps it current)
   }
 
@@ -120,8 +133,13 @@ export class FollowCamera {
     this.side += (side - this.side) * (side < this.side ? 1 : Math.min(1, dt * 4));
     const focus = [head[0] + right[0] * this.side, head[1], head[2] + right[2] * this.side];
     const dir = backDir(this._yaw, this._pitch);
-    const free = pullIn(city, focus, dir, this._want + o.sprintBack * this.sprint);
-    this.dist = free < this.dist ? free : this.dist + (free - this.dist) * Math.min(1, dt * 4);
+    const free = pullIn(city, focus, dir, this._want + o.sprintBack * this.sprint, { thin: o.thin });
+    if (free < this.dist - 1e-3) { // blocked: in quickly (eased over a few frames, not a jump cut)
+      this.dist += (free - this.dist) * (dt >= 0.5 ? 1 : approach(o.pullRate, dt));
+      this.held = 0; this.vdist = 0;
+    } else if ((this.held += dt) >= o.outHold || dt >= 0.5) { // clear for a moment: ease back out
+      [this.dist, this.vdist] = dt >= 0.5 ? [free, 0] : smoothDamp(this.dist, free, this.vdist, o.outTime, dt);
+    }
     const position = [0, 1, 2].map((k) => focus[k] + dir[k] * this.dist);
     return { focus, position, fov: this.fov };
   }

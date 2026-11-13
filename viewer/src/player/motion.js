@@ -23,7 +23,7 @@ export class MotionState {
   constructor() {
     this.speed = 0; this.phase = 0; this.t = 0;
     this.lean = 0; this.bank = 0; this.look = 0; this.air = 0; this.dip = 0;
-    this.wasGrounded = true; this.fallSpeed = 0; this.idle = 0;
+    this.wasGrounded = true; this.fallSpeed = 0; this.idle = 0; this.rise = 0; this.turn = 0;
   }
 
   /**
@@ -33,12 +33,26 @@ export class MotionState {
   update(dt, s, scale = 1) {
     this.t += dt;
     this.speed = smooth(this.speed, s.speed, 10, dt);
-    this.phase += (s.travelled / (strideAt(this.speed) * scale)) * Math.PI;
+    // feet follow the ground: the stride of the speed actually moved at (not the smoothed one, or
+    // the feet would skate through every start and stop)
+    const inst = dt > 0 ? s.travelled / dt : this.speed;
+    if (s.grounded) this.phase += (s.travelled / (strideAt(Math.max(inst, 0.2)) * scale)) * Math.PI;
+    else this.phase += dt * 2.2 * (1 - this.air); // in the air the legs coast into the jump pose
+    // turning on the spot: small shuffling steps instead of a statue rotating
+    const turning = s.grounded && s.speed < 0.4 ? smoothstep(1.2, 4, Math.abs(s.angVel)) : 0;
+    this.turn = smooth(this.turn, turning, turning > this.turn ? 14 : 6, dt);
+    this.phase += this.turn * Math.abs(s.angVel) * dt * 1.1;
+    // stopping: come to rest where the feet pass each other (the pose nearest to standing), so
+    // the fade to the idle pose is a small settle and not a leg swinging home from mid-stride
+    if (s.grounded && s.speed < 0.25 && this.turn < 0.05 && this.speed > 0.02 && this.speed < 0.6) {
+      const half = Math.PI, rest = Math.round(this.phase / half) * half;
+      this.phase = smooth(this.phase, rest, 9, dt);
+    }
     // lean: forward into acceleration, back when braking hard (the captured run already leans)
     const wantLean = clamp(s.accel * 0.025, -0.12, 0.16);
     this.lean = smooth(this.lean, wantLean, 8, dt);
     // bank into turns: centripetal acceleration v * omega, capped (rotY is -yaw, so roll the other way)
-    const wantBank = clamp(-(this.speed * s.angVel) * 0.022, -0.22, 0.22);
+    const wantBank = clamp(-(this.speed * s.angVel) * 0.03, -0.26, 0.26);
     this.bank = smooth(this.bank, wantBank, 7, dt);
     // standing still for a while: the head looks around now and then (an idle fidget)
     this.idle = s.speed < 0.1 && s.grounded ? this.idle + dt : 0;
@@ -46,15 +60,16 @@ export class MotionState {
     this.look = smooth(this.look, clamp(s.steer || 0, -0.7, 0.7) * 0.6 + fidget, 6, dt);
     // airborne and landing
     if (!s.grounded) this.fallSpeed = Math.max(this.fallSpeed, -s.vy);
+    this.rise = smooth(this.rise, s.grounded ? 0 : clamp(s.vy / 3, -1, 1), 12, dt);
     const wantAir = s.grounded ? 0 : 1;
-    this.air = smooth(this.air, wantAir, s.grounded ? 14 : 8, dt);
+    this.air = smooth(this.air, wantAir, s.grounded ? 14 : 16, dt);
     if (s.grounded && !this.wasGrounded) this.dip = clamp(this.fallSpeed / 7, 0.15, 1); // harder fall, deeper dip
     if (s.grounded) this.fallSpeed = 0;
-    this.dip = smooth(this.dip, 0, 6, dt);
+    this.dip = smooth(this.dip, 0, this.speed > 2 ? 11 : 6.5, dt); // a running landing rolls straight on
     this.wasGrounded = s.grounded;
     return {
       mode: MODE.WALK, phase: this.phase, speed: Math.max(this.speed, 0.6), t: this.t,
-      blend: smoothstep(0.05, 0.9, this.speed), lean: this.lean, bank: this.bank, look: this.look,
+      blend: Math.max(smoothstep(0.05, 0.9, this.speed), 0.45 * this.turn), rise: this.rise, lean: this.lean, bank: this.bank, look: this.look,
       air: this.air, dip: this.dip,
     };
   }

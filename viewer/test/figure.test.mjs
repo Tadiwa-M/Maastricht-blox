@@ -117,3 +117,23 @@ test('draw calls and triangles: 1000 instanced figures (two LODs) + bikes + cars
   const c = new THREE.Color(v.colours.top);
   assert.deepEqual([...top.c.slice(0, 3)].map((x) => +x.toFixed(4)), [c.r, c.g, c.b].map((x) => +x.toFixed(4)));
 });
+
+test('standing activities: phone, talking, looking around and hands on hips are distinct poses that ease in', async () => {
+  const { jointAngles, MODE, IDLE } = await import('../src/figure/rig.js');
+  const { makeVariant } = await import('../src/figure/variants.js');
+  const v = makeVariant(11, { kind: 'adult' });
+  const at = (idle, idleK = 1, t = 3) => jointAngles(v, { mode: MODE.IDLE, t, idle, idleK }, {});
+  const plain = at(IDLE.NONE), phone = at(IDLE.PHONE), hips = at(IDLE.HIPS);
+  assert.ok(phone.elbow[1] > 1.5 && phone.headPitch < plain.headPitch - 0.2, 'phone: forearm up, head down');
+  assert.ok(hips.abd[0] > 0.4 && hips.elbow[0] > 1.2, 'hands on hips: elbows out');
+  const half = at(IDLE.PHONE, 0.5);
+  assert.ok(half.elbow[1] > plain.elbow[1] + 0.3 && half.elbow[1] < phone.elbow[1] - 0.3, 'eases in');
+  let talk = 0, look = 0;
+  for (let t = 0; t < 20; t += 0.1) { talk = Math.max(talk, at(IDLE.TALK, 1, t).elbow[1]); look = Math.max(look, Math.abs(at(IDLE.LOOK, 1, t).headYaw)); }
+  assert.ok(talk > 1.2, `talking hands come up: ${talk}`);
+  assert.ok(look > 0.6, `looking around turns the head: ${look}`);
+  // standing shifts the weight, but stays subtle (no swaying statue, no dancing)
+  let roll = 0;
+  for (let t = 0; t < 20; t += 0.1) roll = Math.max(roll, Math.abs(at(IDLE.NONE, 1, t).pelvisRoll));
+  assert.ok(roll > 0.02 && roll < 0.06);
+});

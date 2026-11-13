@@ -27,6 +27,7 @@ export class Character {
     else {
       this.variant = makeVariant(seed, { kind: 'adult' });
       this.variant.acc = this.variant.acc === 'bag' ? 'none' : this.variant.acc;
+      delete this.variant.gait; // the player walks the plain captured gait (crowd people each have a style)
     }
     this.crowd = new FigureCrowd(1, { lod: false });
     this.group = new THREE.Group(); // position + yaw live in the instance matrices; the group just holds the meshes

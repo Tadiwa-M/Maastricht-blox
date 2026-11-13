@@ -125,3 +125,63 @@ test('walkers step out of a bus footprint to the nearer side', async () => {
   clearVehicles([east], [{ ...bus, yaw: 90 }]);
   assert.ok(Math.abs(east.z - 2.05) < 1e-9 && Math.abs(east.x - 2) < 1e-9);
 });
+
+test('anticipatory steering: oncoming people start curving 4-5 m apart, each gives half, on a steady side', async () => {
+  const { steer, separate, STEER } = await import('../src/life/walkgraph.js');
+  const mk = (x, z, dx, dz, o = {}) => ({ x, z, dirX: dx, dirZ: dz, speed: 1.3, baseLateral: 0, lateral: 0, lateralGoal: 0, slow: 1, ...o });
+  const a = mk(0, 0, 1, 0), b = mk(4.5, 0, -1, 0);
+  steer([a, b]);
+  assert.ok(a.lateralGoal > 0.1 && b.lateralGoal > 0.1, 'dead ahead: both keep right, early');
+  const { avoid } = await import('../src/life/walkgraph.js');
+  const a0 = mk(0, 0, 1, 0), b0 = mk(4.5, 0, -1, 0);
+  avoid([a0, b0]);
+  assert.equal(a0.lateralGoal, 0, '(the old loose avoidance saw nothing yet at that range)');
+  // walk two people through each other's line: no contact, no wavering, slow sideways motion
+  const P = [mk(0, 0, 1, 0), mk(12, 0.25, -1, 0)];
+  let minD = 9, maxLat = 0, flips = 0;
+  const lastSign = [0, 0];
+  for (let t = 0; t < 9; t += 0.05) {
+    steer(P);
+    P.forEach((w, q) => {
+      const s = Math.sign(w.shift);
+      if (s && lastSign[q] && s !== lastSign[q]) flips++;
+      if (s) lastSign[q] = s;
+      const l0 = w.lateral;
+      w.lateral += (w.lateralGoal - w.lateral) * Math.min(1, 0.05 * 1.5);
+      maxLat = Math.max(maxLat, Math.abs(w.lateral - l0) / 0.05);
+      // right of the heading: (dirZ, -dirX)
+      w.x += w.dirX * w.speed * 0.05; w.z = (q === 0 ? 0 : 0.25) - w.dirX * w.lateral;
+    });
+    minD = Math.min(minD, Math.hypot(P[0].x - P[1].x, P[0].z - P[1].z));
+  }
+  assert.equal(flips, 0, 'never changes its mind about the side');
+  assert.ok(minD > 0.55, `passed with room without separate(): ${minD}`);
+  assert.ok(maxLat < 0.7, `an easy curve, not a side-step: ${maxLat} m/s sideways`);
+  // someone standing is walked round on the nearer side; someone slower ahead is overtaken
+  const w = mk(0, 0, 1, 0), s = mk(3, 0.2, 1, 0, { stopped: true });
+  steer([w, s]);
+  assert.ok(w.lateralGoal > 0.3, 'round the standing person on the free side');
+  const fast = mk(0, 0, 1, 0, { speed: 1.6 }), slowOne = mk(2, -0.1, 1, 0, { speed: 0.8 });
+  steer([fast, slowOne]);
+  assert.ok(fast.lateralGoal < -0.3 && slowOne.lateralGoal === 0, 'overtakes; the one in front walks on');
+  assert.ok(STEER.ahead >= 4);
+  void separate;
+});
+
+test('people change pace over a few steps (Walker ease), bikes at once', () => {
+  const g = new WalkGraph({ nodes: [0, 0, 100, 0, 200, 0], edges: [0, 1, 1, 2], weights: [1, 1, 1] });
+  const w = new Walker(g, 0, rng(1), { speed: 1.4, ease: true });
+  const d1 = w.step(0.1);
+  assert.ok(d1 > 0 && d1 < 0.05, `sets off gently: ${d1}`);
+  for (let q = 0; q < 10; q++) w.step(0.1);
+  assert.ok(Math.abs(w.pace - 1) < 1e-9);
+  w.slow = 0.2;
+  const d2 = w.step(0.1);
+  assert.ok(d2 > 0.03 && d2 < 0.14 && w.pace > 0.3, `slows over a few frames: ${d2}`);
+  for (let q = 0; q < 3; q++) w.step(0.1);
+  assert.ok(Math.abs(w.pace - 0.2) < 1e-9);
+  w.slow = 0; w.step(0.1); // someone right in front: stops at once
+  assert.equal(w.pace, 0);
+  const bike = new Walker(g, 0, rng(1), { speed: 4 });
+  assert.ok(Math.abs(bike.step(0.1) - 0.4) < 1e-9);
+});

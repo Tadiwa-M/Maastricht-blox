@@ -110,7 +110,7 @@ test('rain: people keep to the wall and shelter there; dry again, they spread ou
   p.update(0.1, [100, 0], 120, []);
   assert.ok(g.pause > 8 && g.shelter !== null, 'waits it out');
   const rot = [];
-  for (let q = 0; q < 5; q++) p.draw({ add: (v, pose) => rot.push(pose.rotY) }); // (turning takes a moment)
+  for (let q = 0; q < 15; q++) { p.update(0.1, [100, 0], 120, []); p.draw({ add: (v, pose) => rot.push(pose.rotY) }); } // (stopping and turning take a moment)
   assert.ok(Math.cos(rot[rot.length - 1]) > 0.95, 'facing the street (north), back to the wall');
   g.pause = 0; g.nextPause = 1e9;
   p.setRain(0);

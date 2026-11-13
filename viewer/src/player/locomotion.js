@@ -14,15 +14,15 @@
 import { angleDelta } from './look.js';
 
 export const LOCO = {
-  accel: 7.0, // m/s² speeding up
-  brake: 10.0, // m/s² slowing down
-  pivotBrake: 16.0, // m/s² while planting for a pivot
+  accel: 11.0, // m/s² speeding up (walking pace in ~0.14 s, a sprint in under half a second)
+  brake: 14.0, // m/s² slowing down
+  pivotBrake: 22.0, // m/s² while planting for a pivot
   turnStill: 14.0, // rad/s turning on the spot
   turnWalk: 9.0, // rad/s at walking pace
-  turnSprint: 3.2, // rad/s at sprint pace
+  turnSprint: 4.2, // rad/s at sprint pace
   sprint: 5.2, // m/s: the pace turnSprint applies to
   pivotAngle: 2.3, // rad (~130 deg): a reversal this sharp at speed plants and pivots
-  pivotMinSpeed: 2.4, // m/s: slower than this just turns
+  pivotMinSpeed: 3.0, // m/s: slower than this just turns
   pivotDone: 0.7, // m/s: the pivot turns once braked below this
   sharpTurnCost: 0.55, // share of the speed kept in a 90 deg turn
 };

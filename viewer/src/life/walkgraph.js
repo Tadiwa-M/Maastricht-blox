@@ -100,13 +100,18 @@ export class WalkGraph {
   }
 }
 
+const PACE_UP = 1.8, PACE_DOWN = 6; // 1/s: walking pace reached in ~0.55 s, a stop takes ~0.17 s
+
 const bez = (p0, p1, p2, u) => (1 - u) * (1 - u) * p0 + 2 * u * (1 - u) * p1 + u * u * p2;
 const bezD = (p0, p1, p2, u) => 2 * (1 - u) * (p1 - p0) + 2 * u * (p2 - p1);
 
 /** One walker on the graph: edge a -> b at distance s, prev node p, next node c. */
 export class Walker {
-  constructor(graph, start, rand, { speed = 1.3, lateral = 0, corner = CORNER_M } = {}) {
+  constructor(graph, start, rand, { speed = 1.3, lateral = 0, corner = CORNER_M, ease = false } = {}) {
     Object.assign(this, { g: graph, rand, speed, lateral, lateralGoal: lateral, slow: 1, corner });
+    // ease: people don't change pace in one frame. pace (0..1) follows slow with a limited rate
+    // (quicker to brake than to set off); without it (bikes) pace is slow itself.
+    this.ease = ease; this.pace = ease ? 0 : 1;
     this.p = -1;
     this.a = start;
     this.b = graph.pickNext(-1, start, rand);
@@ -123,7 +128,10 @@ export class Walker {
 
   /** Advance dt seconds. Returns metres travelled. */
   step(dt) {
-    const g = this.g, move = this.speed * this.slow * dt;
+    // (someone right in front, slow <= 0.15: an emergency stop, a few frames)
+    if (this.ease) this.pace += Math.max(-(this.slow <= 0.15 ? 3 * PACE_DOWN : PACE_DOWN) * dt, Math.min(PACE_UP * dt, this.slow - this.pace));
+    else this.pace = this.slow;
+    const g = this.g, move = this.speed * this.pace * dt;
     this.s += move;
     let L = g.dist(this.a, this.b);
     let guard = 0;
@@ -134,7 +142,7 @@ export class Walker {
       L = g.dist(this.a, this.b);
       if (L === 0) { this.s = 0; break; }
     }
-    this.lateral += (this.lateralGoal - this.lateral) * Math.min(1, dt * 1.5);
+    if (!this.stopped) this.lateral += (this.lateralGoal - this.lateral) * Math.min(1, dt * 1.5); // (standing people don't slide)
     this.place();
     return move;
   }
@@ -222,6 +230,82 @@ export function avoid(walkers, radius = 1.1) {
       }
     }
     w.lateralGoal = side ? Math.min(2.5, (w.baseLateral ?? 0) + 0.9 + (w.hw || 0)) : w.baseLateral ?? w.lateralGoal;
+  }
+}
+
+/** How pedestrians read each other (steer()). Metres, seconds. */
+export const STEER = {
+  ahead: 6, // an oncoming or standing group is noticed this far ahead
+  ramp: 1.5, // m over which the reaction builds up once noticed (no step in the path)
+  pass: 1.0, // clear gap between two people passing (centre to centre, before group widths)
+  near: 1.5, // closer than this behind someone going the same way: match their pace
+  overtake: 2.6, // a slower group this close ahead is passed
+  maxShift: 2.2, // most a group moves off its line for others
+  maxLateral: 2.5,
+};
+
+/**
+ * Anticipatory avoidance for people: each walker looks STEER.ahead metres down its line and
+ * starts easing sideways as soon as someone is on a collision course, instead of side-stepping
+ * at arm's length. Oncoming groups each give half the room and pass on the side they are already
+ * on (dead ahead: both keep right, as people do); standing groups are walked round on the nearer
+ * side; someone slower in front is overtaken on the free side, or followed at their pace when
+ * close. The shift grows as the other comes nearer, so the path is one smooth curve. Sets
+ * w.lateralGoal and w.slow (Walker eases both). O(n) with a grid; separate() still guarantees
+ * personal space afterwards.
+ */
+export function steer(walkers, o = STEER) {
+  const wide = walkers.reduce((m, w) => Math.max(m, w.hw || 0), 0);
+  const cell = o.ahead + 2 * wide, grid = new Map();
+  const k = (i, j) => i * 73856093 ^ j * 19349663;
+  for (const w of walkers) {
+    w.slow = 1;
+    // where the walker would be without giving way (its own line): reading each other's lines, not
+    // the places already moved to, keeps the answer steady while they pass (no wavering)
+    const off = w.stopped ? 0 : (w.lateral ?? 0) - (w.baseLateral ?? w.lateral ?? 0);
+    w.lx = w.x - (w.dirZ ?? 1) * off; w.lz = w.z + (w.dirX ?? 0) * off;
+    const key = k(Math.floor(w.x / cell), Math.floor(w.z / cell));
+    if (!grid.has(key)) grid.set(key, []);
+    grid.get(key).push(w);
+  }
+  for (const w of walkers) {
+    const i0 = Math.floor(w.x / cell), j0 = Math.floor(w.z / cell), fx = w.dirX ?? 0, fz = w.dirZ ?? 1;
+    let shift = 0, urgent = 0;
+    for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) {
+      for (const p of grid.get(k(i, j)) || []) {
+        if (p === w) continue;
+        const dx = p.x - w.x, dz = p.z - w.z;
+        const ahead = dx * fx + dz * fz;
+        if (ahead < 0.2 || ahead > o.ahead) continue;
+        const side = (p.lx - w.lx) * fz - (p.lz - w.lz) * fx; // + : the other's line is to my right
+        const need = o.pass + (w.hw || 0) + (p.hw || 0), miss = Math.abs(side);
+        if (miss >= need) continue;
+        const same = (p.dirX ?? 0) * fx + (p.dirZ ?? 1) * fz, d = Math.hypot(dx, dz);
+        const R = o.near + (w.hw || 0) + (p.hw || 0);
+        let want = 0, weight = 0;
+        if (p.stopped) { // standing: all the room is mine to make, round the nearer side
+          want = (side > 0 ? -1 : 1) * (need - miss + 0.1);
+          weight = Math.min(1, (o.ahead - ahead) / o.ramp);
+          if (d < R) w.slow = Math.min(w.slow, Math.max(0, (d - 0.7) / R));
+        } else if (same < -0.3) { // oncoming: half each, on the side we are already on; dead ahead: keep right
+          want = (miss < 0.12 ? 1 : side > 0 ? -1 : 1) * ((need - miss) / 2 + 0.1);
+          weight = Math.min(1, (o.ahead - ahead) / o.ramp);
+        } else if (same > 0.5) { // same way: pass someone slower, else fall in behind at their pace
+          const slower = (p.speed ?? 1) < (w.speed ?? 1) - 0.12;
+          if (slower && ahead < o.overtake + (w.hw || 0) + (p.hw || 0)) { want = (side > 0 ? -1 : 1) * (need - miss + 0.1); weight = 1; }
+          if (d < R) w.slow = Math.min(w.slow, Math.max(d < R * 0.5 ? 0 : 0.3, (d / R) * Math.min(1, (p.speed ?? 1) / (w.speed || 1))));
+        } else if (d < R) { // crossing close: ease off and pass behind them
+          w.slow = Math.min(w.slow, 0.55);
+          want = (side > 0 ? -1 : 1) * 0.6; weight = 0.9;
+        }
+        const rank = weight / ahead; // the nearest claim on my path decides
+        if (rank > urgent && want) { urgent = rank; shift = want * weight; }
+      }
+    }
+    const base = w.baseLateral ?? 0;
+    shift = Math.max(-o.maxShift, Math.min(o.maxShift, shift));
+    w.shift = shift; // (Pedestrians checks the room for it: never into a wall)
+    w.lateralGoal = Math.max(-o.maxLateral, Math.min(o.maxLateral, base + shift));
   }
 }
 

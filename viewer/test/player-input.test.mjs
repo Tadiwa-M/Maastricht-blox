@@ -1,7 +1,7 @@
 // Player input layer (src/player/input.js): deadzones, key/gamepad mapping, edges, speeds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BINDINGS, deadzone, readKeys, readPad, pressedEdges, combine, frameSpeed, lockDelta } from '../src/player/input.js';
+import { BINDINGS, deadzone, readKeys, readPad, pressedEdges, combine, frameSpeed, lockDelta, smoothTouchLook } from '../src/player/input.js';
 import { StickLook } from '../src/player/look.js';
 import { SETTINGS_DEFAULTS } from '../src/player/settings.js';
 
@@ -86,7 +86,7 @@ test('look settings: mouse sensitivity scales, invert Y flips mouse/touch, pad h
   const m = combine({ kb: readKeys(new Set()), mouse: { look: [10, 10], wheel: 0 }, dt: 0.016, settings: s });
   near(m.look[0], 10 * BINDINGS.look.mouse * 2); near(m.look[1], -10 * BINDINGS.look.mouse * 2);
   const t = combine({ kb: readKeys(new Set()), touch: { move: [0, 0], look: [0, 10] }, dt: 0.016, settings: s });
-  near(t.look[1], -10 * BINDINGS.look.touch * 2);
+  near(t.look[1], -10 * BINDINGS.look.touch * BINDINGS.look.touchPitch * 2);
   const base = combine({ kb: readKeys(new Set()), pads: [readPad(pad([0, 0, 0, 1]))], dt: 0.1 });
   const p = combine({ kb: readKeys(new Set()), pads: [readPad(pad([0, 0, 0, 1]))], dt: 0.1, settings: s });
   assert.ok(base.look[1] > 0, 'stick down looks down by default');
@@ -113,4 +113,21 @@ test('pointer deltas are consumed once: a frame uses exactly what was accumulate
   const b = combine({ kb: readKeys(new Set()), mouse: { look: [0, 0], wheel: 0 }, dt: 0.016 });
   near(a.look[0], 30 * BINDINGS.look.mouse);
   assert.equal(b.look[0], 0);
+});
+
+test('touch stick: dead zone, rescaled walk, run only when pushed right out; look drags are spread, never lost', () => {
+  const kb = readKeys(new Set());
+  const f = (move) => combine({ kb, touch: { move, look: [0, 0] }, dt: 0.016 });
+  assert.deepEqual(f([0.1, 0.05]).move, [0, 0]); // a resting thumb does not creep
+  const half = f([0, 0.5]);
+  assert.ok(half.move[1] > 0.35 && half.move[1] < 0.5 && !half.run);
+  assert.ok(!f([0, 0.78]).run && f([0, 0.9]).run);
+  const pending = [0, 0];
+  let got = 0, first = 0;
+  for (let q = 0; q < 12; q++) { const [dx] = smoothTouchLook(pending, q === 0 ? [30, 0] : [0, 0], 1 / 60); got += dx; if (q === 0) first = dx; }
+  assert.ok(first > 12 && first < 24, `first frame takes a share: ${first}`);
+  near(got, 30); // all of it arrives
+  const slow = [0, 0];
+  const [big] = smoothTouchLook(slow, [30, 0], 0.1); // at 10 fps nearly everything at once (no lag)
+  assert.ok(big > 29);
 });

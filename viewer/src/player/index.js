@@ -68,7 +68,8 @@ export function initPlayer(ctx) {
   }
   const zoomExit = new ZoomOutExit();
   let mode = 'map', tween = null, mapView = null, jumpQueued = false, hover = null, streetT = 0;
-  let padCount = 0, lookIdle = 0;
+  let padCount = 0, lookIdle = 0, jumpKey = false;
+  const drawFeet = [0, 0, 0];
   const focusVec = new THREE.Vector3(), smoothFeet = [0, 0, 0];
   const settings = loadSettings();
 
@@ -311,10 +312,12 @@ export function initPlayer(ctx) {
         follow.recenter(ctrl.yaw, { idle: lookIdle, moving, moveAngle: Math.atan2(frame.move[0], frame.move[1]), dt });
       }
       const jump = jumpQueued || frame.pressed.has('jump');
+      if (frame.pressed.has('jump')) jumpKey = true; else if (jumpQueued) jumpKey = false; // a tap jump is always a full one
+      const jumpHeld = !jumpKey || frame.held.has('jump');
       jumpQueued = false;
       const speed = frameSpeed(frame, ctrl.o.walk, ctrl.o.run);
       const frozen = tween || creator.open || scatter;
-      const res = frozen ? ctrl.update(dt, {}, follow.yaw) : ctrl.update(dt, { move: frame.move, speed, jump }, follow.yaw);
+      const res = frozen ? ctrl.update(dt, {}, follow.yaw) : ctrl.update(dt, { move: frame.move, speed, jump, jumpHeld }, follow.yaw);
       const L = ctrl.loco;
       if (!tween && !scatter) {
         // vehicles: pushed aside by a slow one, knocked flying by a moving one (three.js z = -north)
@@ -325,7 +328,7 @@ export function initPlayer(ctx) {
         else if (hit?.knock) { knockDown([hit.knock[0], hit.knock[1], -hit.knock[2]]); hud.toast('Ouch!'); }
         // a big fall: more than ~3.4 m (landing faster than 11 m/s)
         if (!ctrl.grounded) airMinVy = Math.min(airMinVy, ctrl.vel[1]);
-        if (!scatter && ctrl.grounded && !wasGrounded && airMinVy < -11) knockDown([0, 2, 0]);
+        if (!scatter && ctrl.grounded && !wasGrounded && airMinVy < -14) knockDown([0, 2, 0]);
         if (ctrl.grounded) airMinVy = 0;
       }
       wasGrounded = ctrl.grounded;
@@ -333,14 +336,18 @@ export function initPlayer(ctx) {
         character.drawParts(scatter.update(dt, scatter.gathering ? character.partsAt(ctrl.pos, ctrl.yaw) : null));
         if (scatter.done && ctrl.grounded) { scatter = null; airMinVy = 0; }
       } else {
-        character.update(ctrl.pos, ctrl.yaw, res.speed, res.travelled, dt,
+        drawFeet[0] = ctrl.pos[0]; drawFeet[1] = ctrl.visualY; drawFeet[2] = ctrl.pos[2]; // eased over kerbs and stairs
+        character.update(drawFeet, ctrl.yaw, res.speed, res.travelled, dt,
           { angVel: L.angVel, accel: L.accel, steer: L.steer, grounded: ctrl.grounded, vy: ctrl.vel[1] });
       }
       // smooth the followed height (step-ups and landings), keep x/z exact
       smoothFeet[0] = ctrl.pos[0]; smoothFeet[2] = ctrl.pos[2];
       // the map's orbit point walks along: clip planes, shadows and haze are measured from it
       controls.target.set(ctrl.pos[0], ctrl.pos[1], ctrl.pos[2]);
-      smoothFeet[1] += (ctrl.pos[1] - smoothFeet[1]) * Math.min(1, dt * 10);
+      // the camera rides steps and stairs smoothly and lets a jump play out in frame (slower in the air),
+      // but never falls far behind a long drop
+      smoothFeet[1] += (ctrl.pos[1] - smoothFeet[1]) * (1 - Math.exp(-dt * (ctrl.grounded ? 11 : 4.5)));
+      smoothFeet[1] = Math.max(ctrl.pos[1] - 1.1, Math.min(ctrl.pos[1] + 1.1, smoothFeet[1]));
       follow.aspect = camera.aspect; // portrait phones: wider view, less shoulder offset
       if (!tween) {
         const { focus, position, fov } = follow.update(city, smoothFeet, dt, res.speed);

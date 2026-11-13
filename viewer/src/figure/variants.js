@@ -39,7 +39,7 @@ const hex = (i) => PALETTE_HEX[i];
 /**
  * A variant from a seed. opts.kind forces 'adult' | 'kid' | 'older'. Returns
  * { seed, kind, scale, width, headScale, hair, top, acc, colours: { skin, hair, top, bottom, shoe, hat, acc },
- *   speed (m/s walking), stoop (rad) }.
+ *   speed (m/s walking), stoop (rad), gait: { arms, bounce, roll } (walking style multipliers) }.
  */
 export function makeVariant(seed, opts = {}) {
   let h = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35) ^ (h >>> 16); // scramble: neighbouring seeds look unrelated
@@ -77,6 +77,12 @@ export function makeVariant(seed, opts = {}) {
     },
   };
   if (['cap', 'beanie', 'hat'].includes(hair)) v.colours.hairTint = v.colours.hat;
+  // their own way of walking (rig.js): how far the arms swing, how springy the step, how much the
+  // shoulders roll. Kids bounce, older people keep it small. Drawn last: looks stay as they were.
+  const a = r(), b = r(), c = r();
+  v.gait = kind === 'kid' ? { arms: 1.05 + a * 0.4, bounce: 1.15 + b * 0.35, roll: 0.9 + c * 0.5 }
+    : kind === 'older' ? { arms: 0.55 + a * 0.35, bounce: 0.7 + b * 0.2, roll: 0.6 + c * 0.4 }
+      : { arms: 0.7 + a * 0.6, bounce: 0.85 + b * 0.35, roll: 0.7 + c * 0.6 };
   return v;
 }
 

@@ -66,3 +66,43 @@ test('the head stays nearly level: side sway within a real walker\'s 3-6 cm (the
     assert.ok(hi - lo < 0.06, `speed ${speed}: head sways ${((hi - lo) * 100).toFixed(1)} cm`);
   }
 });
+
+// planted-foot slide (m slid per m walked) with the full rig, for a stride function
+function slide(speed, strideFn, v = makeVariant(52, { kind: 'adult' })) {
+  delete v.gait;
+  const M = 96, stride = strideFn(speed) * v.scale, f = [[], []];
+  for (let i = 0; i <= M; i++) {
+    let q = 0;
+    poseFigure(v, { x: 0, y: 0, z: 0, rotY: 0, mode: MODE.WALK, phase: (i / M) * TAU, speed, t: 0 }, (k, m) => {
+      if (k === 'shoe') f[q++].push([m[13], m[14] - (i / M) * 2 * stride]);
+    });
+  }
+  let slid = 0;
+  for (const q of [0, 1]) {
+    const lo = Math.min(...f[q].map((a) => a[0])), hi = Math.max(...f[q].map((a) => a[0]));
+    for (let i = 0; i < M; i++) if (f[q][i][0] < lo + 0.15 * (hi - lo) && f[q][i][0] <= f[1 - q][i][0]) slid += Math.abs(f[q][i + 1][1] - f[q][i][1]);
+  }
+  return slid / (2 * stride);
+}
+
+test('feet do not skate: the stride is measured on the posed legs, slow walks included', () => {
+  for (const s of [0.5, 0.8, 1.4, 2.5, 4, 5]) assert.ok(slide(s, strideAt) < 0.25, `slide at ${s} m/s: ${slide(s, strideAt)}`);
+  // an amble with a walking-pace stride would skate half the way
+  assert.ok(slide(0.5, () => 0.6) > slide(0.5, strideAt) * 1.4);
+  // steps per second stay human from an amble to a sprint
+  for (const [s, lo, hi] of [[0.5, 1, 2], [1.4, 1.7, 2.4], [5, 3, 4.6]]) {
+    const rate = s / strideAt(s);
+    assert.ok(rate > lo && rate < hi, `${s} m/s: ${rate} steps/s`);
+  }
+  let prev = 0;
+  for (let s = 0.2; s < 7; s += 0.1) { assert.ok(strideAt(s) >= prev - 1e-9, `monotonic at ${s}`); prev = strideAt(s); }
+});
+
+test('everyone walks their own way: arm swing and bounce differ by person, kids bounce, older people keep it small', () => {
+  const swing = (v) => { let lo = 9, hi = -9; for (let i = 0; i < 32; i++) { const J = jointAngles(v, { mode: MODE.WALK, phase: (i / 32) * TAU, speed: 1.3 }); lo = Math.min(lo, J.sh[0]); hi = Math.max(hi, J.sh[0]); } return hi - lo; };
+  const adults = Array.from({ length: 30 }, (_, q) => makeVariant(q * 31 + 7, { kind: 'adult' })).filter((v) => v.acc !== 'bag');
+  const sw = adults.map(swing);
+  assert.ok(Math.max(...sw) > Math.min(...sw) * 1.4, `arm swing spread ${Math.min(...sw)}..${Math.max(...sw)}`);
+  const kid = makeVariant(5, { kind: 'kid' }), old = makeVariant(5, { kind: 'older' });
+  assert.ok(kid.gait.bounce > old.gait.bounce && kid.gait.arms > old.gait.arms);
+});

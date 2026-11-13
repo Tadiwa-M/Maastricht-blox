@@ -1583,3 +1583,21 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   the walking player, and the orbit point walks along with the player.
 - Checked headless on Low: Markt -> 400 m to the Vrijthof without touching the map: 49 people
   within 60 m (before: the crowd stayed at the Markt).
+
+## 2026-11-12: movement feel and crowd behaviour
+
+- Player: faster acceleration and braking (running pace in ~0.45 s), walk/run 1.5/5.0 m/s,
+  sharper sprint turning; a jump with a real arc (stronger fall gravity), short hops when the key
+  is released early, coyote time (0.12 s) and jump buffering (0.14 s); kerbs and stairs step at
+  once but the drawn height eases.
+- Camera: looks past thin posts (lamp posts, trunks) instead of punching in; eased pull-in, a
+  short hold before easing back out; height follows quickly on the ground, slowly in the air.
+- Touch: 14 % stick dead zone, run past 82 %, smoothed look drags, gentler vertical look.
+- Animation: no foot sliding (stride measured from the posed legs), short steps at slow pace,
+  turn-on-the-spot shuffles, a jump pose that follows the arc, faster recovery from a running
+  landing, breathing and weight shifts when standing, idle activities (phone, talk, look round,
+  hands on hips), a walking style per person.
+- Crowd: anticipatory steering (`steer()`: groups read each other's lines 6 m ahead, pass on
+  their side, walk round people standing, overtake or follow), never shifting into a wall,
+  eased starts and stops, heads turning to friends, to what the group looks at and to the player.
+  Guide 09.

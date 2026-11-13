@@ -10,6 +10,8 @@ import { gaitPose } from './gait.js';
 export const TRUNK_ROLL = 0.15;
 
 export const MODE = { WALK: 0, IDLE: 1, SIT: 2, CYCLE: 3, BROWSE: 4 };
+/** What a standing figure does (pose.idle; pose.idleK 0..1 eases it in): crowds pick one per stop. */
+export const IDLE = { NONE: 0, PHONE: 1, TALK: 2, LOOK: 3, HIPS: 4 };
 export const SEAT_H = 0.46; // chair seat height (m)
 export const SADDLE = { h: 0.93, back: 0.17, bbH: 0.3, crank: 0.17 }; // bike: saddle height, saddle behind the bottom bracket
 
@@ -42,16 +44,28 @@ export function jointAngles(v, pose, out = {}) {
     const speed = (pose.speed ?? 1.2) * (v.kind === 'older' ? 0.8 : 1);
     gaitPose(pose.phase || 0, speed, out);
     out.lean += v.stoop;
+    const g = v.gait;
+    if (g) { // each person's own way of walking (variants.js): arm swing, bounce, shoulder roll
+      const mid = (out.sh[0] + out.sh[1]) / 2;
+      out.sh[0] = mid + (out.sh[0] - mid) * g.arms; out.sh[1] = mid + (out.sh[1] - mid) * g.arms;
+      out.bob *= g.bounce; out.chestYaw *= g.roll;
+    }
+    if (v.acc === 'bag') { out.sh[1] *= 0.3; out.elbow[1] = 0.1; } // the hand with the bag hangs
   } else if (mode === MODE.IDLE || mode === MODE.BROWSE) {
-    const sway = Math.sin(t * 1.1 + seed);
-    out.bob = 0.004 * Math.sin(t * 2.2 + seed);
+    // standing: breathing, the weight shifting slowly from one leg to the other, the head wandering
+    const sway = Math.sin(t * 1.1 + seed), shift = Math.sin(t * 0.43 + seed * 1.7);
+    const breath = Math.sin(t * 1.7 + seed);
+    out.bob = 0.004 * breath - 0.006 * Math.abs(shift);
+    out.pelvisRoll = 0.035 * shift;
+    out.lean += 0.012 * breath;
     set2(out, 'hip', 0.03 * sway, -0.03 * sway);
+    set2(out, 'knee', -0.04 - 0.1 * Math.max(0, -shift), -0.04 - 0.1 * Math.max(0, shift)); // the free leg's knee gives
     set2(out, 'sh', 0.04 * Math.sin(t * 1.3 + seed), 0.04 * Math.sin(t * 1.3 + seed + 2));
     out.headYaw += 0.25 * Math.sin(t * 0.37 + seed);
     if (mode === MODE.BROWSE) {
       set2(out, 'sh', 0.38 + 0.08 * sway, 0.3 - 0.06 * sway); set2(out, 'elbow', 0.95, 1.05); set2(out, 'abd', 0.12, 0.12);
       out.headPitch -= 0.25; out.lean += 0.06;
-    }
+    } else if (pose.idle) idleAct(pose.idle, pose.idleK ?? 1, t + seed * 3, out);
   } else if (mode === MODE.SIT) {
     out.pelvisY = SEAT_H / s + 0.075;
     set2(out, 'hip', 1.5, 1.5); set2(out, 'knee', -1.48, -1.48); set2(out, 'ankle', 0, 0);
@@ -75,6 +89,32 @@ export function jointAngles(v, pose, out = {}) {
   return out;
 }
 
+const mix = (a, b, k) => a + (b - a) * k;
+
+/** Standing activities (IDLE): k 0..1 eases the pose in over the plain idle; t: the person's own clock. */
+function idleAct(kind, k, t, out) {
+  if (kind === IDLE.PHONE) { // reading a phone in the right hand; a thumb scroll and a glance up now and then
+    const up = Math.max(0, Math.sin(t * 0.21)) ** 8;
+    out.sh[1] = mix(out.sh[1], 0.5, k); out.elbow[1] = mix(out.elbow[1], 1.75 + 0.05 * Math.sin(t * 2.3), k);
+    out.abd[1] = mix(out.abd[1], -0.08, k);
+    out.headPitch -= 0.42 * k * (1 - up); out.headYaw *= 1 - k * (1 - up);
+  } else if (kind === IDLE.TALK) { // telling something: the hands come up in bursts, the head nods along
+    const burst = Math.max(0, Math.sin(t * 0.9)) ** 2, beat = Math.sin(t * 5.2);
+    out.sh[1] = mix(out.sh[1], 0.35 + 0.12 * beat, k * burst); out.elbow[1] = mix(out.elbow[1], 1.5 + 0.25 * beat, k * burst);
+    out.sh[0] = mix(out.sh[0], 0.2 - 0.08 * beat, k * burst * 0.6); out.elbow[0] = mix(out.elbow[0], 1.1, k * burst * 0.6);
+    out.abd[1] += 0.12 * k * burst;
+    out.headPitch += 0.07 * k * Math.sin(t * 2.6) * burst; out.headYaw *= 1 - 0.7 * k;
+  } else if (kind === IDLE.LOOK) { // looking around: long slow sweeps with holds, a little from the shoulders
+    const a = Math.sin(t * 0.33) + 0.5 * Math.sin(t * 0.71 + 1);
+    const sweep = Math.max(-1, Math.min(1, a * 1.6)); // holds at the ends
+    out.headYaw += 0.6 * k * sweep; out.chestYaw += 0.15 * k * sweep;
+    out.headPitch += 0.1 * k * Math.max(0, Math.sin(t * 0.17));
+  } else if (kind === IDLE.HIPS) { // hands on the hips, waiting
+    for (let q = 0; q < 2; q++) { out.sh[q] = mix(out.sh[q], -0.25, k); out.abd[q] = mix(out.abd[q], 0.55, k); out.elbow[q] = mix(out.elbow[q], 1.45, k); }
+    out.headYaw *= 1 + 0.6 * k;
+  }
+}
+
 const IDLE_J = {};
 const PAIRS = ['hip', 'knee', 'ankle', 'sh', 'abd', 'elbow'];
 
@@ -90,16 +130,21 @@ function motion(v, pose, out) {
     const idle = jointAngles(v, { ...pose, mode: MODE.IDLE, blend: undefined, air: 0, dip: 0, lean: 0 }, IDLE_J);
     const b = Math.max(0, pose.blend);
     for (const k of PAIRS) for (let q = 0; q < 2; q++) out[k][q] = idle[k][q] + (out[k][q] - idle[k][q]) * b;
-    for (const k of ['bob', 'lean', 'headPitch', 'pelvisYaw', 'chestYaw', 'pelvisRoll']) out[k] = idle[k] + (out[k] - idle[k]) * b;
+    for (const k of ['bob', 'lean', 'headPitch', 'headYaw', 'pelvisYaw', 'chestYaw', 'pelvisRoll']) out[k] = idle[k] + (out[k] - idle[k]) * b;
   }
   if (pose.lean) out.lean += pose.lean;
   const a = Math.min(1, Math.max(0, pose.air || 0));
-  if (a) { // knees up, arms out for balance
-    out.hip[0] += 0.55 * a; out.hip[1] += 0.25 * a;
-    out.knee[0] -= 0.95 * a; out.knee[1] -= 0.6 * a;
-    out.ankle[0] += 0.3 * a; out.ankle[1] += 0.2 * a;
-    out.abd[0] += 0.45 * a; out.abd[1] += 0.45 * a;
-    out.sh[0] += 0.3 * a; out.sh[1] += 0.3 * a;
+  if (a) {
+    // pose.rise 1 (going up) .. -1 (coming down): push-off with one knee driving and the arms
+    // thrown up, then the legs reach for the ground and the arms spread for balance
+    const r = Math.min(1, Math.max(-1, pose.rise ?? 0)), up = Math.max(0, r), dn = Math.max(0, -r);
+    out.hip[0] += (0.75 * up + 0.35 * dn + 0.3 * (1 - up - dn)) * a; out.hip[1] += (-0.2 * up + 0.3 * dn + 0.2 * (1 - up - dn)) * a;
+    out.knee[0] -= (1.15 * up + 0.4 * dn + 0.8 * (1 - up - dn)) * a; out.knee[1] -= (0.35 * up + 0.3 * dn + 0.5 * (1 - up - dn)) * a;
+    out.ankle[0] += 0.3 * a; out.ankle[1] += (0.2 - 0.5 * up) * a; // the trailing foot points on the push-off
+    const spread = 0.3 + 0.35 * dn + 0.15 * up;
+    out.abd[0] += spread * a; out.abd[1] += spread * a;
+    out.sh[0] += (0.9 * up + 0.15 * dn + 0.3 * (1 - up - dn)) * a; out.sh[1] += (0.9 * up + 0.15 * dn + 0.3 * (1 - up - dn)) * a;
+    out.lean += (0.1 * up - 0.06 * dn) * a;
   }
   const d = Math.min(1, Math.max(0, pose.dip || 0));
   if (d) { // absorb a landing: hips drop, knees bend, chest leans in

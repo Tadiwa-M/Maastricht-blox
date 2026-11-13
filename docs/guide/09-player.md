@@ -296,3 +296,82 @@ tap one and ride along as a passenger, looking around and out of the windows.
   boards. Re-run `blox life` to get v2.
 
 Phase R2 (live positions and delays) is next; see PLAN.md.
+
+## Movement feel and crowd behaviour (2026-11-12)
+
+What changed in how moving feels, and where each number lives.
+
+### Player body (`controller.js`, `locomotion.js`)
+
+| Thing | Value | Where |
+| --- | --- | --- |
+| Walk / run | 1.5 / 5.0 m/s (was 1.4 / 4.0) | `DEFAULTS.walk`, `.run` |
+| Speeding up / braking | 11 / 14 m/s² (was 7 / 10): running pace in ~0.45 s | `LOCO.accel`, `.brake` |
+| Turn rate at a sprint | 4.2 rad/s (was 3.2) | `LOCO.turnSprint` |
+| Jump | 5.4 m/s up, gravity 20 rising / 30 falling: ~0.73 m apex, ~0.6 s in the air | `jumpSpeed`, `gravity`, `fallGravity` |
+| Short hop | letting go of the key early keeps 45 % of the upward speed | `jumpCut`, `update({ jumpHeld })` |
+| Coyote time | a jump still counts 0.12 s after walking off an edge | `coyote` |
+| Jump buffer | a press up to 0.14 s before landing jumps on landing | `jumpBuffer` |
+| Kerbs and stairs | the collision body still steps at once; the *drawn* height (`ctrl.visualY`) eases behind it | `stepEase`, `stepLag` |
+
+`ctrl.jumped` is true in the step a jump starts (for a sound or an effect). A touch jump is
+always a full jump (a tap has no "held"). The knock-down from a long fall keeps its old height
+(the threshold speed moved with the stronger fall gravity).
+
+### Camera (`camera.js`)
+
+- **Posts are looked past.** A solid run shorter than `CAM.thin` (0.55 m: one stud) with free
+  space on both sides is a lamp post, a trunk or a sign, not a wall; the pull-in ray continues
+  through it. Walking past a pole no longer punches the camera in and out. A thin *wall* (solid
+  to either side) still blocks.
+- **Pull-in is eased, not a jump cut** (`pullRate` 30/s: there in about five frames), and after
+  the view clears the camera **waits `outHold` 0.3 s, then eases out** (`outTime`).
+- Height follows the feet quickly on the ground (kerbs, stairs) and slowly in the air, so a jump
+  plays out in frame instead of the camera bouncing with it; never more than 1.1 m behind.
+- A sprint pulls back 1.1 m and widens the view by 9 degrees.
+
+### Touch (`input.js`)
+
+`BINDINGS.touch`: the stick has a 14 % dead zone (a resting thumb does not creep) and runs past
+82 % of its radius (was 92 %, hard to hold). Look drags are spread over a few frames
+(`smoothTouchLook`: nothing is lost, the turn is even), turn 0.0052 rad per pixel, and the
+vertical part counts 70 % (thumbs wobble up and down while swiping sideways).
+
+### Figure animation (`motion.js`, `figure/rig.js`, `figure/gait.js`)
+
+- **Feet that don't skate.** `strideAt(speed)` is measured on the posed legs: while a foot is
+  planted the body must advance exactly as fast as that ankle moves back under the hip, so the
+  stride is the median planted-ankle speed (forward kinematics of the angles the rig draws),
+  blended into the captured stride from a jog up. The phase advances by distance at the stride
+  of the speed *actually* moved at, so starts and stops don't slide either. Slow walks take
+  short steps (amplitude `(v / walk)^0.6`) at a human cadence (1.4 steps/s at 0.5 m/s).
+- Thighs swing a little wider (`FEEL.legs`), which lengthens the step.
+- Turning on the spot shuffles the feet; stopping settles where the feet pass each other.
+- Jump pose follows the arc (`pose.rise`): knee drive and arms up going up, legs reaching and
+  arms out coming down. A landing at a run recovers almost twice as fast as a standing one.
+- Standing: breathing, the weight shifting from leg to leg with the free knee giving.
+- `IDLE` activities for anyone standing (`pose.idle`, eased by `pose.idleK`): `PHONE`, `TALK`,
+  `LOOK`, `HIPS`.
+- Every person has a walking style (`variant.gait`: arm swing, bounce, shoulder roll); kids
+  bounce, older people keep it small, a hand carrying a bag hangs. The player's figure walks the
+  plain captured gait.
+
+### Crowd (`life/walkers.js`, `life/walkgraph.js`)
+
+- **`steer()` replaces the last-moment side-step.** Each group looks `STEER.ahead` (6 m) down its
+  line. Oncoming groups each give half the room and pass on the side they are already on (dead
+  ahead: both keep right); standing groups are walked round on the nearer side; someone slower
+  is overtaken, or followed at their pace when close. The answer is read from each other's
+  *lines* (where they would walk without giving way), so it does not waver while they pass.
+  `separate()` still guarantees personal space afterwards. Bikes keep the old `avoid()`.
+- **Never into a wall:** `Pedestrians.fitShift` probes the room on the side a group wants to
+  move to and halves the shift until it fits; with no room the group eases off instead.
+- **Pace eases** (`Walker` option `ease`): people reach walking pace in ~0.55 s and stop in
+  ~0.17 s, a kerb stop twice as firmly, instead of switching in one frame.
+- Drawing: the walk and the standing pose blend, each person's stride matches the pace walked,
+  people pick something to do per stop (`pickAct`), friends drift a little ahead and behind each
+  other, and heads turn (`headTarget`) to what the group looks at, to the player passing within
+  6 m (about two in three people, a glance at a time) and to the friend alongside.
+
+Cost: `steer()` is one grid pass like `avoid()` was (a 6 m cell instead of 1.1 m); the walk/stand
+blend poses a figure twice only during the half second of a start or stop.

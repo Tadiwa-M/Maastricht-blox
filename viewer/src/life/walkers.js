@@ -7,9 +7,18 @@
 // daily routines, routines.js). Some groups head somewhere (a goal from routines.js goalPlan:
 // students to the university in the morning, commuters to the station). In the rain people keep
 // to the walls and shelter there; they react to the player (reactions.js, react()).
-import { MODE } from '../figure/rig.js';
+//
+// People should behave like people: they see each other coming and curve round early
+// (walkgraph.js steer), never give way into a wall (fitShift), change pace over a few steps
+// rather than in one frame (Walker ease), walk with their own stride and arm swing (variants.js
+// gait, the stride matched to the speed so feet don't skate), ease between walking and standing,
+// do something when they stand (phone, telling a story, looking around: rig.js IDLE), keep a
+// loose formation with their friends, and turn their heads to what is going on: the player
+// passing, the friend beside them, whatever made a noise.
+import { MODE, IDLE } from '../figure/rig.js';
+import { strideAt } from '../figure/gait.js';
 import { makeVariant } from '../figure/variants.js';
-import { Walker, avoid, separate, rng, turnToward } from './walkgraph.js';
+import { Walker, steer, separate, rng, turnToward } from './walkgraph.js';
 import { crowdFactor as dayCrowd, FIGURES_BY_TIER } from './density.js';
 import { pickGoal } from './routines.js';
 import { REACT, dodgeSide, yawTo } from './reactions.js';
@@ -21,7 +30,8 @@ export const crowdFactor = (hours, day = 2) => Math.min(1, dayCrowd(hours, day))
 const GROUP_SIZES = [[1, 0.5], [2, 0.34], [3, 0.12], [4, 0.04]];
 const SIDE = 0.62; // metres between people walking side by side
 const FILE = 0.75; // metres between people walking one behind the other (narrow pavements)
-const STRIDE = 0.78; // metres per step at scale 1
+const NOTICE_M = 6; // the player this close gets a glance from some people
+const HEAD_MAX = 1.15; // rad the head turns from the body
 const LOOK_M = 2.5; // a walker checks this far ahead for a vehicle coming across
 const VEHICLE_AHEAD_M = 7; // a vehicle's path ahead that people don't step into
 const WAIT_MAX_S = 8; // after that they go anyway (a parked car in the way)
@@ -114,7 +124,8 @@ export class Pedestrians {
       speed = Math.min(speed, v.speed);
     }
     const lateral = (r() - 0.5) * 1.4;
-    const walker = new Walker(this.graph, n, r, { speed, lateral });
+    const walker = new Walker(this.graph, n, r, { speed, lateral, ease: true });
+    walker.pace = 1; // met already walking
     walker.baseLateral = lateral;
     const goal = this.plan ? pickGoal(this.plan, r(), r()) : null;
     if (goal) walker.goal = goal; // (same pace: brisker groups only pile up behind slower ones)
@@ -159,7 +170,8 @@ export class Pedestrians {
     this.dt = dt;
     const active = this.groups.slice(0, this.active ?? 0);
     const ws = active.map((g) => g.walker);
-    avoid(ws);
+    steer(ws); // see each other coming: curve round early
+    for (const g of active) this.fitShift(g, dt); // ...but never into a wall
     separate(ws); // personal space: never through another group
     const r = this.rand;
     for (const g of active) {
@@ -171,9 +183,10 @@ export class Pedestrians {
       const ax = k.x + (k.dirX ?? 0) * LOOK_M, az = k.z + (k.dirZ ?? 1) * LOOK_M;
       if (g.pause <= 0 && vehicles.length && g.wait < WAIT_MAX_S && vehicles.some((f) => inVehiclePath(f, ax, az) && !inVehiclePath(f, k.x, k.z, 0, 0.3))) {
         g.wait += dt;
-        g.travelled = 0;
         k.stopped = true;
-        k.place();
+        k.slow = 0;
+        k.pace = Math.max(0, k.pace - 6 * dt); // a kerb stop is a firm one (twice the usual braking)
+        g.travelled = k.step(dt);
         clearVehicles([k], vehicles, g.size > 1 ? 1.9 : 0.9);
         continue;
       }
@@ -181,8 +194,8 @@ export class Pedestrians {
       if (g.wait > 0) g.wait = Math.max(0, g.wait - dt * 0.5);
       if (g.pause > 0) {
         g.pause -= dt;
-        g.travelled = 0;
-        k.place();
+        k.slow = 0;
+        g.travelled = k.step(dt);
       } else {
         g.nextPause -= dt;
         if (g.nextPause <= 0) { // stop for a chat / to look around, then walk on
@@ -221,6 +234,34 @@ export class Pedestrians {
     else if (g.wall) { g.wall = 0; g.walker.baseLateral = g.dryLateral ?? g.walker.baseLateral; }
     g.file += (g.fileGoal - g.file) * Math.min(1, dt * 2.5);
     g.walker.hw = ((g.size - 1) / 2) * SIDE * (1 - g.file);
+  }
+
+  /**
+   * Giving way must not walk anyone into a wall: where the side a group wants to move to (steer's
+   * w.shift) has no room, the shift is halved until it fits, and with no room at all the group
+   * eases off and lets the other pass. Checked a few times a second, only for groups giving way.
+   */
+  fitShift(g, dt) {
+    const k = g.walker, sh = k.shift || 0;
+    if (Math.abs(sh) < 0.2) { g.shiftCap = null; return; }
+    const sign = Math.sign(sh), base = k.baseLateral ?? 0;
+    g.shiftT = (g.shiftT ?? 0) - dt;
+    if (g.shiftT <= 0 || g.shiftCap == null || sign !== g.shiftSign) {
+      g.shiftT = 0.25; g.shiftSign = sign;
+      const rx = k.dirZ ?? 1, rz = -(k.dirX ?? 0), y = g.y ?? this.ground(k.x, k.z);
+      let cap = Math.abs(sh);
+      for (let q = 0; q < 3; q++) {
+        const reach = base + sign * cap - k.lateral + sign * ((k.hw || 0) + 0.3);
+        const px = k.x + rx * reach, pz = k.z + rz * reach, gy = this.ground(px, pz);
+        if (this.room(px, pz, y) && Number.isFinite(gy) && Math.abs(gy - y) < 0.5) break; // room, and the same street level (not a stoop or a roof)
+        cap = q === 2 ? 0 : cap * 0.5;
+      }
+      g.shiftCap = cap;
+    }
+    if (Math.abs(sh) > g.shiftCap) {
+      k.lateralGoal = Math.max(-2.5, Math.min(2.5, base + sign * g.shiftCap));
+      if (g.shiftCap < 0.2) k.slow = Math.min(k.slow, 0.5);
+    }
   }
 
   /**
@@ -275,6 +316,7 @@ export class Pedestrians {
    * reach, through squared distances.
    */
   react(seen, dt) {
+    this.player = seen ? [seen.x, seen.z] : null; // heads turn to the player passing (draw)
     if (!seen) return;
     const n = this.active ?? 0, o = REACT;
     for (const ev of seen.events) {
@@ -310,7 +352,12 @@ export class Pedestrians {
   /** Where member m stands: side by side (file 0) .. one behind the other (file 1). */
   memberAt(g, m, file = g.file, fileTo = file) {
     const k = g.walker, fx = k.dirX ?? 0, fz = k.dirZ ?? 1, rx = fz, rz = -fx;
-    const rank = g.members.indexOf(m), side = m.off * (1 - fileTo), back = m.back + rank * FILE * file;
+    const rank = g.members.indexOf(m);
+    let side = m.off * (1 - fileTo), back = m.back + rank * FILE * file;
+    if (g.size > 1) { // a loose formation: friends drift a little ahead and behind each other
+      const t = this.t, u = m.u ?? 0.5;
+      back += 0.14 * Math.sin(t * 0.21 + u * 40) * (1 - file);
+    }
     return { x: k.x + rx * side - fx * back, z: k.z + rz * side - fz * back };
   }
 
@@ -320,22 +367,66 @@ export class Pedestrians {
     return Number.isFinite(y) && y - base <= 1.2 ? y : base;
   }
 
+  /** What member m does while the group stands (rig.js IDLE): picked once per stop. */
+  pickAct(g, m) {
+    if (g.look) return IDLE.NONE; // watching something
+    if (g.wait > 0) return IDLE.LOOK; // at the kerb: looking for a gap
+    const u = m.u ?? 0.5, hands = m.v.acc !== 'umbrella' && m.v.acc !== 'bag' && m.v.kind !== 'kid';
+    m.acts = (m.acts || 0) + 1;
+    const h = (u * 97.13 + m.acts * 0.618) % 1;
+    if (g.size > 1 && g.chat && g.shelter == null) return h < 0.7 ? IDLE.TALK : hands && h < 0.85 ? IDLE.HIPS : IDLE.NONE;
+    return hands && h < 0.4 ? IDLE.PHONE : h < 0.75 ? IDLE.LOOK : hands && h < 0.87 ? IDLE.HIPS : IDLE.NONE;
+  }
+
+  /**
+   * Where member m's head turns (rad from the body, + = to the left as the rig's headYaw): to what
+   * the group is looking at, to the player passing close (some people, a glance at a time), or
+   * to the friend walking beside them now and then. Things behind are not looked at.
+   */
+  headTarget(g, m, x, z, walking, t) {
+    const u = m.u ?? 0.5;
+    let at = g.look;
+    if (!at && this.player && u < 0.65 && ((t * 0.22 + u * 7) % 1) < 0.5) {
+      const dx = this.player[0] - x, dz = this.player[1] - z;
+      if (dx * dx + dz * dz < NOTICE_M * NOTICE_M) at = this.player;
+    }
+    if (at) {
+      const d = ((yawTo(x, z, at[0], at[1]) - m.yaw + 540) % 360) - 180;
+      if (Math.abs(d) < 115) return Math.max(-HEAD_MAX, Math.min(HEAD_MAX, (-d * Math.PI) / 180));
+    }
+    if (walking && g.size > 1 && m.off !== 0 && ((t * 0.13 + u * 3) % 1) < 0.3) return Math.sign(m.off) * 0.5; // to the friend alongside
+    return 0;
+  }
+
   /** Add every visible person to the crowd (FigureCrowd). Ground from this.ground. */
   draw(crowd) {
-    const t = this.t;
+    const t = this.t, dt = Math.max(this.dt || 0, 1 / 120);
     for (let q = 0; q < (this.active ?? 0); q++) {
       const g = this.groups[q], k = g.walker;
-      const walking = g.pause <= 0 && !(g.wait > 0 && g.travelled === 0);
+      const pace = k.pace ?? 1, walking = pace > 0.04 && g.travelled > 0;
+      const speed = k.speed * pace;
       for (const m of g.members) {
         const { x, z } = this.memberAt(g, m);
         let yaw = k.yaw;
-        if (g.pause > 0 && g.size > 1 && g.chat) yaw = (k.yaw + (m.off < 0 ? 70 : -70) + 360) % 360; // turn to each other
-        if (g.pause > 0 && g.shelter !== null && g.shelter !== undefined) yaw = g.shelter; // sheltering: watching the rain
-        if (g.look && !walking) yaw = yawTo(x, z, g.look[0], g.look[1]); // looking at the player
-        m.yaw = turnToward(m.yaw, yaw, 400 * Math.max(this.dt || 0, 1 / 60));
-        if (walking) m.phase += (g.travelled / (STRIDE * m.v.scale)) * Math.PI;
-        crowd.add(m.v, { x, y: this.memberY(g, x, z), z: -z, rotY: (-m.yaw * Math.PI) / 180,
-          mode: walking ? MODE.WALK : MODE.IDLE, phase: m.phase, speed: walking ? k.speed * k.slow : 0, t: t + m.phase });
+        if (!walking) {
+          if (g.pause > 0 && g.size > 1 && g.chat) yaw = (k.yaw + (m.off < 0 ? 70 : -70) + 360) % 360; // turn to each other
+          if (g.pause > 0 && g.shelter !== null && g.shelter !== undefined) yaw = g.shelter; // sheltering: watching the rain
+          if (g.look) yaw = yawTo(x, z, g.look[0], g.look[1]); // looking at the player
+        }
+        m.yaw = turnToward(m.yaw, yaw, (walking ? 360 : 200) * dt);
+        // feet on the ground: the stride of the pace actually walked (figure/gait.js)
+        if (walking) m.phase += (g.travelled / (strideAt(Math.max(speed, 0.25)) * m.v.scale)) * Math.PI;
+        // walking <-> standing eases (the rig blends the two poses), so nobody snaps to attention
+        m.blend = (m.blend ?? 1) + ((walking ? 1 : 0) - (m.blend ?? 1)) * Math.min(1, dt * 7);
+        if (!walking && m.act == null) m.act = this.pickAct(g, m);
+        m.actK = Math.max(0, Math.min(1, (m.actK || 0) + (walking ? -4 : 1.6) * dt));
+        if (walking && m.actK === 0) m.act = null;
+        m.look = (m.look || 0) + (this.headTarget(g, m, x, z, walking, t) - (m.look || 0)) * Math.min(1, dt * 5);
+        const b = m.blend, pose = { x, y: this.memberY(g, x, z), z: -z, rotY: (-m.yaw * Math.PI) / 180,
+          mode: b > 0.02 ? MODE.WALK : MODE.IDLE, phase: m.phase, speed: Math.max(speed, 0.5), t: t + (m.u ?? 0) * 50, look: m.look };
+        if (b > 0.02 && b < 0.98) pose.blend = b;
+        if (b < 0.98 && m.act) { pose.idle = m.act; pose.idleK = m.actK; }
+        crowd.add(m.v, pose);
       }
     }
   }

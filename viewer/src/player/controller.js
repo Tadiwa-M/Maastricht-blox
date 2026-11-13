@@ -20,8 +20,14 @@ import { Locomotion } from './locomotion.js';
 export { angleDelta };
 
 export const DEFAULTS = {
-  radius: 0.35, height: 1.9, walk: 1.4, run: 4.0,
-  gravity: 18, jumpSpeed: 4.4, stepMax: 0.42, maxFall: 30, waterProbe: 8, airGrip: 0.25,
+  radius: 0.35, height: 1.9, walk: 1.5, run: 5.0,
+  // jump: a quick rise and a faster fall (fallGravity), cut short when the button is let go early
+  // (jumpCut: share of the upward speed kept); apex ~0.72 m, ~0.62 s in the air on flat ground
+  gravity: 20, fallGravity: 30, jumpSpeed: 5.4, jumpCut: 0.45,
+  coyote: 0.12, // s after walking off an edge in which a jump still counts
+  jumpBuffer: 0.14, // s a jump pressed just before landing is remembered
+  stepEase: 16, // 1/s: how fast the drawn height catches up after a kerb or stair (visualY)
+  stepMax: 0.42, maxFall: 30, waterProbe: 8, airGrip: 0.35,
 };
 
 const RING = Array.from({ length: 8 }, (_, q) => [Math.cos((q * Math.PI) / 4), Math.sin((q * Math.PI) / 4)]);
@@ -38,7 +44,15 @@ export class CharacterController {
     this.grounded = false;
     this.frozen = false;
     this.travelled = 0;
+    this.sinceGround = 1e9; // s since the feet last stood on something (coyote time)
+    this.jumpWanted = 1e9; // s since jump was last pressed (jump buffering)
+    this.jumping = false; // rising from a jump (not a fall or a knock)
+    this.jumped = false; // a jump started this step (sound, animation)
+    this.stepLag = 0; // m the drawn body is below (-) / above (+) the collision body after a step
   }
+
+  /** Height to draw the feet at: the body's, eased over kerbs and stairs (no 1-frame pops). */
+  get visualY() { return this.pos[1] + this.stepLag; }
 
   solid(x, y, z) { return this.city.isSolid(x, y, z) !== false; }
 
@@ -79,6 +93,7 @@ export class CharacterController {
     this.vel = [0, 0, 0];
     this.yaw = yaw;
     this.loco.heading = yaw; this.loco.speed = 0; this.loco.pivoting = false;
+    this.stepLag = 0; this.sinceGround = 1e9; this.jumpWanted = 1e9; this.jumping = false;
     this.unstick();
     this.grounded = this.footSolid(...this.pos);
   }
@@ -119,7 +134,9 @@ export class CharacterController {
     if (!this.grounded) return false; // no stepping in mid-air
     for (let up = 0.05; up <= this.o.stepMax + 1e-9; up += 0.05) {
       if (!this.bodyHits(nx, y + up, nz)) {
-        this.pos = [nx, this.settle(nx, nz, y, y + up), nz];
+        const ny = this.settle(nx, nz, y, y + up);
+        this.stepLag -= ny - y; // the drawn body rises smoothly behind
+        this.pos = [nx, ny, nz];
         return true;
       }
     }
@@ -128,10 +145,11 @@ export class CharacterController {
 
   /**
    * input: { move: [x right, y forward] (|move| <= 1, already camera-relative compass is
-   * given by camYaw), speed: wanted m/s, jump: bool }. camYaw: compass radians the camera
+   * given by camYaw), speed: wanted m/s, jump: pressed this step, jumpHeld: still held (default: yes;
+   * letting go early makes a lower hop) }. camYaw: compass radians the camera
    * looks to. Returns { speed (m/s horizontal), travelled (m) }.
    */
-  update(dt, { move = [0, 0], speed = 0, jump = false } = {}, camYaw = 0) {
+  update(dt, { move = [0, 0], speed = 0, jump = false, jumpHeld = true } = {}, camYaw = 0) {
     const o = this.o;
     const [x0, y0, z0] = this.pos;
     // never act inside unloaded space: wait until the city knows what is here
@@ -149,7 +167,18 @@ export class CharacterController {
     this.vel[0] = loco.vx;
     this.vel[2] = loco.vz;
 
-    if (jump && this.grounded) { this.vel[1] = o.jumpSpeed; this.grounded = false; }
+    // jump: forgiving on both sides. Pressed a moment before landing it is remembered (buffer);
+    // pressed a moment after walking off an edge it still counts (coyote time).
+    this.jumpWanted = jump ? 0 : this.jumpWanted + dt;
+    this.sinceGround = this.grounded ? 0 : this.sinceGround + dt;
+    this.jumped = false;
+    if (this.jumpWanted <= o.jumpBuffer && this.sinceGround <= o.coyote && !this.jumping) {
+      this.vel[1] = o.jumpSpeed; this.grounded = false;
+      this.jumping = this.jumped = true;
+      this.jumpWanted = this.sinceGround = 1e9;
+    }
+    if (this.jumping && !jumpHeld && this.vel[1] > 0) { this.vel[1] *= o.jumpCut; this.jumping = false; } // let go: a short hop
+    if (this.vel[1] <= 0) this.jumping = false;
 
     // horizontal, sub-stepped, axis by axis
     const dx = this.vel[0] * dt, dz = this.vel[2] * dt;
@@ -164,7 +193,7 @@ export class CharacterController {
 
     // vertical
     const wasGrounded = this.grounded;
-    this.vel[1] = Math.max(-o.maxFall, this.vel[1] - o.gravity * dt);
+    this.vel[1] = Math.max(-o.maxFall, this.vel[1] - (this.vel[1] > 0 ? o.gravity : o.fallGravity) * dt);
     if (this.grounded && this.vel[1] < 0) this.vel[1] = 0;
     const [x, , z] = this.pos;
     if (this.vel[1] > 0) { // rising: stop at ceilings
@@ -176,6 +205,7 @@ export class CharacterController {
       const y = this.pos[1];
       if (wasGrounded && this.vel[1] <= 0 && this.hits(x, y - o.stepMax - 0.01, z, 0, o.stepMax)) {
         this.pos[1] = this.settle(x, z, y - o.stepMax - 0.01, y);
+        this.stepLag += y - this.pos[1]; // the drawn body comes down smoothly
       } else {
         this.grounded = false;
         const fall = this.vel[1] < 0 ? -this.vel[1] * dt : 0;
@@ -196,6 +226,11 @@ export class CharacterController {
       this.vel[1] = 0;
       this.pos[1] = this.settle(x, z, this.pos[1] - 0.035, this.pos[1]);
     }
+    // the drawn height catches up (faster when moving fast, so stairs at a run don't sink the body)
+    const lagMax = o.stepMax + 0.1;
+    this.stepLag = Math.max(-lagMax, Math.min(lagMax, this.stepLag));
+    this.stepLag *= Math.exp(-(o.stepEase + 2.5 * loco.speed) * dt);
+    if (Math.abs(this.stepLag) < 1e-4) this.stepLag = 0;
     const travelled = Math.hypot(this.pos[0] - x0, this.pos[2] - z0);
     this.travelled += travelled;
     return { speed: travelled / dt, travelled };

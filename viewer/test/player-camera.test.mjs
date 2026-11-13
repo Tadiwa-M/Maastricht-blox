@@ -35,7 +35,7 @@ test('pull-in: looking up from low, the floor stops the camera; unknown space do
   assert.equal(pullIn(city, focus, backDir(-Math.PI / 2, 0), 8), 8); // toward +x into unknown
 });
 
-test('FollowCamera: snaps in at once, eases back out, clamps zoom and pitch', () => {
+test('FollowCamera: pulls in within a few frames, eases back out, clamps zoom and pitch', () => {
   const city = synthCity();
   const cam = new FollowCamera();
   const feet = [5, city.floorY, -5];
@@ -43,7 +43,9 @@ test('FollowCamera: snaps in at once, eases back out, clamps zoom and pitch', ()
   assert.ok(Math.abs(cam.dist - 5) < 1e-9);
   city.fill(0, 4, 5, 39, 5, 30);
   r = cam.update(city, feet, 0.016);
-  assert.ok(r.position[2] < -3, `pulled in at once: ${r.position[2]}`);
+  assert.ok(cam.dist < 4.2 && cam.dist > 1.5, `first frame: on its way, not a jump cut: ${cam.dist}`);
+  for (let q = 0; q < 9; q++) r = cam.update(city, feet, 1 / 60);
+  assert.ok(r.position[2] < -3, `pulled in within 0.17 s: ${r.position[2]}`);
   cam.input([0, 5], 100);
   assert.equal(cam.aimPitch, cam.o.maxPitch);
   assert.equal(cam.aimDist, cam.o.maxDist);
@@ -90,8 +92,9 @@ test('FollowCamera: collision pull-in still works on the damped values', () => {
   for (let q = 0; q < 60; q++) cam.update(city, feet, 1 / 60);
   assert.ok(Math.abs(cam.dist - 5) < 0.05);
   city.fill(0, 4, 5, 39, 5, 30); // wall between player and camera (south)
-  const r = cam.update(city, feet, 1 / 60);
-  assert.ok(r.position[2] < -3, `pulled in at once: ${r.position[2]}`);
+  let r;
+  for (let q = 0; q < 10; q++) r = cam.update(city, feet, 1 / 60);
+  assert.ok(r.position[2] < -3, `pulled in: ${r.position[2]}`);
 });
 
 test('raycast finds the first solid point and the spawn point is backed off toward the viewer', () => {
@@ -159,4 +162,34 @@ test('phones: portrait screens get a wider view and a smaller shoulder offset; l
   assert.ok(p > 70 && p <= 78, `portrait fov ${p}`);
   assert.equal(shoulderScale(16 / 9), 1);
   assert.ok(shoulderScale(390 / 844) < 0.4);
+});
+
+test('FollowCamera: a lamp post between player and camera is looked past; a wall is not; easing out waits', () => {
+  const city = synthCity();
+  const feet = [5, city.floorY, -5];
+  const cam = new FollowCamera({ shoulder: 0 });
+  cam.update(city, feet, 1 / 60);
+  // a post one cell (0.5 m... thin) wide, 2.5 m behind the player, right on the view line
+  const S = city.S, i = Math.floor(5 / S), j = Math.floor((5 - 2.5) / S); // Unity north = -z
+  city.fill(i - 0, j, 5, i, j, 30);
+  const thin = pullIn(city, [5.25, city.floorY + 1.6, -5], [0, 0, 1], 5, { thin: 0.55 });
+  const solid = pullIn(city, [5.25, city.floorY + 1.6, -5], [0, 0, 1], 5);
+  assert.ok(solid < 2.6, `without the option the post blocks: ${solid}`);
+  assert.equal(thin, 5);
+  city.fill(0, j, 5, 39, j, 30); // the same thickness as a wall right across: blocks
+  assert.ok(pullIn(city, [5.25, city.floorY + 1.6, -5], [0, 0, 1], 5, { thin: 0.55 }) < 2.6);
+  // a wall (thicker than a post) still blocks, and after it goes the camera holds, then eases out
+  const c2 = synthCity(), cam2 = new FollowCamera();
+  cam2.update(c2, feet, 1 / 60);
+  c2.fill(0, 4, 5, 39, 5, 30);
+  for (let q = 0; q < 20; q++) cam2.update(c2, feet, 1 / 60);
+  const inD = cam2.dist;
+  assert.ok(inD < 3);
+  const open = synthCity(); // (the wall is no longer in the way)
+  cam2.update(open, feet, 1 / 60);
+  assert.ok(Math.abs(cam2.dist - inD) < 1e-9, 'holds for a moment');
+  let prev = cam2.dist, maxStep = 0;
+  for (let q = 0; q < 120; q++) { cam2.update(open, feet, 1 / 60); maxStep = Math.max(maxStep, cam2.dist - prev); prev = cam2.dist; }
+  assert.ok(Math.abs(cam2.dist - 5) < 0.05, `back out: ${cam2.dist}`);
+  assert.ok(maxStep < 0.12, `eased, no pop: ${maxStep}`);
 });
