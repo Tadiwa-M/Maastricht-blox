@@ -365,7 +365,7 @@ export async function initLife(ctx) {
     // every scheduled vehicle this frame (Ride: the transit panel and the passenger camera read this)
     state.vehicles = state.trains ? buses.concat(state.trains.update(clock, camera)) : buses;
     if (state.crossings) state.crossings.t = clock.sec; // the light clock for walkers and bikes
-    state.signals?.update([camera.position.x, -camera.position.z], clock.sec, tier());
+    state.signals?.update(at, clock.sec, tier()); // round the player, or where the map camera looks
     holdTransit(state, clock, dt, at); // (the lag shows from the next frame on)
     const traffic = trafficFactor(clock.hours, clock.day);
     if (state.cars) {

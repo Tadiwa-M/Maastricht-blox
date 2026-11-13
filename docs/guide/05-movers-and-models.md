@@ -634,9 +634,12 @@ unchanged timing) drives every lamp and every rule.
   first 40 cars within 80 m of the camera; now every car within the living radius (cap 200).
   That was most of `bikesInVehicles`: bikes riding into the back of cars they could not see.
 - **Drawing** (`signalsdraw.js`): five instanced meshes (posts, stud caps, heads, lamps, zebra
-  plates); only the nearest poles and stripes by tier (`SIGNAL_CAPS`: high 64 poles / 600 stripes
-  within 160 m, lite 10 / 100 within 50 m), re-picked when the camera moves 12 m (and every ~90
-  frames, for ground that streams in late). Lamps are an unlit material: the lit one shows its full
+  plates); only the nearest poles and stripes by tier (`SIGNAL_CAPS`: high 120 poles / 1200 stripes
+  within 320 m, lite 12 / 120 within 60 m), measured from the player, or from where the map camera
+  looks, and re-picked on a 12 m move and every ~90 frames. Where the ground is not streamed in yet
+  (the lookup answers Infinity) a pole or stripe is left out and looked for again after 20 frames.
+  Sizes are a little over life (3.7 m posts, 0.28 m lamps, light grey posts) so a light reads
+  from across a square; zebra stripes are 0.5 x 4 m. Lamps are an unlit material: the lit one shows its full
   colour (glows at night), the others 2.5 % (dark).
 - `audit.js` also counts `bikesInBuses` (of `bikesInVehicles`).
 - Measured (`tools/life-audit.mjs`, markt/vrijthof/station, 40 s): see DEVLOG 2026-11-13.

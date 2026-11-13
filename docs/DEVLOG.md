@@ -1693,3 +1693,15 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Owner: the pause menu was plain. The main page is now a left column in the title screen's style
   with the paused city beside it (guide 20). CSS and two lines of markup; no behaviour changed.
 
+## 2026-11-13: traffic lights and zebras you can actually see
+
+- Owner: no lights or zebras to be seen on the live site (Wilhelminasingel). The data was right
+  (335 signals, 304 crossings, all but 3 crossings drawn); the drawing was the problem: thin dark
+  poles, shown only within 120-160 m of the camera itself (nothing from the map view), and a pole
+  placed before its ground had streamed in got an invalid height (the ground lookup answers
+  Infinity there) and stayed invisible until the next re-pick.
+- Now: bigger heads and lamps on light grey posts, 4 m zebra stripes, twice the range, measured
+  from the player or the map's focus, and unloaded spots are skipped and retried quickly.
+  Checked in the full city at Stationsstraat / Wilhelminasingel (guide 05).
+- Note: a roundabout has no lights in OSM; its zebras are drawn where OSM has crossing nodes.
+

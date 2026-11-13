@@ -236,7 +236,7 @@ export class CrossingMap {
       const count = Math.max(2, Math.floor((2 * half) / 1.0));
       for (let q = 0; q < count; q++) {
         const o = -half + 0.5 + q * ((2 * half - 1) / Math.max(1, count - 1)); // across the road (right = (uz, -ux))
-        out.push({ x: g.x[n] + uz * o, z: g.z[n] - ux * o, yaw, w: 0.5, len: 2.6 });
+        out.push({ x: g.x[n] + uz * o, z: g.z[n] - ux * o, yaw, w: 0.5, len: 4 }); // Dutch zebra: 0.5 m stripes, 4 m long
       }
     }
     return out;
