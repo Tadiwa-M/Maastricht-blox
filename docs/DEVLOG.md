@@ -1681,3 +1681,10 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   between two slow frames was lost; it is latched now.
 - Open decisions: weapon balance after real play; whether pickups should be shared room state.
 
+## 2026-11-13: capture the flag: shared pickups, guns on other players, gamepad
+
+- Pickups are decided by the room now (first player there gets it, gone 20 s for everyone);
+  other players' figures carry a gun at their side; a gamepad can fire, aim, reload, swap, stab.
+- Checked in a browser match against a scripted player: the pickup through the room, the gun
+  on the other figure. The relay must be redeployed for pickups to work.
+

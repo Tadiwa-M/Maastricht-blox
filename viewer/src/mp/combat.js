@@ -271,9 +271,50 @@ export class Combat {
       p.gun.rotation.y += dt * 1.5;
       if (!p.g.visible || !alive || Math.hypot(st.pos[0] - p.x, st.pos[2] - p.z) > PICKUP_R || Math.abs(st.pos[1] - p.y) > 2.5) continue;
       if (this.gun.slots[1] === p.w && this.gun.ammo[p.w] === WEAPONS[p.w].mag) continue; // already full
-      this.gun.give(p.w); p.back = PICKUP_BACK_S; this.zoom2 = false;
-      this.toast?.(`${WEAPONS[p.w].name} picked up`);
+      if ((p.asked = (p.asked || 0) - dt) > 0) continue;
+      p.asked = 0.5; this.send({ t: 'take', i: this.pickups.indexOf(p) }); // the room says who gets it
     }
+  }
+
+  /** The room: weapon i was taken (by me?) and is gone for `seconds`. */
+  taken(i, mine, seconds = PICKUP_BACK_S) {
+    const p = this.pickups[i];
+    if (!p) return;
+    p.back = seconds;
+    if (mine && this.gun.give(p.w)) { this.zoom2 = false; this.toast?.(`${WEAPONS[p.w].name} picked up`); }
+  }
+
+  /** Guns at the other players' sides: figures() -> [{ id, pos, yaw, team, w, hidden }]. */
+  drawOthers() {
+    this.otherGuns = this.otherGuns || new Map();
+    const seen = new Set();
+    for (const o of this.active ? this.figures?.() || [] : []) {
+      const key = `${o.id}|${o.w}|${o.team}`;
+      let g = this.otherGuns.get(o.id);
+      if (!g || g.userData.key !== key) {
+        if (g) this.scene.remove(g);
+        g = buildGun(o.w, TEAM_HEX[o.team] || '#888'); g.scale.setScalar(1.25); g.userData.key = key;
+        this.scene.add(g); this.otherGuns.set(o.id, g);
+      }
+      seen.add(o.id);
+      g.visible = !o.hidden;
+      g.position.set(o.pos[0] + Math.cos(o.yaw) * 0.42 + Math.sin(o.yaw) * 0.3, o.pos[1] + 1.12, o.pos[2] + Math.sin(o.yaw) * 0.42 - Math.cos(o.yaw) * 0.3);
+      g.rotation.set(0, -o.yaw, 0);
+    }
+    for (const [id, g] of this.otherGuns) if (!seen.has(id)) { this.scene.remove(g); this.otherGuns.delete(id); }
+  }
+
+  /** Gamepad: RT fire, LT aim, X reload, Y next weapon, right stick click stab. */
+  pollPad() {
+    const pad = [...(navigator.getGamepads?.() || [])].find((g) => g && g.connected);
+    const b = (i) => !!pad && (pad.buttons[i]?.pressed || pad.buttons[i]?.value > 0.4);
+    const was = this.pad || {};
+    this.pad = { fire: b(7), aim: b(6), reload: b(2), swap: b(3), stab: b(11) };
+    if (this.pad.fire !== !!was.fire) { this.fire = this.pad.fire; if (this.pad.fire) this.tap = true; }
+    if (this.pad.aim !== !!was.aim) this.aiming = this.pad.aim;
+    if (this.pad.reload && !was.reload) this.want.reload = true;
+    if (this.pad.swap && !was.swap) this.want.swap = true;
+    if (this.pad.stab && !was.stab) this.want.stab = true;
   }
 
   restoreCamera() {
@@ -294,7 +335,9 @@ export class Combat {
       else { this.restoreCamera(); this.hands.visible = this.side.visible = false; this.fire = this.aiming = false; for (const p of this.pickups) p.g.visible = false; }
     }
     this.stepFx(dt);
+    this.drawOthers();
     if (!on) return;
+    this.pollPad();
     const moved = this.lastPos ? Math.hypot(st.pos[0] - this.lastPos[0], st.pos[2] - this.lastPos[2]) / Math.max(dt, 1e-3) : 0;
     this.speed = lerp(this.speed || 0, Math.min(8, moved), Math.min(1, dt * 10)); this.lastPos = st.pos;
     const def = this.gun.def, alive = this.down <= 0;
@@ -431,5 +474,6 @@ export class Combat {
     this.camera.remove(this.hands); this.scene.remove(this.side, this.flash, this.pickGroup);
     for (const t of this.tracers) this.scene.remove(t.m);
     for (const p of this.puffs) this.scene.remove(p.m);
+    for (const g of (this.otherGuns || new Map()).values()) this.scene.remove(g);
   }
 }

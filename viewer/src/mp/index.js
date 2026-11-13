@@ -39,6 +39,7 @@ export async function initMultiplayer(ctx) {
   const ground = (x, z) => { const g = city?.groundHeight?.(x, z); return typeof g === 'number' ? g : null; };
   const look = () => { const ch = loadChoices(location.hash, local); return ch ? encodeChoices(ch) : ''; };
 
+  const lastWeapon = new Map();
   let conn = null, model = null, view = null, status = '', combat = null, basesKey = '';
   let sendT = 0, idleT = 0, lastSent = null, lastSentAt = 0;
   let spawn = null; // { at: { x, z, yaw }, t } waiting for the ground there to load
@@ -76,6 +77,9 @@ export async function initMultiplayer(ctx) {
     model = new MatchModel();
     view = view || new RoomView(stage.scene, ground, origin);
     combat = combat || new Combat({ scene: stage.scene, camera, city, origin, player, send: (m) => conn?.send(m), toast: (t) => ui.toast(t),
+      // every other player on screen, for the gun at their side (the weapon they last fired)
+      figures: () => (model && view ? model.players.filter((p) => p.id !== model.me && p.on && view.others.get(p.id)?.prev)
+        .map((p) => { const o = view.others.get(p.id); return { id: p.id, pos: [o.pose.x, o.pose.y, o.pose.z], yaw: -o.pose.rotY, team: p.team, w: lastWeapon.get(p.id) || 'rifle', hidden: !!o.scatter }; }) : []),
       // living enemies as the room last drew them (three.js feet)
       enemies: () => (model && view ? model.players.filter((p) => p.team !== model.team && p.on && view.others.get(p.id)?.prev && !view.others.get(p.id).scatter)
         .map((p) => { const o = view.others.get(p.id); return { id: p.id, pos: [o.pose.x, o.pose.y, o.pose.z], scale: o.variant?.scale || 1 }; }) : []) });
@@ -105,7 +109,8 @@ export async function initMultiplayer(ctx) {
     for (const e of model.apply(m)) {
       if (e.k === 'pos') view.push(e.id, e.p, e.yaw, e.speed, now);
       else if (e.k === 'spawn' && e.at) { spawn = { at: e.at, t: 0 }; boundary.reset(); combat?.respawn(model.config?.hp || 100); }
-      else if (e.k === 'shot') combat?.tracer(toThree(e.o, origin), toThree(e.e, origin), e.w);
+      else if (e.k === 'take') combat?.taken(e.i, e.mine, e.s);
+      else if (e.k === 'shot') { lastWeapon.set(e.by, e.w); combat?.tracer(toThree(e.o, origin), toThree(e.e, origin), e.w); }
       else if (e.k === 'hurt') combat?.hurt(e.hp);
       else if (e.k === 'hitmark') combat?.hitmark(e.kill);
       else if (e.k === 'killed') { knockMe(e.by); combat?.killed(model.config?.respawnS || 4, () => { const at = model?.spawn(); if (at && model.phase === 'play') { spawn = { at, t: 0 }; boundary.reset(); } }); }

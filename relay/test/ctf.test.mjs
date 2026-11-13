@@ -260,3 +260,17 @@ test('shotgun and knife: pellets add up within range; a stab knocks out, but onl
   place(2, 11000);
   assert.ok(shoot(g, 1, msg('knife', 2), 11100).events.some((e) => e.k === 'kill'), 'one stab');
 });
+
+test('pickups: the first player near a spot takes it, then it is gone for 20 s', async () => {
+  const { take, pickupSpots } = await import('../src/ctf.js');
+  const g = newGame('ABCD', 0);
+  join(g, { pid: 'aaaaaaaa1', name: 'A' }, 0); join(g, { pid: 'bbbbbbbb2', name: 'B' }, 0);
+  start(g, 1, 0);
+  const spot = pickupSpots(g.bases)[0];
+  move(g, 1, { p: [spot.at[0] + 5, 50, spot.at[1]] }, 1000); move(g, 2, { p: [spot.at[0] + 300, 50, spot.at[1]] }, 1000);
+  assert.equal(take(g, 2, { i: 0 }, 1100).events.length, 0, 'too far away');
+  assert.deepEqual(take(g, 1, { i: 0 }, 1200).events, [{ k: 'take', i: 0, id: 1, w: 'scout', s: CTF.pickupBackS }]);
+  assert.equal(take(g, 1, { i: 0 }, 1300).events.length, 0, 'already taken');
+  assert.equal(take(g, 1, { i: 9 }, 1300).events.length, 0);
+  assert.equal(take(g, 1, { i: 0 }, 1200 + CTF.pickupBackS * 1000 + 1).events.length, 1, 'back again');
+});

@@ -32,6 +32,8 @@ export const CTF = {
   respawnS: 4, // knocked out this long, then back at the base
   shotRangeM: 170,
   shotSlackM: 2.5, // a claimed hit must pass this close to where the room last saw the target
+  pickupBackS: 20, // a taken weapon lies there again after this
+  pickupReachM: 36, // clients move a spot to open street nearby (up to 30 m), so the room is generous
   shotFromM: 8, // and start this close to where it last saw the shooter
   // shotgun: damage per pellet that hit (msg.n of 8), short range; knife: one hit, arm's length
   weapons: { rifle: { body: 24, head: 48, minMs: 80 }, scout: { body: 75, head: 150, minMs: 850 },
@@ -65,6 +67,17 @@ export const PLACES = [
   { name: 'Bonnefanten', at: [177122, 316999], side: 'e' },
 ];
 export const BASE_GAP_M = [250, 550];
+
+/**
+ * Where weapons lie in a round (the same maths as the client's mp/weapons.js pickupSpots): four
+ * spots mirrored about the middle of the line between the bases. -> [{ at: [east, north], w }]
+ */
+export function pickupSpots(bases) {
+  const a = bases.blue.at, b = bases.yellow.at, L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  const f = [(b[0] - a[0]) / L, (b[1] - a[1]) / L], n = [-f[1], f[0]];
+  const at = (t, side) => [Math.round(a[0] + f[0] * L * t + n[0] * side), Math.round(a[1] + f[1] * L * t + n[1] * side)];
+  return [{ at: at(0.5, 38), w: 'scout' }, { at: at(0.5, -38), w: 'shotgun' }, { at: at(0.22, -24), w: 'shotgun' }, { at: at(0.78, 24), w: 'shotgun' }];
+}
 
 /** The bases of a round: Markt and Vrijthof first, then a random fair pair (same side, 250-550 m apart). */
 export function pickBases(round, rand = Math.random) {
@@ -179,7 +192,7 @@ export function start(g, id, now, rand = Math.random) {
   g.flags = { blue: home(g, 'blue'), yellow: home(g, 'yellow') };
   g.score = { blue: 0, yellow: 0 };
   for (const p of list(g)) { p.caps = 0; p.tags = 0; p.down = 0; p.hp = CTF.hp; p.kills = 0; p.deaths = 0; p.shotAt = 0; }
-  g.phase = 'play'; g.round++; g.winner = null;
+  g.phase = 'play'; g.round++; g.winner = null; g.taken = {};
   g.endsAt = now + CTF.matchS * 1000;
   return { ok: true, ...result([{ k: 'start', round: g.round }]) };
 }
@@ -240,6 +253,16 @@ export function move(g, id, msg, now) {
     }
   }
   return result(events);
+}
+
+/** Take the weapon at spot i: the first living player near it gets it; everyone hears it is gone for a while. */
+export function take(g, id, msg, now) {
+  const p = g.players[id], i = Math.floor(+msg?.i), spot = pickupSpots(g.bases)[i];
+  if (!p || !spot || g.phase !== 'play' || !p.at || p.down > now || dist(p.at, spot.at) > CTF.pickupReachM) return result();
+  g.taken = g.taken || {};
+  if ((g.taken[i] || 0) > now) return result();
+  g.taken[i] = now + CTF.pickupBackS * 1000;
+  return result([{ k: 'take', i, id, w: spot.w, s: CTF.pickupBackS }], false);
 }
 
 const vec3 = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => Number.isFinite(n) && Math.abs(n) < 1e7);

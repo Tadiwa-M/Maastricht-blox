@@ -147,7 +147,12 @@ knock-outs, flags); the client knows the walls, so it claims hits and the room c
 - **After the match:** the room panel shows a small heat map of where the knock-outs happened.
 - Checked with a browser player against a scripted second player on a local relay: rifle
   knock-out in 5 hits, pickup, knife, being hurt, knocked out and back at the base.
+- **Shared pickups:** walking onto a weapon sends `{ t: 'take', i }`; the room (`ctf.js` `take`)
+  gives it to the first living player within 36 m of the spot and tells everyone it is gone for
+  20 s (`ev` `take`). The room computes the same spots as the client (`pickupSpots`, tested equal).
+- **Guns on other players:** each figure carries the weapon it last fired (rifle until then) at
+  its side, in its team colour.
+- **Gamepad:** RT fire, LT aim, X reload, Y next weapon, right stick click stab.
 - Open: not played by two people on real devices yet (frame rate, touch layout, how the guns
-  feel); pickups are not shared state (two players can each take the same one); other players'
-  figures do not show a gun; no gamepad buttons for firing.
-
+  feel); other players' guns point where the figure faces, not up or down; the heat map and a
+  shotgun hit have unit tests but were not seen in a browser match.

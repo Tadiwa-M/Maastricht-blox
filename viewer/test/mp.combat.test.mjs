@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { WEAPONS, Gun, spreadDir, raySphere, hitTest, wallT, heatProject, meleeTarget, pickupSpots } from '../src/mp/weapons.js';
 import { MatchModel } from '../src/mp/model.js';
+import { pickupSpots as roomSpots } from '../../relay/src/ctf.js';
 
 test('rifle: automatic at its fire rate, reloads by itself when empty', () => {
   const g = new Gun();
@@ -117,4 +118,5 @@ test('pickups: four weapons mirrored about the middle, the same distance from ea
   for (const s of spots.slice(0, 2)) assert.ok(Math.abs(d(s.at, bases.blue.at) - d(s.at, bases.yellow.at)) < 2);
   assert.ok(Math.abs(d(spots[2].at, bases.blue.at) - d(spots[3].at, bases.yellow.at)) < 2, 'each team has a shotgun as near');
   for (const s of spots) assert.ok(d(s.at, bases.blue.at) > 30 && d(s.at, bases.yellow.at) > 30);
+  assert.deepEqual(spots, roomSpots(bases), 'the room and the client agree on the spots');
 });
