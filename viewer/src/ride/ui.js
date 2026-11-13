@@ -52,9 +52,17 @@ const CSS = `
 #rd-hud .btns button.on { outline: 2px solid #F2A900; }
 .rd-out { color: #8d91ad; font-size: 11px; white-space: nowrap; }
 #rd-hud .hint { color: #8d91ad; font-size: 11px; margin-top: 8px; }
-body.riding #pl-bar, body.riding #pl-back, body.riding #rd-open, body.riding #pl-compass, body.riding #hud, body.riding #info { display: none !important; }
+body.riding #pl-bar, body.riding #pl-back, body.riding #rd-open, body.riding #pl-compass, body.riding #hud, body.riding #info, body.riding #mp-open, body.riding #ex-open, body.riding #rp-open { display: none !important; }
 body.title #rd-open, body.title #rd-panel, body.title .rd-mark { visibility: hidden; }
 @media (max-width: 600px) { #rd-panel { top: auto; height: 62vh; bottom: 70px; } #rd-hud .next { font-size: 22px; } }
+/* phones (portrait or landscape): the ride bar stays slim so the view out of the bus stays visible */
+@media (max-width: 600px), (max-height: 500px) {
+  #rd-hud { width: min(460px, calc(100vw - 28px)); padding: 6px 10px; border-radius: 10px; }
+  #rd-hud .top { gap: 6px; } #rd-hud .head { font-size: 12px; }
+  #rd-hud .next { margin: 2px 0; font-size: 16px; } #rd-hud .next small { display: inline; margin: 0 6px 0 0; font-size: 9px; }
+  #rd-hud .strip, #rd-hud .hint { display: none; }
+  #rd-hud .btns { gap: 4px; } #rd-hud .btns button { padding: 4px 7px; font-size: 11px; }
+}
 `;
 
 const el = (tag, props = {}, html = '') => Object.assign(document.createElement(tag), props, html ? { innerHTML: html } : {});

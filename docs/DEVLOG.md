@@ -1610,3 +1610,9 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   a gentle limiter, a 2 s fade-in, smooth mute fades.
 - Measured (30 s offline render): peak -14.3 -> -24.6 dBFS, energy above 4 kHz 44 % -> < 0.001 %,
   largest sample jump 0.055 -> 0.002 (`audio.render.test.mjs`). Guide 14.
+
+## 2026-11-13: a slim ride bar on phones
+
+- Owner: the blue ride box covered the screen on a phone. On narrow or short screens it is now a
+  slim bar (line, next stop, small buttons; the stop strip and hint hidden): 19 % of a landscape
+  phone screen. The multiplayer, journal and report buttons hide while riding.
