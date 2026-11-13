@@ -29,7 +29,8 @@ function fakeContext() {
     createStereoPanner: () => node({ pan: param(0) }),
     createBiquadFilter: () => node({ type: 'lowpass', frequency: param(350), Q: param(1) }),
     createDynamicsCompressor: () => node({ threshold: param(), knee: param(), ratio: param(), attack: param(), release: param() }),
-    createOscillator: () => source({ type: 'sine', frequency: param(440) }),
+    createOscillator: () => source({ type: 'sine', frequency: param(440), detune: param(0) }),
+    createDelay: () => node({ delayTime: param(0) }),
     createBufferSource: () => source({ buffer: null, loop: false, playbackRate: param(1) }),
     createBuffer: (ch, n, rate) => { const d = new Float32Array(n); return { duration: n / rate, getChannelData: () => d }; },
   };
@@ -37,7 +38,7 @@ function fakeContext() {
 }
 
 const MIX = {
-  rain: 0.4, bells: { level: 0.3, pan: 0.5, cut: 3000 },
+  rain: 1, day: 0.5, bells: { level: 0.3, pan: 0.5, cut: 3000 },
 };
 
 test('synth: the always-on graph is small and every voice schedules cleanly', () => {
@@ -49,7 +50,8 @@ test('synth: the always-on graph is small and every voice schedules cleanly', ()
   s.mix(MIX);
   for (const surface of ['cobble', 'stone', 'gravel', 'grass', 'nope']) s.step(surface, 1);
   s.thud('cobble', 1); s.thud('grass', 0);
-  s.bell(2, 233, 1, 4.5); s.bell(2, 1047, 0.4, 1.6, true);
+  s.bell(2, 233, 1, 6); s.bell(2, 523, 0.3, 2.2, true); s.hourStrike(3, 12);
+  ac.currentTime = 100; s.mix(MIX); ac.currentTime = 200; s.mix(MIX); // the pad moves a voice
   const transient = ac.made.sources.slice(loops);
   assert.ok(transient.length > 10);
   for (const src of transient) {

@@ -1,5 +1,5 @@
-// The sound mix as numbers: where the ear is, how loud and from which side each layer is (traffic,
-// crowd, birds, bells, rain), by distance, time of day and weather. Pure (no Web Audio), so it is
+// The sound mix as numbers: where the ear is, how loud and from which side each layer is
+// (bells, rain, the pad), by distance, time of day and weather. Pure (no Web Audio), so it is
 // tested with node --test (test/audio.test.mjs); synth.js turns the numbers into sound.
 //
 // Coordinates are Unity metres (x east, z north; three.js z = -north). Loudness is an amplitude
@@ -43,15 +43,23 @@ export function greenAt(x, z, parks = []) {
 }
 
 /**
- * Footstep sounds by surface: filter (type, Hz, Q), length (s) and loudness. Cobbles click,
- * smooth paving taps, gravel crunches, grass thuds softly.
+ * Footstep sounds by surface, all soft low taps: f the tap's pitch (Hz), len (s), vol, and a hint
+ * of texture (low-passed noise below tex Hz, grain = its share). Cobbles tap a little higher,
+ * paving lower, gravel has the most texture, grass is the softest.
  */
 export const SURFACES = {
-  cobble: { type: 'bandpass', f: 1700, q: 1.1, len: 0.07, vol: 1, heel: 0.5 },
-  stone: { type: 'bandpass', f: 1200, q: 0.9, len: 0.06, vol: 0.85, heel: 0.4 },
-  gravel: { type: 'highpass', f: 2200, q: 0.7, len: 0.14, vol: 0.75, heel: 0.2 },
-  grass: { type: 'lowpass', f: 700, q: 0.7, len: 0.1, vol: 0.5, heel: 0.15 },
+  cobble: { f: 185, len: 0.07, vol: 1, tex: 800, grain: 0.3 },
+  stone: { f: 160, len: 0.06, vol: 0.9, tex: 650, grain: 0.22 },
+  gravel: { f: 150, len: 0.09, vol: 0.8, tex: 1100, grain: 0.5 },
+  grass: { f: 125, len: 0.09, vol: 0.6, tex: 450, grain: 0.3 },
 };
+
+/** Daylight 0..1 from the hour of the day (0..24): up 6-8, down 19-22; the pad's brightness. */
+export function dayLevel(hour) {
+  if (!Number.isFinite(hour)) return 1;
+  const h = ((hour % 24) + 24) % 24, s = (x) => { const c = clamp(x); return c * c * (3 - 2 * c); };
+  return Math.min(s((h - 6) / 2), s((22 - h) / 3));
+}
 
 /** Surface under the feet: gravel paths in the parks, cobbles in the old town, paving elsewhere. */
 export function surfaceAt(x, z, places) {

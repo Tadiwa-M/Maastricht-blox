@@ -1,9 +1,10 @@
-// Volume and mute, remembered per browser (localStorage, key blox.audio.v1). Storage can be
+// Volume and mute, remembered per browser (localStorage, key blox.audio.v2; v2 because
+// the calm mix has a lower default). Storage can be
 // missing or throw (private mode, blocked site data): then the defaults apply. Pure; the store is
 // passed in (tests use a Map-like stub).
 
-export const PREFS_KEY = 'blox.audio.v1';
-export const PREFS_DEFAULTS = Object.freeze({ volume: 0.6, muted: false });
+export const PREFS_KEY = 'blox.audio.v2';
+export const PREFS_DEFAULTS = Object.freeze({ volume: 0.35, muted: false });
 
 export function loadPrefs(store) {
   try {
@@ -18,5 +19,5 @@ export function savePrefs(store, prefs) {
   try { store?.setItem(PREFS_KEY, JSON.stringify({ volume: prefs.volume, muted: !!prefs.muted })); return true; } catch { return false; }
 }
 
-/** Master gain for the prefs: 0 muted, else a perceptual (squared) curve, 0.6 -> ~0.3. */
+/** Master gain for the prefs: 0 muted, else a perceptual (squared) curve, the default 0.35 -> ~0.1. */
 export const masterGain = (p) => (p.muted ? 0 : 0.85 * p.volume * p.volume);

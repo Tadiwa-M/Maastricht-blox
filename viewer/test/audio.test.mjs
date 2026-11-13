@@ -2,7 +2,7 @@
 // (bells, steps, landing), the remembered prefs and the sound places (src/audio/).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { att, earFrom, placeOf, greenAt, surfaceAt, rainLevel, SURFACES } from '../src/audio/mix.js';
+import { att, earFrom, placeOf, greenAt, surfaceAt, rainLevel, dayLevel, SURFACES } from '../src/audio/mix.js';
 import { bellStrikes, StepClock, AirWatch, PRELUDE } from '../src/audio/events.js';
 import { loadPrefs, savePrefs, masterGain, PREFS_KEY, PREFS_DEFAULTS } from '../src/audio/prefs.js';
 import { audioPlaces, DEFAULT_ORIGIN_RD } from '../src/audio/places.js';
@@ -53,7 +53,7 @@ test('green and surfaces: gravel in a park, cobbles in the old town, paving else
   assert.equal(surfaceAt(P.oldTown.x + 30, P.oldTown.z + 200, P), 'cobble');
   assert.equal(surfaceAt(P.oldTown.x + 3000, P.oldTown.z + 3000, P), 'stone');
   assert.equal(surfaceAt(0, 0, null), 'cobble');
-  for (const s of Object.values(SURFACES)) assert.ok(s.f > 0 && s.len > 0 && s.vol > 0);
+  for (const s of Object.values(SURFACES)) assert.ok(s.f > 0 && s.f < 250 && s.tex <= 1200 && s.grain <= 0.5 && s.len > 0 && s.vol > 0); // low, soft taps
 });
 
 test('rain: a weather source first, else #rain= from the URL, clamped', () => {
@@ -64,14 +64,24 @@ test('rain: a weather source first, else #rain= from the URL, clamped', () => {
   assert.equal(rainLevel({ rain: 0.3 }, '#rain=1'), 0.3);
 });
 
-test('bells: the hour strikes its count, half hours once, nights quiet', () => {
+test('daylight: dark at night, full by day, gradual at dawn and dusk', () => {
+  assert.equal(dayLevel(2), 0); assert.equal(dayLevel(23.5), 0);
+  assert.equal(dayLevel(12), 1); assert.equal(dayLevel(NaN), 1);
+  assert.ok(dayLevel(7) > 0.2 && dayLevel(7) < 0.8);
+  assert.ok(dayLevel(20) > dayLevel(21) && dayLevel(21) > 0);
+});
+
+test('bells: the hour strikes its count, no half hours, evenings and nights quiet', () => {
   assert.deepEqual(bellStrikes(MON + 9 * H - 1, MON + 9 * H + 1), [{ kind: 'hour', hour: 9, count: 9 }]);
   assert.deepEqual(bellStrikes(MON + 15 * H - 1, MON + 15 * H), [{ kind: 'hour', hour: 15, count: 3 }]);
   assert.deepEqual(bellStrikes(MON + 12 * H - 1, MON + 12 * H + 1), [{ kind: 'hour', hour: 12, count: 12 }]);
-  assert.deepEqual(bellStrikes(MON + 10.5 * H - 1, MON + 10.5 * H + 1), [{ kind: 'half', hour: 10 }]);
+  assert.deepEqual(bellStrikes(MON + 10.5 * H - 1, MON + 10.5 * H + 1), []);
+  assert.deepEqual(bellStrikes(MON + 10.5 * H - 1, MON + 10.5 * H + 1, { half: true }), [{ kind: 'half', hour: 10 }]);
   assert.deepEqual(bellStrikes(MON + 3 * H - 1, MON + 3 * H + 1), []);
-  assert.deepEqual(bellStrikes(MON + 22.5 * H - 1, MON + 22.5 * H + 1), []);
-  assert.deepEqual(bellStrikes(MON + 22 * H - 1, MON + 22 * H + 1), [{ kind: 'hour', hour: 22, count: 10 }]);
+  assert.deepEqual(bellStrikes(MON + 7 * H - 1, MON + 7 * H + 1), []);
+  assert.deepEqual(bellStrikes(MON + 22 * H - 1, MON + 22 * H + 1), []);
+  assert.deepEqual(bellStrikes(MON + 21.5 * H - 1, MON + 21.5 * H + 1, { half: true }), []);
+  assert.deepEqual(bellStrikes(MON + 21 * H - 1, MON + 21 * H + 1), [{ kind: 'hour', hour: 21, count: 9 }]);
   assert.deepEqual(bellStrikes(MON + 9 * H + 1, MON + 9 * H + 50), []); // nothing crossed
 });
 
@@ -123,9 +133,10 @@ test('prefs: defaults, stored values, bad data, throwing storage', () => {
   assert.deepEqual(loadPrefs(null), PREFS_DEFAULTS);
 });
 
-test('master gain: muted is silent, the default is moderate', () => {
+test('master gain: muted is silent, the default is quiet', () => {
   assert.equal(masterGain({ volume: 1, muted: true }), 0);
   const g = masterGain(PREFS_DEFAULTS);
-  assert.ok(g > 0.2 && g < 0.45);
+  assert.equal(PREFS_DEFAULTS.volume, 0.35);
+  assert.ok(g > 0.06 && g < 0.15);
   assert.ok(masterGain({ volume: 1, muted: false }) <= 1);
 });

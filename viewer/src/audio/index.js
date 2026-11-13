@@ -1,6 +1,7 @@
-// City sound for the web game, all synthesised with the Web Audio API (no sound files): rain, the
-// Vrijthof bells striking the game clock's hours, footsteps, jump and landing thuds. (Traffic,
-// crowd, birds and bus sounds were taken out on the owner's request.) Entry point, called once from main.js initHooks
+// City sound for the web game, all synthesised with the Web Audio API (no sound files) and kept
+// calm: a barely audible pad of slow chords, the Vrijthof bells striking the game clock's hours,
+// soft footsteps and landings, rain as a low patter. (Traffic, crowd, birds and bus sounds were
+// taken out on the owner's request.) Entry point, called once from main.js initHooks
 // (the `// [audio hook]`): const hook = await initAudio(ctx); hook.update(dt) every frame.
 //
 // It only reads the other tracks' state: window.__bloxLife (clock),
@@ -10,17 +11,16 @@
 // and bells every frame. Muted or in a hidden tab the context is suspended (no CPU).
 // Guide: docs/guide/14-sound.md. The numbers: mix.js and events.js (pure, tested).
 import { audioPlaces } from './places.js';
-import { att, earFrom, placeOf, surfaceAt, rainLevel, clamp } from './mix.js';
-import { bellStrikes, StepClock, AirWatch, PRELUDE, PRELUDE_BEAT_S, STRIKE_GAP_S } from './events.js';
+import { att, earFrom, placeOf, surfaceAt, rainLevel, dayLevel, clamp } from './mix.js';
+import { bellStrikes, StepClock, AirWatch } from './events.js';
 import { loadPrefs, savePrefs, masterGain } from './prefs.js';
 import { bindAudioUI } from './ui.js';
 import { CitySynth } from './synth.js';
 import { strideAt } from '../figure/gait.js';
 
 const TICK_S = 0.1; // layer updates: ~10 Hz
-const BELL_HOUR_HZ = 233; // Sint Servaas (B flat)
-const BELL_HALF_HZ = 349; // Sint Jan (F)
-const PRELUDE_HZ = 1047; // C6, the small bells' tune
+const FADE_IN_TAU_S = 0.6; // the first start: ~2 s to full level
+const FADE_TAU_S = 0.2; // mute, unmute, the volume slider
 
 export async function initAudio(ctx) {
   if (typeof window === 'undefined' || ctx.still || /[#&]audio=0\b/.test(location.hash)) return null;
@@ -30,15 +30,15 @@ export async function initAudio(ctx) {
   const prefs = loadPrefs(store);
   const places = audioPlaces(ctx.originRD || window.BLOX_SITE?.originRD);
   const camera = ctx.camera || ctx.stage?.camera;
-  let ac = null, synth = null, offSince = 0, suspendTimer = 0;
+  let ac = null, synth = null, offSince = 0, suspendTimer = 0, started = false;
 
   const wanted = () => !prefs.muted && prefs.volume > 0 && !document.hidden;
   function apply() {
     if (!wanted()) {
       if (!synth) return;
-      synth.setVolume(0);
+      synth.setVolume(0, FADE_TAU_S); // fade out, then stop the context
       clearTimeout(suspendTimer);
-      suspendTimer = setTimeout(() => { if (!wanted() && ac.state === 'running') { ac.suspend(); offSince = performance.now(); } }, 250);
+      suspendTimer = setTimeout(() => { if (!wanted() && ac.state === 'running') { ac.suspend(); offSince = performance.now(); } }, 1000);
       return;
     }
     if (!ac) {
@@ -48,7 +48,8 @@ export async function initAudio(ctx) {
     if (offSince && performance.now() - offSince > 1000) synth.resetBuses(); // drop sounds queued before the mute
     offSince = 0;
     if (ac.state !== 'running') ac.resume().catch(() => {});
-    synth.setVolume(masterGain(prefs), 0.15);
+    synth.setVolume(masterGain(prefs), started ? FADE_TAU_S : FADE_IN_TAU_S);
+    started = true;
   }
   const ui = bindAudioUI(prefs, { onChange: () => { savePrefs(store, prefs); if (gestured) apply(); } });
 
@@ -85,13 +86,7 @@ export async function initAudio(ctx) {
   function bells(clock) {
     const t = clock.t, due = bellStrikes(lastT, t);
     lastT = t;
-    let when = synth.now + 0.05;
-    for (const s of due) {
-      if (s.kind === 'half') { synth.bell(when, BELL_HALF_HZ, 0.8, 3.5); continue; }
-      for (const [semi, beat] of PRELUDE) synth.bell(when + beat * PRELUDE_BEAT_S, PRELUDE_HZ * 2 ** (semi / 12), 0.45, 1.6, true);
-      when += (PRELUDE[PRELUDE.length - 1][1] + 3) * PRELUDE_BEAT_S;
-      for (let q = 0; q < s.count; q++) synth.bell(when + q * STRIKE_GAP_S, BELL_HOUR_HZ, 1, 4.5);
-    }
+    for (const s of due) if (s.kind === 'hour') synth.hourStrike(synth.now + 0.05, s.count);
   }
 
   /** The walking player's feet: steps by distance, jump and landing. */
@@ -107,15 +102,15 @@ export async function initAudio(ctx) {
     const n = steps.update(moved, speed, c.grounded && !c.frozen);
     for (let q = 0; q < n; q++) synth.step(surface, 0.7 + 0.3 * clamp(speed / 4), synth.now + q * 0.12);
     const ev = air.update(c.grounded, c.vel[1], dt);
-    if (ev?.kind === 'jump') synth.step(surface, 0.6);
+    if (ev?.kind === 'jump') synth.step(surface, 0.5);
     else if (ev?.kind === 'land') synth.thud(surface, ev.strength);
   }
 
-  /** The layers: rain (muffled inside a bus) and where the bells are heard from. */
+  /** The layers: rain (softer inside a bus), the pad's daylight and where the bells are heard from. */
   function layers(life) {
     const E = ear(), ride = ridden(life);
-    const b = places.bells.servaas, pb = placeOf(E, b.x, b.z), lb = att(pb.d, 90); // across the old town, duller with distance
-    last = { rain: rain() * (ride ? 0.6 : 1), bells: { level: lb, pan: pb.pan, cut: 700 + 7000 * lb } };
+    const b = places.bells.servaas, pb = placeOf(E, b.x, b.z), lb = 0.8 * att(pb.d, 90); // across the old town, duller with distance
+    last = { rain: rain() * (ride ? 0.6 : 1), day: dayLevel(life?.clock?.hours), bells: { level: lb, pan: pb.pan, cut: 500 + 2500 * lb } };
     synth.mix(last);
   }
 

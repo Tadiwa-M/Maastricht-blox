@@ -1601,3 +1601,12 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   their side, walk round people standing, overtake or follow), never shifting into a wall,
   eased starts and stops, heads turning to friends, to what the group looks at and to the player.
   Guide 09.
+
+## 2026-11-12: calm sound
+
+- Owner: "just noise". Reworked so nothing is a raw noise burst: a very quiet pad of slow chords
+  (one voice moves every 15 s), mellow distant bells (low partials, soft attack, long tail, a dull
+  echo; hours only), soft low footsteps and landings, rain as a low patter. Default volume 35 %,
+  a gentle limiter, a 2 s fade-in, smooth mute fades.
+- Measured (30 s offline render): peak -14.3 -> -24.6 dBFS, energy above 4 kHz 44 % -> < 0.001 %,
+  largest sample jump 0.055 -> 0.002 (`audio.render.test.mjs`). Guide 14.

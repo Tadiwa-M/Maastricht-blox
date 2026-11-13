@@ -1,16 +1,17 @@
 // Sound events from the game state, as pure state machines (tested in test/audio.test.mjs):
 // the hour bells from the game clock, footsteps from the distance walked, jump and landing from
-// the controller, and a ridden bus's doors from its speed.
+// the controller.
 
 const HOUR = 3600;
 
 /**
  * Bell strikes due between two game-clock readings (seconds since Monday 00:00, LifeClock.t).
- * Hours from..to (inclusive) strike their count (1-12) on Sint Servaas; half hours one stroke on
- * Sint Jan; the night stays quiet. A jump of the clock (the "now" button, the sun slider) of more
- * than maxJump seconds strikes nothing. -> [{ kind: 'hour', hour, count } | { kind: 'half', hour }]
+ * Hours from..to (inclusive) strike their count (1-12) on Sint Servaas; the evening and night
+ * stay quiet. Half hours (one stroke) only with half: true; off by default, the calm mix strikes
+ * the hours only. A jump of the clock (the "now" button, the sun slider) of more than maxJump
+ * seconds strikes nothing. -> [{ kind: 'hour', hour, count } | { kind: 'half', hour }]
  */
-export function bellStrikes(prevT, nowT, { from = 7, to = 22, maxJump = 120 } = {}) {
+export function bellStrikes(prevT, nowT, { from = 8, to = 21, half: halves = false, maxJump = 120 } = {}) {
   if (!Number.isFinite(prevT) || !Number.isFinite(nowT)) return [];
   let a = prevT, b = nowT;
   if (b < a) b += 7 * 86400; // Sunday night -> Monday
@@ -18,16 +19,17 @@ export function bellStrikes(prevT, nowT, { from = 7, to = 22, maxJump = 120 } = 
   const out = [];
   for (let k = Math.floor(a / (HOUR / 2)) + 1; k * (HOUR / 2) <= b; k++) {
     const hour = Math.floor((k * (HOUR / 2)) / HOUR) % 24, half = k % 2 === 1;
+    if (half && !halves) continue;
     if (half ? hour < from || hour >= to : hour < from || hour > to) continue;
     out.push(half ? { kind: 'half', hour } : { kind: 'hour', hour, count: hour % 12 || 12 });
   }
   return out;
 }
 
-/** The short tune Sint Jan's small bells play before the hour strikes: [semitones above C6, beat]. */
+/** The short tune Sint Jan's small bells play before the hour strikes: [semitones above C5, beat]. */
 export const PRELUDE = [[7, 0], [4, 1], [9, 2], [7, 3], [4, 4.5], [2, 5], [0, 6]];
-export const STRIKE_GAP_S = 2.4; // between the hour bell's strokes
-export const PRELUDE_BEAT_S = 0.3;
+export const STRIKE_GAP_S = 3; // between the hour bell's strokes
+export const PRELUDE_BEAT_S = 0.42;
 
 /**
  * Footsteps from the distance walked: one step per stride (m, by speed; the figure's gait,
