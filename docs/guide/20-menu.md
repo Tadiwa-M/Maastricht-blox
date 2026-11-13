@@ -63,3 +63,14 @@ face their building) → fade out (0.4 s). When the ground is not loaded yet: le
 the map camera and `city.focus` at it, retry every 0.4 s ("Travelling to …" on the black), give up
 after 45 s and stay on the map there with a note. Riding a bus: you get off first. Not during a
 multiplayer match.
+
+## The look of the main page (2026-11-13)
+
+The pause page reads like the title screen: a column down the left (the wordmark with the yellow
+brick badge, the Limburg stripe, the street or time, entries in big Anton capitals with a yellow
+bar on hover or focus, Resume as a yellow brick), fading out to the right so the paused city
+stays in view. Settings and the map keep their own layouts. On short landscape phones the
+entries sit in two columns. All in `menu/style.js` (`.bx-main` rules); the markup added is the
+brand and stripe in `menu/index.js`. Checked at 1280x720, 915x412 and 412x915: every entry on
+screen, none under 40 px high.
+

@@ -1,5 +1,6 @@
 // Styles of the pause menu, its map and the fast-travel fade (injected once by index.js).
-// Title-screen look: dark Limburg blue, yellow brick buttons with a stud row, Anton headings.
+// Title-screen look: the main page is a column down the left (brand with the yellow brick badge,
+// Limburg stripe, big Anton entries) with the paused city in view beside it; other pages are cards.
 export const MENU_CSS = `
 #bx-menu-btn { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px));
   z-index: 7; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 9px; cursor: pointer;
@@ -38,6 +39,58 @@ body.title #bx-menu-btn, body.shot #bx-menu-btn, body.bx-paused #bx-menu-btn { v
 #bx-menu button.bx-item.primary:focus-visible { box-shadow: inset 0 0 0 2px #fff; }
 #bx-menu button.bx-back { font: 600 13px/1 system-ui, sans-serif; color: #11143a; background: #F2A900; border: 0; border-radius: 8px;
   min-height: 38px; padding: 0 14px; cursor: pointer; box-shadow: inset 0 -3px 0 rgba(0,0,0,.2); }
+/* the main page: a title-screen column down the left, the paused city in view beside it */
+#bx-menu:has(.bx-main:not([hidden])) { background: rgba(4, 5, 16, .18); backdrop-filter: none; }
+#bx-menu .bx-main { justify-content: flex-start; padding: 0;
+  background: linear-gradient(90deg, rgba(4,5,16,.94) 0, rgba(11,13,42,.86) min(420px, 70vw), rgba(4,5,16,0) min(760px, 100vw)),
+    radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,.5) 100%); }
+#bx-menu .bx-main::before { content: ''; position: absolute; inset: 0 auto 0 0; width: min(420px, 70vw); pointer-events: none; opacity: .5;
+  background: radial-gradient(circle, rgba(255,255,255,.06) 1.5px, transparent 2px) 0 0 / 22px 22px; } /* a faint stud plate */
+#bx-menu .bx-main .bx-card { position: relative; width: min(400px, 100%); height: 100%; max-height: none; border-radius: 0; border: 0; box-shadow: none;
+  background: none; display: flex; flex-direction: column; justify-content: center;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 22px calc(18px + env(safe-area-inset-bottom, 0px)) calc(clamp(18px, 4vw, 44px) + env(safe-area-inset-left, 0px)); }
+#bx-menu .bx-brand { font: 400 30px/.9 'Anton', Impact, 'Arial Narrow Bold', sans-serif; letter-spacing: .02em; text-transform: uppercase;
+  display: flex; align-items: center; gap: 10px; text-shadow: 0 6px 24px rgba(0,0,0,.6); }
+#bx-menu .bx-brand b { font-weight: 400; }
+#bx-menu .bx-brand span { position: relative; padding: .16em .45em .1em; font-size: .72em; letter-spacing: .14em; color: #11143a; background: #F2A900;
+  border-radius: 5px; transform: rotate(-2deg);
+  box-shadow: inset 0 -.12em 0 rgba(0,0,0,.18), inset 0 .06em 0 rgba(255,255,255,.45), 0 .16em 0 #8f5b00; }
+#bx-menu .bx-brand span i { position: absolute; top: -.2em; width: .62em; height: .22em; border-radius: .12em .12em 0 0; background: #F2A900;
+  box-shadow: inset 0 .05em 0 rgba(255,255,255,.5); }
+#bx-menu .bx-brand span i:nth-of-type(1) { left: 10%; } #bx-menu .bx-brand span i:nth-of-type(2) { left: 32%; }
+#bx-menu .bx-brand span i:nth-of-type(3) { left: 54%; } #bx-menu .bx-brand span i:nth-of-type(4) { left: 76%; }
+#bx-menu .bx-stripe { display: flex; gap: 4px; margin: 12px 0 14px; } /* the Limburg colours */
+#bx-menu .bx-stripe i { width: 34px; height: 4px; border-radius: 2px; background: #fff; }
+#bx-menu .bx-stripe i:nth-child(2) { background: #3d5bff; } #bx-menu .bx-stripe i:nth-child(3) { background: #F2A900; }
+#bx-menu .bx-main h2 { font-size: 15px; letter-spacing: .38em; color: rgba(246,243,234,.7); font-family: system-ui, sans-serif; font-weight: 600; }
+#bx-menu .bx-main .bx-where { margin: 4px 0 14px; padding-left: 12px; border-left: 3px solid #F2A900; font: 400 17px/1.2 'Anton', Impact, sans-serif;
+  letter-spacing: .12em; text-transform: uppercase; color: #f6f3ea; }
+#bx-menu .bx-main .bx-where:empty { border: 0; }
+#bx-menu .bx-main .bx-items { gap: 2px; overflow: auto; touch-action: pan-y; overscroll-behavior: contain; margin-right: -8px; padding-right: 8px; }
+#bx-menu .bx-main button.bx-item { min-height: 42px; padding: 4px 12px 4px 14px; border-radius: 6px; background: none; box-shadow: none;
+  font: 400 21px/1.1 'Anton', Impact, 'Arial Narrow Bold', sans-serif; letter-spacing: .08em; text-transform: uppercase; color: rgba(246,243,234,.82);
+  transition: transform .12s ease, background-color .12s ease, color .12s ease; }
+#bx-menu .bx-main button.bx-item small { font: 400 11px/1.2 system-ui, sans-serif; letter-spacing: 0; text-transform: none; }
+#bx-menu .bx-main button.bx-item::before { content: ''; position: absolute; left: 0; top: 50%; width: 5px; height: 0; border-radius: 3px; background: #F2A900;
+  transform: translateY(-50%); transition: height .12s ease; }
+#bx-menu .bx-main button.bx-item:hover, #bx-menu .bx-main button.bx-item:focus-visible { color: #fff; background: linear-gradient(90deg, rgba(242,169,0,.24), rgba(242,169,0,0));
+  transform: translateX(6px); box-shadow: none; }
+#bx-menu .bx-main button.bx-item:hover::before, #bx-menu .bx-main button.bx-item:focus-visible::before { height: 70%; }
+#bx-menu .bx-main button.bx-item.primary { color: #11143a; background: #F2A900; margin-bottom: 8px; min-height: 50px; font-size: 24px;
+  box-shadow: inset 0 -4px 0 rgba(0,0,0,.2), inset 0 2px 0 rgba(255,255,255,.4), 0 4px 0 #8f5b00; }
+#bx-menu .bx-main button.bx-item.primary:hover, #bx-menu .bx-main button.bx-item.primary:focus-visible { background: #ffc531; color: #11143a; transform: translateX(0) translateY(-1px);
+  box-shadow: inset 0 -4px 0 rgba(0,0,0,.2), inset 0 2px 0 rgba(255,255,255,.4), 0 5px 0 #8f5b00; }
+#bx-menu .bx-main button.bx-item.primary::before { display: none; }
+#bx-menu .bx-main button.bx-item kbd { background: rgba(246,243,234,.16); color: #f6f3ea; box-shadow: none; font-family: system-ui, sans-serif; letter-spacing: 0; }
+@media (prefers-reduced-motion: reduce) { #bx-menu .bx-main button.bx-item { transition: none; } }
+@media (max-height: 520px) {
+  #bx-menu .bx-main { background: linear-gradient(90deg, rgba(4,5,16,.94) 0, rgba(11,13,42,.88) 70%, rgba(4,5,16,.4) 100%); }
+  #bx-menu .bx-main .bx-card { width: min(660px, 100%); justify-content: flex-start; padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-bottom: 8px; }
+  #bx-menu .bx-brand { font-size: 20px; } #bx-menu .bx-stripe { margin: 6px 0; } #bx-menu .bx-main h2 { display: none; }
+  #bx-menu .bx-main .bx-where { margin: 0 0 6px; font-size: 13px; }
+  #bx-menu .bx-main button.bx-item { min-height: 40px; font-size: 16px; }
+  #bx-menu .bx-main button.bx-item.primary { min-height: 40px; font-size: 17px; margin-bottom: 0; }
+}
 /* the settings panel (#hud) re-hosted on the Settings page */
 #bx-menu .bx-slot #hud { position: static; transform: none; width: auto; display: grid; margin: 8px 0 0; padding: 0;
   background: none; backdrop-filter: none; box-shadow: none; }

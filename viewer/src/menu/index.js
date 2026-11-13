@@ -40,7 +40,8 @@ export async function initMenu(ctx) {
   const root = el('div', { id: 'bx-menu', hidden: true });
   root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', 'Game menu');
   const main = el('div', { className: 'bx-page bx-main' },
-    '<div class="bx-card"><div class="bx-head"><h2>Paused</h2></div><div class="bx-where"></div><div class="bx-items"></div></div>');
+    '<div class="bx-card"><div class="bx-brand"><b>Maastricht</b><span>Blox<i></i><i></i><i></i><i></i></span></div>'
+    + '<div class="bx-stripe"><i></i><i></i><i></i></div><div class="bx-head"><h2>Paused</h2></div><div class="bx-where"></div><div class="bx-items"></div></div>');
   const settings = el('div', { className: 'bx-page bx-settings', hidden: true },
     '<div class="bx-card"><div class="bx-head"><h2>Settings</h2><button class="bx-back" type="button">Back</button></div><div class="bx-slot"></div></div>');
   const mapPage = el('div', { className: 'bx-page bx-map', hidden: true }, `<canvas></canvas>

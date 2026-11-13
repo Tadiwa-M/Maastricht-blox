@@ -1688,3 +1688,8 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Checked in a browser match against a scripted player: the pickup through the room, the gun
   on the other figure. The relay must be redeployed for pickups to work.
 
+## 2026-11-13: the pause menu looks like the title screen
+
+- Owner: the pause menu was plain. The main page is now a left column in the title screen's style
+  with the paused city beside it (guide 20). CSS and two lines of markup; no behaviour changed.
+
