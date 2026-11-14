@@ -156,3 +156,7 @@ knock-outs, flags); the client knows the walls, so it claims hits and the room c
 - Open: not played by two people on real devices yet (frame rate, touch layout, how the guns
   feel); other players' guns point where the figure faces, not up or down; the heat map and a
   shotgun hit have unit tests but were not seen in a browser match.
+
+- **How to play (2026-11-14):** when a player's first match in a room starts, a line above the
+  hint bar names the controls for 14 s (`combat.js` `controlsTip`: mouse and keys, or the touch
+  buttons) and says that the yellow pads hold weapons.

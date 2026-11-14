@@ -1746,3 +1746,7 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Open: the car lights and the tour have not been seen on screen yet; bike riding feel and a
   wider code review are next.
 
+## 2026-11-14: the shooting mode says how to play
+
+- Nothing told a new player how to fire, aim, swap, stab or find weapons. A controls line now shows
+  for 14 s when their first match in a room starts (guide 18).

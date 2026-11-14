@@ -29,6 +29,9 @@ const CSS = `
 #cb-ammo { position: absolute; right: 70px; bottom: 16px; color: #fff; text-align: right; text-shadow: 0 1px 3px #000; font-weight: 700; }
 #cb-ammo span { font-size: 26px; } #cb-ammo small { display: block; font-size: 11px; letter-spacing: .12em; opacity: .85; text-transform: uppercase; }
 #cb-ammo u { display: block; height: 3px; margin-top: 3px; background: #F2C200; text-decoration: none; }
+#cb-tip { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); max-width: min(92vw, 640px); padding: 8px 14px; border-radius: 10px;
+  background: rgba(11,13,42,.82); border-top: 3px solid #F2A900; color: #f6f3ea; font-size: 13px; line-height: 1.45; text-align: center; transition: opacity .6s; }
+#cb-tip b { color: #F2A900; font-weight: 700; } #cb-tip.gone { opacity: 0; }
 #cb-down { position: absolute; left: 0; right: 0; top: 38%; text-align: center; color: #fff; font-size: 22px; font-weight: 800; text-shadow: 0 2px 6px #000; }
 .cb-btn { position: fixed; z-index: 6; pointer-events: auto; border-radius: 50%; border: 2px solid rgba(255,255,255,.6); background: rgba(17,20,58,.55);
   color: #fff; font: 700 12px system-ui, sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -128,6 +131,14 @@ class ShotSound {
   }
 }
 
+export const TIP_S = 14;
+/** The how-to-play line shown when a player's first match in a room starts. */
+export function controlsTip(touch) {
+  return touch
+    ? '<b>FIRE</b> shoots · <b>AIM</b> looks down the sights · <b>SWAP</b> changes weapon · <b>KNIFE</b> knocks out in one hit up close · walk over a <b>yellow pad</b> for a scout or a shotgun'
+    : '<b>Left mouse</b> fire · <b>right mouse</b> aim · <b>Q</b> or <b>1 2 3</b> weapon · <b>R</b> reload · <b>V</b> knife: one hit up close · walk over a <b>yellow pad</b> for a scout or a shotgun';
+}
+
 export class Combat {
   /** o: { scene, camera, city, origin, player: () => __bloxPlayer, send(msg), enemies: () => [{ id, pos, scale }] } */
   constructor(o) {
@@ -155,6 +166,7 @@ export class Combat {
     this.hpEl = el('b', {}, el('div', { id: 'cb-hp' }, r));
     this.ammoEl = el('div', { id: 'cb-ammo' }, r);
     this.downEl = el('div', { id: 'cb-down', hidden: true }, r);
+    this.tipEl = el('div', { id: 'cb-tip', className: 'gone', innerHTML: controlsTip(this.touch) }, r);
     const btn = (id, text, down, up) => {
       const b = el('button', { id, className: 'cb-btn', textContent: text, hidden: true }, document.body);
       b.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); down(b); });
@@ -332,10 +344,12 @@ export class Combat {
       this.active = on;
       this.root.hidden = !on;
       for (const b of this.btns) b.hidden = !(on && this.touch);
+      if (on && !this.tipped) { this.tipped = true; this.tipT = TIP_S; this.tipEl.classList.remove('gone'); } // how to play, once per room
       if (on) { this.saved = { o: { minDist: f.o.minDist, shoulder: f.o.shoulder, fov: f.o.fov }, dist: f.aimDist, recenter: P.settings.recenter }; P.settings.recenter = false; }
       else { this.restoreCamera(); this.hands.visible = this.side.visible = false; this.fire = this.aiming = false; for (const p of this.pickups) p.g.visible = false; }
     }
     this.stepFx(dt);
+    if (this.tipT > 0 && (this.tipT -= dt) <= 0) this.tipEl.classList.add('gone');
     this.drawOthers();
     if (!on) return;
     this.pollPad();

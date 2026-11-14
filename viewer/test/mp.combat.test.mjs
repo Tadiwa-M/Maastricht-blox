@@ -120,3 +120,10 @@ test('pickups: four weapons mirrored about the middle, the same distance from ea
   for (const s of spots) assert.ok(d(s.at, bases.blue.at) > 30 && d(s.at, bases.yellow.at) > 30);
   assert.deepEqual(spots, roomSpots(bases), 'the room and the client agree on the spots');
 });
+
+test('how to play: the tip names the controls of the device in hand', async () => {
+  const { controlsTip } = await import('../src/mp/combat.js');
+  for (const w of ['Left mouse', 'right mouse', 'reload', 'knife', 'yellow pad']) assert.ok(controlsTip(false).includes(w), w);
+  for (const w of ['FIRE', 'AIM', 'SWAP', 'KNIFE', 'yellow pad']) assert.ok(controlsTip(true).includes(w), w);
+  assert.ok(!controlsTip(true).includes('mouse'));
+});
