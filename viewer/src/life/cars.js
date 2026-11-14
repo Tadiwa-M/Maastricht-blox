@@ -11,7 +11,7 @@ import { nextPatrolIn, sirenStep, switchOn, beacons, POLICE } from './police.js'
 
 // common car colours (palette hex where one fits; movers may use non-palette colours)
 const COLOURS = ['#F2F0EA', '#F2F0EA', '#1E1F21', '#1E1F21', '#5C6062', '#A7AAA8', '#A7AAA8', '#22385A', '#A33A2B', '#6E8798', '#2F5A3C', '#C8102E', '#5B8DB8', '#8F7A57'];
-const TYPES = [['hatch', 0.45], ['saloon', 0.35], ['van', 0.2]];
+const TYPES = [['hatch', 0.34], ['saloon', 0.2], ['estate', 0.14], ['suv', 0.14], ['van', 0.14], ['taxi', 0.04]];
 
 export class Cars {
   /** doc: streets.json roads. ground(x, z) -> y. */
@@ -65,7 +65,7 @@ export class Cars {
     }
     // (rule state from a previous life is reset: commits, waiting, pulling over, lights)
     Object.assign(c, { e, s, v: (CLASS_SPEED[this.g.cls[e]] || 8) * 0.6, next: undefined, next2: undefined, prev: -1, gone: false,
-      type, len: CAR_TYPES[type].L, mood: 0.85 + r() * 0.25, colour: police ? '#F4F4F2' : COLOURS[Math.floor(r() * COLOURS.length)], dist: 0, id: this.nextId++,
+      type, len: CAR_TYPES[type].L, mood: 0.85 + r() * 0.25, colour: police ? '#F4F4F2' : type === 'taxi' ? '#1E1F21' : COLOURS[Math.floor(r() * COLOURS.length)], dist: 0, id: this.nextId++,
       commits: [], wait: 0, goNode: undefined, yieldNode: undefined, yielding: false, waitingFor: null, lat: 0, latWant: 0,
       police, siren: false, sirenT: 0 });
     if (police && r() < POLICE.sirenOnSpawn) switchOn(c, r);

@@ -1738,3 +1738,11 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Owner: the city should feel alive. First touch: tree foliage near the camera drifts with the
   live wind speed (guide 06). One shader patch and a per-instance flag; no new draw passes.
 
+## 2026-11-14: more car types with lights at night; rush jobs and sightseeing tours
+
+- Owner: a city that feels alive, more varied challenges. Cars: estate, suv, taxi, body details,
+  head and tail lights with light pools from dusk (guide 05). Goals: a timed delivery between real
+  shops that needs a run, and a three-sights tour in any order (guide 17).
+- Open: the car lights and the tour have not been seen on screen yet; bike riding feel and a
+  wider code review are next.
+

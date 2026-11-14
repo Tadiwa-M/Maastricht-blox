@@ -667,3 +667,17 @@ unchanged timing) drives every lamp and every rule.
   sideways push was tried and did not move the number, so it was not kept; the next thing to try
   is spacing along the heading (the one behind stops), not only sideways.
 
+## More cars, and lights at night (2026-11-14)
+
+- `figure/vehicles.js` `CAR_TYPES`: estate, suv and taxi join hatch, saloon and van (`cars.js`
+  `TYPES`: 34 / 20 / 14 / 14 / 14 / 4 %; the taxi is black with a lit yellow roof sign).
+  Every body now has wing mirrors, a dark grille, sills, door seams and handles, dark arches over
+  the wheels, and roof rails on the estate and the suv. Still one body + one glass mesh per type.
+- **Lights**: `VehicleFleet.setNight(n)` (life/index.js passes the scene's night factor). Above
+  `LIGHTS_FROM` (0.2) every car adds one instance of `carLights`: a unit set of head lamps, tail
+  lamps and two pools of light on the road ahead, scaled to the car's width, lamp height and
+  length, drawn additively (unlit, no depth write, no shadow), fading in over dusk. One more draw
+  call for all cars together. `test/vehicles.test.mjs`.
+- Seen on screen: the new body details by day. The lights are covered by tests only (no car was
+  in frame in the night check).
+

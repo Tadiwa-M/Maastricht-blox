@@ -1,10 +1,12 @@
 // Light goals (docs/guide/17-goals.md): what to offer and when it counts as done. Pure: no
 // three.js, no DOM; positions are Unity metres (x east, z north). Tested in test/goals.logic.test.mjs.
 //
-// Three kinds, one at a time, always optional:
+// Five kinds, one at a time, always optional:
 //   tourist  a passer-by asks for a real place; walk there within a generous time
 //   bus      catch a timetable bus line to a stop a few calls down the line
 //   golden   reach a viewpoint before sunset on the game clock
+//   delivery a shop asks you to run something across town: short, against the clock (you have to run)
+//   tour     three sights near you, in any order, no clock
 
 export const WEEK_S = 7 * 86400;
 /** The game's sun sets at 18:00 (scene.js sunAt: dayT = 1 at 18 h). */
@@ -90,6 +92,75 @@ export function placeLabel(p) {
 }
 
 export const askLine = (p) => `Excuse me, do you know the way to ${placeLabel(p)}?`;
+
+// ---- delivery -----------------------------------------------------------------------------
+
+/** Shops and cafes that send and receive things (places.js poiType values). */
+const DELIVERS = new Set(['cafe', 'restaurant', 'bar', 'pub', 'bakery', 'books', 'chocolate', 'cheese', 'ice cream',
+  'deli', 'wine', 'coffee', 'tea', 'gift', 'clothes', 'confectionery', 'hotel', 'library', 'theatre']);
+const PARCELS = { bakery: 'a box of vlaai', cafe: 'a tray of coffees', restaurant: 'a hot order', bar: 'a crate of bottles', pub: 'a crate of bottles',
+  books: 'a parcel of books', chocolate: 'a box of chocolates', cheese: 'a wheel of cheese', 'ice cream': 'a tub of ice cream', wine: 'two bottles of wine',
+  deli: 'a lunch order', clothes: 'a mended coat', gift: 'a wrapped present', hotel: 'a forgotten suitcase', library: 'an overdue book', theatre: 'a costume' };
+export const DELIVERY_RANGE = [150, 480];
+
+/**
+ * A delivery from one shop to another: rows as pickTourist. -> { from: { name, sub }, to: { name,
+ * sub, x, z, d }, parcel } or null. The sender is the nearest shop (within 120 m, else nobody
+ * in particular); the receiver a different shop DELIVERY_RANGE metres away.
+ */
+export function pickDelivery(rows, here, { built = () => true, recent = new Set(), rand = Math.random, range = DELIVERY_RANGE } = {}) {
+  const shops = [];
+  for (const [name, kind, x, z, sub] of rows) {
+    const type = String(sub || '').toLowerCase();
+    if (kind !== 'poi' || !DELIVERS.has(type) || !name || name.length > 40) continue;
+    shops.push({ name, sub: type, x, z, d: dist([x, z], here) });
+  }
+  const to = weighted(shops.filter((p) => p.d >= range[0] && p.d <= range[1] && !recent.has(p.name) && built(p.x, p.z)), () => 1, rand);
+  if (!to) return null;
+  const from = shops.filter((p) => p.d <= 120 && p.name !== to.name).sort((a, b) => a.d - b.d)[0] || null;
+  return { from, to, parcel: PARCELS[from?.sub] || PARCELS[to.sub] || 'a parcel' };
+}
+
+/** Seconds for a delivery of straight-line metres d: a walk will not do it, a run will (5 m/s, streets wind). */
+export const deliveryLimit = (d) => Math.round(22 + d / 2.7);
+
+// ---- tour ---------------------------------------------------------------------------------
+
+export const TOUR_N = 3, TOUR_MAX_M = 900, TOUR_APART_M = 90;
+
+/**
+ * Three sights near `here` (landmarks, stations, parks), nearest first but at least
+ * TOUR_APART_M from each other: [{ name, kind, x, z, seen: false }] or null (fewer than three).
+ */
+export function pickTour(rows, here, { built = () => true, recent = new Set(), n = TOUR_N, maxM = TOUR_MAX_M } = {}) {
+  const cand = [];
+  for (const [name, kind, x, z] of rows) {
+    if (!['landmark', 'station', 'park'].includes(kind) || !name || name.length > 40 || recent.has(name)) continue;
+    const d = dist([x, z], here);
+    if (d < 60 || d > maxM || !built(x, z)) continue;
+    cand.push({ name, kind, x, z, d });
+  }
+  cand.sort((a, b) => a.d - b.d);
+  const out = [];
+  for (const c of cand) {
+    if (out.some((o) => dist([o.x, o.z], [c.x, c.z]) < TOUR_APART_M)) continue;
+    out.push({ name: c.name, kind: c.kind, x: c.x, z: c.z, seen: false });
+    if (out.length === n) return out;
+  }
+  return null;
+}
+
+/** Mark the sights within r of pos as seen. -> the names newly seen. */
+export function tourVisit(stops, pos, r = ARRIVE_M + 10) {
+  const now = [];
+  for (const s of stops) if (!s.seen && dist([s.x, s.z], pos) <= r) { s.seen = true; now.push(s.name); }
+  return now;
+}
+
+/** The nearest sight not seen yet, or null when the tour is done. */
+export function tourNext(stops, pos) {
+  return stops.filter((s) => !s.seen).sort((a, b) => dist([a.x, a.z], pos) - dist([b.x, b.z], pos))[0] || null;
+}
 
 // ---- bus ----------------------------------------------------------------------------------
 

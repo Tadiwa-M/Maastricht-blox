@@ -362,7 +362,7 @@ export async function initLife(ctx) {
       if (state.timetable) state.timetable.delaysOn = nearReal;
       updateWeather();
     }
-    if (stage.night !== undefined && stage.night !== night) { night = stage.night; mats.setNight(night); }
+    if (stage.night !== undefined && stage.night !== night) { night = stage.night; mats.setNight(night); fleet.setNight(night); }
     clock.advance(dt);
     t += dt;
     swayUniforms.uSwayT.value = t; // leaves in the wind (materials.js): the real wind decides how much

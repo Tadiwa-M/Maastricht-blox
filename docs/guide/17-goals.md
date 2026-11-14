@@ -69,3 +69,18 @@ Clear `localStorage['blox.goals.v1']` to see the first-minute prompt again.
 - On touch there is no `O` key: after *No goals* the offers stay off until storage is cleared
   (the player's menu could get a "Goals" toggle).
 - The bus goal does not press *Get off* for you; the card says when to.
+
+## Two more kinds: a rush job and three sights (2026-11-14)
+
+- **delivery ("A rush job")**: the nearest shop or café (within 120 m) asks you to run something
+  to another one 150 to 480 m away: `pickDelivery`, with a parcel that fits the sender (a box of
+  vlaai from a bakery, a hot order from a restaurant). The clock is `deliveryLimit(d) = 22 + d / 2.7`
+  seconds: a walk cannot make it, a run can with a little room (tested for both ends of the
+  range). Offered only while walking. The time left turns red under 15 s.
+- **tour ("Three sights")**: the three nearest landmarks, stations or parks within 900 m that are
+  at least 90 m apart (`pickTour`), in any order, no clock. The cue points at the nearest one not
+  seen yet (`tourNext`); reaching one says so and strikes it off the card (`tourVisit`).
+- Offer weights: tourist 1.5, bus 1, golden hour 2 (when open), delivery 1.3, tour 1.
+- Checked in the browser on the Markt sample: delivery offers come up with real shop names and
+  run. The sample has too few sights for a tour, so the tour is covered by its tests only.
+

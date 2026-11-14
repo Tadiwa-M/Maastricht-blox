@@ -183,3 +183,35 @@ test('spots: the GPS fallbacks land in the old town (default origin)', () => {
   assert.equal(jan.fromData, true);
   assert.equal(locateSpot(TOWERS[1], [{ name: 'Sint Servaasbrug', kind: 'street', centroid: [0, 0] }], origin).fromData, false);
 });
+
+test('delivery: a shop in range, a time only a run makes, the nearest shop sends it', async () => {
+  const { pickDelivery, deliveryLimit, DELIVERY_RANGE } = await import('../src/goals/logic.js');
+  const rows = [['Bakkerij Mathieu', 'poi', 20, 0, 'bakery'], ['Boekhandel', 'poi', 300, 0, 'books'], ['Stadhuis', 'landmark', 250, 0, ''],
+    ['Far Cafe', 'poi', 2000, 0, 'cafe'], ['Next Door', 'poi', 60, 0, 'cafe'], ['A bench', 'poi', 300, 50, 'bench']];
+  const d = pickDelivery(rows, [0, 0], { rand: () => 0 });
+  assert.equal(d.to.name, 'Boekhandel');
+  assert.equal(d.from.name, 'Bakkerij Mathieu');
+  assert.equal(d.parcel, 'a box of vlaai');
+  assert.equal(pickDelivery(rows, [0, 0], { recent: new Set(['Boekhandel']) }), null, 'nothing else in range');
+  assert.equal(pickDelivery(rows, [0, 0], { built: () => false }), null);
+  for (const m of DELIVERY_RANGE) {
+    const t = deliveryLimit(m);
+    assert.ok(m * 1.3 / 1.5 > t, `walking ${m} m takes longer than ${t} s`);
+    assert.ok(m * 1.3 / 5 < t - 8, `running ${m} m fits in ${t} s with a little room`);
+  }
+});
+
+test('tour: three sights, nearest first but apart; seen as you reach them, any order', async () => {
+  const { pickTour, tourVisit, tourNext } = await import('../src/goals/logic.js');
+  const rows = [['A', 'landmark', 100, 0, ''], ['A twin', 'landmark', 120, 0, ''], ['B', 'park', 0, 300, ''], ['C', 'station', -400, 0, ''],
+    ['D', 'landmark', 0, 800, ''], ['Shop', 'poi', 50, 50, 'cafe'], ['Here', 'landmark', 10, 0, '']];
+  const stops = pickTour(rows, [0, 0]);
+  assert.deepEqual(stops.map((s) => s.name), ['A', 'B', 'C'], 'not the twin 20 m away, not the one we stand on, no shops');
+  assert.equal(pickTour(rows.slice(0, 3), [0, 0]), null, 'fewer than three sights');
+  assert.equal(tourNext(stops, [0, 290]).name, 'B');
+  assert.deepEqual(tourVisit(stops, [0, 290]), ['B']);
+  assert.deepEqual(tourVisit(stops, [0, 290]), [], 'only once');
+  assert.equal(tourNext(stops, [0, 290]).name, 'A');
+  tourVisit(stops, [100, 0]); tourVisit(stops, [-400, 5]);
+  assert.equal(tourNext(stops, [0, 0]), null, 'done');
+});

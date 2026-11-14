@@ -14,6 +14,7 @@ import { GroundLine } from '../plan/groundline.js';
 import { upcomingCalls } from '../life/schedule.js';
 import {
   dist, compassWord, distLabel, clockLabel, hhmm, weekDelta, weighted, pickTourist, touristLimit, askLine, placeLabel,
+  pickDelivery, deliveryLimit, pickTour, tourVisit, tourNext,
   pickBus, busWindow, BusWatch, goldenOpen, pickViewpoint, toSunset, SUNSET_H, ARRIVE_M, loadTally, saveTally, bump,
 } from './logic.js';
 import { VIEWPOINTS, TOWERS, MARKT, locateSpot } from './spots.js';
@@ -93,6 +94,15 @@ export async function initGoals(ctx) {
     if (!p) return null;
     return { kind: 'tourist', place: p, npc: walking() ? nearestWalker(pos) : null };
   }
+  function deliveryOffer(pos) {
+    if (!walking()) return null; // a rush on foot: offered while you walk
+    const d = pickDelivery(known.rows, pos, { built, recent: new Set(recent) });
+    return d ? { kind: 'delivery', job: d } : null;
+  }
+  function tourOffer(pos) {
+    const stops = pickTour(known.rows, pos, { built, recent: new Set(recent) });
+    return stops ? { kind: 'tour', stops } : null;
+  }
   function busOffer(pos) {
     const L = life(), c = L?.clock;
     if (!L?.timetable || !c) return null;
@@ -111,7 +121,7 @@ export async function initGoals(ctx) {
     refreshData();
     const pos = here();
     if (first) return touristOffer(pos) || goldenOffer(pos) || busOffer(pos);
-    const kinds = [[touristOffer, 1.5], [busOffer, 1], [goldenOffer, 2]];
+    const kinds = [[touristOffer, 1.5], [busOffer, 1], [goldenOffer, 2], [deliveryOffer, 1.3], [tourOffer, 1]];
     while (kinds.length) {
       const k = weighted(kinds, (x) => x[1]);
       const o = k[0](pos);
@@ -129,6 +139,14 @@ export async function initGoals(ctx) {
       o.view = () => ({ head: o.npc ? 'A tourist asks' : 'A visitor asks', title: `“${esc(askLine(o.place))}”`,
         sub: `${distLabel(dist(pos, [o.place.x, o.place.z]))} ${compassWord(o.place.x - pos[0], o.place.z - pos[1])} of here`,
         short: esc(placeLabel(o.place)), actions: offerActions('Show them the way') });
+    } else if (o.kind === 'delivery') {
+      const j = o.job;
+      o.view = () => ({ head: 'A rush job', title: `${j.from ? `<b>${esc(j.from.name)}</b> asks: can you run` : 'Can you run'} ${esc(j.parcel)} to <b>${esc(j.to.name)}</b>?`,
+        sub: `${distLabel(dist(pos, [j.to.x, j.to.z]))} ${compassWord(j.to.x - pos[0], j.to.z - pos[1])} · ${clockLabel(deliveryLimit(j.to.d))} on the clock: you will have to run`,
+        short: esc(j.to.name), actions: offerActions("I'm on it") });
+    } else if (o.kind === 'tour') {
+      o.view = () => ({ head: 'Three sights', title: `See ${o.stops.map((x) => `<b>${esc(x.name)}</b>`).join(', ')}`,
+        sub: 'In any order, in your own time.', short: 'Three sights', actions: offerActions('Show me round') });
     } else if (o.kind === 'bus') {
       const b = o.bus;
       o.view = () => {
@@ -174,6 +192,13 @@ export async function initGoals(ctx) {
       recent = [p.name, ...recent].slice(0, 8);
       goal = { kind: 'tourist', name: placeLabel(p), target: [p.x, p.z], t: 0, limit: touristLimit(p.d), r: ARRIVE_M };
       if (o.npc) ui.toast('“Thank you! I’ll follow you.”', 3000);
+    } else if (o.kind === 'delivery') {
+      const j = o.job;
+      recent = [j.to.name, ...recent].slice(0, 8);
+      goal = { kind: 'delivery', name: j.to.name, parcel: j.parcel, target: [j.to.x, j.to.z], t: 0, limit: deliveryLimit(j.to.d), r: ARRIVE_M };
+    } else if (o.kind === 'tour') {
+      recent = [...o.stops.map((x) => x.name), ...recent].slice(0, 8);
+      goal = { kind: 'tour', stops: o.stops, r: ARRIVE_M + 10 };
     } else if (o.kind === 'bus') {
       const b = o.bus;
       const t0 = o.madeT ?? c?.t ?? 0;
@@ -200,6 +225,7 @@ export async function initGoals(ctx) {
   /** Where the cues point now (Unity [x, z]) and the card's text. */
   function goalTarget() {
     if (!goal) return null;
+    if (goal.kind === 'tour') { const n = tourNext(goal.stops, here()); return n ? [n.x, n.z] : null; }
     if (goal.kind === 'bus') return goal.phase === 'walk' ? [goal.bus.from.x, goal.bus.from.z] : [goal.bus.to.x, goal.bus.to.z];
     return goal.target;
   }
@@ -211,6 +237,16 @@ export async function initGoals(ctx) {
     if (goal.kind === 'tourist') {
       return { head: 'Tourist', title: `Take them to <b>${esc(goal.name)}</b>`, short: esc(goal.name),
         sub: `${where} · ${clockLabel(goal.limit - goal.t)} left`, actions: acts };
+    }
+    if (goal.kind === 'delivery') {
+      const left = goal.limit - goal.t;
+      return { head: 'A rush job', title: `Run ${esc(goal.parcel)} to <b>${esc(goal.name)}</b>`, short: esc(goal.name),
+        sub: `${where} · <b${left < 15 ? ' style="color:#ff8a7a"' : ''}>${clockLabel(Math.max(0, left))}</b> left`, actions: acts };
+    }
+    if (goal.kind === 'tour') {
+      const next = tourNext(goal.stops, pos), seen = goal.stops.filter((x) => x.seen).length;
+      return { head: 'Three sights', title: goal.stops.map((x) => (x.seen ? `<s>${esc(x.name)}</s>` : `<b>${esc(x.name)}</b>`)).join(' · '),
+        short: `Sights ${seen}/${goal.stops.length}`, sub: next ? `Nearest: ${esc(next.name)}, ${where}` : '', actions: acts };
     }
     if (goal.kind === 'golden') {
       return { head: 'Golden hour', title: `Reach <b>${esc(goal.name)}</b> before sunset`, short: esc(goal.name),
@@ -245,6 +281,15 @@ export async function initGoals(ctx) {
       goal.t += dt;
       if (walking() && dist(pos, goal.target) <= goal.r) finish(true, `“That’s it, thank you!” ${esc(goal.name)} found.`);
       else if (goal.t >= goal.limit) finish(false, 'The tourist found someone else to ask. No harm done.');
+    } else if (goal.kind === 'delivery') {
+      goal.t += dt;
+      if (walking() && dist(pos, goal.target) <= goal.r) finish(true, `Delivered to ${esc(goal.name)} with ${clockLabel(Math.max(0, goal.limit - goal.t))} to spare.`);
+      else if (goal.t >= goal.limit) finish(false, 'Too late: they sent someone else. It happens.');
+    } else if (goal.kind === 'tour') {
+      if (!walking()) return;
+      const now = tourVisit(goal.stops, pos, goal.r);
+      if (!tourNext(goal.stops, pos)) finish(true, `Three sights seen: ${goal.stops.map((x) => esc(x.name)).join(', ')}.`);
+      else if (now.length) { ui.toast(`${esc(now[0])}: seen. ${goal.stops.filter((x) => !x.seen).length} to go.`, 3000); setRoute(false); }
     } else if (goal.kind === 'golden') {
       if (walking() && dist(pos, goal.target) <= goal.r) finish(true, `Golden hour at ${esc(goal.name)}. Lovely.`);
       else if (c && toSunset(c.sec) <= 0) finish(false, 'The sun has set. Another evening, perhaps.');
