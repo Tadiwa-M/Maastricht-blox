@@ -172,3 +172,6 @@ knock-outs, flags); the client knows the walls, so it claims hits and the room c
   (at home or dropped) with its distance, or "Home: <base>" in the team's colour once you carry
   it; hidden while a teammate carries it. It slides with the view and pins to an end with an
   arrow when the target is behind you (`combat.js` `stripMark`, `index.js` `objective`).
+- **Ammo where the eyes are (2026-11-14):** under the crosshair, only when it matters
+  (`combat.js` `ammoCue`): "LOW · 7 · R" in amber at a quarter of the magazine or less, "RELOADING"
+  with a progress bar, "EMPTY" blinking in red. Nothing for a full magazine or the knife.

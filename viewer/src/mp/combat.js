@@ -40,6 +40,13 @@ const CSS = `
 #cb-obj i { position: absolute; top: 0; transform: translateX(-50%); padding: 3px 9px; border-radius: 9px; font: 700 12px/1.4 system-ui, sans-serif; font-style: normal;
   color: #11143a; background: #F2A900; white-space: nowrap; box-shadow: 0 2px 0 rgba(0,0,0,.35); transition: left .08s linear; }
 @media (max-height: 500px) { #cb-obj { top: 46px; } }
+#cb-cue { position: absolute; left: 50%; top: calc(50% + 34px); transform: translateX(-50%); min-width: 74px; text-align: center; color: #fff;
+  font: 700 11px/1.3 system-ui, sans-serif; letter-spacing: .1em; text-shadow: 0 1px 3px #000; }
+#cb-cue.warn { color: #ffb14a; } #cb-cue.empty { color: #ff6a5a; animation: cbblink .7s steps(2) infinite; }
+#cb-cue u { display: block; height: 3px; margin: 3px auto 0; width: 74px; background: rgba(255,255,255,.25); text-decoration: none; border-radius: 2px; overflow: hidden; }
+#cb-cue u b { display: block; height: 100%; background: #F2C200; }
+@keyframes cbblink { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { #cb-cue.empty { animation: none; } }
 #cb-down { position: absolute; left: 0; right: 0; top: 38%; text-align: center; color: #fff; font-size: 22px; font-weight: 800; text-shadow: 0 2px 6px #000; }
 .cb-btn { position: fixed; z-index: 6; pointer-events: auto; border-radius: 50%; border: 2px solid rgba(255,255,255,.6); background: rgba(17,20,58,.55);
   color: #fff; font: 700 12px system-ui, sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -183,6 +190,21 @@ export function hitAngle(pos, from, yaw) {
   return Math.atan2(Math.sin(bearing - yaw), Math.cos(bearing - yaw));
 }
 
+export const LOW_AMMO = 0.25; // a magazine at or under this share is "low"
+/**
+ * What to say under the crosshair about the weapon in hand: null (nothing to say), or
+ * { text, level: '' | 'warn' | 'empty', progress: 0..1 | null (the reload bar) }.
+ */
+export function ammoCue(gun, touch = false) {
+  const d = gun.def;
+  if (d.melee) return null;
+  if (gun.reloading) return { text: 'RELOADING', level: '', progress: gun.reloadProgress };
+  const n = gun.ammo[gun.w];
+  if (n === 0) return { text: 'EMPTY', level: 'empty', progress: null };
+  if (n <= Math.max(1, Math.floor(d.mag * LOW_AMMO))) return { text: touch ? `LOW · ${n}` : `LOW · ${n} · R`, level: 'warn', progress: null };
+  return null;
+}
+
 export const STRIP_HALF = 1.0; // the strip at the top spans this many radians to each side of straight ahead
 /**
  * Where a target at screen angle a (hitAngle) sits on the objective strip: x -1 (left end) .. 1
@@ -223,6 +245,7 @@ export class Combat {
     this.scopeEl = el('div', { id: 'cb-scope' }, r);
     this.dmgEl = el('div', { id: 'cb-dmg' }, r);
     this.dirEl = el('div', { id: 'cb-dir' }, r); // where the last hit came from
+    this.cueEl = el('div', { id: 'cb-cue' }, r); // ammo state where the eyes are: low, empty, reloading
     this.objEl = el('i', {}, el('div', { id: 'cb-obj' }, r)); // where to go: the flag, or home with it
     this.xEl = el('div', { id: 'cb-x' }, r);
     this.xLines = [0, 1, 2, 3].map(() => el('i', {}, this.xEl));
@@ -547,6 +570,9 @@ export class Combat {
       this.dirEl.style.transform = `rotate(${hitAngle(st.pos, this.hitFrom, f.yaw)}rad)`;
       this.dirEl.style.opacity = Math.min(1, this.hitDirT / 0.4);
     } else this.dirEl.style.opacity = 0;
+    const cue = alive ? ammoCue(this.gun, this.touch) : null;
+    const cueHtml = cue ? `${cue.text}${cue.progress !== null ? `<u><b style="width:${Math.round(cue.progress * 100)}%"></b></u>` : ''}` : '';
+    if (cueHtml !== this.cueHtml) { this.cueEl.innerHTML = cueHtml; this.cueHtml = cueHtml; this.cueEl.className = cue?.level || ''; }
     const ob = alive ? this.objective?.() : null; // { at: [x, z] three.js, label, colour }
     this.objEl.parentElement.style.display = ob ? '' : 'none';
     if (ob) {

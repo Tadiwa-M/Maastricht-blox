@@ -1766,3 +1766,8 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Nothing on screen said where the flag or your base was. A strip at the top now points to the
   enemy flag, and to your own base while you carry it, with the distance (guide 18).
 
+## 2026-11-14: ammo cue at the crosshair
+
+- The ammo count sat in a corner. Low, reloading (with progress) and empty now show under the
+  crosshair, and only then (guide 18).
+

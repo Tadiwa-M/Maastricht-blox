@@ -165,3 +165,22 @@ test('objective strip: ahead is the middle, to the side slides, behind pins to a
   assert.deepEqual(stripMark(2.5), { x: 1, side: 1 });
   assert.deepEqual(stripMark(-3), { x: -1, side: -1 });
 });
+
+test('ammo cue under the crosshair: quiet with a full magazine, low, reloading with progress, never for the knife', async () => {
+  const { ammoCue } = await import('../src/mp/combat.js');
+  const g = new Gun();
+  assert.equal(ammoCue(g), null);
+  g.ammo.rifle = 7;
+  assert.deepEqual(ammoCue(g), { text: 'LOW · 7 · R', level: 'warn', progress: null });
+  assert.equal(ammoCue(g, true).text, 'LOW · 7', 'no key hint on a phone');
+  g.ammo.rifle = 8;
+  assert.equal(ammoCue(g), null);
+  g.ammo.rifle = 1; g.step(0.2, { fire: true }); // the last round: the reload starts by itself
+  const r = ammoCue(g);
+  assert.equal(r.text, 'RELOADING');
+  assert.ok(r.progress >= 0 && r.progress < 0.2);
+  g.give('scout'); g.ammo.scout = 1;
+  assert.equal(ammoCue(g).level, 'warn', 'a five-round magazine is low at one');
+  g.step(0.01, { slot: 2 });
+  assert.equal(ammoCue(g), null, 'the knife needs no ammo');
+});
