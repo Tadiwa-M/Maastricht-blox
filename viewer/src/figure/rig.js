@@ -86,7 +86,8 @@ export function jointAngles(v, pose, out = {}) {
     set2(out, 'sh', 0.95, 0.95); set2(out, 'elbow', 0.35, 0.35); set2(out, 'abd', 0.1, 0.1);
   }
   if (pose.blend !== undefined || pose.air || pose.dip || pose.lean) motion(v, pose, out);
-  if (pose.aim) holdGun(pose.aim, pose.aimPitch || 0, out, { sprint: pose.aimSprint || 0, phase: pose.phase || 0, speed: mode === MODE.WALK ? pose.speed || 0 : 0 });
+  if (pose.twist) { out.chestYaw = (out.chestYaw || 0) + pose.twist; out.headYaw -= pose.twist * 0.15; } // chest toward the aim, legs where they go
+  if (pose.aim) holdGun(pose.aim, pose.aimPitch || 0, out, { sprint: pose.aimSprint || 0, ready: pose.aimReady ?? 1, phase: pose.phase || 0, speed: mode === MODE.WALK ? pose.speed || 0 : 0 });
   return out;
 }
 
@@ -95,18 +96,21 @@ export function jointAngles(v, pose, out = {}) {
  * reaching across under the barrel, both following the aim's pitch (radians, + = up). k 0..1
  * blends from whatever the body was doing (walking legs keep walking).
  */
-export function holdGun(k, pitch, out, { sprint = 0, phase = 0, speed = 0 } = {}) {
-  const p = Math.max(-0.9, Math.min(0.9, pitch)) * (1 - sprint);
-  // moving: the gun rides the stride (a small bob and a counter-swing), more the faster
-  const m = Math.min(1, speed / 5), bob = Math.sin(phase * 2) * 0.05 * m, swing = Math.sin(phase) * 0.06 * m;
-  // aiming hold, blended toward a sprint carry: gun low across the chest, elbows bent
-  const rSh = mix(1.25 + p, 0.55, sprint) + bob, rEl = mix(0.55, 1.45, sprint), rAbd = mix(-0.18, -0.05, sprint);
-  const lSh = mix(1.38 + p, 0.95, sprint) + bob, lEl = mix(0.25, 1.25, sprint), lAbd = mix(-0.5, -0.62, sprint);
-  out.sh[1] = mix(out.sh[1], rSh, k); out.elbow[1] = mix(out.elbow[1], rEl, k); out.abd[1] = mix(out.abd[1], rAbd, k);
-  out.sh[0] = mix(out.sh[0], lSh, k); out.elbow[0] = mix(out.elbow[0], lEl, k); out.abd[0] = mix(out.abd[0], lAbd, k);
-  // shoulder into the stock when aiming; when running the chest swings against the hips a little
-  out.chestYaw = mix(out.chestYaw || 0, mix(-0.12, 0.1, sprint) + swing, k);
+export function holdGun(k, pitch, out, { sprint = 0, ready = 1, phase = 0, speed = 0 } = {}) {
+  // three holds, blended: LOW READY (at the hip, barrel down: the default), SHOULDERED (ready = 1:
+  // aiming or just fired, follows the aim's pitch) and the SPRINT CARRY (across the chest, swinging)
+  const p = Math.max(-0.9, Math.min(0.9, pitch)), r = ready * (1 - sprint);
+  const m = Math.min(1, speed / 5), bob = Math.sin(phase * 2) * 0.05 * m, swing = Math.sin(phase) * (0.05 + 0.1 * sprint) * m;
+  const low = { rSh: 0.32, rEl: 0.95, rAbd: -0.08, lSh: 0.72, lEl: 1.15, lAbd: -0.55, chest: 0.12 };
+  const aim = { rSh: 1.25 + p, rEl: 0.55, rAbd: -0.18, lSh: 1.38 + p, lEl: 0.25, lAbd: -0.5, chest: -0.12 };
+  const run = { rSh: 0.55, rEl: 1.45, rAbd: -0.05, lSh: 0.95, lEl: 1.25, lAbd: -0.62, chest: 0.1 };
+  const lowRun = (key) => mix(low[key], run[key], sprint);
+  const at = (key) => mix(lowRun(key), aim[key], r);
+  out.sh[1] = mix(out.sh[1], at('rSh') + bob + swing * (1 - r), k); out.elbow[1] = mix(out.elbow[1], at('rEl'), k); out.abd[1] = mix(out.abd[1], at('rAbd'), k);
+  out.sh[0] = mix(out.sh[0], at('lSh') + bob - swing * (1 - r), k); out.elbow[0] = mix(out.elbow[0], at('lEl'), k); out.abd[0] = mix(out.abd[0], at('lAbd'), k);
+  out.chestYaw = mix(out.chestYaw || 0, (out.chestYaw || 0) + at('chest') + swing * 0.6, k); // keeps the stance twist
   out.lean += k * (0.06 * m + 0.12 * sprint); // lean into the run, more in a sprint
+  if (r > 0.5) out.headPitch = mix(out.headPitch, p * 0.6, k * r); // eyes down the sights
   return out;
 }
 

@@ -123,7 +123,7 @@ export async function initMultiplayer(ctx) {
       if (e.k === 'pos') view.push(e.id, e.p, e.yaw, e.speed, now);
       else if (e.k === 'spawn' && e.at) { spawn = { at: e.at, t: 0 }; boundary.reset(); combat?.respawn(model.config?.hp || 100, model.config?.spawnSafeS || 0); }
       else if (e.k === 'take') combat?.taken(e.i, e.mine, e.s);
-      else if (e.k === 'shot') { lastWeapon.set(e.by, e.w); combat?.tracer(toThree(e.o, origin), toThree(e.e, origin), e.w); }
+      else if (e.k === 'shot') { lastWeapon.set(e.by, e.w); const ob = view?.others.get(e.by); if (ob) ob.shotT = 0; combat?.tracer(toThree(e.o, origin), toThree(e.e, origin), e.w); }
       else if (e.k === 'hurt') combat?.hurt(e.hp, view.posOf(e.by));
       else if (e.k === 'hitmark') combat?.hitmark(e.kill);
       else if (e.k === 'killed') { knockMe(e.by); combat?.killed(model.config?.respawnS || 4, () => { const at = model?.spawn(); if (at && model.phase === 'play') { spawn = { at, t: 0 }; boundary.reset(); } }); }

@@ -394,3 +394,18 @@ blend poses a figure twice only during the half second of a start or stop.
   real crowd). The sprint carry has not been seen on screen yet (the headless check could not
   drive a run).
 
+## Moving like someone carrying a gun (2026-11-14)
+
+- **Three holds** (`figure/rig.js` `holdGun`, blended): LOW READY by default (at the hip, elbow
+  bent, support hand across, barrel down and a little across), SHOULDERED when aiming or within
+  1.4 s of a shot (`combat.js` `readyK`: up in about a tenth of a second, the quick draw, down
+  slowly), and the SPRINT CARRY across the chest above 4.2 m/s. The stride bobs and swings the
+  gun, more in a sprint; the head looks down the sights when shouldered. The third-person gun model
+  turns with the hold (barrel down at the hip, along the aim when shouldered).
+- **Legs and chest** (`player/stance.js` `stance`): the chest and gun face the aim, the legs face
+  where the body travels, up to a 60-degree waist twist (`pose.twist` turns the chest in the rig);
+  moving backwards the legs face the aim and the walk cycle runs in reverse (a real backpedal).
+  The legs ease round instead of snapping.
+- Other players use the same holds (at the hip unless they just fired, sprint carry by speed).
+- Tests: `test/stance.test.mjs` (including that the chest really faces the aim when the legs turn).
+

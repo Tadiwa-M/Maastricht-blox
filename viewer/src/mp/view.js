@@ -149,6 +149,7 @@ export class RoomView {
   /** Per frame. model: MatchModel; me: { pos, yaw } of the local player (three.js) or null. */
   update(dt, now, camera, model, me) {
     this.t += dt;
+    for (const o of this.others.values()) o.shotT = (o.shotT ?? 9) + dt;
     const present = new Set();
     this.crowd.begin(camera.position);
     for (const p of model.players) {
@@ -163,7 +164,7 @@ export class RoomView {
       const speed = travelled > 1e-4 && s.speed > 0.05 ? Math.min(8, s.speed) : 0;
       o.prev = s;
       const m = o.motion.update(dt, { speed, travelled, angVel: 0, accel: 0, steer: 0, grounded: true, vy: 0 }, o.variant.scale);
-      Object.assign(o.pose, { x: s.x, y: s.y, z: s.z, rotY: -s.yaw }, m, { aim: model.phase === 'play' ? 1 : 0, aimPitch: 0, aimSprint: Math.max(0, Math.min(1, (speed - 4) / 1.2)) }); // in a match everyone holds their gun
+      Object.assign(o.pose, { x: s.x, y: s.y, z: s.z, rotY: -s.yaw }, m, { aim: model.phase === 'play' ? 1 : 0, aimPitch: 0, aimSprint: Math.max(0, Math.min(1, (speed - 4) / 1.2)), aimReady: (o.shotT ?? 9) < 1.4 ? 1 : 0 }); // at the hip unless they just fired // in a match everyone holds their gun
       if (o.scatter) {
         const stand = o.scatter.gathering ? captureParts(o.variant, { ...o.pose, mode: MODE.IDLE, t: 0 }) : null;
         this.crowd.addParts(o.variant, o.scatter.update(dt, stand));

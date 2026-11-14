@@ -195,6 +195,7 @@ export function rumble(pad, { ms, weak, strong }) {
 export const canRumble = (pad) => !!(pad?.vibrationActuator?.playEffect || pad?.hapticActuators?.[0]?.pulse);
 
 export const HIT_DIR_S = 1.6;
+export const READY_HOLD_S = 1.4; // the gun stays shouldered this long after the last shot
 export const SPRINT_FROM = 4.2; // m/s: faster than this the gun goes to a sprint carry
 /**
  * Screen angle (radians, clockwise from straight up) toward a shooter: pos is my feet (three.js
@@ -573,12 +574,19 @@ export class Combat {
     // sprinting (and not aiming or firing): the gun drops to a low carry; aiming or a shot brings it up at once
     const wantSprint = this.speed > SPRINT_FROM && this.aim < 0.1 && !this.fire && this.gun.cool <= 0 ? 1 : 0;
     this.sprintK = (this.sprintK || 0) + (wantSprint - (this.sprintK || 0)) * Math.min(1, dt * (wantSprint ? 6 : 14));
-    if (P?.character) P.character.aim = alive && !eyes ? { k: 1, pitch: -f.pitch, yaw, sprint: this.sprintK } : null;
+    // up to the shoulder when aiming or firing (a quick draw), back to the hip a moment after the last shot
+    if (this.fire || this.kick > 0.8) this.lastShotT = 0; else this.lastShotT = (this.lastShotT ?? 9) + dt; // (kick: a shot this frame)
+    const wantReady = this.aim > 0.05 || this.lastShotT < READY_HOLD_S ? 1 : 0;
+    this.readyK = (this.readyK ?? 0) + (wantReady - (this.readyK ?? 0)) * Math.min(1, dt * (wantReady ? 18 : 3.5));
+    if (P?.character) P.character.aim = alive && !eyes ? { k: 1, pitch: -f.pitch, yaw, sprint: this.sprintK, ready: this.readyK } : null;
     const hand = alive && !eyes ? P?.character?.rightHand?.() : null;
     if (hand) model.side.position.set(hand[12], hand[13] + 0.05, hand[14]);
     else model.side.position.set(st.pos[0] + right[0] * 0.42 + Math.sin(yaw) * 0.3, st.pos[1] + 1.12, st.pos[2] + right[1] * 0.42 - Math.cos(yaw) * 0.3);
-    const sk = this.sprintK || 0; // the low carry: barrel down and across the body
-    model.side.rotation.set(-f.pitch * (1 - sk) - 0.7 * sk, -yaw + 0.75 * sk, 0.35 * sk, 'YXZ');
+    // where the barrel points: down and a little across at the hip, across the chest in a sprint,
+    // along the aim when shouldered
+    const sk = this.sprintK || 0, rk = (this.readyK ?? 0) * (1 - sk), lowK = 1 - rk;
+    const downP = -0.55 * (1 - sk) - 0.7 * sk, across = 0.35 * (1 - sk) + 0.75 * sk;
+    model.side.rotation.set(-f.pitch * rk + downP * lowK, -yaw + across * lowK, 0.3 * lowK, 'YXZ');
     if (def.melee) { // the stab: a quick lunge forward
       model.hand.position.set(0.16, -0.16, -0.38 - this.kick * 0.28); model.hand.rotation.set(-0.25 + this.kick * 0.3, 0.25, 0.5);
       model.side.position.x += Math.sin(yaw) * this.kick * 0.4; model.side.position.z -= Math.cos(yaw) * this.kick * 0.4;

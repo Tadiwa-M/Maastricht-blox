@@ -1801,3 +1801,10 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   them aside or over. Both done (guide 09). Not seen on screen yet: the sprint carry and a
   knock-down in the live city (both covered by tests against the real code paths).
 
+## 2026-11-14: low ready, quick draw, strafing and backpedalling
+
+- Owner: proper movement in general, the gun at the hip pointing down when running, ready for a
+  quick draw. Three blended holds, a chest that keeps the aim while the legs go where you walk,
+  and real backwards steps (guide 09). Animation assets were considered: the figure has its own
+  rig and a captured gait already, so retargeting a pack would cost more than it gives.
+

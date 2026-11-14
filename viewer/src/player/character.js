@@ -10,6 +10,7 @@ import { makeVariant } from '../figure/variants.js';
 import { customVariant } from '../figure/custom.js';
 import { MODE, captureParts } from '../figure/rig.js';
 import { MotionState } from './motion.js';
+import { stance, easeAngle, STANCE } from './stance.js';
 
 export const PLAYER_SEED = 52;
 
@@ -72,9 +73,19 @@ export class Character {
     if (o) { this.pose = o; this.crowd.begin(); this.crowd.add(this.variant, o); this.crowd.end(); return; }
     const m = this.motion.update(dt, { speed, travelled, angVel: 0, accel: 0, steer: 0, grounded: true, vy: 0, ...body },
       this.variant.scale);
-    // aiming (the shooting mode): the figure faces where the gun points; walking still moves it freely (strafing)
-    const faceYaw = this.aim && Number.isFinite(this.aim.yaw) ? this.aim.yaw : yaw;
-    Object.assign(this.pose, { x: feet[0], y: feet[1], z: feet[2], rotY: -faceYaw }, m, { aim: this.aim?.k || 0, aimPitch: this.aim?.pitch || 0, aimSprint: this.aim?.sprint || 0 });
+    // carrying a gun (the shooting mode): the chest and gun face the aim, the legs where the body
+    // goes (stance.js): strafing steps sideways, going backwards steps backwards
+    let legYaw = yaw, twist = 0, phase = m.phase;
+    if (this.aim && Number.isFinite(this.aim.yaw)) {
+      const st = stance(this.aim.yaw, yaw, speed);
+      this.legYaw = easeAngle(this.legYaw ?? st.legYaw, st.legYaw, STANCE.turnRate, dt);
+      legYaw = this.legYaw;
+      twist = -Math.atan2(Math.sin(this.aim.yaw - legYaw), Math.cos(this.aim.yaw - legYaw));
+      this.back = st.back;
+      if (st.back) phase = -m.phase; // the walk cycle backwards
+    } else this.legYaw = null;
+    Object.assign(this.pose, { x: feet[0], y: feet[1], z: feet[2], rotY: -legYaw }, m, { phase, twist,
+      aim: this.aim?.k || 0, aimPitch: this.aim?.pitch || 0, aimSprint: this.aim?.sprint || 0, aimReady: this.aim?.ready ?? 1 });
     this.crowd.begin();
     this.crowd.add(this.variant, this.pose);
     this.crowd.end();
