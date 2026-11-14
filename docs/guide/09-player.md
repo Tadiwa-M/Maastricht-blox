@@ -375,3 +375,22 @@ vertical part counts 70 % (thumbs wobble up and down while swiping sideways).
 
 Cost: `steer()` is one grid pass like `avoid()` was (a 6 m cell instead of 1.1 m); the walk/stand
 blend poses a figure twice only during the half second of a start or stop.
+
+## Running into people; carrying a gun on the move (2026-11-14)
+
+- **Contact** (`life/reactions.js` `contact`, applied in `life/walkers.js` `bumps`): the player
+  touching a person (0.55 m) while moving toward them. At a full run (4.3 m/s and up) the one hit
+  is knocked over: their figure flies apart along the player's direction and gathers itself
+  again (`player/scatter.js`, as the player's own fall), their friends startle and stay. Slower,
+  they are shoved aside: their group steps to the side the player came past, the person stumbles
+  (a lean and a dip) and looks round. A person bumped is left alone for 1.6 s. The player loses
+  speed (`blox:bump`: x0.7 for a shove, x0.45 for a knock-down) and the controller bumps.
+- **Gun on the move** (`figure/rig.js` `holdGun(k, pitch, out, { sprint, phase, speed })`): the
+  arms keep the hold and ride the stride (a bob and a counter-swing of the chest), the body leans
+  into a run; above 4.2 m/s, not aiming or firing, the gun drops to a sprint carry, low across the
+  chest with the elbows bent and a deeper lean (`combat.js` `sprintK`); a shot or aiming brings
+  it up at once. Other players carry theirs the same way from their speed.
+- Tests: `test/life.contact.test.mjs`, `test/life.people.test.mjs` (a sprint and a walk into a
+  real crowd). The sprint carry has not been seen on screen yet (the headless check could not
+  drive a run).
+

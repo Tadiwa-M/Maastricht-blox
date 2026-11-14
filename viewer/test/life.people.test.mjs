@@ -88,3 +88,32 @@ test('drawn people: stopping eases walk into stand, they do something while stan
   assert.ok(turned > 0.4, `head turned to the player: ${turned}`);
   assert.ok(sp > 0.5);
 });
+
+test('running into a person: a sprint knocks them down (they get up again), a walk shoves them aside', async () => {
+  const p = new Pedestrians({ graph: street(), ground: () => 0, cap: 1, seed: 3 });
+  p.setCount(1, [100, 0]);
+  const g = p.groups[0], k = g.walker;
+  g.nextPause = 1e9; g.pause = 0;
+  p.update(0.1, [100, 0], 120, []);
+  const m = g.members[0], at = p.memberAt(g, m);
+  const bumps = [];
+  p.onBump = (kind) => bumps.push(kind);
+  const drawn = () => { let parts = 0, figures = 0; p.draw({ add: () => { figures++; }, addParts: () => { parts++; } }); return { parts, figures }; };
+  // a sprint straight at them
+  p.react({ x: at.x - 0.4, z: at.z, vx: 5, vz: 0, speed: 5, running: true, events: [] }, 0.1);
+  assert.deepEqual(bumps, ['knock']);
+  assert.ok(m.scatter, 'down');
+  assert.equal(drawn().parts, 1, 'drawn as flying pieces');
+  p.react({ x: at.x - 0.4, z: at.z, vx: 5, vz: 0, speed: 5, running: true, events: [] }, 0.1);
+  assert.equal(bumps.length, 1, 'not knocked again while down');
+  for (let i = 0; i < 200 && m.scatter; i++) { p.dt = 0.05; p.draw({ add() {}, addParts() {} }); }
+  assert.equal(m.scatter, null, 'back on their feet');
+  // later, a walk into them: a shove
+  p.t += 5;
+  const at2 = p.memberAt(g, m), lat0 = k.lateral;
+  p.react({ x: at2.x - 0.4, z: at2.z + 0.05, vx: 1.4, vz: 0, speed: 1.4, running: false, events: [] }, 0.1);
+  assert.equal(bumps[1], 'shove');
+  assert.ok(Math.abs(k.lateral - lat0) > 0.5, 'pushed aside');
+  assert.ok(m.stumble > 0 && g.pause > 0.5);
+  assert.equal(drawn().figures, 1);
+});

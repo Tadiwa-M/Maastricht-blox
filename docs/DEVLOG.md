@@ -1795,3 +1795,9 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   available. Whether a DualSense rumbles depends on the browser and platform (Chrome or Edge on a
   PC is the likeliest to work; phones often give gamepads no rumble). Not tested on the hardware.
 
+## 2026-11-14: running into people, and the body when running with a gun
+
+- Owner: hips and arms should move like running with a gun; running into people should push
+  them aside or over. Both done (guide 09). Not seen on screen yet: the sprint carry and a
+  knock-down in the live city (both covered by tests against the real code paths).
+

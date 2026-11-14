@@ -157,6 +157,7 @@ export const HAPTICS = {
   shotgun: [45, { ms: 160, weak: 0.8, strong: 1 }],
   knife: [20, { ms: 70, weak: 0.3, strong: 0.5 }],
   hit: [15, { ms: 60, weak: 0.6, strong: 0 }], // my shot landed
+  shove: [25, { ms: 90, weak: 0.5, strong: 0.3 }], // brushed someone aside
   kill: [[20, 40, 60], { ms: 180, weak: 1, strong: 0.4 }],
   hurt: [70, { ms: 150, weak: 0.4, strong: 0.9 }],
   down: [[120, 60, 220], { ms: 500, weak: 1, strong: 1 }],
@@ -194,6 +195,7 @@ export function rumble(pad, { ms, weak, strong }) {
 export const canRumble = (pad) => !!(pad?.vibrationActuator?.playEffect || pad?.hapticActuators?.[0]?.pulse);
 
 export const HIT_DIR_S = 1.6;
+export const SPRINT_FROM = 4.2; // m/s: faster than this the gun goes to a sprint carry
 /**
  * Screen angle (radians, clockwise from straight up) toward a shooter: pos is my feet (three.js
  * [x, y, z]), from the shooter's [x, z], yaw the compass direction the camera looks (0 = north,
@@ -568,11 +570,15 @@ export class Combat {
     const yaw = f.yaw, right = [Math.cos(yaw), Math.sin(yaw)];
     // in the figure's hands: the arms are posed to hold it (rig.js holdGun), the grip sits in the right hand
     const P = this.player();
-    if (P?.character) P.character.aim = alive && !eyes ? { k: 1, pitch: -f.pitch, yaw } : null;
+    // sprinting (and not aiming or firing): the gun drops to a low carry; aiming or a shot brings it up at once
+    const wantSprint = this.speed > SPRINT_FROM && this.aim < 0.1 && !this.fire && this.gun.cool <= 0 ? 1 : 0;
+    this.sprintK = (this.sprintK || 0) + (wantSprint - (this.sprintK || 0)) * Math.min(1, dt * (wantSprint ? 6 : 14));
+    if (P?.character) P.character.aim = alive && !eyes ? { k: 1, pitch: -f.pitch, yaw, sprint: this.sprintK } : null;
     const hand = alive && !eyes ? P?.character?.rightHand?.() : null;
     if (hand) model.side.position.set(hand[12], hand[13] + 0.05, hand[14]);
     else model.side.position.set(st.pos[0] + right[0] * 0.42 + Math.sin(yaw) * 0.3, st.pos[1] + 1.12, st.pos[2] + right[1] * 0.42 - Math.cos(yaw) * 0.3);
-    model.side.rotation.set(-f.pitch, -yaw, 0, 'YXZ');
+    const sk = this.sprintK || 0; // the low carry: barrel down and across the body
+    model.side.rotation.set(-f.pitch * (1 - sk) - 0.7 * sk, -yaw + 0.75 * sk, 0.35 * sk, 'YXZ');
     if (def.melee) { // the stab: a quick lunge forward
       model.hand.position.set(0.16, -0.16, -0.38 - this.kick * 0.28); model.hand.rotation.set(-0.25 + this.kick * 0.3, 0.25, 0.5);
       model.side.position.x += Math.sin(yaw) * this.kick * 0.4; model.side.position.z -= Math.cos(yaw) * this.kick * 0.4;

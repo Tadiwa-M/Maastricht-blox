@@ -31,7 +31,7 @@ import { streetFinder } from './streets.js';
 import { raycastCity, spawnPoint } from './ray.js';
 import { parseWalkHash } from './hash.js';
 import { Creator } from './creator.js';
-import { rumble, canRumble } from '../mp/combat.js';
+import { rumble, canRumble, haptic } from '../mp/combat.js';
 import { VehicleContacts, lifeVehicles } from './bump.js';
 import { Scatter } from './scatter.js';
 import { defaultChoices, loadChoices } from '../figure/custom.js';
@@ -67,6 +67,13 @@ export function initPlayer(ctx) {
     ctrl.vel[1] = Math.max(ctrl.vel[1], impulse[1] * 0.5);
     ctrl.grounded = false;
   }
+  // running into people (life/walkers.js): a shove costs a little speed, knocking someone over more
+  window.addEventListener('blox:bump', (e) => {
+    if (mode !== 'walk' || scatter) return;
+    const knock = e.detail?.kind === 'knock';
+    ctrl.loco.speed *= knock ? 0.45 : 0.7;
+    haptic(knock ? 'kill' : 'shove');
+  });
   const zoomExit = new ZoomOutExit();
   let mode = 'map', tween = null, mapView = null, jumpQueued = false, hover = null, streetT = 0;
   let padCount = 0, lookIdle = 0, jumpKey = false;

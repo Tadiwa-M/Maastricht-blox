@@ -15,13 +15,14 @@
 // do something when they stand (phone, telling a story, looking around: rig.js IDLE), keep a
 // loose formation with their friends, and turn their heads to what is going on: the player
 // passing, the friend beside them, whatever made a noise.
-import { MODE, IDLE } from '../figure/rig.js';
+import { MODE, IDLE, captureParts } from '../figure/rig.js';
+import { Scatter } from '../player/scatter.js';
 import { strideAt } from '../figure/gait.js';
 import { makeVariant } from '../figure/variants.js';
 import { Walker, steer, separate, rng, turnToward } from './walkgraph.js';
 import { crowdFactor as dayCrowd, FIGURES_BY_TIER } from './density.js';
 import { pickGoal } from './routines.js';
-import { REACT, dodgeSide, yawTo } from './reactions.js';
+import { REACT, dodgeSide, yawTo, contact } from './reactions.js';
 
 export const WALKERS_BY_TIER = FIGURES_BY_TIER;
 /** Share of the crowd out at an hour (weekday curve; density.js has the day-aware one). */
@@ -348,6 +349,7 @@ export class Pedestrians {
         }
       }
     }
+    this.bumps(seen);
     if (seen.running) {
       const reach = o.dodgeM + 2;
       for (let q = 0; q < n; q++) {
@@ -357,6 +359,39 @@ export class Pedestrians {
         if (!side) continue;
         k.lateral = Math.max(-3, Math.min(3, k.lateral + side * o.dodgeRate * dt));
         if (g.pause > 0 && !g.look) { g.look = [seen.x, seen.z]; g.lookT = 1; }
+      }
+    }
+  }
+
+  /**
+   * The player running into people (reactions.js contact): a shove pushes the person's group aside
+   * and they stumble and look round; at a sprint the one hit goes down (their figure falls apart
+   * and gathers itself, as the player's own does) and their friends startle. Calls onBump(kind)
+   * (life/index.js: the player loses speed, the controller bumps).
+   */
+  bumps(seen) {
+    const o = REACT, n = this.active ?? 0, t = this.t;
+    for (let q = 0; q < n; q++) {
+      const g = this.groups[q], k = g.walker, dx = k.x - seen.x, dz = k.z - seen.z;
+      if (dx * dx + dz * dz > 9) continue;
+      for (const m of g.members) {
+        if (m.scatter || (m.bumpT || 0) > t) continue;
+        const at = this.memberAt(g, m), kind = contact(seen, at.x, at.z);
+        if (!kind) continue;
+        m.bumpT = t + o.bumpS;
+        const L = seen.speed || 1, ux = seen.vx / L, uz = seen.vz / L;
+        if (kind === 'shove') {
+          const side = (ux * (k.dirZ ?? 1) - uz * (k.dirX ?? 0)) >= 0 ? 1 : -1; // pushed to the side the player came past
+          k.lateral = Math.max(-3, Math.min(3, k.lateral + side * o.shoveM * 2));
+          m.stumble = 0.5;
+          g.pause = Math.max(g.pause, 0.9); g.look = [seen.x, seen.z]; g.lookT = 1.6;
+        } else {
+          const pose = { x: at.x, y: this.memberY(g, at.x, at.z), z: -at.z, rotY: (-m.yaw * Math.PI) / 180, mode: MODE.WALK, phase: m.phase, speed: 1.2, t };
+          const sp = Math.min(7, seen.speed) * 0.85;
+          m.scatter = new Scatter(captureParts(m.v, pose), [ux * sp, 2.4, -uz * sp], (x, z3) => this.ground(x, -z3), this.rand);
+          g.pause = Math.max(g.pause, 3.5); g.look = [seen.x, seen.z]; g.lookT = 4; g.flee = 0;
+        }
+        this.onBump?.(kind);
       }
     }
   }
@@ -436,6 +471,13 @@ export class Pedestrians {
         m.look = (m.look || 0) + (this.headTarget(g, m, x, z, walking, t) - (m.look || 0)) * Math.min(1, dt * 5);
         const b = m.blend, pose = { x, y: this.memberY(g, x, z), z: -z, rotY: (-m.yaw * Math.PI) / 180,
           mode: b > 0.02 ? MODE.WALK : MODE.IDLE, phase: m.phase, speed: Math.max(speed, 0.5), t: t + (m.u ?? 0) * 50, look: m.look };
+        if (m.scatter) { // knocked over: the pieces fly, settle, then gather back into the person
+          const stand = m.scatter.gathering ? captureParts(m.v, { ...pose, mode: MODE.IDLE }) : null;
+          crowd.addParts(m.v, m.scatter.update(dt, stand));
+          if (m.scatter.done) m.scatter = null;
+          continue;
+        }
+        if (m.stumble > 0) { m.stumble = Math.max(0, m.stumble - dt); pose.lean = 0.35 * Math.sin((m.stumble / 0.5) * Math.PI); pose.dip = 0.3 * m.stumble; }
         if (b > 0.02 && b < 0.98) pose.blend = b;
         if (b < 0.98 && m.act) { pose.idle = m.act; pose.idleK = m.actK; }
         crowd.add(m.v, pose);

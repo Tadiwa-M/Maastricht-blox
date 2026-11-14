@@ -225,6 +225,8 @@ export async function initLife(ctx) {
       // a person standing at y there: is the body (1 m and 1.6 m up) clear of walls? unknown: yes
       const room = (x, z, y) => { const c = cityOf(ctx); return !c?.isSolid || (c.isSolid(x, y + 1.0, -z) !== true && c.isSolid(x, y + 1.6, -z) !== true); };
       state.walkers = new Pedestrians({ graph, ground: ground.walk, room, cap: FIGURES_BY_TIER.high });
+      // the player running into someone (walkers.js bumps): the player feels it and loses speed
+      state.walkers.onBump = (kind) => { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('blox:bump', { detail: { kind } })); };
       hideDemo(models.character.name);
     }
   }

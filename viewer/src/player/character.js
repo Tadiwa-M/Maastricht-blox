@@ -74,7 +74,7 @@ export class Character {
       this.variant.scale);
     // aiming (the shooting mode): the figure faces where the gun points; walking still moves it freely (strafing)
     const faceYaw = this.aim && Number.isFinite(this.aim.yaw) ? this.aim.yaw : yaw;
-    Object.assign(this.pose, { x: feet[0], y: feet[1], z: feet[2], rotY: -faceYaw }, m, { aim: this.aim?.k || 0, aimPitch: this.aim?.pitch || 0 });
+    Object.assign(this.pose, { x: feet[0], y: feet[1], z: feet[2], rotY: -faceYaw }, m, { aim: this.aim?.k || 0, aimPitch: this.aim?.pitch || 0, aimSprint: this.aim?.sprint || 0 });
     this.crowd.begin();
     this.crowd.add(this.variant, this.pose);
     this.crowd.end();

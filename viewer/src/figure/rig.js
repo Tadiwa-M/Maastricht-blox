@@ -86,7 +86,7 @@ export function jointAngles(v, pose, out = {}) {
     set2(out, 'sh', 0.95, 0.95); set2(out, 'elbow', 0.35, 0.35); set2(out, 'abd', 0.1, 0.1);
   }
   if (pose.blend !== undefined || pose.air || pose.dip || pose.lean) motion(v, pose, out);
-  if (pose.aim) holdGun(pose.aim, pose.aimPitch || 0, out);
+  if (pose.aim) holdGun(pose.aim, pose.aimPitch || 0, out, { sprint: pose.aimSprint || 0, phase: pose.phase || 0, speed: mode === MODE.WALK ? pose.speed || 0 : 0 });
   return out;
 }
 
@@ -95,11 +95,19 @@ export function jointAngles(v, pose, out = {}) {
  * reaching across under the barrel, both following the aim's pitch (radians, + = up). k 0..1
  * blends from whatever the body was doing (walking legs keep walking).
  */
-export function holdGun(k, pitch, out) {
-  const p = Math.max(-0.9, Math.min(0.9, pitch));
-  out.sh[1] = mix(out.sh[1], 1.25 + p, k); out.elbow[1] = mix(out.elbow[1], 0.55, k); out.abd[1] = mix(out.abd[1], -0.18, k);
-  out.sh[0] = mix(out.sh[0], 1.38 + p, k); out.elbow[0] = mix(out.elbow[0], 0.25, k); out.abd[0] = mix(out.abd[0], -0.5, k);
-  out.chestYaw = mix(out.chestYaw || 0, -0.12, k); // shoulder into the stock
+export function holdGun(k, pitch, out, { sprint = 0, phase = 0, speed = 0 } = {}) {
+  const p = Math.max(-0.9, Math.min(0.9, pitch)) * (1 - sprint);
+  // moving: the gun rides the stride (a small bob and a counter-swing), more the faster
+  const m = Math.min(1, speed / 5), bob = Math.sin(phase * 2) * 0.05 * m, swing = Math.sin(phase) * 0.06 * m;
+  // aiming hold, blended toward a sprint carry: gun low across the chest, elbows bent
+  const rSh = mix(1.25 + p, 0.55, sprint) + bob, rEl = mix(0.55, 1.45, sprint), rAbd = mix(-0.18, -0.05, sprint);
+  const lSh = mix(1.38 + p, 0.95, sprint) + bob, lEl = mix(0.25, 1.25, sprint), lAbd = mix(-0.5, -0.62, sprint);
+  out.sh[1] = mix(out.sh[1], rSh, k); out.elbow[1] = mix(out.elbow[1], rEl, k); out.abd[1] = mix(out.abd[1], rAbd, k);
+  out.sh[0] = mix(out.sh[0], lSh, k); out.elbow[0] = mix(out.elbow[0], lEl, k); out.abd[0] = mix(out.abd[0], lAbd, k);
+  // shoulder into the stock when aiming; when running the chest swings against the hips a little
+  out.chestYaw = mix(out.chestYaw || 0, mix(-0.12, 0.1, sprint) + swing, k);
+  out.lean += k * (0.06 * m + 0.12 * sprint); // lean into the run, more in a sprint
+  return out;
 }
 
 const mix = (a, b, k) => a + (b - a) * k;

@@ -15,7 +15,23 @@ export const REACT = {
   fleeS: 2.8, // then hurry away
   fleePace: 1.7, // x walking speed
   airS: 0.3, // in the air at least this long for a landing to count
+  contactM: 0.55, // the player's body and a person's touch (centre to centre)
+  knockSpeed: 4.3, // m/s: running into someone faster than this (a sprint) knocks them over
+  shoveM: 0.45, // a slower bump shoves them this far aside
+  bumpS: 1.6, // a person bumped is left alone this long (no second bump while they recover)
 };
+
+/**
+ * Running into a person: null (not touching, or barely moving), 'shove' (pushed aside, stumbles)
+ * or 'knock' (sent flying, gets up again). p: the player { x, z, vx, vz, speed } (Unity m, m/s);
+ * (mx, mz): the person. Only counts when the player moves toward them.
+ */
+export function contact(p, mx, mz, o = REACT) {
+  const dx = mx - p.x, dz = mz - p.z, d = Math.hypot(dx, dz);
+  if (d > o.contactM || p.speed < 0.8) return null;
+  if (d > 0.05 && (dx * p.vx + dz * p.vz) / (d * p.speed) < 0.2) return null; // moving away or past
+  return p.speed >= o.knockSpeed ? 'knock' : 'shove';
+}
 
 /** Player state for life from window.__bloxPlayer (walk mode only), or null. Unity metres. */
 export function playerSample(pl) {
