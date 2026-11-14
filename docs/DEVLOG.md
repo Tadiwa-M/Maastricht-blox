@@ -1756,3 +1756,8 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Being shot only flashed the screen red. A red arc now points toward the shooter for a moment
   (guide 18): the cue a player needs to react instead of dying without knowing why.
 
+## 2026-11-14: haptics in the shooting mode
+
+- Owner asked for haptic feedback. Shots, hits, knock-outs and pickups buzz the phone or rumble
+  the gamepad (guide 18). Not felt on a real device yet; iPhones cannot vibrate from a web page.
+

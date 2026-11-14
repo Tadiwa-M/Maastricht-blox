@@ -163,3 +163,8 @@ knock-outs, flags); the client knows the walls, so it claims hits and the room c
 - **Where a hit came from (2026-11-14):** being hit shows a red arc round the middle of the screen
   on the shooter's side for 1.6 s (`combat.js` `hitAngle`, from the shooter's drawn position and
   the camera's heading); it turns with the view, so turning toward it brings it to the top.
+- **Haptics (2026-11-14):** `combat.js` `haptic(kind)` with the table `HAPTICS`: a tick per shot
+  (heavier for the scout and the shotgun), a thump when hit, a short pattern for a knock-out, a
+  long shake when knocked out, a flutter for a pickup. Phones use `navigator.vibrate` (Android
+  browsers; iPhones do not give web pages vibration), gamepads their rumble motors
+  (`vibrationActuator`, Chrome and Edge). Where neither exists nothing happens.

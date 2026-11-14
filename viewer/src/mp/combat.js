@@ -134,6 +134,39 @@ class ShotSound {
   }
 }
 
+// What the hands feel: [phone buzz in ms (a number or an on/off pattern), gamepad rumble { ms, weak, strong } 0..1].
+// Shots are a tick, being hit a thump, a knock-out a long shake. Phones: navigator.vibrate (Android;
+// iPhones do not offer it to web pages). Gamepads: the pad's rumble motors, where the browser has them.
+export const HAPTICS = {
+  rifle: [10, { ms: 45, weak: 0.5, strong: 0.15 }],
+  scout: [35, { ms: 140, weak: 0.7, strong: 0.9 }],
+  shotgun: [45, { ms: 160, weak: 0.8, strong: 1 }],
+  knife: [20, { ms: 70, weak: 0.3, strong: 0.5 }],
+  hit: [15, { ms: 60, weak: 0.6, strong: 0 }], // my shot landed
+  kill: [[20, 40, 60], { ms: 180, weak: 1, strong: 0.4 }],
+  hurt: [70, { ms: 150, weak: 0.4, strong: 0.9 }],
+  down: [[120, 60, 220], { ms: 500, weak: 1, strong: 1 }],
+  pickup: [[15, 30, 15], { ms: 80, weak: 0.6, strong: 0.2 }],
+  empty: [8, { ms: 30, weak: 0.25, strong: 0 }],
+};
+
+/** Play a HAPTICS entry on whatever this device has. nav: navigator (for tests). Never throws. */
+export function haptic(kind, nav = typeof navigator !== 'undefined' ? navigator : null) {
+  const h = HAPTICS[kind];
+  if (!h || !nav) return false;
+  let felt = false;
+  try { if (typeof nav.vibrate === 'function') felt = nav.vibrate(h[0]) !== false; } catch { /* not allowed here */ }
+  try {
+    for (const pad of nav.getGamepads?.() || []) {
+      const act = pad?.connected ? pad.vibrationActuator : null;
+      if (!act?.playEffect) continue;
+      act.playEffect('dual-rumble', { duration: h[1].ms, weakMagnitude: h[1].weak, strongMagnitude: h[1].strong })?.catch?.(() => {});
+      felt = true;
+    }
+  } catch { /* no rumble */ }
+  return felt;
+}
+
 export const HIT_DIR_S = 1.6;
 /**
  * Screen angle (radians, clockwise from straight up) toward a shooter: pos is my feet (three.js
@@ -245,10 +278,10 @@ export class Combat {
   /** A new round, or back at the base. */
   respawn(maxHp = 100) { this.maxHp = this.hp = maxHp; this.down = 0; this.gun.reset(); this.aiming = false; this.fire = false; }
   /** from: the shooter's position (three.js [x, y, z]) or null: an arc on screen points their way for a moment. */
-  hurt(hp, from = null) { this.hp = hp; this.dmg = 1; if (from) { this.hitFrom = [from[0], from[2]]; this.hitDirT = HIT_DIR_S; } }
+  hurt(hp, from = null) { this.hp = hp; this.dmg = 1; haptic('hurt'); if (from) { this.hitFrom = [from[0], from[2]]; this.hitDirT = HIT_DIR_S; } }
   /** Knocked out for `seconds`; onBack runs when it is time to stand at the base again. */
-  killed(seconds, onBack) { this.down = seconds; this.onBack = onBack; this.fire = false; this.aiming = false; this.btns[1].classList.remove('on'); }
-  hitmark(kill) { this.hitT = kill ? 0.5 : 0.18; this.hitEl.className = kill ? 'on kill' : 'on'; }
+  killed(seconds, onBack) { haptic('down'); this.down = seconds; this.onBack = onBack; this.fire = false; this.aiming = false; this.btns[1].classList.remove('on'); }
+  hitmark(kill) { haptic(kill ? 'kill' : 'hit'); this.hitT = kill ? 0.5 : 0.18; this.hitEl.className = kill ? 'on kill' : 'on'; }
 
   /** Someone else's shot: a tracer from where it left to where it ended (three.js points). */
   tracer(from, to, kind, mine = false) {
@@ -310,7 +343,7 @@ export class Combat {
     const p = this.pickups[i];
     if (!p) return;
     p.back = seconds;
-    if (mine && this.gun.give(p.w)) { this.zoom2 = false; this.toast?.(`${WEAPONS[p.w].name} picked up`); }
+    if (mine && this.gun.give(p.w)) { haptic('pickup'); this.zoom2 = false; this.toast?.(`${WEAPONS[p.w].name} picked up`); }
   }
 
   /** Guns at the other players' sides: figures() -> [{ id, pos, yaw, team, w, hidden }]. */
@@ -402,7 +435,8 @@ export class Combat {
     this.want.reload = this.want.swap = this.want.stab = false; this.want.slot = null;
     if (this.tap) { this.tap = false; if (!this.fire) this.gun.held = false; }
     if (r.swapped) this.zoom2 = false;
-    if (r.shot) this.shoot(st, f);
+    if (r.shot) { this.shoot(st, f); haptic(this.gun.w); }
+    if (r.empty) haptic('empty');
     f.aimPitch = Math.max(f.lim.min, Math.min(f.lim.max, f.aimPitch));
     this.prevAim = [f.aimYaw, f.aimPitch];
     this.draw(dt, st, f, alive);

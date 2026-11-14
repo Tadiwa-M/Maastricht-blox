@@ -138,3 +138,21 @@ test('hit direction: the arc points at the shooter whatever way I look', async (
   near(hitAngle(me, [20, 10], Math.PI / 2), 0); // looking east at a shooter in the east: ahead again
   near(hitAngle(me, [10, 0], Math.PI / 2), -Math.PI / 2);
 });
+
+test('haptics: a buzz on phones, rumble on gamepads, nothing (and no error) where neither exists', async () => {
+  const { haptic, HAPTICS } = await import('../src/mp/combat.js');
+  const buzz = [], rumble = [];
+  const nav = { vibrate: (p) => { buzz.push(p); return true; },
+    getGamepads: () => [null, { connected: true, vibrationActuator: { playEffect: (type, o) => { rumble.push([type, o]); return Promise.resolve(); } } }, { connected: true }] };
+  assert.equal(haptic('shotgun', nav), true);
+  assert.deepEqual(buzz, [HAPTICS.shotgun[0]]);
+  assert.deepEqual(rumble, [['dual-rumble', { duration: 160, weakMagnitude: 0.8, strongMagnitude: 1 }]]);
+  assert.equal(haptic('nothing', nav), false);
+  assert.equal(haptic('hurt', {}), false, 'a desktop without either');
+  assert.equal(haptic('hurt', { vibrate: () => { throw new Error('blocked'); } }), false);
+  assert.equal(haptic('hurt', null), false);
+  // a shot is a tick, being hit is clearly more, a knock-out the most
+  const ms = (k) => [].concat(HAPTICS[k][0]).reduce((a, b) => a + b, 0);
+  assert.ok(ms('rifle') < ms('hurt') && ms('hurt') < ms('down'));
+  for (const k of ['rifle', 'scout', 'shotgun', 'knife']) assert.ok(HAPTICS[k], k);
+});
