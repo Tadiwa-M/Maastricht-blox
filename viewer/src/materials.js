@@ -9,6 +9,34 @@ import * as THREE from 'three';
 import { rippleNormalTexture, addRipples } from './ripples.js';
 import { classOf } from './matkey.js';
 
+// Leaves in the wind: bricks flagged per instance (aSway, set by bricks.js for the leaf colours)
+// drift a few centimetres, in a slow wave that runs through a canopy (phase from where the brick
+// stands). One shared time and strength for every material (life/index.js sets them from the
+// clock and the real wind). Bricks without the attribute read 0 and stand still.
+export const swayUniforms = { uSwayT: { value: 0 }, uSwayAmp: { value: 0.03 } };
+export const SWAY = { calm: 0.012, perKmh: 0.0016, max: 0.09 }; // metres of drift: still air, per km/h of wind, storm cap
+/** Drift (m) for a wind speed (km/h). */
+export const swayAmp = (windKmh) => Math.min(SWAY.max, SWAY.calm + SWAY.perKmh * Math.max(0, windKmh || 0));
+
+function addSway(m, key) {
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, swayUniforms);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aSway;\nuniform float uSwayT;\nuniform float uSwayAmp;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        #ifdef USE_INSTANCING
+          if (aSway > 0.0) {
+            float swayPh = dot(instanceMatrix[3].xz, vec2(0.33, 0.27)) + instanceMatrix[3].y * 0.4;
+            transformed.x += sin(uSwayT * 1.25 + swayPh) * uSwayAmp * aSway;
+            transformed.z += cos(uSwayT * 0.95 + swayPh * 1.3) * uSwayAmp * aSway * 0.7;
+            transformed.y += sin(uSwayT * 1.7 + swayPh * 2.1) * uSwayAmp * aSway * 0.25;
+          }
+        #endif`);
+  };
+  m.customProgramCacheKey = () => key;
+  return m;
+}
+
 function plastic(extra = {}) {
   return new THREE.MeshPhysicalMaterial({
     color: 0xffffff, roughness: 0.35, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.3,
@@ -35,7 +63,7 @@ function windowGlass(extra = {}) {
 export class MaterialSet {
   /** clippingPlanes: optional, e.g. to cut moving models at the diorama edge. */
   constructor({ clippingPlanes = null } = {}) {
-    this.solid = plastic();
+    this.solid = addSway(plastic(), 'solid-sway');
     this.glass = windowGlass();
     this.trans = plastic({ roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.05, transparent: true,
       opacity: 0.75, envMapIntensity: 1.6, depthWrite: false });

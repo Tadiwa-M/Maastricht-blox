@@ -586,3 +586,17 @@ A phone-first page in every site build, next to the 3D city: `plan.html` + `plan
 - **Sky:** stars (a few bright) and a moon disc fade in at night; not in the reflection map.
 - **Bloom** follows the night factor: by day a faint glow on glints, at night the threshold drops so
   warm windows get a halo, not only the lamp heads.
+
+## Leaves in the wind (2026-11-14)
+
+Tree foliage near the camera moves. `bricks.js` flags every brick (and stud) in a leaf colour
+(`isLeaf`: palette names starting with `leaf`) with a per-instance attribute `aSway`; leaf bricks
+get their own meshes, so nothing else pays for it. `materials.js` `addSway` patches the solid
+material's vertex shader: a flagged brick drifts in a slow wave whose phase comes from where it
+stands, so the wave runs through a canopy instead of the tree shaking as one block. Strength is
+`swayAmp(wind)`: 1.2 cm in still air, +1.6 mm per km/h of the real wind (life/weather.js), capped
+at 9 cm; `life/index.js` sets it and the shared time each frame. Trunks, grass and hedges in other
+greens stand still. Only the instanced near zone sways (the far city is merged geometry); shadows
+do not follow. Tests: `test/sway.test.mjs`. Checked on the look-test scene: canopies change
+between two frames, buildings and trunks do not.
+

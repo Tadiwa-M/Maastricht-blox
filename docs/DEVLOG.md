@@ -1733,3 +1733,8 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Open decisions: Itteren (left out); if the site is too big, drop the outer far-bake level or
   host the world files elsewhere.
 
+## 2026-11-14: leaves sway in the real wind
+
+- Owner: the city should feel alive. First touch: tree foliage near the camera drifts with the
+  live wind speed (guide 06). One shader patch and a per-instance flag; no new draw passes.
+
