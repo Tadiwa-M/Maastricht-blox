@@ -249,3 +249,14 @@ test('copyPlaces validates, copies and indexes; a broken file stops the build', 
   await assert.rejects(copyPlaces(src, out, () => {}), /c.json: not valid JSON/);
   assert.deepEqual(await loadPlaces(async () => { throw new Error('404'); }), []);
 });
+
+test('doors follow the world: picked in the city slice, moved for a world with another origin', async () => {
+  const { shiftDoor, DOOR_ORIGIN_RD } = await import('../src/interiors/index.js');
+  const place = () => ({ door: { x: 1317, z: 3822.6 } });
+  assert.deepEqual(shiftDoor(place(), DOOR_ORIGIN_RD).door, { x: 1317, z: 3822.6 }, 'the city slice itself: unchanged');
+  const whole = shiftDoor(place(), [172140, 314000]); // the whole of Maastricht starts 2560 m further west
+  assert.deepEqual(whole.door, { x: 3877, z: 3822.6 });
+  assert.deepEqual(shiftDoor(whole, [172140, 314000]).door, { x: 3877, z: 3822.6 }, 'only once');
+  assert.deepEqual(shiftDoor({ originRD: [175700, 316500], door: { x: 718, z: 1442 } }, DOOR_ORIGIN_RD).door, { x: 1718, z: 3942 }, 'a place picked in another world says so');
+  assert.deepEqual(shiftDoor(place(), null).door, { x: 1317, z: 3822.6 });
+});

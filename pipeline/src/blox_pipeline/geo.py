@@ -36,10 +36,15 @@ SLICE_NAME: str = "centre"
 
 # Named slices (CONTRACT 1, v4). The manifest records the slice that was built, and renderers
 # read origin and size from it. "centre" is the original 2x2 km slice and the default (tests and
-# fixtures use it); "city" (4.1 x 5.6 km) adds the north (Bosscherweg) and Sint-Pietersberg.
+# fixtures use it); "city" (4.1 x 5.6 km) adds the north (Bosscherweg) and Sint-Pietersberg;
+# "maastricht" (8.7 x 7.7 km) is the whole built-up municipality: the western districts (Wolder,
+# Daalhof, Belfort, Pottenberg, Malberg, Caberg), the east (Scharn, Heer, De Heeg, Amby), Randwyck
+# and the north up to Borgharen. Its origin is the city slice's moved 80 chunks (2560 m) west, so
+# the two share chunk boundaries and the same south edge. Itteren, 2 km further north, is left out.
 SLICES: dict[str, tuple[float, float, int, int]] = {
     "centre": (175700.0, 316500.0, 64, 64),
     "city": (174700.0, 314000.0, 128, 176),
+    "maastricht": (172140.0, 314000.0, 272, 240),
 }
 
 

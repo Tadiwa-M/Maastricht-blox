@@ -52,6 +52,17 @@ body.title #in-pill, body.riding #in-pill, body.shot #in-pill { display: none; }
 #in-fade { position: fixed; inset: 0; background: #07080c; opacity: 0; pointer-events: none; z-index: 8; }
 `;
 
+export const DOOR_ORIGIN_RD = [174700, 314000]; // the city slice: where the doors in data/ were picked
+
+/** Move a place's door from the origin it was picked in to this world's origin (both RD metres). */
+export function shiftDoor(place, worldOrigin) {
+  const from = place.originRD || DOOR_ORIGIN_RD;
+  if (!worldOrigin || !place.door || place.shifted) return place;
+  place.door.x += from[0] - worldOrigin[0]; place.door.z += from[1] - worldOrigin[1];
+  place.shifted = true;
+  return place;
+}
+
 export async function initInteriors(ctx) {
   if (typeof document === 'undefined') return null;
   const player = window.__bloxPlayer;
@@ -59,6 +70,10 @@ export async function initInteriors(ctx) {
   const { stage } = ctx;
   const camera = ctx.camera || stage.camera;
   const places = await loadPlaces(async (u) => { const r = await fetch(u); if (!r.ok) throw new Error(`${u}: ${r.status}`); return r.json(); });
+  // door positions are Unity metres of the world they were picked in (a place's own originRD,
+  // else the city slice's): another world (the whole of Maastricht) has its origin elsewhere
+  const worldOrigin = window.BLOX_SITE?.originRD || ctx.originRD || ctx.world?.manifest?.originRD || null;
+  for (const p of places) shiftDoor(p, worldOrigin);
   const byId = new Map(places.map((p) => [p.id, p]));
   const volumes = installVolumes(player.city);
   const fader = new Fader();

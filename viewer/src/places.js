@@ -9,6 +9,11 @@ export const PLACES_RD = {
   bosscherweg: [176197, 319239],
   fort: [176050, 316326],
   enci: [176549, 314837],
+  // the wider city (only in a world that has them: the 'maastricht' slice); district centres, to ~300 m
+  wolder: [173400, 316300],
+  daalhof: [173400, 317300],
+  heer: [179300, 316500],
+  amby: [179700, 319400],
 };
 
 /** Chunk (cx, cy) of a place for a world with ``originRD`` and ``chunkStuds * studM`` chunks. */

@@ -313,3 +313,34 @@ test scene build (`testscene/build.py`) refuses to write a chunk that fails it.
 | `tests/test_islands_town.py` | the town fixture's islands: grouping, layouts verify, pieces face out, shops from world streets, plinth, paving, occupancy, before/after detail share, determinism, 256-stud split, `blox build` + preview, the `island_share` estimator, party wall against an on-grid neighbour, committed `fixtures/town_world` is current |
 | `tests/test_models.py` | model generators and `check_model` |
 | `tests/test_testscene.py` | the look-test scene builds and verifies |
+
+## The whole of Maastricht: the `maastricht` slice (2026-11-14)
+
+`geo.SLICES["maastricht"] = (172140, 314000, 272, 240)`: 8704 x 7680 m, 65,280 chunk slots (the
+city slice has 22,528). West to the Belgian border (Wolder, Daalhof, Belfort, Pottenberg, Malberg,
+Caberg), east past Scharn, Heer, De Heeg and Amby, south as the city slice (ENCI, Sint
+Pietersberg), north to Borgharen. Itteren is left out (2 km of fields further north; +25 %).
+
+- Its origin is the city slice's moved 80 chunks west, same south edge: chunk boundaries match.
+- Nothing else in the pipeline is slice-specific: sources fetch the slice's box, OSM is clipped to
+  `slice_clip_maastricht.osm.pbf`, the manifest records origin and size, and the viewer reads
+  them (CONTRACT v4). Bus routes that left the city slice at its west and east edges stay inside.
+- The game follows: landmarks and studs shift from their data origin (`explore/logic.js`
+  `shiftTo`), interior doors too (`interiors/index.js` `shiftDoor`), multiplayer and the planner
+  work in RD. View presets `#view=wolder|daalhof|heer|amby` exist where the world has them.
+- **Not built yet**: it has to run on the workstation. Expect roughly three times the city
+  slice: 6 to 9 h for `build`, and a site of perhaps 600 to 750 MiB in 90 to 100 thousand files.
+  GitHub Pages allows 1 GB per site: check the size `site.ps1` prints before publishing, and keep
+  `build/site_city` until the new one is live and looks right.
+
+```
+cd pipeline
+uv run blox --slice maastricht fetch
+uv run blox --slice maastricht fetch --only gtfs
+uv run blox --slice maastricht build --out ../build/world_maastricht
+uv run blox --slice maastricht life  --out ../build/world_maastricht
+cd ..
+scripts/site.sh build/world_maastricht build/site_maastricht --serve
+scripts/publish.sh build/site_maastricht
+```
+

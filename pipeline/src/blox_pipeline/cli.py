@@ -189,8 +189,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="blox", description="Maastricht Blox data pipeline")
     p.add_argument("-v", "--verbose", action="store_true")
     p.add_argument("--slice", default=os.environ.get("BLOX_SLICE", "centre"), choices=sorted(geo.SLICES),
-                   help="city area: 'centre' (2x2 km, default) or 'city' (4.1x5.6 km incl. Bosscherweg and "
-                        "Sint-Pietersberg); also via env BLOX_SLICE")
+                   help="city area: 'centre' (2x2 km, default), 'city' (4.1x5.6 km incl. Bosscherweg and "
+                        "Sint-Pietersberg) or 'maastricht' (8.7x7.7 km: the whole built-up municipality); "
+                        "also via env BLOX_SLICE")
     sub = p.add_subparsers(dest="command", required=True)
     bbox_help = "RD bbox xmin,ymin,xmax,ymax (default: the whole slice)"
 

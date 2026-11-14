@@ -1723,3 +1723,13 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - The relay must be redeployed. Open decisions: let the drawn river follow the level; traffic and
   roadworks need a different source or a scheduled job.
 
+## 2026-11-14: a slice for the whole of Maastricht
+
+- Owner: build the west (and so the whole city); buses glitch where they leave the built area.
+- New slice `maastricht` (8.7 x 7.7 km, guide 02). The viewer already took origin and size from
+  the manifest; the one thing tied to the city slice's origin, interior doors, now shifts
+  (`shiftDoor`). Not built: 6 to 9 h on the workstation, and the site may come near GitHub
+  Pages' 1 GB limit, so the size has to be checked before publishing.
+- Open decisions: Itteren (left out); if the site is too big, drop the outer far-bake level or
+  host the world files elsewhere.
+
