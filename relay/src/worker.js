@@ -3,6 +3,7 @@
 //   GET  /live?lines=ARR_21004,...   Arriva/OVapi delays per journey (cached 20 s)
 //   GET  /trains?stations=MT,MTR     NS departures with delays (needs the NS_KEY secret)
 //   POST /report                     a "Report a mistake" -> GitHub issue (needs GITHUB_TOKEN)
+//   GET  /city                       the Maas (level, flow, temperature) and the air, now (city.js; cached 5 min)
 //   GET  /health                     what is configured
 //   /room, /room/<code>              multiplayer rooms (rooms.js; BloxRoom Durable Objects, room.js)
 // Secrets: GITHUB_TOKEN (fine-grained, this repo only: Contents + Issues read/write), NS_KEY.
@@ -10,6 +11,7 @@ import { OVAPI, lineKeys, journeyDelays } from './ovapi.js';
 import { NS_DEPARTURES, STATIONS, stationCodes, departures } from './ns.js';
 import { checkReport, bodyWithImages, rateLimiter } from './report.js';
 import { rooms } from './rooms.js';
+import { cityNow, CITY_CACHE_S } from './city.js';
 
 export { BloxRoom } from './room.js';
 
@@ -54,6 +56,20 @@ async function trains(url, env, ctx, h) {
     out[code] = { name: STATIONS[code], departures: departures(doc) };
   }
   return json({ at: Math.floor(Date.now() / 1000), stations: out }, 200, h, CACHE_S);
+}
+
+/** The city now: one upstream round per CITY_CACHE_S for everyone (edge cache under a fixed key). */
+async function city(ctx, h) {
+  const cache = caches.default, key = new Request('https://blox-relay.cache/city');
+  const hit = await cache.match(key);
+  let data = hit ? await hit.json() : null;
+  if (!data) {
+    data = await cityNow();
+    // a round where a source failed is kept only briefly, so it is asked again soon
+    const ttl = data.water && data.air ? CITY_CACHE_S : 60;
+    ctx.waitUntil(cache.put(key, new Response(JSON.stringify(data), { headers: { 'Cache-Control': `max-age=${ttl}` } })));
+  }
+  return json(data, 200, h, 120);
 }
 
 async function gh(env, path, init = {}) {
@@ -104,6 +120,7 @@ export default {
     try {
       if (req.method === 'GET' && url.pathname === '/live') return await live(url, env, ctx, h);
       if (req.method === 'GET' && url.pathname === '/trains') return await trains(url, env, ctx, h);
+      if (req.method === 'GET' && url.pathname === '/city') return await city(ctx, h);
       if (req.method === 'POST' && url.pathname === '/report') return await report(req, env, h);
       if (url.pathname === '/room' || url.pathname.startsWith('/room/')) return await rooms(req, env, url, h);
       if (url.pathname === '/health') return json({ ok: true, reports: !!env.GITHUB_TOKEN, trains: !!env.NS_KEY, rooms: !!env.ROOMS }, 200, h);

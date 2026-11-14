@@ -8,6 +8,7 @@ sits in between, on Cloudflare's free plan, and also turns "Report a mistake" in
 |---|---|---|
 | `GET /live?lines=ARR_21004,...` | Arriva/OVapi delays per journey, cached 20 s | nothing |
 | `GET /trains?stations=MT,MTR` | NS departures with delays (Maastricht, Randwyck) | `NS_KEY` secret |
+| `GET /city` | The Maas now (level at Sint Pieter in m NAP, inflow at Eijsden in m³/s, water temperature at the Borgharen weir: Rijkswaterstaat) and the air at the two Maastricht stations (Luchtmeetnet), cached 5 min | nothing |
 | `POST /report` | a map report -> GitHub issue (+ images on the `map-reports` branch) | `GITHUB_TOKEN` secret |
 | `GET /room`, `POST /room`, `/room/<code>` (WebSocket) | multiplayer capture-the-flag rooms (`src/rooms.js`, `src/room.js`, rules `src/ctf.js`; docs/guide/18-multiplayer.md) | the `ROOMS` Durable Object binding (in `wrangler.toml`) |
 | `GET /health` | which of the above are configured | |

@@ -66,6 +66,8 @@ body.title #bx-menu-btn, body.shot #bx-menu-btn, body.bx-paused #bx-menu-btn { v
 #bx-menu .bx-main .bx-where { margin: 4px 0 14px; padding-left: 12px; border-left: 3px solid #F2A900; font: 400 17px/1.2 'Anton', Impact, sans-serif;
   letter-spacing: .12em; text-transform: uppercase; color: #f6f3ea; }
 #bx-menu .bx-main .bx-where:empty { border: 0; }
+#bx-menu .bx-live { margin: -8px 0 12px; font-size: 12px; color: rgba(246,243,234,.72); letter-spacing: .02em; min-height: 0; }
+#bx-menu .bx-live:empty { display: none; }
 #bx-menu .bx-main .bx-items { gap: 2px; overflow: auto; touch-action: pan-y; overscroll-behavior: contain; margin-right: -8px; padding-right: 8px; }
 #bx-menu .bx-main button.bx-item { min-height: 42px; padding: 4px 12px 4px 14px; border-radius: 6px; background: none; box-shadow: none;
   font: 400 21px/1.1 'Anton', Impact, 'Arial Narrow Bold', sans-serif; letter-spacing: .08em; text-transform: uppercase; color: rgba(246,243,234,.82);

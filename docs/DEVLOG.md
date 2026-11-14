@@ -1712,3 +1712,14 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   behind people waiting at a kerb added. Strangers through each other is not fixed (6.55 -> 6.2,
   noise); guide 05 says what was measured, what was tried and what to try next.
 
+## 2026-11-14: the Maas and the air, live (relay `/city`)
+
+- Owner: move toward a digital twin, through the relay (the website never used the Python proxy).
+  New `relay/src/city.js` and `GET /city`; `viewer/src/life/cityfeed.js` shows it in the status
+  line and on the pause page. Both sources checked against real answers today (Maas 44.07 m NAP,
+  47.6 m³/s, 10.3 °C; both air stations "moderate"). Guide 08.
+- Fixed: after creating a room a gun filled the screen in the lobby (the first-person gun was
+  never hidden before the first match).
+- The relay must be redeployed. Open decisions: let the drawn river follow the level; traffic and
+  roadworks need a different source or a scheduled job.
+

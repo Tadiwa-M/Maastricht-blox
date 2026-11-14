@@ -173,6 +173,7 @@ export class Combat {
     if (!this.camera.parent) this.scene.add(this.camera); // the gun in the hands is a child of the camera
     this.hands = new THREE.Group(); this.camera.add(this.hands);
     this.side = new THREE.Group(); this.scene.add(this.side);
+    this.hands.visible = this.side.visible = false; // nothing in the hands until a match is on (the lobby showed a gun across the screen)
     this.models = {};
     this.setTeam('blue');
     const mat = new THREE.MeshBasicMaterial({ color: '#ffe9a0', transparent: true, opacity: 0.9, toneMapped: false, depthWrite: false });

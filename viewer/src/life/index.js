@@ -36,6 +36,7 @@ import { bindLifeUI } from './ui.js';
 import { parseYmd, weekdayOf, zonedDayNumber, clockDate, eventsAt } from './calendar.js';
 import { placesUnity, spotPulls, spotWeights, goalPlan, nightFactor, eventCrowd, eventOutfit } from './routines.js';
 import { WeatherFeed, weatherState, hashWeather } from './weather.js';
+import { CityFeed, cityText } from './cityfeed.js';
 import { dress } from './outfits.js';
 import { PlayerWatch, playerSample, hitByVehicle } from './reactions.js';
 
@@ -310,6 +311,10 @@ export async function initLife(ctx) {
   const busHalf = [models.bus.size[0] * world.studM / 2, models.bus.size[1] * world.studM / 2];
   state.busHalf = busHalf; // the player's vehicle contacts (player/bump.js) use the same footprints
   const by = (table) => table[tier()] ?? table.medium;
+  // the Maas and the air right now (cityfeed.js), through the relay
+  const cityRelay = typeof window !== 'undefined' ? window.BLOX_SITE?.relay : '';
+  const cityFeed = cityRelay && !ctx.still ? new CityFeed(cityRelay) : null;
+  cityFeed?.start();
   // weather (weather.js): #rain= / #temp= in the URL, else the real Maastricht weather while the
   // clock shows the real time, else ctx.weather?.rain or a dry, mild day. state.weather is read
   // by the terraces and the HUD: { rain, tempC, cloud, wind, live, terrace, crowd }.
@@ -417,13 +422,16 @@ export async function initLife(ctx) {
     ui.update();
     if ((statT += dt) > 0.5 || dt === 0) {
       statT = 0;
+      state.city = cityFeed?.now || null; // (window.__bloxLife.city)
+      state.cityText = cityText(state.city);
       const b = state.buses?.stats;
       state.stats = { people: crowd.count, walkers: state.walkers?.people || 0, cyclists: state.cyclists?.count || 0,
         cars: state.cars?.count || 0, carsMoving: state.cars ? state.cars.cars.slice(0, state.cars.count).filter((c) => c.v > 0.5).length : 0, seated: state.terraces?.seated || 0, market: state.market?.state || 'none',
         drawCalls: crowd.drawCalls() + fleet.drawCalls() + props.drawCalls() + (state.signals?.drawCalls() || 0) };
       ui.stats([b ? `${b.active} buses (${b.full} near)` : 'no timetable', `${crowd.count} people`,
         `${state.stats.cyclists} bikes`, `${state.stats.cars} cars`, `${state.boats?.items.length || 0} boats`,
-        ...state.events.slice(0, 1).map((e) => e.name), ...(state.weather.live ? [`${Math.round(state.weather.tempC)}°C${state.weather.rain > 0 ? ' rain' : ''}`] : [])].join(' · '));
+        ...state.events.slice(0, 1).map((e) => e.name), ...(state.weather.live ? [`${Math.round(state.weather.tempC)}°C${state.weather.rain > 0 ? ' rain' : ''}`] : []),
+        ...(state.city ? [cityText(state.city)] : [])].filter(Boolean).join(' · '));
     }
   }
   state.step = step; // screenshots: re-place everything after moving the camera
