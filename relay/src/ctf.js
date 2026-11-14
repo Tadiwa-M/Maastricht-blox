@@ -30,6 +30,7 @@ export const CTF = {
   // shooting: clients claim hits (they know the walls), the room checks who, how often and where
   hp: 100,
   respawnS: 4, // knocked out this long, then back at the base
+  spawnSafeS: 3, // just back (or just started): shots do not count on you this long, unless you shoot first
   shotRangeM: 170,
   shotSlackM: 2.5, // a claimed hit must pass this close to where the room last saw the target
   pickupBackS: 20, // a taken weapon lies there again after this
@@ -93,8 +94,8 @@ export function pickBases(round, rand = Math.random) {
 /** What the clients need to draw the arena and run the soft boundary. */
 export function arenaConfig(g) {
   const bases = g?.bases || CTF.bases;
-  const { version, teams, arenaR, flagR, baseR, tagR, returnS, matchS, winCaps, minPlayers, maxPlayers, hp, respawnS, shotRangeM } = CTF;
-  return { version, teams, bases, arenaR, flagR, baseR, tagR, returnS, matchS, winCaps, minPlayers, maxPlayers, hp, respawnS, shotRangeM };
+  const { version, teams, arenaR, flagR, baseR, tagR, returnS, matchS, winCaps, minPlayers, maxPlayers, hp, respawnS, spawnSafeS, shotRangeM } = CTF;
+  return { version, teams, bases, arenaR, flagR, baseR, tagR, returnS, matchS, winCaps, minPlayers, maxPlayers, hp, respawnS, spawnSafeS, shotRangeM };
 }
 
 export const cleanName = (s) => String(s ?? '').replace(/[^\p{L}\p{N} _.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 12) || 'Player';
@@ -191,7 +192,7 @@ export function start(g, id, now, rand = Math.random) {
   g.bases = pickBases(g.round + 1, rand); // a new part of town every round after the first
   g.flags = { blue: home(g, 'blue'), yellow: home(g, 'yellow') };
   g.score = { blue: 0, yellow: 0 };
-  for (const p of list(g)) { p.caps = 0; p.tags = 0; p.down = 0; p.hp = CTF.hp; p.kills = 0; p.deaths = 0; p.shotAt = 0; }
+  for (const p of list(g)) { p.caps = 0; p.tags = 0; p.down = 0; p.hp = CTF.hp; p.kills = 0; p.deaths = 0; p.shotAt = 0; p.safe = now + CTF.spawnSafeS * 1000; }
   g.phase = 'play'; g.round++; g.winner = null; g.taken = {};
   g.endsAt = now + CTF.matchS * 1000;
   return { ok: true, ...result([{ k: 'start', round: g.round }]) };
@@ -280,9 +281,11 @@ export function shoot(g, id, msg, now) {
   const o = [msg.o[0], msg.o[2]], e = [msg.e[0], msg.e[2]];
   if (dist(o, p.at) > CTF.shotFromM || dist(o, e) > CTF.shotRangeM) return result();
   p.shotAt = now;
+  p.safe = 0; // shooting gives up the spawn shield
   const events = [{ k: 'shot', by: id, w: msg.w, o: msg.o, e: msg.e }];
   const q = g.players[msg.hit];
   if (!q || q.team === p.team || !fresh(q, now) || q.down > now || segDist(q.at, o, e) > CTF.shotSlackM) return result(events, false);
+  if ((q.safe || 0) > now) return result(events, false); // just back at the base: not a target yet
   if (w.rangeM && dist(w.melee ? p.at : o, q.at) > w.rangeM + (w.melee ? 0 : CTF.shotSlackM)) return result(events, false);
   const head = !!msg.head;
   const n = w.pellets ? Math.max(1, Math.min(w.pellets, Math.floor(+msg.n) || 1)) : 1;
@@ -291,6 +294,7 @@ export function shoot(g, id, msg, now) {
   if (q.hp > 0) return result(events, false);
   q.hp = CTF.hp; q.deaths = (q.deaths || 0) + 1; p.kills = (p.kills || 0) + 1;
   q.down = now + CTF.respawnS * 1000;
+  q.safe = q.down + CTF.spawnSafeS * 1000;
   const f = carried(g, q.id);
   if (f) {
     Object.assign(g.flags[f], { st: 'dropped', at: [...q.at], by: 0, since: now, lock: now + CTF.dropLockS * 1000 });

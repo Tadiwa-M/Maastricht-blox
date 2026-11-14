@@ -316,7 +316,7 @@ export class Combat {
   }
 
   /** A new round, or back at the base. */
-  respawn(maxHp = 100) { this.maxHp = this.hp = maxHp; this.down = 0; this.gun.reset(); this.aiming = false; this.fire = false; }
+  respawn(maxHp = 100, safeS = 0) { this.safeT = safeS; this.maxHp = this.hp = maxHp; this.down = 0; this.gun.reset(); this.aiming = false; this.fire = false; }
   /** from: the shooter's position (three.js [x, y, z]) or null: an arc on screen points their way for a moment. */
   hurt(hp, from = null) { this.hp = hp; this.dmg = 1; haptic('hurt'); if (from) { this.hitFrom = [from[0], from[2]]; this.hitDirT = HIT_DIR_S; } }
   /** Knocked out for `seconds`; onBack runs when it is time to stand at the base again. */
@@ -448,7 +448,7 @@ export class Combat {
     if (!alive) {
       this.down -= dt;
       this.downEl.hidden = false; this.downEl.textContent = `Knocked out: back in ${Math.max(1, Math.ceil(this.down))}`;
-      if (this.down <= 0) { this.downEl.hidden = true; this.respawn(this.maxHp); this.onBack?.(); }
+      if (this.down <= 0) { this.downEl.hidden = true; this.respawn(this.maxHp, this.safeS || 0); this.onBack?.(); }
     } else this.downEl.hidden = true;
 
     this.stepPickups(dt, st, alive);
@@ -475,7 +475,8 @@ export class Combat {
     this.want.reload = this.want.swap = this.want.stab = false; this.want.slot = null;
     if (this.tap) { this.tap = false; if (!this.fire) this.gun.held = false; }
     if (r.swapped) this.zoom2 = false;
-    if (r.shot) { this.shoot(st, f); haptic(this.gun.w); }
+    if (r.shot) { this.shoot(st, f); haptic(this.gun.w); this.safeT = 0; } // shooting gives up the spawn shield
+    if (this.safeT > 0) this.safeT -= dt;
     if (r.empty) haptic('empty');
     f.aimPitch = Math.max(f.lim.min, Math.min(f.lim.max, f.aimPitch));
     this.prevAim = [f.aimYaw, f.aimPitch];
@@ -585,6 +586,8 @@ export class Combat {
       this.objEl.style.color = /^#2F6FD6$/i.test(ob.colour || '') ? '#fff' : '#11143a'; // readable on blue and on yellow
     }
     this.dmgEl.style.opacity = Math.max(this.dmg * 0.8, (1 - this.hp / this.maxHp) * 0.35);
+    // the spawn shield: a white glow round the health bar while shots do not count on me
+    this.hpEl.parentElement.style.boxShadow = this.safeT > 0 ? '0 0 0 2px #fff, 0 0 14px 4px rgba(255,255,255,.75)' : '';
     this.hpEl.style.width = `${(this.hp / this.maxHp) * 100}%`;
     this.hpEl.style.background = this.hp > 50 ? '#5fd66b' : this.hp > 25 ? '#F2C200' : '#e5484d';
     const ammo = `${def.melee ? '<span>—</span>' : `<span>${this.gun.ammo[this.gun.w]}</span> / ${def.mag}`}<small>${this.gun.reloading ? 'Reloading' : def.name}</small><em>${this.gun.slots.map((w, i) => (w ? `${i + 1} ${WEAPONS[w].name}` : '')).filter(Boolean).join(' · ')}</em>${this.gun.reloading ? `<u style="width:${this.gun.reloadProgress * 100}%"></u>` : ''}`;

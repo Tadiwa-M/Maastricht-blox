@@ -1771,3 +1771,9 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - The ammo count sat in a corner. Low, reloading (with progress) and empty now show under the
   crosshair, and only then (guide 18).
 
+## 2026-11-14: a spawn shield
+
+- A player back at the base could be shot the moment they appeared. Three seconds of shield
+  after the start and after a respawn, given up by shooting (guide 18). The relay must be
+  redeployed for it.
+

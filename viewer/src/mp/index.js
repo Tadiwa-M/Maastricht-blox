@@ -119,7 +119,7 @@ export async function initMultiplayer(ctx) {
     const now = performance.now();
     for (const e of model.apply(m)) {
       if (e.k === 'pos') view.push(e.id, e.p, e.yaw, e.speed, now);
-      else if (e.k === 'spawn' && e.at) { spawn = { at: e.at, t: 0 }; boundary.reset(); combat?.respawn(model.config?.hp || 100); }
+      else if (e.k === 'spawn' && e.at) { spawn = { at: e.at, t: 0 }; boundary.reset(); combat?.respawn(model.config?.hp || 100, model.config?.spawnSafeS || 0); }
       else if (e.k === 'take') combat?.taken(e.i, e.mine, e.s);
       else if (e.k === 'shot') { lastWeapon.set(e.by, e.w); combat?.tracer(toThree(e.o, origin), toThree(e.e, origin), e.w); }
       else if (e.k === 'hurt') combat?.hurt(e.hp, view.posOf(e.by));
@@ -131,7 +131,7 @@ export async function initMultiplayer(ctx) {
     }
     const key = JSON.stringify(model.config?.bases || '');
     if (key !== basesKey && model.config) { basesKey = key; view.setBases(model.config); combat?.setBases(model.config.bases); } // bases move between rounds
-    if (combat && model.team) { combat.setTeam(model.team); combat.range = model.config?.shotRangeM; }
+    if (combat && model.team) { combat.setTeam(model.team); combat.range = model.config?.shotRangeM; combat.safeS = model.config?.spawnSafeS || 0; }
     if (m.t === 'welcome') {
       // back after a reload in the middle of a match: on the map, so start at the base again
       if (m.rejoin && m.phase === 'play' && player()?.mode !== 'walk' && !spawn) { const at = model.spawn(); if (at) spawn = { at, t: 0 }; }

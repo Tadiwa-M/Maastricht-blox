@@ -175,3 +175,6 @@ knock-outs, flags); the client knows the walls, so it claims hits and the room c
 - **Ammo where the eyes are (2026-11-14):** under the crosshair, only when it matters
   (`combat.js` `ammoCue`): "LOW · 7 · R" in amber at a quarter of the magazine or less, "RELOADING"
   with a progress bar, "EMPTY" blinking in red. Nothing for a full magazine or the knife.
+- **Spawn shield (2026-11-14):** for `spawnSafeS` (3 s) after a match starts and after coming back
+  at the base, hits on a player do not count (`ctf.js` `shoot`: `safe`); shooting gives the shield
+  up at once, so nobody fires from behind it. The health bar glows white while it lasts.

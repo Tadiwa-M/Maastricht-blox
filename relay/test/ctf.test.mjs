@@ -193,6 +193,7 @@ test('shooting: damage, head shots, knock-out drops the flag and respawns; the r
   join(g, { pid: 'aaaaaaaa1', name: 'A' }, 0); join(g, { pid: 'bbbbbbbb2', name: 'B' }, 0);
   start(g, 1, 0);
   const a = g.players[1], b = g.players[2];
+  a.safe = b.safe = 0; // (the spawn shield has its own test)
   move(g, 1, { p: [176300, 50, 317900] }, 1000); move(g, 2, { p: [176300, 50, 317930] }, 1000);
   const shot = (over = {}) => ({ w: 'rifle', o: [176300, 51.5, 317900], e: [176300, 51, 317930], hit: 2, head: false, ...over });
   let r = shoot(g, 1, shot(), 1100);
@@ -213,8 +214,8 @@ test('shooting: damage, head shots, knock-out drops the flag and respawns; the r
   assert.equal(shoot(g, 2, shot({ o: [176300, 51, 317930], e: [176300, 51, 317900], hit: 1 }), 4000).events.length, 0, 'knocked out: no shooting');
   assert.deepEqual(shoot(g, 1, shot(), 5000).events.map((e) => e.k), ['shot'], 'and no hits on someone who is down');
   g.flags.blue = { st: 'home', at: [...g.bases.blue.at], by: 0, since: 0, lock: 0 };
-  move(g, 2, { p: [176300, 50, 317930] }, 3000 + CTF.respawnS * 1000);
-  assert.ok(shoot(g, 1, shot(), 3000 + CTF.respawnS * 1000 + 1).events.some((e) => e.k === 'hit'), 'up again after the respawn time');
+  move(g, 2, { p: [176300, 50, 317930] }, 3000 + (CTF.respawnS + CTF.spawnSafeS) * 1000);
+  assert.ok(shoot(g, 1, shot(), 3000 + (CTF.respawnS + CTF.spawnSafeS) * 1000 + 1).events.some((e) => e.k === 'hit'), 'up again after the respawn time and the spawn shield');
   const pub = publicState(g, 0);
   assert.equal(pub.players[0].kills, 1);
   assert.ok(pub.bases.blue.name);
@@ -247,6 +248,7 @@ test('shotgun and knife: pellets add up within range; a stab knocks out, but onl
   join(g, { pid: 'aaaaaaaa1', name: 'A' }, 0); join(g, { pid: 'bbbbbbbb2', name: 'B' }, 0);
   start(g, 1, 0);
   const b = g.players[2];
+  g.players[1].safe = b.safe = 0;
   const place = (d, now) => { move(g, 1, { p: [176300, 50, 317900] }, now); move(g, 2, { p: [176300, 50, 317900 + d] }, now); };
   const msg = (w, d, over = {}) => ({ w, o: [176300, 51.5, 317900], e: [176300, 51, 317900 + d], hit: 2, ...over });
   place(10, 1000);
@@ -273,4 +275,31 @@ test('pickups: the first player near a spot takes it, then it is gone for 20 s',
   assert.equal(take(g, 1, { i: 0 }, 1300).events.length, 0, 'already taken');
   assert.equal(take(g, 1, { i: 9 }, 1300).events.length, 0);
   assert.equal(take(g, 1, { i: 0 }, 1200 + CTF.pickupBackS * 1000 + 1).events.length, 1, 'back again');
+});
+
+test('spawn shield: no hits for 3 s after the start and after coming back, unless you shoot first', async () => {
+  const { shoot } = await import('../src/ctf.js');
+  const g = newGame('ABCD', 0);
+  join(g, { pid: 'aaaaaaaa1', name: 'A' }, 0); join(g, { pid: 'bbbbbbbb2', name: 'B' }, 0);
+  start(g, 1, 0);
+  const b = g.players[2], S = CTF.spawnSafeS * 1000;
+  const see = (now) => { move(g, 1, { p: [176300, 50, 317900] }, now); move(g, 2, { p: [176300, 50, 317930] }, now); };
+  const at = (from, to, hit, w = 'rifle') => ({ w, o: [176300, 51.5, from], e: [176300, 51, to], hit });
+  see(500);
+  assert.deepEqual(shoot(g, 1, at(317900, 317930, 2), 600).events.map((e) => e.k), ['shot'], 'the match just started');
+  see(S + 100);
+  assert.ok(shoot(g, 1, at(317900, 317930, 2), S + 200).events.some((e) => e.k === 'hit'), 'after the shield');
+  // B is knocked out, comes back, and is shielded again
+  see(S + 1000);
+  const r = shoot(g, 1, at(317900, 317930, 2, 'scout'), S + 1100);
+  shoot(g, 1, at(317900, 317930, 2, 'scout'), S + 2100);
+  assert.equal(b.deaths, 1);
+  const back = b.down;
+  see(back + 500);
+  assert.deepEqual(shoot(g, 1, at(317900, 317930, 2), back + 600).events.map((e) => e.k), ['shot'], 'just back at the base');
+  // ...but B shooting first gives the shield up
+  shoot(g, 2, at(317930, 317900, 1), back + 700);
+  see(back + 900);
+  assert.ok(shoot(g, 1, at(317900, 317930, 2), back + 1000).events.some((e) => e.k === 'hit'), 'no hiding behind it while shooting');
+  void r;
 });
