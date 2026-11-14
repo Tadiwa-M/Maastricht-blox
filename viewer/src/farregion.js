@@ -263,6 +263,9 @@ export class FarRegions {
       const sched = new StreamScheduler(items, {
         loadRadius: coarsest ? Infinity : this.loadRadius(lv.level), unloadRadius: coarsest ? Infinity : this.loadRadius(lv.level) * 1.4,
         concurrency: coarsest ? 8 : 3,
+        // the coarsest level is the whole silhouette: keep every region (the default cap of 600 is
+        // fewer than the whole-Maastricht bake's 1,020, which then never settled and blocked streaming)
+        ...(coarsest ? { maxLoaded: Infinity } : {}),
         // a loaded look keeps only its decoded quads (12 B each); meshes are built the first
         // time it is shown, and their vertex arrays leave the CPU after upload
         load: async (it, signal) => ({ decoded: await this.decode(await this.fetchBytes(it.file, signal)), level: it.level, built: null }),

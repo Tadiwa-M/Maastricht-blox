@@ -600,3 +600,14 @@ greens stand still. Only the instanced near zone sways (the far city is merged g
 do not follow. Tests: `test/sway.test.mjs`. Checked on the look-test scene: canopies change
 between two frames, buildings and trunks do not.
 
+## The silhouette must hold every coarse region (2026-11-14)
+
+Chunk streaming waits for `FarRegions.silhouetteReady()`: the coarsest level loaded for the
+whole city and settled. Its scheduler used the default `maxLoaded` of 600; the whole-Maastricht
+bake has 1,020 regions, so it unloaded regions as fast as it loaded them, never settled, and
+no chunk was ever requested: the loading screen stayed up on PC, and on phones the camera came
+down onto the coarse far look ("No ground there", grass slabs where buildings should be). The
+coarsest level now has no cap (it is the whole silhouette by design; about 10 MB here).
+`test/farregion.cap.test.mjs` fails with the old cap. Checked against the published site's
+data with the fixed code: past the loading screen in 21 s, chunks streaming, walking on the Markt.
+

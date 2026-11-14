@@ -1777,3 +1777,12 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   after the start and after a respawn, given up by shooting (guide 18). The relay must be
   redeployed for it.
 
+## 2026-11-14: the whole-Maastricht site would not stream (fixed)
+
+- After publishing the `maastricht` slice: the loading screen never ended on PC; on phones only
+  the coarse far look showed when zooming in. Cause: the silhouette's region cap (600) was below
+  the region count (1,020), so it never settled and chunk streaming never started (guide 06).
+  The world data was fine; only the site needs rebuilding (no world rebuild).
+- Also seen while checking: two chunks near the hospital (Randwyck) hold a flat grey roof about
+  45 m up with no walls; a building lost its walls in the build. Open.
+
