@@ -163,7 +163,7 @@ export class RoomView {
       const speed = travelled > 1e-4 && s.speed > 0.05 ? Math.min(8, s.speed) : 0;
       o.prev = s;
       const m = o.motion.update(dt, { speed, travelled, angVel: 0, accel: 0, steer: 0, grounded: true, vy: 0 }, o.variant.scale);
-      Object.assign(o.pose, { x: s.x, y: s.y, z: s.z, rotY: -s.yaw }, m);
+      Object.assign(o.pose, { x: s.x, y: s.y, z: s.z, rotY: -s.yaw }, m, { aim: model.phase === 'play' ? 1 : 0, aimPitch: 0 }); // in a match everyone holds their gun
       if (o.scatter) {
         const stand = o.scatter.gathering ? captureParts(o.variant, { ...o.pose, mode: MODE.IDLE, t: 0 }) : null;
         this.crowd.addParts(o.variant, o.scatter.update(dt, stand));

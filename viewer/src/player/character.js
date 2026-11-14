@@ -55,6 +55,13 @@ export class Character {
   /** Swap the figure's look (character creator); a fresh variant object (the crowd caches per variant). */
   setVariant(v) { this.variant = v; }
 
+  /** World matrix (Float32Array(16)) of the right hand in the current pose, or null. */
+  rightHand() {
+    let hand = null;
+    for (const p of captureParts(this.variant, this.pose)) if (p.key === 'hand') hand = p.mat; // left first, then right
+    return hand;
+  }
+
   /**
    * feet: [x, y, z] three.js; yaw: compass radians; speed m/s; travelled m this frame;
    * body: { angVel, accel, steer, grounded, vy } from the controller (motion.js: lean, bank,
@@ -65,7 +72,9 @@ export class Character {
     if (o) { this.pose = o; this.crowd.begin(); this.crowd.add(this.variant, o); this.crowd.end(); return; }
     const m = this.motion.update(dt, { speed, travelled, angVel: 0, accel: 0, steer: 0, grounded: true, vy: 0, ...body },
       this.variant.scale);
-    Object.assign(this.pose, { x: feet[0], y: feet[1], z: feet[2], rotY: -yaw }, m);
+    // aiming (the shooting mode): the figure faces where the gun points; walking still moves it freely (strafing)
+    const faceYaw = this.aim && Number.isFinite(this.aim.yaw) ? this.aim.yaw : yaw;
+    Object.assign(this.pose, { x: feet[0], y: feet[1], z: feet[2], rotY: -faceYaw }, m, { aim: this.aim?.k || 0, aimPitch: this.aim?.pitch || 0 });
     this.crowd.begin();
     this.crowd.add(this.variant, this.pose);
     this.crowd.end();

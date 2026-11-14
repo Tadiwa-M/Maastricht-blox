@@ -611,3 +611,16 @@ coarsest level now has no cap (it is the whole silhouette by design; about 10 MB
 `test/farregion.cap.test.mjs` fails with the old cap. Checked against the published site's
 data with the fixed code: past the loading screen in 21 s, chunks streaming, walking on the Markt.
 
+## Rooms with people in them: windows by the hour (2026-11-14)
+
+Every window used to glow the same way all night (60 % lit, always the same ones). Now:
+- `glow.js` `litShare(hours)`: the share of rooms with the light on, from the clock (about 68 %
+  at 20:00, 32 % at midnight, 6 % at 03:00, a bump to 32 % before work at 06:30). `scene.js`
+  sets it with the time of day (`windowUniforms`); `life/index.js` feeds the game clock.
+- Near glass (`materials.js` `windowGlass`): every window has its room colour (`windowGlow(...,
+  { all: true })`); the shader decides which are on (per window, on its own 6 to 18 game-minute
+  schedule, so lights go on and off as you watch), TV rooms flicker, and the light falls off from
+  the ceiling toward the sill. The far city (`cityFar`) keeps the same share per metre cell.
+- Room light is weaker than a lamp (glass emissive x1.15, far x1.2 at night, were x1.6), so lit
+  windows no longer wash out the street. Checked on the full city at 21:00 and 03:00.
+

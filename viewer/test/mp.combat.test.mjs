@@ -146,7 +146,7 @@ test('haptics: a buzz on phones, rumble on gamepads, nothing (and no error) wher
     getGamepads: () => [null, { connected: true, vibrationActuator: { playEffect: (type, o) => { rumble.push([type, o]); return Promise.resolve(); } } }, { connected: true }] };
   assert.equal(haptic('shotgun', nav), true);
   assert.deepEqual(buzz, [HAPTICS.shotgun[0]]);
-  assert.deepEqual(rumble, [['dual-rumble', { duration: 160, weakMagnitude: 0.8, strongMagnitude: 1 }]]);
+  assert.deepEqual(rumble, [['dual-rumble', { startDelay: 0, duration: 160, weakMagnitude: 0.8, strongMagnitude: 1 }]]);
   assert.equal(haptic('nothing', nav), false);
   assert.equal(haptic('hurt', {}), false, 'a desktop without either');
   assert.equal(haptic('hurt', { vibrate: () => { throw new Error('blocked'); } }), false);
@@ -183,4 +183,17 @@ test('ammo cue under the crosshair: quiet with a full magazine, low, reloading w
   assert.equal(ammoCue(g).level, 'warn', 'a five-round magazine is low at one');
   g.step(0.01, { slot: 2 });
   assert.equal(ammoCue(g), null, 'the knife needs no ammo');
+});
+
+test('rumble: the older Firefox actuator works too; a pad without motors is reported as such', async () => {
+  const { rumble, canRumble } = await import('../src/mp/combat.js');
+  const pulses = [];
+  const ff = { hapticActuators: [{ pulse: (v, ms) => { pulses.push([v, ms]); return Promise.resolve(); } }] };
+  assert.equal(rumble(ff, { ms: 90, weak: 0.3, strong: 0.7 }), true);
+  assert.deepEqual(pulses, [[0.7, 90]]);
+  assert.ok(canRumble(ff));
+  assert.equal(rumble({ id: 'pad' }, { ms: 90, weak: 1, strong: 1 }), false);
+  assert.ok(!canRumble({ id: 'pad' }) && !canRumble(null));
+  const trig = { vibrationActuator: { effects: ['trigger-rumble'], playEffect: () => Promise.resolve() } };
+  assert.equal(rumble(trig, { ms: 90, weak: 1, strong: 1 }), false, 'only a kind it cannot play');
 });

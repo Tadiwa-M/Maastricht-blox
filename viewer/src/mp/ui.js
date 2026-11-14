@@ -60,6 +60,10 @@ const CSS = `
 #mp-names .mp-name { position: absolute; left: 0; top: 0; padding: 2px 7px; border-radius: 7px; background: rgba(18,22,30,.7);
   color: #fff; font: 600 12px system-ui, sans-serif; border-bottom: 3px solid; white-space: nowrap; will-change: transform; }
 body.mp-match #pl-street { visibility: hidden; }
+/* in a match only the fight's own HUD: no brick info, no side buttons or footer under the fire buttons
+   (the room panel stays reachable from the pause menu: Multiplayer) */
+body.mp-match #info, body.mp-match #foot, body.mp-match #rd-open, body.mp-match #ex-open, body.mp-match #rp-open,
+body.mp-match #mp-open, body.mp-match #pl-bar { display: none !important; }
 @media (max-width: 560px) { /* narrow phones: below the title box and the Map button, not on them */
   #mp-pill { top: calc(62px + env(safe-area-inset-top, 0px)); }
   #mp-toast { top: calc(104px + env(safe-area-inset-top, 0px)); }

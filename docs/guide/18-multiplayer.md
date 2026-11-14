@@ -178,3 +178,15 @@ knock-outs, flags); the client knows the walls, so it claims hits and the room c
 - **Spawn shield (2026-11-14):** for `spawnSafeS` (3 s) after a match starts and after coming back
   at the base, hits on a player do not count (`ctf.js` `shoot`: `safe`); shooting gives the shield
   up at once, so nobody fires from behind it. The health bar glows white while it lasts.
+- **Holding the gun (2026-11-14):** in third person the figure holds the weapon: `rig.js`
+  `holdGun` raises the right arm to the grip and the left under the barrel, following the aim's
+  pitch; the figure faces the aim (`Character.aim`), while walking still moves it freely
+  (strafing); the gun sits in the right hand (`Character.rightHand`). Other players hold theirs
+  the same way. The hand's exact spot was tuned from screenshots only: it can sit a little low.
+- **Match HUD:** in a match the brick info panel, the side buttons (Play, journal, report), the
+  Transit button, the hint bar and the footer are hidden (the room panel is in the pause menu);
+  on phones the ammo count sits bottom left, clear of Jump and Fire.
+- **Controllers:** `rumble(pad, ...)` tries `vibrationActuator.playEffect('dual-rumble')` (Chrome,
+  Edge: PlayStation and Xbox pads) and the older `hapticActuators[0].pulse` (Firefox). When a pad
+  connects it buzzes once and the toast says whether this browser gives it rumble at all.
+

@@ -31,6 +31,7 @@ import { streetFinder } from './streets.js';
 import { raycastCity, spawnPoint } from './ray.js';
 import { parseWalkHash } from './hash.js';
 import { Creator } from './creator.js';
+import { rumble, canRumble } from '../mp/combat.js';
 import { VehicleContacts, lifeVehicles } from './bump.js';
 import { Scatter } from './scatter.js';
 import { defaultChoices, loadChoices } from '../figure/custom.js';
@@ -114,7 +115,10 @@ export function initPlayer(ctx) {
     onLock: (locked) => hud.setLocked(locked),
     onPad: (name, on) => {
       padCount = Math.max(0, padCount + (on ? 1 : -1));
-      hud.toast(on ? `Controller connected: ${name.replace(/\s*\(.*$/, '').slice(0, 40)}` : 'Controller disconnected');
+      // say whether this browser lets the pad rumble (and give a short buzz to prove it)
+      const pad = on ? [...(navigator.getGamepads?.() || [])].find((p) => p?.connected && p.id === name) : null;
+      const buzz = pad ? rumble(pad, { ms: 180, weak: 0.6, strong: 0.8 }) : false;
+      hud.toast(on ? `Controller connected: ${name.replace(/\s*\(.*$/, '').slice(0, 40)}${canRumble(pad) ? (buzz ? ' · rumble on' : '') : ' · this browser gives it no rumble'}` : 'Controller disconnected', 4000);
       hud.setMode(mode, padCount > 0);
     },
   });

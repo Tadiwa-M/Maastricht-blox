@@ -14,6 +14,7 @@ import { probe, createRoom, checkRoom, Connection } from './net.js';
 import { posMessage, newPid, parseCode, cleanNick, rdToUnity, threeToRd, toThree, NICK_KEY, PID_KEY } from './protocol.js';
 import { loadChoices, encodeChoices } from '../figure/custom.js';
 import { Combat } from './combat.js';
+import { captureParts } from '../figure/rig.js';
 
 const SEND_S = 0.1, IDLE_SEND_S = 1, SPAWN_GIVE_UP_S = 20;
 const STATUS = { connecting: 'Connecting...', on: '', reconnecting: 'Connection lost: reconnecting...' };
@@ -90,7 +91,8 @@ export async function initMultiplayer(ctx) {
       },
       // every other player on screen, for the gun at their side (the weapon they last fired)
       figures: () => (model && view ? model.players.filter((p) => p.id !== model.me && p.on && view.others.get(p.id)?.prev)
-        .map((p) => { const o = view.others.get(p.id); return { id: p.id, pos: [o.pose.x, o.pose.y, o.pose.z], yaw: -o.pose.rotY, team: p.team, w: lastWeapon.get(p.id) || 'rifle', hidden: !!o.scatter }; }) : []),
+        .map((p) => { const o = view.others.get(p.id); let hand = null; if (o.variant) for (const q of captureParts(o.variant, o.pose)) if (q.key === 'hand') hand = q.mat;
+          return { id: p.id, pos: [o.pose.x, o.pose.y, o.pose.z], yaw: -o.pose.rotY, team: p.team, w: lastWeapon.get(p.id) || 'rifle', hidden: !!o.scatter, hand }; }) : []),
       // living enemies as the room last drew them (three.js feet)
       enemies: () => (model && view ? model.players.filter((p) => p.team !== model.team && p.on && view.others.get(p.id)?.prev && !view.others.get(p.id).scatter)
         .map((p) => { const o = view.others.get(p.id); return { id: p.id, pos: [o.pose.x, o.pose.y, o.pose.z], scale: o.variant?.scale || 1 }; }) : []) });

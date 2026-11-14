@@ -37,7 +37,7 @@ import { parseYmd, weekdayOf, zonedDayNumber, clockDate, eventsAt } from './cale
 import { placesUnity, spotPulls, spotWeights, goalPlan, nightFactor, eventCrowd, eventOutfit } from './routines.js';
 import { WeatherFeed, weatherState, hashWeather } from './weather.js';
 import { CityFeed, cityText } from './cityfeed.js';
-import { swayUniforms, swayAmp } from '../materials.js';
+import { swayUniforms, swayAmp, windowUniforms } from '../materials.js';
 import { dress } from './outfits.js';
 import { PlayerWatch, playerSample, hitByVehicle } from './reactions.js';
 
@@ -367,6 +367,7 @@ export async function initLife(ctx) {
     t += dt;
     swayUniforms.uSwayT.value = t; // leaves in the wind (materials.js): the real wind decides how much
     swayUniforms.uSwayAmp.value = swayAmp(state.weather?.wind);
+    windowUniforms.uWinT.value = clock.sec;
     const at = target(), R = livingRadius();
     const trafficEnv = (buses) => trafficEnvFor(state, clock, buses, state.busHalf);
     const buses = state.buses ? state.buses.update(clock, camera) : [];

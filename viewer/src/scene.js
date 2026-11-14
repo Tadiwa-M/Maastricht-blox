@@ -9,6 +9,8 @@ import { Sky } from './sky.js';
 import { makeGround } from './ground.js';
 import { Post } from './post.js';
 import { lookAt } from './render/look.js';
+import { windowUniforms } from './materials.js';
+import { litShare } from './glow.js';
 import { installHaze, setHazeSun } from './render/haze.js';
 
 installHaze(); // before any material compiles: fog with sun scattering (render/haze.js)
@@ -123,6 +125,7 @@ export class Stage {
   setTime(hours) {
     const sun = sunAt(hours), { elevation: el, azimuth: az, night: n } = sun;
     const L = lookAt(sun);
+    windowUniforms.uLitShare.value = litShare(hours); // rooms with the light on at this hour (glow.js)
     this.look = L;
     this.sunDir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el));
     srgb(this.sun.color, L.sunColor);

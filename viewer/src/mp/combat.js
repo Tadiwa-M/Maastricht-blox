@@ -57,6 +57,8 @@ const CSS = `
 #cb-knife { right: 30px; bottom: 286px; width: 52px; height: 52px; }
 #cb-ammo em { display: block; font-style: normal; font-size: 10px; opacity: .7; font-weight: 400; }
 @media (max-width: 600px), (max-height: 500px) { #cb-hp { bottom: 8px; left: 8px; width: 110px; } #cb-ammo { bottom: 8px; } }
+/* phones: the jump and fire buttons own the bottom right; the ammo sits bottom left by the health bar */
+@media (pointer: coarse) { #cb-ammo { right: auto; left: 16px; bottom: 36px; text-align: left; } #cb-ammo u { width: 110px; } }
 `;
 
 function box(parent, w, h, d, x, y, z, mat) {
@@ -168,16 +170,28 @@ export function haptic(kind, nav = typeof navigator !== 'undefined' ? navigator 
   if (!h || !nav) return false;
   let felt = false;
   try { if (typeof nav.vibrate === 'function') felt = nav.vibrate(h[0]) !== false; } catch { /* not allowed here */ }
-  try {
-    for (const pad of nav.getGamepads?.() || []) {
-      const act = pad?.connected ? pad.vibrationActuator : null;
-      if (!act?.playEffect) continue;
-      act.playEffect('dual-rumble', { duration: h[1].ms, weakMagnitude: h[1].weak, strongMagnitude: h[1].strong })?.catch?.(() => {});
-      felt = true;
-    }
-  } catch { /* no rumble */ }
+  try { for (const pad of nav.getGamepads?.() || []) if (pad?.connected && rumble(pad, h[1])) felt = true; } catch { /* no rumble */ }
   return felt;
 }
+
+/**
+ * Rumble one gamepad by whatever the browser offers: Chrome/Edge `vibrationActuator.playEffect`
+ * ('dual-rumble'; on PlayStation and Xbox pads), the older `hapticActuators[0].pulse` (Firefox).
+ * -> true when a rumble was asked for (the browser may still not move the motors).
+ */
+export function rumble(pad, { ms, weak, strong }) {
+  const act = pad?.vibrationActuator;
+  if (act?.playEffect && (!act.effects || act.effects.includes('dual-rumble'))) {
+    act.playEffect('dual-rumble', { startDelay: 0, duration: ms, weakMagnitude: weak, strongMagnitude: strong })?.catch?.(() => {});
+    return true;
+  }
+  const old = pad?.hapticActuators?.[0];
+  if (old?.pulse) { old.pulse(Math.max(weak, strong), ms)?.catch?.(() => {}); return true; }
+  return false;
+}
+
+/** Can this gamepad rumble from a web page? (said when it connects) */
+export const canRumble = (pad) => !!(pad?.vibrationActuator?.playEffect || pad?.hapticActuators?.[0]?.pulse);
 
 export const HIT_DIR_S = 1.6;
 /**
@@ -400,7 +414,8 @@ export class Combat {
       }
       seen.add(o.id);
       g.visible = !o.hidden;
-      g.position.set(o.pos[0] + Math.cos(o.yaw) * 0.42 + Math.sin(o.yaw) * 0.3, o.pos[1] + 1.12, o.pos[2] + Math.sin(o.yaw) * 0.42 - Math.cos(o.yaw) * 0.3);
+      if (o.hand) g.position.set(o.hand[12], o.hand[13] + 0.05, o.hand[14]);
+      else g.position.set(o.pos[0] + Math.cos(o.yaw) * 0.42 + Math.sin(o.yaw) * 0.3, o.pos[1] + 1.12, o.pos[2] + Math.sin(o.yaw) * 0.42 - Math.cos(o.yaw) * 0.3);
       g.rotation.set(0, -o.yaw, 0);
     }
     for (const [id, g] of this.otherGuns) if (!seen.has(id)) { this.scene.remove(g); this.otherGuns.delete(id); }
@@ -435,7 +450,7 @@ export class Combat {
       for (const b of this.btns) b.hidden = !(on && this.touch);
       if (on && !this.tipped) { this.tipped = true; this.tipT = TIP_S; this.tipEl.classList.remove('gone'); } // how to play, once per room
       if (on) { this.saved = { o: { minDist: f.o.minDist, shoulder: f.o.shoulder, fov: f.o.fov }, dist: f.aimDist, recenter: P.settings.recenter }; P.settings.recenter = false; }
-      else { this.restoreCamera(); this.hands.visible = this.side.visible = false; this.fire = this.aiming = false; for (const p of this.pickups) p.g.visible = false; }
+      else { this.restoreCamera(); const P = this.player(); if (P?.character) P.character.aim = null; this.hands.visible = this.side.visible = false; this.fire = this.aiming = false; for (const p of this.pickups) p.g.visible = false; }
     }
     this.stepFx(dt);
     if (this.tipT > 0 && (this.tipT -= dt) <= 0) this.tipEl.classList.add('gone');
@@ -551,7 +566,12 @@ export class Combat {
     model.hand.rotation.set(this.kick * 0.05 - re * 0.7, (1 - a) * 0.06, re * 0.35);
     // at the figure's side, pointing where the camera looks
     const yaw = f.yaw, right = [Math.cos(yaw), Math.sin(yaw)];
-    model.side.position.set(st.pos[0] + right[0] * 0.42 + Math.sin(yaw) * 0.3, st.pos[1] + 1.12, st.pos[2] + right[1] * 0.42 - Math.cos(yaw) * 0.3);
+    // in the figure's hands: the arms are posed to hold it (rig.js holdGun), the grip sits in the right hand
+    const P = this.player();
+    if (P?.character) P.character.aim = alive && !eyes ? { k: 1, pitch: -f.pitch, yaw } : null;
+    const hand = alive && !eyes ? P?.character?.rightHand?.() : null;
+    if (hand) model.side.position.set(hand[12], hand[13] + 0.05, hand[14]);
+    else model.side.position.set(st.pos[0] + right[0] * 0.42 + Math.sin(yaw) * 0.3, st.pos[1] + 1.12, st.pos[2] + right[1] * 0.42 - Math.cos(yaw) * 0.3);
     model.side.rotation.set(-f.pitch, -yaw, 0, 'YXZ');
     if (def.melee) { // the stab: a quick lunge forward
       model.hand.position.set(0.16, -0.16, -0.38 - this.kick * 0.28); model.hand.rotation.set(-0.25 + this.kick * 0.3, 0.25, 0.5);

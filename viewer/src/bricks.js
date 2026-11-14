@@ -149,7 +149,7 @@ export function worldContext(world, mats) {
   return {
     grid, codeOf,
     covered: (I, J, K) => world.occupied(I, J, K) || !outside(I, J, K),
-    glows: windowGlow(world, (n) => mats.classOf(world.palette.get(world.color[n])) === 'glass'),
+    glows: windowGlow(world, (n) => mats.classOf(world.palette.get(world.color[n])) === 'glass', { all: true }),
     glassEntry: glassEntry(world.palette),
   };
 }

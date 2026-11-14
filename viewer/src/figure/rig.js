@@ -86,7 +86,20 @@ export function jointAngles(v, pose, out = {}) {
     set2(out, 'sh', 0.95, 0.95); set2(out, 'elbow', 0.35, 0.35); set2(out, 'abd', 0.1, 0.1);
   }
   if (pose.blend !== undefined || pose.air || pose.dip || pose.lean) motion(v, pose, out);
+  if (pose.aim) holdGun(pose.aim, pose.aimPitch || 0, out);
   return out;
+}
+
+/**
+ * Holding a long gun (the shooting mode): the right arm raised forward to the grip, the left
+ * reaching across under the barrel, both following the aim's pitch (radians, + = up). k 0..1
+ * blends from whatever the body was doing (walking legs keep walking).
+ */
+export function holdGun(k, pitch, out) {
+  const p = Math.max(-0.9, Math.min(0.9, pitch));
+  out.sh[1] = mix(out.sh[1], 1.25 + p, k); out.elbow[1] = mix(out.elbow[1], 0.55, k); out.abd[1] = mix(out.abd[1], -0.18, k);
+  out.sh[0] = mix(out.sh[0], 1.38 + p, k); out.elbow[0] = mix(out.elbow[0], 0.25, k); out.abd[0] = mix(out.abd[0], -0.5, k);
+  out.chestYaw = mix(out.chestYaw || 0, -0.12, k); // shoulder into the stock
 }
 
 const mix = (a, b, k) => a + (b - a) * k;

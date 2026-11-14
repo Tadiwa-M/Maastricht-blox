@@ -1786,3 +1786,12 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Also seen while checking: two chunks near the hospital (Randwyck) hold a flat grey roof about
   45 m up with no walls; a building lost its walls in the build. Open.
 
+## 2026-11-14: the figure holds its gun; windows by the hour; match HUD; controller rumble
+
+- Owner: the gun floated beside the character; windows looked like placeholder lights; no
+  haptics on a PS5 controller; (from the screenshot) the brick info, Play button and ammo
+  overlapped the fire buttons. All four addressed (guides 06 and 18).
+- PS5 rumble: the code now tries every API browsers offer and says on connect whether rumble is
+  available. Whether a DualSense rumbles depends on the browser and platform (Chrome or Edge on a
+  PC is the likeliest to work; phones often give gamepads no rumble). Not tested on the hardware.
+
