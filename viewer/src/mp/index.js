@@ -8,7 +8,7 @@
 // URL hash: #mp=ABCD fills in a room code to join.
 import { MpUi } from './ui.js';
 import { RoomView } from './view.js';
-import { MatchModel } from './model.js';
+import { MatchModel, TEAM_NAMES, TEAM_HEX } from './model.js';
 import { Boundary, inArena } from './arena.js';
 import { probe, createRoom, checkRoom, Connection } from './net.js';
 import { posMessage, newPid, parseCode, cleanNick, rdToUnity, threeToRd, toThree, NICK_KEY, PID_KEY } from './protocol.js';
@@ -77,6 +77,17 @@ export async function initMultiplayer(ctx) {
     model = new MatchModel();
     view = view || new RoomView(stage.scene, ground, origin);
     combat = combat || new Combat({ scene: stage.scene, camera, city, origin, player, send: (m) => conn?.send(m), toast: (t) => ui.toast(t),
+      // where to go: the enemy flag (wherever it is), or home once I carry it
+      objective: () => {
+        if (!model?.team || !model.config || model.phase !== 'play') return null;
+        const theirs = model.team === 'blue' ? 'yellow' : 'blue';
+        const home = model.carrying(model.me) === theirs;
+        const f = model.room?.flags?.[theirs];
+        const rd = home ? model.config.bases[model.team].at : (f?.st === 'carried' ? null : f?.at);
+        if (!rd) return null; // a teammate has it: nothing to fetch
+        const [x, z] = rdToUnity(rd, origin);
+        return { at: [x, -z], label: home ? `Home: ${model.baseName(model.team)}` : `${TEAM_NAMES[theirs]} flag`, colour: home ? TEAM_HEX[model.team] : TEAM_HEX[theirs] };
+      },
       // every other player on screen, for the gun at their side (the weapon they last fired)
       figures: () => (model && view ? model.players.filter((p) => p.id !== model.me && p.on && view.others.get(p.id)?.prev)
         .map((p) => { const o = view.others.get(p.id); return { id: p.id, pos: [o.pose.x, o.pose.y, o.pose.z], yaw: -o.pose.rotY, team: p.team, w: lastWeapon.get(p.id) || 'rifle', hidden: !!o.scatter }; }) : []),

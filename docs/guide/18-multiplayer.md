@@ -168,3 +168,7 @@ knock-outs, flags); the client knows the walls, so it claims hits and the room c
   long shake when knocked out, a flutter for a pickup. Phones use `navigator.vibrate` (Android
   browsers; iPhones do not give web pages vibration), gamepads their rumble motors
   (`vibrationActuator`, Chrome and Edge). Where neither exists nothing happens.
+- **Where to go (2026-11-14):** a strip under the score pill carries one marker: the enemy flag
+  (at home or dropped) with its distance, or "Home: <base>" in the team's colour once you carry
+  it; hidden while a teammate carries it. It slides with the view and pins to an end with an
+  arrow when the target is behind you (`combat.js` `stripMark`, `index.js` `objective`).

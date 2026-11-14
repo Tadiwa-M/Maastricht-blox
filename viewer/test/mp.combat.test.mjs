@@ -156,3 +156,12 @@ test('haptics: a buzz on phones, rumble on gamepads, nothing (and no error) wher
   assert.ok(ms('rifle') < ms('hurt') && ms('hurt') < ms('down'));
   for (const k of ['rifle', 'scout', 'shotgun', 'knife']) assert.ok(HAPTICS[k], k);
 });
+
+test('objective strip: ahead is the middle, to the side slides, behind pins to an end with an arrow', async () => {
+  const { stripMark, STRIP_HALF } = await import('../src/mp/combat.js');
+  assert.deepEqual(stripMark(0), { x: 0, side: 0 });
+  assert.deepEqual(stripMark(STRIP_HALF / 2), { x: 0.5, side: 0 });
+  assert.deepEqual(stripMark(-STRIP_HALF / 2), { x: -0.5, side: 0 });
+  assert.deepEqual(stripMark(2.5), { x: 1, side: 1 });
+  assert.deepEqual(stripMark(-3), { x: -1, side: -1 });
+});

@@ -35,6 +35,11 @@ const CSS = `
 #cb-dir { position: absolute; left: 50%; top: 50%; width: 0; height: 0; opacity: 0; }
 #cb-dir::before { content: ''; position: absolute; left: -46px; top: calc(-1 * min(30vmin, 190px)); width: 92px; height: 26px; box-sizing: border-box;
   border-top: 7px solid rgba(255,60,50,.95); border-radius: 50% 50% 0 0 / 100% 100% 0 0; filter: drop-shadow(0 0 6px rgba(255,40,30,.8)); }
+#cb-obj { position: absolute; left: 50%; top: 58px; width: min(64vw, 420px); height: 30px; margin-left: calc(-1 * min(32vw, 210px)); }
+#cb-obj::before { content: ''; position: absolute; left: 0; right: 0; top: 14px; height: 2px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); }
+#cb-obj i { position: absolute; top: 0; transform: translateX(-50%); padding: 3px 9px; border-radius: 9px; font: 700 12px/1.4 system-ui, sans-serif; font-style: normal;
+  color: #11143a; background: #F2A900; white-space: nowrap; box-shadow: 0 2px 0 rgba(0,0,0,.35); transition: left .08s linear; }
+@media (max-height: 500px) { #cb-obj { top: 46px; } }
 #cb-down { position: absolute; left: 0; right: 0; top: 38%; text-align: center; color: #fff; font-size: 22px; font-weight: 800; text-shadow: 0 2px 6px #000; }
 .cb-btn { position: fixed; z-index: 6; pointer-events: auto; border-radius: 50%; border: 2px solid rgba(255,255,255,.6); background: rgba(17,20,58,.55);
   color: #fff; font: 700 12px system-ui, sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -178,6 +183,17 @@ export function hitAngle(pos, from, yaw) {
   return Math.atan2(Math.sin(bearing - yaw), Math.cos(bearing - yaw));
 }
 
+export const STRIP_HALF = 1.0; // the strip at the top spans this many radians to each side of straight ahead
+/**
+ * Where a target at screen angle a (hitAngle) sits on the objective strip: x -1 (left end) .. 1
+ * (right end); side -1 / 1 when it is further round than the strip shows (pinned to that end
+ * with an arrow), else 0.
+ */
+export function stripMark(a) {
+  if (Math.abs(a) <= STRIP_HALF) return { x: a / STRIP_HALF, side: 0 };
+  return { x: Math.sign(a), side: Math.sign(a) };
+}
+
 export const TIP_S = 14;
 /** The how-to-play line shown when a player's first match in a room starts. */
 export function controlsTip(touch) {
@@ -207,6 +223,7 @@ export class Combat {
     this.scopeEl = el('div', { id: 'cb-scope' }, r);
     this.dmgEl = el('div', { id: 'cb-dmg' }, r);
     this.dirEl = el('div', { id: 'cb-dir' }, r); // where the last hit came from
+    this.objEl = el('i', {}, el('div', { id: 'cb-obj' }, r)); // where to go: the flag, or home with it
     this.xEl = el('div', { id: 'cb-x' }, r);
     this.xLines = [0, 1, 2, 3].map(() => el('i', {}, this.xEl));
     el('i', { className: 'd' }, this.xEl);
@@ -530,6 +547,17 @@ export class Combat {
       this.dirEl.style.transform = `rotate(${hitAngle(st.pos, this.hitFrom, f.yaw)}rad)`;
       this.dirEl.style.opacity = Math.min(1, this.hitDirT / 0.4);
     } else this.dirEl.style.opacity = 0;
+    const ob = alive ? this.objective?.() : null; // { at: [x, z] three.js, label, colour }
+    this.objEl.parentElement.style.display = ob ? '' : 'none';
+    if (ob) {
+      const m = stripMark(hitAngle(st.pos, ob.at, f.yaw));
+      const dist = Math.round(Math.hypot(ob.at[0] - st.pos[0], ob.at[1] - st.pos[2]));
+      const text = `${m.side < 0 ? '◀ ' : ''}${ob.label} · ${dist} m${m.side > 0 ? ' ▶' : ''}`;
+      if (text !== this.objText) { this.objEl.textContent = text; this.objText = text; }
+      this.objEl.style.left = `${(m.x + 1) * 50}%`;
+      this.objEl.style.background = ob.colour || '#F2A900';
+      this.objEl.style.color = /^#2F6FD6$/i.test(ob.colour || '') ? '#fff' : '#11143a'; // readable on blue and on yellow
+    }
     this.dmgEl.style.opacity = Math.max(this.dmg * 0.8, (1 - this.hp / this.maxHp) * 0.35);
     this.hpEl.style.width = `${(this.hp / this.maxHp) * 100}%`;
     this.hpEl.style.background = this.hp > 50 ? '#5fd66b' : this.hp > 25 ? '#F2C200' : '#e5484d';

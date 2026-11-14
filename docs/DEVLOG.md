@@ -1761,3 +1761,8 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Owner asked for haptic feedback. Shots, hits, knock-outs and pickups buzz the phone or rumble
   the gamepad (guide 18). Not felt on a real device yet; iPhones cannot vibrate from a web page.
 
+## 2026-11-14: an objective marker in matches
+
+- Nothing on screen said where the flag or your base was. A strip at the top now points to the
+  enemy flag, and to your own base while you carry it, with the distance (guide 18).
+
