@@ -1750,3 +1750,9 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 
 - Nothing told a new player how to fire, aim, swap, stab or find weapons. A controls line now shows
   for 14 s when their first match in a room starts (guide 18).
+
+## 2026-11-14: a hit says where it came from
+
+- Being shot only flashed the screen red. A red arc now points toward the shooter for a moment
+  (guide 18): the cue a player needs to react instead of dying without knowing why.
+

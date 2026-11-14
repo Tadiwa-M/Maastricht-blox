@@ -160,3 +160,6 @@ knock-outs, flags); the client knows the walls, so it claims hits and the room c
 - **How to play (2026-11-14):** when a player's first match in a room starts, a line above the
   hint bar names the controls for 14 s (`combat.js` `controlsTip`: mouse and keys, or the touch
   buttons) and says that the yellow pads hold weapons.
+- **Where a hit came from (2026-11-14):** being hit shows a red arc round the middle of the screen
+  on the shooter's side for 1.6 s (`combat.js` `hitAngle`, from the shooter's drawn position and
+  the camera's heading); it turns with the view, so turning toward it brings it to the top.

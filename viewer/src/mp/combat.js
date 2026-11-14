@@ -32,6 +32,9 @@ const CSS = `
 #cb-tip { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); max-width: min(92vw, 640px); padding: 8px 14px; border-radius: 10px;
   background: rgba(11,13,42,.82); border-top: 3px solid #F2A900; color: #f6f3ea; font-size: 13px; line-height: 1.45; text-align: center; transition: opacity .6s; }
 #cb-tip b { color: #F2A900; font-weight: 700; } #cb-tip.gone { opacity: 0; }
+#cb-dir { position: absolute; left: 50%; top: 50%; width: 0; height: 0; opacity: 0; }
+#cb-dir::before { content: ''; position: absolute; left: -46px; top: calc(-1 * min(30vmin, 190px)); width: 92px; height: 26px; box-sizing: border-box;
+  border-top: 7px solid rgba(255,60,50,.95); border-radius: 50% 50% 0 0 / 100% 100% 0 0; filter: drop-shadow(0 0 6px rgba(255,40,30,.8)); }
 #cb-down { position: absolute; left: 0; right: 0; top: 38%; text-align: center; color: #fff; font-size: 22px; font-weight: 800; text-shadow: 0 2px 6px #000; }
 .cb-btn { position: fixed; z-index: 6; pointer-events: auto; border-radius: 50%; border: 2px solid rgba(255,255,255,.6); background: rgba(17,20,58,.55);
   color: #fff; font: 700 12px system-ui, sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -131,6 +134,17 @@ class ShotSound {
   }
 }
 
+export const HIT_DIR_S = 1.6;
+/**
+ * Screen angle (radians, clockwise from straight up) toward a shooter: pos is my feet (three.js
+ * [x, y, z]), from the shooter's [x, z], yaw the compass direction the camera looks (0 = north,
+ * three.js -z). 0: in front, +pi/2: to my right, pi: behind.
+ */
+export function hitAngle(pos, from, yaw) {
+  const bearing = Math.atan2(from[0] - pos[0], -(from[1] - pos[2]));
+  return Math.atan2(Math.sin(bearing - yaw), Math.cos(bearing - yaw));
+}
+
 export const TIP_S = 14;
 /** The how-to-play line shown when a player's first match in a room starts. */
 export function controlsTip(touch) {
@@ -159,6 +173,7 @@ export class Combat {
     const r = this.root = el('div', { id: 'cb', hidden: true }, document.body);
     this.scopeEl = el('div', { id: 'cb-scope' }, r);
     this.dmgEl = el('div', { id: 'cb-dmg' }, r);
+    this.dirEl = el('div', { id: 'cb-dir' }, r); // where the last hit came from
     this.xEl = el('div', { id: 'cb-x' }, r);
     this.xLines = [0, 1, 2, 3].map(() => el('i', {}, this.xEl));
     el('i', { className: 'd' }, this.xEl);
@@ -229,7 +244,8 @@ export class Combat {
 
   /** A new round, or back at the base. */
   respawn(maxHp = 100) { this.maxHp = this.hp = maxHp; this.down = 0; this.gun.reset(); this.aiming = false; this.fire = false; }
-  hurt(hp) { this.hp = hp; this.dmg = 1; }
+  /** from: the shooter's position (three.js [x, y, z]) or null: an arc on screen points their way for a moment. */
+  hurt(hp, from = null) { this.hp = hp; this.dmg = 1; if (from) { this.hitFrom = [from[0], from[2]]; this.hitDirT = HIT_DIR_S; } }
   /** Knocked out for `seconds`; onBack runs when it is time to stand at the base again. */
   killed(seconds, onBack) { this.down = seconds; this.onBack = onBack; this.fire = false; this.aiming = false; this.btns[1].classList.remove('on'); }
   hitmark(kill) { this.hitT = kill ? 0.5 : 0.18; this.hitEl.className = kill ? 'on kill' : 'on'; }
@@ -436,6 +452,7 @@ export class Combat {
     for (const p of this.puffs) if (p.t > 0) { p.t -= dt; p.m.visible = p.t > 0; p.m.scale.setScalar(1 + (0.25 - p.t) * 5); p.m.material.opacity = Math.max(0, p.t * 4); }
     this.kick = Math.max(0, this.kick - dt * 9);
     this.dmg = Math.max(0, this.dmg - dt * 1.6);
+    if (this.hitDirT > 0) this.hitDirT -= dt;
     if (this.hitT > 0 && (this.hitT -= dt) <= 0) this.hitEl.className = '';
     if (this.flashT > 0) this.flashT -= dt;
     this.flash.visible = this.flashT > 0;
@@ -475,6 +492,10 @@ export class Combat {
     const set = (i, x, y, w, h) => { const s = this.xLines[i].style; s.left = `${x}px`; s.top = `${y}px`; s.width = `${w}px`; s.height = `${h}px`; };
     set(0, -gap - len, -1, len, 2); set(1, gap, -1, len, 2); set(2, -1, -gap - len, 2, len); set(3, -1, gap, 2, len);
     this.xEl.style.opacity = !alive || scoped ? 0 : 1 - a * (def.scope ? 1 : 0.55);
+    if (this.hitDirT > 0 && this.hitFrom) { // turns with the view, so it keeps pointing at the shooter
+      this.dirEl.style.transform = `rotate(${hitAngle(st.pos, this.hitFrom, f.yaw)}rad)`;
+      this.dirEl.style.opacity = Math.min(1, this.hitDirT / 0.4);
+    } else this.dirEl.style.opacity = 0;
     this.dmgEl.style.opacity = Math.max(this.dmg * 0.8, (1 - this.hp / this.maxHp) * 0.35);
     this.hpEl.style.width = `${(this.hp / this.maxHp) * 100}%`;
     this.hpEl.style.background = this.hp > 50 ? '#5fd66b' : this.hp > 25 ? '#F2C200' : '#e5484d';

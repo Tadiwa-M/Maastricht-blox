@@ -127,3 +127,14 @@ test('how to play: the tip names the controls of the device in hand', async () =
   for (const w of ['FIRE', 'AIM', 'SWAP', 'KNIFE', 'yellow pad']) assert.ok(controlsTip(true).includes(w), w);
   assert.ok(!controlsTip(true).includes('mouse'));
 });
+
+test('hit direction: the arc points at the shooter whatever way I look', async () => {
+  const { hitAngle } = await import('../src/mp/combat.js');
+  const me = [10, 0, 10], near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} vs ${b}`);
+  near(hitAngle(me, [10, 0], 0), 0); // shooter to the north (three.js -z), looking north: straight ahead
+  near(hitAngle(me, [20, 10], 0), Math.PI / 2); // to the east: on my right
+  near(Math.abs(hitAngle(me, [10, 20], 0)), Math.PI); // behind
+  near(hitAngle(me, [0, 10], 0), -Math.PI / 2); // to the west: on my left
+  near(hitAngle(me, [20, 10], Math.PI / 2), 0); // looking east at a shooter in the east: ahead again
+  near(hitAngle(me, [10, 0], Math.PI / 2), -Math.PI / 2);
+});
