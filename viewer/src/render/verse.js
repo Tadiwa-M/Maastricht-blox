@@ -86,9 +86,10 @@ const shader = {
       // lifted toward a cool ink
       o = pow(o, vec3(1.1));
       o = mix(o, 0.9 + (o - 0.9) * 0.35, step(0.9, o));
-      // split toning, the film's signature: light warm (amber), shade cool (teal by day, violet at night)
+      // split toning, kept gentle: the shade a little cool (violet at night), the light all but
+      // neutral (the sun's own colour already warms it; an amber on top turned people orange)
       float Lo = luma(o);
-      vec3 shadeT = mix(vec3(0.9, 0.98, 1.08), vec3(0.97, 0.88, 1.12), night), lightT = vec3(1.09, 1.0, 0.84);
+      vec3 shadeT = mix(vec3(0.96, 0.99, 1.04), vec3(0.98, 0.94, 1.06), night), lightT = vec3(1.015, 1.0, 0.98);
       o *= mix(shadeT, lightT, smoothstep(0.12, 0.72, Lo));
       return o * 0.95 + vec3(0.018, 0.022, 0.034);
     }

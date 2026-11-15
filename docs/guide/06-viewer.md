@@ -806,3 +806,9 @@ next to the film; ship it as a pause-menu option.
   touch deeper (gamma 1.1), highlights rolled off, blacks lifted toward a cool ink, a paler sky,
   and split toning: light amber, shade teal by day and violet at night; denser depth haze (fog from
   45 m). Checked at 13:00, 17:30 and 21:00.
+- Owner on the first build: people looked yellow and glowing at golden hour (an amber split tone on
+  top of the warm sun, plus cloth and skin sheen catching the low sun); the split tone is now gentle
+  (shade a touch cool, light near neutral) and sheen is low (skin 0.1, cloth 0.1-0.12, hair 0.25).
+- Street lights (every look): lantern halos 0.42 m with a steep fall-off (were 0.9 m soft blobs);
+  pools as a street light falls off, strong under the lamp and soft at the edge
+  (att = (1 - d/r)^2 / (1 + 0.06 d^2), r 10 m), not a flat bright disc.

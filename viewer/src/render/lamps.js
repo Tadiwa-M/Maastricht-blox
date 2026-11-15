@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { poolSources, lampPool } from './pools.js';
 
 
-export const LAMP = { type: 'lamp_double_1x3', poolR: 5.5, glowR: 0.9, cap: 240, from: 0.12, full: 0.45 };
+export const LAMP = { type: 'lamp_double_1x3', poolR: 5.5, glowR: 0.42, cap: 240, from: 0.12, full: 0.45 }; // (glow: a tight halo round the lantern, not a 2 m blob)
 const WARM = [1.0, 0.72, 0.38];
 
 /**
@@ -46,7 +46,7 @@ function glowGeometry() { // a camera-facing quad with a soft round glow
   const g = new THREE.CircleGeometry(1, 24);
   const pos = g.attributes.position, col = new Float32Array(pos.count * 3);
   for (let q = 0; q < pos.count; q++) {
-    const r = Math.hypot(pos.getX(q), pos.getY(q)), k = 0.9 * (1 - r) ** 2.2;
+    const r = Math.hypot(pos.getX(q), pos.getY(q)), k = 0.55 * (1 - r) ** 3.2;
     col.set([WARM[0] * k, WARM[1] * k * 1.05, WARM[2] * k * 1.2], q * 3);
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));

@@ -1881,3 +1881,5 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   "Look: Classic / Comic" in the pause menu (saved, reloads); depth from the scene render instead of
   a second scene render (draw calls no longer double); the film's grade (muted, split-toned, hazier).
   Manga stays a test flag (#look=manga); next: fewer dots and hatching there.
+- Fixes from the owner's first look: no amber cast on people (gentle split tone, low sheen); street
+  lamps with tight halos and pools that fall off like real street lights.

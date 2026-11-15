@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { frontDir } from '../rotation.js';
 
-export const POOL = { cap: 48, lampR: 11, lampI: 2.6, shopR: 6.5, shopI: 1.3, from: 0.12, full: 0.45 };
+export const POOL = { cap: 48, lampR: 10, lampI: 3.0, shopR: 6.5, shopI: 1.3, from: 0.12, full: 0.45 };
 export const SHOP_TYPES = ['shop_window_1x2x4', 'window_1x2x3'];
 const WARM = [1.0, 0.7, 0.4], SHOP = [[1.0, 0.78, 0.5], [1.0, 0.86, 0.66], [1.0, 0.3, 0.62], [0.25, 0.9, 0.95], [0.85, 0.9, 1.0]];
 
@@ -74,7 +74,8 @@ export const POOL_GLSL = `
       if (i >= uPoolN) break;
       vec4 L = uPoolP[i];
       vec3 d = L.xyz - wp; float dist = length(d);
-      float att = clamp(1.0 - dist / L.w, 0.0, 1.0); att *= att;
+      // a street light's fall-off: strong under the lamp, a soft edge, never a flat bright disc
+      float att = clamp(1.0 - dist / L.w, 0.0, 1.0); att *= att / (1.0 + dist * dist * 0.06);
       if (att <= 0.0) continue;
       sum += uPoolC[i] * att * clamp(dot(wn, d / max(dist, 1e-3)) * 0.8 + 0.2, 0.0, 1.0);
     }

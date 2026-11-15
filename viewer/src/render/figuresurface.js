@@ -40,7 +40,7 @@ const TWILL = `float tw = smoothstep(0.4, 0.6, fract((p.y + p.x) * 260.0)) - 0.5
 const FRONT = 'float front = step(p.z, 0.0);';
 
 const KIND = {
-  face: { params: { clearcoat: 0.05, roughness: 0.6, sheen: 0.35, sheenRoughness: 0.6, sheenColor: 0xff9a7a },
+  face: { params: { clearcoat: 0.05, roughness: 0.6, sheen: 0.1, sheenRoughness: 0.7, sheenColor: 0xffc0a8 }, // (more sheen glowed in low sun)
     glsl: `${FRONT}
       float brow = 0.0;
       for (int s = -1; s <= 1; s += 2) { vec2 d = vec2(p.x - float(s) * 0.047, p.y - 0.226 + pow(p.x - float(s) * 0.047, 2.0) * 6.0); brow += (1.0 - smoothstep(0.9, 1.1, length(d / vec2(0.024, 0.0055)))); }
@@ -48,13 +48,13 @@ const KIND = {
       c = mix(c, c * vec3(1.08, 0.86, 0.82), cheek * 0.5 * front);
       c = mix(c, c * 0.32, clamp(brow, 0.0, 1.0) * front * step(0.98, vLocC.r));
       c *= 1.0 + (fNoise(p * 60.0) - 0.5) * 0.04;` },
-  hand: { params: { clearcoat: 0.05, roughness: 0.6, sheen: 0.35, sheenRoughness: 0.6, sheenColor: 0xff9a7a },
+  hand: { params: { clearcoat: 0.05, roughness: 0.6, sheen: 0.1, sheenRoughness: 0.7, sheenColor: 0xffc0a8 },
     glsl: 'c *= 1.0 - (fLine(p.y + 0.045, 0.002) + fLine(p.y + 0.075, 0.002)) * 0.12;' },
-  hair: { params: { clearcoat: 0.0, roughness: 0.5, sheen: 0.6, sheenRoughness: 0.35, sheenColor: 0xffffff },
+  hair: { params: { clearcoat: 0.0, roughness: 0.55, sheen: 0.25, sheenRoughness: 0.45, sheenColor: 0xffffff },
     glsl: `float a = atan(p.x, p.z);
       float strand = fNoise(vec3(a * 22.0, p.y * 6.0, 0.0)) * 0.6 + fNoise(vec3(a * 61.0, p.y * 14.0, 3.0)) * 0.4;
       c *= 1.0 + (strand - 0.5) * 0.55 * (1.0 - smoothstep(0.4, 1.0, fwidth(a * 22.0)));` },
-  top: { params: { clearcoat: 0.0, roughness: 0.85, sheen: 0.5, sheenRoughness: 0.75, sheenColor: 0xffffff },
+  top: { params: { clearcoat: 0.0, roughness: 0.85, sheen: 0.12, sheenRoughness: 0.85, sheenColor: 0xffffff },
     glsl: `${CLOTH} ${FRONT}
       float zip = fLine(p.x, 0.004) * front * step(0.04, p.y);
       float teeth = zip * step(0.5, fract(p.y * 220.0));
@@ -69,13 +69,13 @@ const KIND = {
       float label = back * step(abs(p.x), 0.025) * step(0.495, p.y) * step(p.y, 0.515);
       k -= zip * 0.25 - teeth * 0.15 + collar * 0.12 + pockets * 0.28 + seams * 0.2 + hem * 0.22 + yoke * 0.24 + spine * 0.15 + wrinkle * 0.14 - label * 0.35;
       c *= k;` },
-  sleeve: { params: { clearcoat: 0.0, roughness: 0.85, sheen: 0.5, sheenRoughness: 0.75, sheenColor: 0xffffff },
+  sleeve: { params: { clearcoat: 0.0, roughness: 0.85, sheen: 0.12, sheenRoughness: 0.85, sheenColor: 0xffffff },
     glsl: `${CLOTH}
       float cuff = smoothstep(-0.2, -0.205, p.y) * step(p.y, -0.15);
       float rib = cuff * step(0.5, fract(atan(p.x, p.z) * 9.0));
       k -= cuff * 0.06 + rib * 0.08;
       c *= k;` },
-  hips: { params: { clearcoat: 0.0, roughness: 0.82, sheen: 0.3, sheenRoughness: 0.8, sheenColor: 0xffffff },
+  hips: { params: { clearcoat: 0.0, roughness: 0.82, sheen: 0.1, sheenRoughness: 0.85, sheenColor: 0xffffff },
     glsl: `${TWILL} ${FRONT}
       float belt = step(-0.03, p.y) * step(p.y, 0.012);
       float buckle = belt * front * step(abs(p.x), 0.024);
@@ -90,7 +90,7 @@ const KIND = {
       c = mix(c, vec3(0.05, 0.035, 0.03), belt * (1.0 - buckle));
       c = mix(c, vec3(0.72, 0.68, 0.6), buckle * (1.0 - fLine(abs(p.x) - 0.016, 0.003) * 0.5));
       c = mix(c, vec3(0.8, 0.62, 0.3), stitch * 0.5 * (1.0 - belt));` },
-  legs: { params: { clearcoat: 0.0, roughness: 0.82, sheen: 0.3, sheenRoughness: 0.8, sheenColor: 0xffffff },
+  legs: { params: { clearcoat: 0.0, roughness: 0.82, sheen: 0.1, sheenRoughness: 0.85, sheenColor: 0xffffff },
     glsl: `${TWILL} ${FRONT}
       float crease = fLine(p.x, 0.0035) * front * step(p.y, -0.02);
       float seam = fLine(abs(p.x) - 0.062, 0.004) * step(p.y, -0.02);
