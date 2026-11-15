@@ -24,7 +24,9 @@ for t in "${targets[@]}"; do
       fi ;;
     viewer)
       [ -d viewer/node_modules ] || (cd viewer && npm ci --no-audit --no-fund)
-      run viewer viewer npm test --silent ;;
+      run viewer viewer npm test --silent
+      # the whole game must bundle (a syntax error in a module no test imports would ship otherwise)
+      run viewer-bundle viewer npx esbuild src/main.js --bundle --target=es2022 --format=esm --outfile=/dev/null --log-level=error ;;
     relay)    run relay relay npm test --silent ;;
     *) echo "unknown target: $t"; exit 2 ;;
   esac

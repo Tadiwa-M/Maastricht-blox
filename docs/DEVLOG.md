@@ -1889,3 +1889,11 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Owner: outside advice on integrating characters; hatching as close to the film as possible.
   Contact shadows under every figure (all looks), figure colours pulled into the painted palette,
   form-following inked hatching (comic and manga), manga lighter (more paper, finer screentone).
+
+## 2026-11-15 (evening): play-test fixes
+
+- Owner on phone and laptop: gun drifting from the hand in the comic look (twos vs live hand: player
+  figures now animate every frame); phone on Low read like a filter (fine detail fades under 600 px;
+  laptop on Low untouched); no way to close the room panel on a phone (close button, auto-close at
+  match start); guns should feel like guns (recoil recovery, shake, flash, kick-back, sounds).
+  check.sh bundles the game now.

@@ -6,16 +6,21 @@
 export const WEAPONS = {
   // an automatic: easy to hit with up close, zooms a little
   rifle: { name: 'Rifle', auto: true, intervalS: 0.1, mag: 30, reloadS: 1.7, fov: 38, sens: 0.6, scope: false,
-    spreadHip: 0.02, spreadAim: 0.002, bloom: 0.006, bloomMax: 0.04, kick: [0.011, 0.005] },
+    spreadHip: 0.02, spreadAim: 0.002, bloom: 0.006, bloomMax: 0.04, kick: [0.011, 0.005],
+    // feel: share of the kick that recovers, camera shake (rad), muzzle flash size, how far the gun jumps back
+    feel: { recover: 0.55, shake: 0.0035, flash: 1, back: 0.05 } },
   // a bolt action with a scope: two body hits or one to the head, slow between shots
   scout: { name: 'Scout', auto: false, intervalS: 1.0, mag: 5, reloadS: 2.3, fov: 13, sens: 0.22, scope: true,
-    spreadHip: 0.06, spreadAim: 0, bloom: 0, bloomMax: 0, kick: [0.045, 0.01] },
+    spreadHip: 0.06, spreadAim: 0, bloom: 0, bloomMax: 0, kick: [0.045, 0.01],
+    feel: { recover: 0.8, shake: 0.01, flash: 1.6, back: 0.14 } },
   // eight pellets in a wide cone: deadly within a few metres, useless across a square
   shotgun: { name: 'Shotgun', auto: false, intervalS: 0.75, mag: 6, reloadS: 2.2, fov: 46, sens: 0.75, scope: false, pellets: 8, pelletSpread: 0.055, rangeM: 45,
-    spreadHip: 0.012, spreadAim: 0.006, bloom: 0, bloomMax: 0, kick: [0.06, 0.012] },
+    spreadHip: 0.012, spreadAim: 0.006, bloom: 0, bloomMax: 0, kick: [0.06, 0.012],
+    feel: { recover: 0.75, shake: 0.022, flash: 2.4, back: 0.22 } },
   // always with you: one stab knocks out anyone within reach
   knife: { name: 'Knife', melee: true, auto: false, intervalS: 0.55, mag: Infinity, reloadS: 0, fov: 55, sens: 1, scope: false, reachM: 2.3, arc: 0.5,
-    spreadHip: 0, spreadAim: 0, bloom: 0, bloomMax: 0, kick: [0, 0] },
+    spreadHip: 0, spreadAim: 0, bloom: 0, bloomMax: 0, kick: [0, 0],
+    feel: { recover: 0, shake: 0.004, flash: 0, back: 0 } },
 };
 export const PICKUPS = ['scout', 'shotgun']; // found in the arena (pickupSpots); the rifle and the knife you always have
 export const PICKUP_R = 1.8, PICKUP_BACK_S = 20;

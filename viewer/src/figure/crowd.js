@@ -36,7 +36,9 @@ function contactTexture() { // a soft round falloff (alpha map: green channel)
 
 export class FigureCrowd {
   /** cap: maximum figures. material: optional shared material. */
-  constructor(cap, { clippingPlanes = null, shadows = true, material = null, lod = true, hiDist = 32, hiCap = 160 } = {}) {
+  /** twos: animate on twos in the painted looks (crowds); false for figures something is attached to (the player's gun). */
+  constructor(cap, { clippingPlanes = null, shadows = true, material = null, lod = true, hiDist = 32, hiCap = 160, twos = true } = {}) {
+    this.twos = twos;
     this.cap = cap;
     this.material = material || figureMaterial({ clippingPlanes });
     this.group = new THREE.Group();
@@ -103,7 +105,7 @@ export class FigureCrowd {
   begin(eye = this.eye) {
     // animation on twos (the comic look, render/verse.js): a new pose only 12 times a second;
     // between ticks the figures keep their last pose (add/end do nothing)
-    if (globalThis.__bloxTwos) {
+    if (globalThis.__bloxTwos && this.twos) {
       const tick = Math.floor(performance.now() / (1000 / 12));
       this.hold = tick === this.lastTick;
       this.lastTick = tick;

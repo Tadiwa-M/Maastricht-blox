@@ -45,10 +45,10 @@ export const PAINTED_LOOK = LOOK === 'verse' || LOOK === 'manga';
 export const twosTick = (t, hz = VERSE.twosHz) => Math.floor(t * hz);
 
 const shader = {
-  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, fovScale: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, fovScale: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, dpr: { value: 1 }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 fovScale; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float focus; uniform vec2 res;
+    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 fovScale; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float dpr; uniform float focus; uniform vec2 res;
     varying vec2 vUv;
     float dist(vec2 uv) { float d = texture2D(tDepth, uv).x; return depthOk > 0.5 ? (near * far) / (far - d * (far - near)) : focus; } // (no depth: all in focus, no lines)
     vec3 vpos(vec2 uv) { float z = dist(uv); return vec3((uv * 2.0 - 1.0) * fovScale * z, -z); }
@@ -168,7 +168,10 @@ const shader = {
       float dEdge = smoothstep(0.035, 0.08, (abs(zx - z) + abs(zy - z) + abs(zx2 - z) + abs(zy2 - z)) / max(z, 0.5));
       float nEdge = smoothstep(0.6, 1.1, (1.0 - dot(n0, nrm(vUv + vec2(px.x, 0.0)))) + (1.0 - dot(n0, nrm(vUv + vec2(0.0, px.y)))));
       float near = 1.0 - smoothstep(60.0, 260.0, z);
-      float line = max(dEdge, nEdge * 0.35) * near * (1.0 - coc * 0.7) * (1.0 - sky); // (the sky has no normals: no lines in the clouds)
+      // fine detail (crease lines, hatching, dots) needs pixels: on a small, low-resolution screen
+      // (a phone on Low) it would read as a filter over everything, so it fades out; outlines stay
+      float detail = smoothstep(360.0, 600.0, res.y * dpr); // (a laptop on Low, 700+ px tall, keeps it all)
+      float line = max(dEdge, nEdge * 0.35 * detail) * near * (1.0 - coc * 0.7) * (1.0 - sky); // (the sky has no normals: no lines in the clouds)
       c = mix(c, c * 0.42, line * 0.85);
       float rim = smoothstep(0.55, 0.92, 1.0 - abs(n0.z)) * near * (1.0 - dEdge) * (1.0 - sky);
       c += rim * 0.07 * vec3(1.0, 0.95, 0.88);
@@ -177,11 +180,11 @@ const shader = {
       float shade = 1.0 - smoothstep(0.12, 0.55, L);
       float soft = smoothstep(0.55, 0.95, slip); // print texture only where it is clearly out of focus
       // the print texture sits in the shade only: lit walls and the street stay clean colour
-      c *= 1.0 - 0.18 * dots(f, 0.42, 5.0, soft * shade * 0.8);
+      c *= 1.0 - 0.18 * detail * dots(f, 0.42, 5.0, soft * shade * 0.8);
       // inked hatching in the shadows (in focus too, as on the film's shaded sides), stronger out of
       // focus, fading with distance; drawn in a darker shade of the colour, not black
       float hpitch = max(3.0, res.y / 260.0);
-      float hk = inkHatch(f, n0, shade, hpitch) * (1.0 - sky) * (0.45 + 0.55 * near);
+      float hk = inkHatch(f, n0, shade, hpitch) * (1.0 - sky) * (0.45 + 0.55 * near) * detail;
       c = mix(c, c * 0.55, hk * (0.32 + 0.28 * soft));
       #ifdef MANGA
         gl_FragColor = vec4(manga(base, z, sky, dEdge, nEdge, near, f, n0), 1.0);
@@ -199,8 +202,9 @@ export function makeVersePass(scenePass, look = 'verse') {
 }
 
 /** Per frame: the camera and the focus distance (m: to the player, or the orbit target). */
-export function updateVerse(pass, camera, focus, width, height, night = 0) {
+export function updateVerse(pass, camera, focus, width, height, night = 0, dpr = 1) {
   const u = pass.uniforms;
+  u.dpr.value = dpr;
   u.night.value = night;
   u.near.value = camera.near; u.far.value = camera.far; u.focus.value = focus;
   const ty = Math.tan(THREE.MathUtils.degToRad(camera.fov || 50) / 2);

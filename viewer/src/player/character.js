@@ -30,7 +30,7 @@ export class Character {
       this.variant.acc = this.variant.acc === 'bag' ? 'none' : this.variant.acc;
       delete this.variant.gait; // the player walks the plain captured gait (crowd people each have a style)
     }
-    this.crowd = new FigureCrowd(1, { lod: false });
+    this.crowd = new FigureCrowd(1, { lod: false, twos: false }); // smooth: the gun follows the hand every frame
     this.group = new THREE.Group(); // position + yaw live in the instance matrices; the group just holds the meshes
     this.group.name = 'player';
     this.group.add(this.crowd.group);

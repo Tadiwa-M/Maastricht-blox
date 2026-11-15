@@ -128,27 +128,54 @@ const el = (tag, props = {}, parent = null) => { const e = Object.assign(documen
 const lerp = (a, b, t) => a + (b - a) * t;
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
-/** Short soft shot sounds (Web Audio, no files); quiet, and silent when the game's sound is muted. */
+/**
+ * Shot sounds (Web Audio, no files), one character per weapon: the rifle a short crack with a
+ * thump, the scout a loud crack with a long tail, the shotgun a deep boom and then the pump
+ * (two clicks), the knife a whoosh. Every shot echoes off the street walls (a short feedback
+ * delay). Silent when the game's sound is muted.
+ */
+export const SHOT_SOUND = {
+  rifle: { len: 0.12, lp: 2600, f0: 170, f1: 50, gain: 1, echo: 0.11, fb: 0.28 },
+  scout: { len: 0.32, lp: 1900, f0: 125, f1: 38, gain: 1.35, echo: 0.17, fb: 0.38 },
+  shotgun: { len: 0.45, lp: 750, f0: 85, f1: 28, gain: 1.6, echo: 0.14, fb: 0.36, pump: 0.42 },
+  knife: { len: 0.13, lp: 0, f0: 0, f1: 0, gain: 0.5, echo: 0, fb: 0, whoosh: true },
+};
 class ShotSound {
   play(kind, gain = 1) {
     const prefs = window.__bloxAudio?.prefs;
     if (prefs?.muted || prefs?.volume === 0 || gain < 0.02) return;
     try {
       this.ac = this.ac || new (window.AudioContext || window.webkitAudioContext)();
-      const ac = this.ac, t = ac.currentTime, len = kind === 'scout' ? 0.22 : kind === 'shotgun' ? 0.26 : kind === 'knife' ? 0.07 : 0.09;
-      const buf = ac.createBuffer(1, Math.ceil(ac.sampleRate * len), ac.sampleRate), d = buf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 2;
-      const n = ac.createBufferSource(); n.buffer = buf;
-      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = kind === 'scout' ? 1400 : kind === 'shotgun' ? 900 : kind === 'knife' ? 5000 : 2200;
-      const o = ac.createOscillator(); o.frequency.setValueAtTime(kind === 'scout' ? 110 : 150, t); o.frequency.exponentialRampToValueAtTime(45, t + len);
-      const g = ac.createGain(); g.gain.setValueAtTime(0.16 * gain * (prefs?.volume ?? 0.35) / 0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + len);
-      n.connect(lp).connect(g); o.connect(g); g.connect(ac.destination);
-      n.start(t); o.start(t); o.stop(t + len);
+      const ac = this.ac, t = ac.currentTime, P = SHOT_SOUND[kind] || SHOT_SOUND.rifle;
+      const vol = 0.16 * gain * P.gain * (prefs?.volume ?? 0.35) / 0.35;
+      const out = ac.createGain(); out.gain.value = 1; out.connect(ac.destination);
+      if (P.echo) { // the street's echo
+        const dl = ac.createDelay(1), fb = ac.createGain(), wet = ac.createGain();
+        dl.delayTime.value = P.echo; fb.gain.value = P.fb; wet.gain.value = 0.5;
+        out.connect(dl); dl.connect(fb).connect(dl); dl.connect(wet).connect(ac.destination);
+        setTimeout(() => { try { out.disconnect(); dl.disconnect(); fb.disconnect(); wet.disconnect(); } catch { /* gone */ } }, 2500);
+      }
+      const noise = (len, at, type, f, g) => {
+        const buf = ac.createBuffer(1, Math.ceil(ac.sampleRate * len), ac.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 2.2;
+        const n = ac.createBufferSource(); n.buffer = buf;
+        const flt = ac.createBiquadFilter(); flt.type = type; flt.frequency.value = f;
+        const gn = ac.createGain(); gn.gain.setValueAtTime(g, at); gn.gain.exponentialRampToValueAtTime(0.001, at + len);
+        n.connect(flt).connect(gn).connect(out); n.start(at);
+        return flt;
+      };
+      if (P.whoosh) { const flt = noise(P.len, t, 'bandpass', 600, vol); flt.frequency.exponentialRampToValueAtTime(3000, t + P.len); return; }
+      noise(P.len, t, 'lowpass', P.lp, vol);
+      noise(0.025, t, 'highpass', 3000, vol * 0.6); // the crack
+      const o = ac.createOscillator(), og = ac.createGain();
+      o.frequency.setValueAtTime(P.f0, t); o.frequency.exponentialRampToValueAtTime(P.f1, t + P.len);
+      og.gain.setValueAtTime(vol * 1.1, t); og.gain.exponentialRampToValueAtTime(0.001, t + P.len);
+      o.connect(og).connect(out); o.start(t); o.stop(t + P.len);
+      if (P.pump) { noise(0.03, t + P.pump, 'highpass', 1800, vol * 0.35); noise(0.035, t + P.pump + 0.12, 'highpass', 1400, vol * 0.4); }
     } catch { /* no audio */ }
   }
 }
 
-// What the hands feel: [phone buzz in ms (a number or an on/off pattern), gamepad rumble { ms, weak, strong } 0..1].
 // Shots are a tick, being hit a thump, a knock-out a long shake. Phones: navigator.vibrate (Android;
 // iPhones do not offer it to web pages). Gamepads: the pad's rumble motors, where the browser has them.
 export const HAPTICS = {
@@ -533,9 +560,13 @@ export class Combat {
     const best = [...hits.entries()].sort((a, b) => b[1].n - a[1].n)[0];
     this.send({ t: 'shot', w, o: rd(head), e: rd(best ? best[1].end : first), hit: best ? best[0] : 0, head: !!best?.[1].head, n: best ? best[1].n : 0 });
     // feel: recoil (up and a little sideways), the gun jumps back, flash, tracer, sound
-    f.aimPitch -= def.kick[0] * (1 - this.aim * 0.35);
+    const kp = def.kick[0] * (1 - this.aim * 0.35), fe = def.feel || {};
+    f.aimPitch -= kp;
     f.aimYaw = wrap(f.aimYaw + (Math.random() - 0.5) * 2 * def.kick[1]);
-    this.flashT = 0.04;
+    this.recoilDebt = (this.recoilDebt || 0) + kp * (fe.recover || 0); // part of the kick comes back down
+    this.shakeT = 0.18; this.shakeA = fe.shake || 0;
+    this.flash.scale.setScalar(fe.flash || 1);
+    this.flashT = 0.03 + 0.015 * (fe.flash || 1);
     this.pendingTracer = { ends, kind: w };
     this.sound.play(w, 1);
   }
@@ -565,12 +596,19 @@ export class Combat {
     const hip = new THREE.Vector3(0.19, -0.19, -0.42), aimAt = model.hand.userData.aim;
     model.hand.position.lerpVectors(hip, aimAt, a);
     model.hand.position.x += Math.sin(this.sway) * bob; model.hand.position.y += Math.abs(Math.cos(this.sway)) * bob - re * 0.16;
-    model.hand.position.z += this.kick * 0.05 * (def.scope ? 1.6 : 1);
+    model.hand.position.z += this.kick * (def.feel?.back ?? 0.05);
     model.hand.rotation.set(this.kick * 0.05 - re * 0.7, (1 - a) * 0.06, re * 0.35);
     // at the figure's side, pointing where the camera looks
     const yaw = f.yaw, right = [Math.cos(yaw), Math.sin(yaw)];
     // in the figure's hands: the arms are posed to hold it (rig.js holdGun), the grip sits in the right hand
     const P = this.player();
+    // shot feel: the recovering part of the kick eases back, and a short shake after each shot
+    if (this.recoilDebt > 0) { const r = this.recoilDebt * Math.min(1, dt * 9); f.aimPitch += r; this.recoilDebt -= r; }
+    if (this.shakeT > 0) {
+      const k = this.shakeA * (this.shakeT / 0.18);
+      f.aimPitch += (Math.random() - 0.5) * k; f.aimYaw = wrap(f.aimYaw + (Math.random() - 0.5) * k);
+      this.shakeT -= dt;
+    }
     // sprinting (and not aiming or firing): the gun drops to a low carry; aiming or a shot brings it up at once
     const wantSprint = this.speed > SPRINT_FROM && this.aim < 0.1 && !this.fire && this.gun.cool <= 0 ? 1 : 0;
     this.sprintK = (this.sprintK || 0) + (wantSprint - (this.sprintK || 0)) * Math.min(1, dt * (wantSprint ? 6 : 14));
@@ -586,7 +624,11 @@ export class Combat {
     // along the aim when shouldered
     const sk = this.sprintK || 0, rk = (this.readyK ?? 0) * (1 - sk), lowK = 1 - rk;
     const downP = -0.55 * (1 - sk) - 0.7 * sk, across = 0.35 * (1 - sk) + 0.75 * sk;
-    model.side.rotation.set(-f.pitch * rk + downP * lowK, -yaw + across * lowK, 0.3 * lowK, 'YXZ');
+    model.side.rotation.set(-f.pitch * rk + downP * lowK + this.kick * (def.feel?.back || 0) * 1.6, -yaw + across * lowK, 0.3 * lowK, 'YXZ');
+    if (!def.melee && this.kick > 0) { // the gun jumps back into the shoulder
+      const b = this.kick * (def.feel?.back || 0);
+      model.side.position.x -= Math.sin(yaw) * b; model.side.position.z += Math.cos(yaw) * b;
+    }
     if (def.melee) { // the stab: a quick lunge forward
       model.hand.position.set(0.16, -0.16, -0.38 - this.kick * 0.28); model.hand.rotation.set(-0.25 + this.kick * 0.3, 0.25, 0.5);
       model.side.position.x += Math.sin(yaw) * this.kick * 0.4; model.side.position.z -= Math.cos(yaw) * this.kick * 0.4;

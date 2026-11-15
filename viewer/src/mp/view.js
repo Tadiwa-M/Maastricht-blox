@@ -93,7 +93,7 @@ export class RoomView {
     this.group = new THREE.Group();
     this.group.name = 'multiplayer';
     scene.add(this.group);
-    this.crowd = new FigureCrowd(8, { lod: false });
+    this.crowd = new FigureCrowd(8, { lod: false, twos: false }); // (their guns follow their hands)
     this.group.add(this.crowd.group);
     this.flags = { blue: makeFlag('blue'), yellow: makeFlag('yellow') };
     this.rings = {};

@@ -20,6 +20,9 @@ const CSS = `
   overflow: auto; box-sizing: border-box; background: #11143a; color: #f6f3ea; border-radius: 14px; padding: 14px 16px;
   font: 13px/1.4 system-ui, sans-serif; box-shadow: 0 20px 50px rgba(0,0,0,.5); display: grid; gap: 10px; }
 #mp-panel[hidden] { display: none; }
+#mp-panel > div { display: grid; gap: 10px; }
+#mp-panel button.close { position: absolute; top: 6px; right: 6px; width: 34px; height: 34px; padding: 0; border-radius: 50%;
+  background: rgba(255,255,255,.1); color: #f6f3ea; font: 400 22px/1 system-ui, sans-serif; }
 #mp-panel h3 { margin: 0; font: 400 22px/1 'Anton', Impact, sans-serif; letter-spacing: .06em; }
 #mp-panel .rules { color: #b9bcc4; font-size: 12px; margin: 0; }
 #mp-panel input { width: 100%; box-sizing: border-box; border-radius: 9px; border: 0; padding: 9px 11px;
@@ -100,6 +103,12 @@ export class MpUi {
     document.head.append(el('style', { textContent: CSS }));
     this.btn = el('button', { id: 'mp-open', title: 'Play capture the flag with friends' }, 'PLAY<span class="dot"></span>');
     this.panel = el('div', { id: 'mp-panel', hidden: true });
+    // a close button that survives every re-render (the Play button is hidden during a match, so on a
+    // phone this was the only way out); the content lives in this.body
+    this.closeBtn = el('button', { className: 'close', type: 'button', title: 'Close', ariaLabel: 'Close' }, '&times;');
+    this.closeBtn.addEventListener('click', () => this.show(false));
+    this.body = el('div');
+    this.panel.append(this.closeBtn, this.body);
     this.pillEl = el('div', { id: 'mp-pill', hidden: true });
     this.toastEl = el('div', { id: 'mp-toast', className: 'gone' });
     this.warnEl = el('div', { id: 'mp-warn', hidden: true });
@@ -129,11 +138,11 @@ export class MpUi {
     this.btn.classList.remove('in');
     if (this.availability !== 'ok') {
       const soon = this.availability === 'soon' || this.availability === 'unknown';
-      this.panel.innerHTML = `<h3>CAPTURE THE FLAG</h3>
+      this.body.innerHTML = `<h3>CAPTURE THE FLAG</h3>
         <p class="rules">${soon ? 'Multiplayer coming soon: race your friends from the Markt to the Vrijthof and back.' : 'The game server cannot be reached right now. Try again in a minute.'}</p>`;
       return;
     }
-    this.panel.innerHTML = `<h3>CAPTURE THE FLAG</h3>
+    this.body.innerHTML = `<h3>CAPTURE THE FLAG</h3>
       <p class="rules">Two teams, 2 to 8 players. Blue defends the Markt, yellow the Vrijthof. Walk onto the other
       team's flag, carry it to your base while your own flag is home. Run into a carrier to knock them down.
       First to 3, or most in 8 minutes.</p>
@@ -163,7 +172,7 @@ export class MpUi {
     this.view = 'room';
     this.btn.classList.add('in');
     const room = model.room;
-    if (!room) { this.panel.innerHTML = `<h3>JOINING...</h3><div class="msg">${esc(status)}</div>`; return; }
+    if (!room) { this.body.innerHTML = `<h3>JOINING...</h3><div class="msg">${esc(status)}</div>`; return; }
     const cfg = model.config || {};
     const teams = ['blue', 'yellow'].map((t) => {
       const names = room.players.filter((p) => p.team === t).map((p) =>
@@ -172,13 +181,16 @@ export class MpUi {
     }).join('');
     const n = room.players.filter((p) => p.on).length, min = cfg.minPlayers || 2;
     let action = '';
+    // the match starting closes the panel once (it covers the fire buttons on a phone)
+    if (room.phase === 'play' && this.lastPhase !== 'play' && this.lastPhase !== undefined) this.show(false);
+    this.lastPhase = room.phase;
     if (room.phase === 'play') action = '<div class="note">Match on: see the score at the top.</div>';
     else if (model.isHost) action = `<button class="go start" ${n < min ? 'disabled' : ''}>${room.phase === 'over' ? 'Play again' : 'Start the match'}</button>
       ${n < min ? `<div class="note">Waiting for at least ${min} players: send them the code.</div>` : ''}`;
     else action = '<div class="note">Waiting for the host to start.</div>';
     const over = room.phase === 'over' && room.winner
       ? `<div class="msg">${room.winner === 'draw' ? 'A draw!' : room.winner === model.team ? 'Your team won!' : `${TEAM_NAMES[room.winner]} won`} ${room.score.blue}-${room.score.yellow}</div>${model.kills?.length ? '<canvas class="heat" width="220" height="220" style="display:block;margin:8px auto;border-radius:10px"></canvas><div class="note">Where the knock-outs happened</div>' : ''}` : '';
-    this.panel.innerHTML = `<h3>ROOM</h3><div class="code-big">${esc(room.code)}</div>
+    this.body.innerHTML = `<h3>ROOM</h3><div class="code-big">${esc(room.code)}</div>
       <div class="note">Friends join with this code (Play, then Join). You are on <b style="color:${TEAM_HEX[model.team] || '#fff'}">${TEAM_NAMES[model.team] || '...'}</b>.</div>
       <div class="teams">${teams}</div>${over}${action}
       <div class="msg">${esc(status)}</div>

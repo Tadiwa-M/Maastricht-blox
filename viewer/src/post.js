@@ -135,7 +135,7 @@ export class Post {
       const p = globalThis.__bloxPlayer, cam = this.camera;
       const at = p?.mode === 'walk' && p.ctrl ? p.ctrl.pos : null;
       const focus = at ? Math.hypot(cam.position.x - at[0], cam.position.y - at[1] - 1.2, cam.position.z - at[2]) : (this.focusTarget ? cam.position.distanceTo(this.focusTarget) : 30);
-      updateVerse(this.verse, cam, focus, this.width, this.height, this.night);
+      updateVerse(this.verse, cam, focus, this.width, this.height, this.night, this.composer.renderer.getPixelRatio());
       this.pools.update(cam, this.night);
     }
     this.composer.render();

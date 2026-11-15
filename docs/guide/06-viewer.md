@@ -829,3 +829,21 @@ Owner passed on outside advice (written for Unity; the ideas that apply to this 
   in a darker shade of the colour, in focus too, stronger out of focus. Pitch ~res.y/260 px.
 - **Manga** (test flag): mostly paper and solid blacks (tones only where they shape), a finer 3 px
   screentone, and the same inked hatching instead of screen-aligned lines.
+
+## Owner's play-test fixes (2026-11-15, evening)
+
+- **Gun held on twos:** the comic look poses figures 12 times a second, but the gun followed the
+  hand's live position every frame, so between poses it drifted ("floats, sways"). The player's and
+  other players' figures now animate every frame (`FigureCrowd` option `twos: false`); crowds keep
+  the twos.
+- **Phone on Low looked like a filter:** fine detail (crease lines, hatching, dots) fades out when the
+  render is under ~600 px tall (`detail` in `render/verse.js`); a laptop on Low (700+ px) keeps it
+  all, as the owner wanted. Outlines always stay.
+- **Room panel on phones:** a close button that survives every re-render, and the panel closes by
+  itself when the match starts (the Play button that toggled it is hidden in a match).
+- **Guns feel like guns** (`mp/weapons.js` `feel`, `mp/combat.js`): part of each kick recovers (rifle
+  climbs, shotgun punches and settles, scout snaps), a short camera shake per shot, muzzle flash
+  sized per weapon, the gun jumps back in the hands, and per-weapon sounds with a street echo
+  (`SHOT_SOUND`: rifle crack and thump, scout loud crack with a long tail, shotgun boom and pump).
+- `scripts/check.sh viewer` now also bundles the whole game (a syntax error in a module no test
+  imports had slipped through); CI runs it.
