@@ -695,3 +695,19 @@ model, coloured and drawn). `render/verse.js` now runs after the grade and adds:
 - Open: lit shopfronts and neon; style-aware lighting; the night streets in the comic look still
   read a little blue.
 
+
+## Painted surfaces and film lighting (comic test look, 2026-11-15)
+
+Owner: closer, but not there. Diagnosis against the reference stills: the post pass is not the gap;
+the reference has painted, weathered surfaces, motivated light (a strong key, coloured shade, pools
+of light at night), a restrained palette with accent colours, depth haze and far more geometric
+detail. First steps, all behind `#look=verse`:
+- `render/surface.js` `installSurface`: world-space paint on opaque materials (near solid, far
+  solid, city far): a value shift per brick, large soft stains and vertical run-off streaks on
+  walls, greying the surface's own colour; matte (no clearcoat, roughness >= 0.72).
+- `scene.js`: sun x1.15, hemisphere fill x0.78, fog from 70 m to 1.1 km (depth haze).
+- `render/verse.js`: a restrained palette (only clearly coloured surfaces gain chroma), fine
+  hatching in the shadows (also in focus), the colour slip halved (1.3 px, from 1x to 4x the
+  focus distance), no lines or rim in the sky.
+- Open (the bigger gap): facade detail (frames, sills, cornices, shopfronts, signs), light pools
+  and shop spill at night, a warmer brick palette, dramatic camera framing.

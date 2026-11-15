@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
-export const VERSE = { twosHz: 12, maxSlip: 2.6, focusSpan: 0.55 };
+export const VERSE = { twosHz: 12, maxSlip: 1.3, focusSpan: 1.0 };
 export const lookFromHash = (hash) => (/(?:^|[#&])look=verse(?:&|$)/.test(hash || '') ? 'verse' : null);
 
 /** The animation-on-twos tick for a time in seconds (a new pose only when it changes). */
@@ -41,7 +41,7 @@ const shader = {
       float keep = clamp(L2 / max(L, 0.03), 0.6, 1.8);
       // punchier colour, but a colourless shade (moonlight, sky fill) is not pushed into a blue wash
       float own = smoothstep(0.12, 0.35, length(chroma) / max(L, 0.05)); // tinted greys (moonlit paving) stay grey
-      chroma *= keep * mix(1.05, 1.32, own) * mix(0.85, 1.0, smoothstep(0.12, 0.35, L2));
+      chroma *= keep * mix(0.92, 1.22, own) * mix(0.85, 1.0, smoothstep(0.12, 0.35, L2)); // a restrained palette, accents carry the colour
       // a slight hue shift by value: shade a touch cooler, light a touch warmer (the colour itself stays)
       vec3 cool = vec3(-0.012, 0.0, 0.03), warm = vec3(0.025, 0.008, -0.025);
       // (scaled with the value: in a dark night frame a fixed shift would turn everything navy)
@@ -59,7 +59,7 @@ const shader = {
       // in front of the focus counts half (people passing close by stay readable); the sky is not printed
       float rel = (z < focus ? (focus - z) * 0.5 : z - focus) / max(focus, 0.5);
       float sky = max(step(far * 0.92, z), step(2400.0, z)); // cleared depth, or the sky dome (3 km round the camera)
-      float coc = smoothstep(${VERSE.focusSpan.toFixed(2)}, 2.6, rel);
+      float coc = smoothstep(${VERSE.focusSpan.toFixed(2)}, 4.0, rel);
       float bright = smoothstep(0.82, 0.98, luma(base));
       // the print slip only on soft shapes: lights stay clean glows
       float slip = coc * (1.0 - bright) * (1.0 - sky);
@@ -74,9 +74,9 @@ const shader = {
       float dEdge = smoothstep(0.035, 0.08, (abs(zx - z) + abs(zy - z) + abs(zx2 - z) + abs(zy2 - z)) / max(z, 0.5));
       float nEdge = smoothstep(0.6, 1.1, (1.0 - dot(n0, nrm(vUv + vec2(px.x, 0.0)))) + (1.0 - dot(n0, nrm(vUv + vec2(0.0, px.y)))));
       float near = 1.0 - smoothstep(60.0, 260.0, z);
-      float line = max(dEdge, nEdge * 0.35) * near * (1.0 - coc * 0.7);
+      float line = max(dEdge, nEdge * 0.35) * near * (1.0 - coc * 0.7) * (1.0 - sky); // (the sky has no normals: no lines in the clouds)
       c = mix(c, c * 0.42, line * 0.85);
-      float rim = smoothstep(0.55, 0.92, 1.0 - abs(n0.z)) * near * (1.0 - dEdge);
+      float rim = smoothstep(0.55, 0.92, 1.0 - abs(n0.z)) * near * (1.0 - dEdge) * (1.0 - sky);
       c += rim * 0.07 * vec3(1.0, 0.95, 0.88);
       float L = luma(c);
       vec2 f = gl_FragCoord.xy;
@@ -84,7 +84,8 @@ const shader = {
       float soft = smoothstep(0.55, 0.95, slip); // print texture only where it is clearly out of focus
       // the print texture sits in the shade only: lit walls and the street stay clean colour
       c *= 1.0 - 0.18 * dots(f, 0.42, 5.0, soft * shade * 0.8);
-      c *= 1.0 - 0.1 * soft * shade * step(0.8, fract((f.x - f.y) / 4.5));
+      // fine hatching drawn into the shadows, in focus too (the reference's shaded side), fading with distance
+      c *= 1.0 - (0.05 + 0.08 * soft) * shade * shade * (0.4 + 0.6 * near) * smoothstep(0.55, 0.85, fract((f.x - f.y * 0.6) / 3.2));
       gl_FragColor = vec4(c, 1.0);
     }`,
 };

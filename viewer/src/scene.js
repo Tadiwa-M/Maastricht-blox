@@ -143,6 +143,10 @@ export class Stage {
     // scattered sunlight in the haze (render/haze.js): the sun's colour, a touch brighter
     this.hazeColor = this.sun.color.clone().multiplyScalar(L.haze);
     this.renderer.toneMappingExposure = L.exposure;
+    if (this.post?.verse) { // comic test look: a film's lighting, stronger key against a coloured fill, and depth haze
+      this.sun.intensity *= 1.15; this.hemi.intensity *= 0.78;
+      this.scene.fog.near = 70; this.scene.fog.far = 1100;
+    }
     if (this.box) this.fitShadow();
     this.night = n;
     this.post?.setNight(n);

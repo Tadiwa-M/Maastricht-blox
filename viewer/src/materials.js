@@ -8,6 +8,11 @@
 import * as THREE from 'three';
 import { rippleNormalTexture, addRipples } from './ripples.js';
 import { classOf } from './matkey.js';
+import { lookFromHash } from './render/verse.js';
+import { installSurface } from './render/surface.js';
+
+// the comic test look paints opaque surfaces (render/surface.js)
+const PAINTED = typeof location !== 'undefined' && lookFromHash(location.hash) === 'verse';
 
 // Leaves in the wind: bricks flagged per instance (aSway, set by bricks.js for the leaf colours)
 // drift a few centimetres, in a slow wave that runs through a canopy (phase from where the brick
@@ -88,6 +93,7 @@ export class MaterialSet {
   /** clippingPlanes: optional, e.g. to cut moving models at the diorama edge. */
   constructor({ clippingPlanes = null } = {}) {
     this.solid = addSway(plastic(), 'solid-sway');
+    if (PAINTED) installSurface(this.solid, 'solid');
     this.glass = windowGlass();
     this.trans = plastic({ roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.05, transparent: true,
       opacity: 0.75, envMapIntensity: 1.6, depthWrite: false });
@@ -131,7 +137,7 @@ export class MaterialSet {
     if (this.far.has(key)) return this.far.get(key);
     let m;
     const std = (extra) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0, ...extra });
-    if (key === 'solid') m = std({});
+    if (key === 'solid') { m = std({}); if (PAINTED) installSurface(m, 'far-solid'); }
     else if (key === 'metal') m = std({ metalness: 0.8, roughness: 0.28, envMapIntensity: 1.4 });
     else if (key === 'glass') m = windowGlass({ vertexColors: true });
     else if (key === 'trans') m = this.trans.clone();
@@ -182,6 +188,7 @@ export class MaterialSet {
           totalEmissiveRadiance += vExtra.rgb * 2.0 * uGlow * keep;`);
     };
     m.customProgramCacheKey = () => 'city-far-opaque';
+    if (PAINTED) installSurface(m, 'city-far');
     m.userData.uGlow = uGlow;
     this.cityOpaque = m;
     this.setNight(this.night);

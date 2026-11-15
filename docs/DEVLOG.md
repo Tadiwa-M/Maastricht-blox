@@ -1840,3 +1840,10 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   (`#look=verse`) gains sharpening, edge and crease lines in the surface's own darker colour, a rim,
   a clean sky and print texture only in out-of-focus shade; tinted greys stay grey. Night fill and
   exposure raised for all looks (guide 06). Still behind the test flag; open: shopfronts, neon, lighting.
+
+## 2026-11-15: comic look, painted surfaces
+
+- Owner: closer but "something" missing. Diagnosis: surfaces, lighting, palette and detail, not
+  the filter. Added world-space weathering on opaque materials, a stronger key and depth haze, a
+  restrained palette and shadow hatching, all behind `#look=verse` (guide 06). Next: facade detail
+  and night light pools.
