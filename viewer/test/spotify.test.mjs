@@ -29,6 +29,9 @@ test('Spotify login (PKCE): the login address, the way back, token times', async
   assert.equal(parseCallback('?error=access_denied&state=S').error, 'access_denied');
   assert.equal(parseCallback('?t=12'), null);
   assert.equal(redirectUri({ origin: 'https://tadiwa-m.github.io', pathname: '/Maastricht_larper/' }), 'https://tadiwa-m.github.io/Maastricht_larper/');
+  assert.equal(redirectUri({ origin: 'https://tadiwa-m.github.io', pathname: '/Maastricht_larper/index.html' }), 'https://tadiwa-m.github.io/Maastricht_larper/');
+  assert.equal(redirectUri({ origin: 'https://tadiwa-m.github.io', pathname: '/Maastricht_larper' }), 'https://tadiwa-m.github.io/Maastricht_larper/');
+  assert.equal(redirectUri({ origin: 'http://127.0.0.1:8080', pathname: '/' }), 'http://127.0.0.1:8080/');
   const t = tokensFrom({ access_token: 'A', refresh_token: 'R', expires_in: 3600 }, 0);
   assert.ok(fresh(t, 1000) && !fresh(t, 3600 * 1000));
   assert.equal(tokensFrom({ access_token: 'B', expires_in: 3600 }, 0, t).refresh, 'R', 'a refresh keeps the old refresh token');

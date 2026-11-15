@@ -7,7 +7,7 @@
 //   a link, and Spotify's embedded player plays it (whole songs when signed in to Spotify in this
 //   browser, else previews).
 // The city's own sounds step back while music plays (window.__bloxAudio.duck).
-import { login, finishLogin, getTokens, logout } from './auth.js';
+import { login, finishLogin, getTokens, logout, redirectUri } from './auth.js';
 
 export const MUSIC_KEY = 'blox.music';
 const TYPES = ['playlist', 'album', 'track', 'artist', 'show', 'episode'];
@@ -202,7 +202,8 @@ export function initMusic({ clientId = window.BLOX_SITE?.spotifyClientId || '', 
       <div class="ctl">${usingSdk() ? `<button class="prev" aria-label="Previous">${ICON.prev}</button>` : ''}<button class="pp" aria-label="Play or pause">${st.paused ? ICON.play : ICON.pause}</button>${usingSdk() ? `<button class="next" aria-label="Next">${ICON.next}</button>` : ''}</div>
       ${usingSdk() ? `<input type="range" class="vol" min="0" max="1" step="0.05" value="${st.volume}" aria-label="Volume">` : ''}` : '';
     const top = connected ? '' : clientId
-      ? `<button class="connect">${ICON.note} Connect Spotify</button><div class="note">Log in once. With Premium your music plays right here in the game; without it, through Spotify's small player.</div>`
+      ? `<button class="connect">${ICON.note} Connect Spotify</button><div class="note">Log in once. With Premium your music plays right here in the game; without it, through Spotify's small player.</div>
+        <div class="note" style="opacity:.7">Spotify app Redirect URI for this page: <code style="user-select:all">${esc(redirectUri(location))}</code></div>`
       : '<div class="note">Play a Spotify playlist, album or song while you explore.</div>';
     panel.innerHTML = `<div class="card"><button class="x" aria-label="Close">&times;</button><h3>MUSIC</h3>${top}${now}${lists}
       <div id="music-embed-slot"></div>

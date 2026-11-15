@@ -25,7 +25,8 @@ export async function challengeOf(verifier) {
 }
 
 /** This page's address without the query or hash: what Spotify sends the player back to. */
-export const redirectUri = (loc) => `${loc.origin}${loc.pathname}`;
+// (always the folder: /index.html dropped, a missing final slash added, so it matches the one URI saved in the app)
+export const redirectUri = (loc) => `${loc.origin}${loc.pathname.replace(/index\.html$/, '').replace(/([^/])$/, '$1/')}`;
 
 /** The Spotify login address. */
 export function authUrl({ clientId, redirect, challenge, state, scopes = SCOPES }) {
