@@ -1,7 +1,7 @@
 // The comic-print focus test flag (src/render/verse.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lookFromHash, twosTick, VERSE } from '../src/render/verse.js';
+import { lookFromHash, twosTick, VERSE, chooseLook, hashWithLook, MENU_LOOKS } from '../src/render/verse.js';
 
 test('only the explicit flag turns it on', () => {
   assert.equal(lookFromHash('#look=verse'), 'verse');
@@ -9,6 +9,18 @@ test('only the explicit flag turns it on', () => {
   assert.equal(lookFromHash('#look=verses'), null);
   assert.equal(lookFromHash('#t=21'), null);
   assert.equal(lookFromHash('#look=manga&t=9'), 'manga');
+});
+
+test('the saved look applies unless the address says otherwise; switching keeps the other settings', () => {
+  const store = (v) => ({ getItem: () => v });
+  assert.equal(chooseLook('#t=9', store('verse')), 'verse');
+  assert.equal(chooseLook('#t=9', store('classic')), null);
+  assert.equal(chooseLook('#look=classic', store('verse')), null);
+  assert.equal(chooseLook('#look=manga', store('verse')), 'manga');
+  assert.equal(chooseLook('', null), null);
+  assert.equal(hashWithLook('#t=9&look=verse&quality=high', null), '#t=9&quality=high&look=classic');
+  assert.equal(hashWithLook('', 'verse'), '#look=verse');
+  assert.deepEqual(MENU_LOOKS.map((l) => l.id), [null, 'verse']);
   assert.equal(lookFromHash(undefined), null);
 });
 

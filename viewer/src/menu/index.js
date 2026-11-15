@@ -8,6 +8,7 @@
 // (moved in while the page is up; on phones #hud is hidden otherwise), Map is the full-screen
 // map with fast travel (map.js, travel.js). API: window.__bloxMenu { isOpen, open(page), close(), toggle() }.
 import { MENU_CSS } from './style.js';
+import { LOOK, MENU_LOOKS, switchLook } from '../render/verse.js';
 import { menuItems, moveFocus, PAUSED_SPEED, resumeSpeed } from './items.js';
 import { MapScreen, builtMask } from './map.js';
 import { mergeStops, segmentTiles, PointGrid, headingFrom } from './mapdata.js';
@@ -91,7 +92,7 @@ export async function initMenu(ctx) {
   function renderMain() {
     const has = { player: !!player(), explore: !!explore(), trip: !!window.__bloxTrip, goals: !!window.__bloxGoals,
       mp: !!document.getElementById('mp-open') };
-    const list = menuItems({ has, goalsOff: !!window.__bloxGoals?.flow?.off, touch: touch(), match: match() });
+    const list = menuItems({ has, goalsOff: !!window.__bloxGoals?.flow?.off, touch: touch(), match: match(), look: lookName() });
     const box = main.querySelector('.bx-items');
     box.innerHTML = '';
     for (const it of list) {
@@ -179,12 +180,17 @@ export async function initMenu(ctx) {
     setTimeout(wait, 150);
   }
 
+  // the look (render/verse.js): Classic or Comic from the menu; a hash flag can pick the manga test look
+  function lookName() { return MENU_LOOKS.find((l) => l.id === LOOK)?.name || (LOOK === 'manga' ? 'Manga (test)' : 'Classic'); }
+  function nextLook() { const i = MENU_LOOKS.findIndex((l) => l.id === LOOK); return MENU_LOOKS[(i + 1) % MENU_LOOKS.length].id; }
+
   function choose(id) {
     const p = player(), ex = explore();
     switch (id) {
       case 'resume': close(); break;
       case 'map': showPage('map'); break;
       case 'settings': showPage('settings'); break;
+      case 'look': switchLook(nextLook()); break;
       case 'character': close({ resume: false }); inWalk(() => p?.openCreator?.()); break;
       case 'journal': close({ resume: false }); ex?.journal(true); break;
       case 'photo': close(); inWalk(() => ex?.photo(true)); break;

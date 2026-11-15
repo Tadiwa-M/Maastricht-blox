@@ -2,15 +2,42 @@
 // test flag #look=verse, not a menu setting yet): what is in focus stays a clean render; what is
 // out of focus is not blurred but printed badly: the colour plates slip apart, a halftone dot
 // screen and fine diagonal hatching come in, more the further from focus. Depth from the AO pass
-// (GTAOPass renders it anyway). Also animation on twos: figures pose 12 times a second
+// (render/depthpass.js keeps the scene render's depth). Also animation on twos: figures pose 12 times a second
 // (figure/crowd.js reads twosTick) while the camera moves smoothly.
 import * as THREE from 'three';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
 export const VERSE = { twosHz: 12, maxSlip: 1.3, focusSpan: 1.0 };
 export const lookFromHash = (hash) => /(?:^|[#&])look=(verse|manga)(?:&|$)/.exec(hash || '')?.[1] || null;
+/** Looks offered in the pause menu (manga stays a test flag until it is right). */
+export const MENU_LOOKS = [{ id: null, name: 'Classic' }, { id: 'verse', name: 'Comic' }];
+const STORE_KEY = 'blox.look';
+const safeStore = () => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } };
+
+/** The look for a page: the address (#look=verse|manga|classic) wins, then the saved choice. */
+export function chooseLook(hash, store = safeStore()) {
+  const h = lookFromHash(hash);
+  if (h) return h;
+  if (/(?:^|[#&])look=classic(?:&|$)/.test(hash || '')) return null;
+  try { const s = store?.getItem(STORE_KEY); return s === 'verse' || s === 'manga' ? s : null; } catch { return null; }
+}
+
 /** The look of this page: null (the toy look), 'verse' (comic colour) or 'manga' (ink and screentone). */
-export const LOOK = typeof location !== 'undefined' ? lookFromHash(location.hash) : null;
+export const LOOK = typeof location !== 'undefined' ? chooseLook(location.hash) : null;
+
+/** The address for another look (keeps the other hash settings). */
+export function hashWithLook(hash, id) {
+  const parts = (hash || '').replace(/^#/, '').split('&').filter((p) => p && !p.startsWith('look='));
+  parts.push(`look=${id || 'classic'}`);
+  return `#${parts.join('&')}`;
+}
+
+/** Switch look: save it and reload (materials are compiled for one look). */
+export function switchLook(id) {
+  try { safeStore()?.setItem(STORE_KEY, id || 'classic'); } catch { /* storage blocked: the address still carries it */ }
+  location.hash = hashWithLook(location.hash, id);
+  location.reload();
+}
 /** Painted looks: textured materials, figures and vehicles finished as film props. */
 export const PAINTED_LOOK = LOOK === 'verse' || LOOK === 'manga';
 
@@ -18,13 +45,17 @@ export const PAINTED_LOOK = LOOK === 'verse' || LOOK === 'manga';
 export const twosTick = (t, hz = VERSE.twosHz) => Math.floor(t * hz);
 
 const shader = {
-  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, tNormal: { value: null }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, fovScale: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform sampler2D tNormal; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float focus; uniform vec2 res;
+    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 fovScale; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float focus; uniform vec2 res;
     varying vec2 vUv;
     float dist(vec2 uv) { float d = texture2D(tDepth, uv).x; return depthOk > 0.5 ? (near * far) / (far - d * (far - near)) : focus; } // (no depth: all in focus, no lines)
-    vec3 nrm(vec2 uv) { return texture2D(tNormal, uv).rgb * 2.0 - 1.0; } // view-space normal (the AO pass)
+    vec3 vpos(vec2 uv) { float z = dist(uv); return vec3((uv * 2.0 - 1.0) * fovScale * z, -z); }
+    vec3 nrm(vec2 uv) { // view-space normal from the depth (no second scene render for normals)
+      vec2 px = 1.0 / res; vec3 p = vpos(uv);
+      return normalize(cross(vpos(uv + vec2(px.x, 0.0)) - p, vpos(uv + vec2(0.0, px.y)) - p));
+    }
     float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
     float dots(vec2 f, float ang, float size, float amount) {
       float s = sin(ang), c = cos(ang); vec2 p = mat2(c, -s, s, c) * f / size;
@@ -45,12 +76,21 @@ const shader = {
       float keep = clamp(L2 / max(L, 0.03), 0.6, 1.8);
       // punchier colour, but a colourless shade (moonlight, sky fill) is not pushed into a blue wash
       float own = smoothstep(0.12, 0.35, length(chroma) / max(L, 0.05)); // tinted greys (moonlit paving) stay grey
-      chroma *= keep * mix(0.92, 1.22, own) * mix(0.85, 1.0, smoothstep(0.12, 0.35, L2)); // a restrained palette, accents carry the colour
+      chroma *= keep * mix(0.74, 1.04, own) * mix(0.85, 1.0, smoothstep(0.12, 0.35, L2)); // the film's muted palette: accents carry the colour
       // a slight hue shift by value: shade a touch cooler, light a touch warmer (the colour itself stays)
       vec3 cool = vec3(-0.012, 0.0, 0.03), warm = vec3(0.025, 0.008, -0.025);
       // (scaled with the value: in a dark night frame a fixed shift would turn everything navy)
       vec3 shift = mix(cool, warm, smoothstep(0.25, 0.7, L2)) * clamp(L2 / 0.45, 0.25, 1.0);
-      return clamp(vec3(L2) + chroma + shift, 0.0, 1.0);
+      vec3 o = clamp(vec3(L2) + chroma + shift, 0.0, 1.0);
+      // the film's print: mids a little deeper, highlights rolled off (no paper white), blacks
+      // lifted toward a cool ink
+      o = pow(o, vec3(1.1));
+      o = mix(o, 0.9 + (o - 0.9) * 0.35, step(0.9, o));
+      // split toning, the film's signature: light warm (amber), shade cool (teal by day, violet at night)
+      float Lo = luma(o);
+      vec3 shadeT = mix(vec3(0.9, 0.98, 1.08), vec3(0.97, 0.88, 1.12), night), lightT = vec3(1.09, 1.0, 0.84);
+      o *= mix(shadeT, lightT, smoothstep(0.12, 0.72, Lo));
+      return o * 0.95 + vec3(0.018, 0.022, 0.034);
     }
     #ifdef MANGA
     // ink on paper: the value picks a tone (paper, fine screentone, dense screentone, cross-hatching,
@@ -94,6 +134,7 @@ const shader = {
       vec2 dir = normalize(vec2(1.0, 0.35)) / res * slip * ${VERSE.maxSlip.toFixed(1)};
       vec3 c = vec3(slip > 0.01 ? texture2D(tDiffuse, vUv + dir).r : base.r, base.g, slip > 0.01 ? texture2D(tDiffuse, vUv - dir).b : base.b);
       c = treat(c);
+      c = mix(vec3(luma(c)), c, 1.0 - sky * 0.35); // a hazier, paler sky
       // a modelled look: fine lines where a shape passes in front of another (depth) and lighter
       // ones at creases (normals), drawn in a darker shade of the surface's own colour; a rim of
       // light on edges turning away from the eye. Fades with distance and out of focus.
@@ -123,10 +164,9 @@ const shader = {
 };
 
 /** The pass (after the grade: it treats the displayed colours). */
-export function makeVersePass(gtao, look = 'verse') {
+export function makeVersePass(scenePass, look = 'verse') {
   const pass = new ShaderPass(look === 'manga' ? { ...shader, defines: { MANGA: 1 } } : shader);
-  pass.uniforms.tDepth.value = gtao.depthTexture;
-  pass.uniforms.tNormal.value = gtao.normalTexture;
+  pass.uniforms.tDepth.value = scenePass.depthTexture; // render/depthpass.js (normals come from it too)
   return pass;
 }
 
@@ -135,5 +175,7 @@ export function updateVerse(pass, camera, focus, width, height, night = 0) {
   const u = pass.uniforms;
   u.night.value = night;
   u.near.value = camera.near; u.far.value = camera.far; u.focus.value = focus;
+  const ty = Math.tan(THREE.MathUtils.degToRad(camera.fov || 50) / 2);
+  u.fovScale.value.set(ty * (camera.aspect || 1), ty);
   u.res.value.set(width, height);
 }

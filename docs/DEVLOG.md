@@ -1874,3 +1874,10 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   carry the comic look's lessons to the toy and manga looks. Every look: window bars, real night
   pools, printed figure detail, tyre and rim detail. Manga built as `#look=manga` on the comic
   pass (ink lines from depth, screentone, hatching). Toy look keeps smooth bricks on purpose.
+
+## 2026-11-15: the comic look ships
+
+- Owner: put it on the live site as a pause-menu choice; fix the lag; tone it like the film.
+  "Look: Classic / Comic" in the pause menu (saved, reloads); depth from the scene render instead of
+  a second scene render (draw calls no longer double); the film's grade (muted, split-toned, hazier).
+  Manga stays a test flag (#look=manga); next: fewer dots and hatching there.

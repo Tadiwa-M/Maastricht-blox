@@ -101,12 +101,13 @@ test('marker pick by screen distance; labels by zoom; heading from a camera', ()
 
 test('menu items follow the modules that are there; key hints only without touch', () => {
   const all = menuItems({ has: { player: true, explore: true, trip: true, goals: true, mp: true } });
-  assert.deepEqual(all.map((i) => i.id), ['resume', 'map', 'character', 'journal', 'photo', 'trip', 'goals', 'settings', 'help', 'mp']);
+  assert.deepEqual(all.map((i) => i.id), ['resume', 'map', 'character', 'journal', 'photo', 'trip', 'goals', 'look', 'settings', 'help', 'mp']);
   assert.equal(all.find((i) => i.id === 'journal').key, 'J');
   const bare = menuItems({ has: {}, touch: true, goalsOff: true });
-  assert.deepEqual(bare.map((i) => i.id), ['resume', 'map', 'settings']);
+  assert.deepEqual(bare.map((i) => i.id), ['resume', 'map', 'look', 'settings']);
   assert.ok(bare.every((i) => i.key === ''));
   assert.equal(menuItems({ has: { goals: true }, goalsOff: true }).find((i) => i.id === 'goals').label, 'Goals: off');
+  assert.equal(menuItems({ look: 'Comic' }).find((i) => i.id === 'look').label, 'Look: Comic');
 });
 
 test('focus moves through a grid and wraps', () => {

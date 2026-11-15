@@ -366,7 +366,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     // the baseplate beyond the city fades into the horizon haze, the city itself stays clear
     // (street level: haze from ~200 m, gone at ~1.1 km; whole city: the far edge is lightly hazed)
     // (the comic test look: depth haze from ~70 m, as a film's aerial perspective)
-    const haze0 = stage.post.verse ? 70 : 200, haze1 = stage.post.verse ? 700 : 900;
+    const haze0 = stage.post.verse ? 45 : 200, haze1 = stage.post.verse ? 520 : 900;
     stage.scene.fog.near = zoomed + haze0;
     stage.scene.fog.far = stage.scene.fog.near + haze1 + cityRadius * 2.4 * zoomT(zoomed);
     const sr = THREE.MathUtils.clamp(dist * 1.1, 45, Math.max(45, TIERS[tierName].shadowRange ?? 1600));

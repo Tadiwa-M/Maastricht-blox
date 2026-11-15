@@ -787,3 +787,22 @@ Owner: carry what works in the comic look over to the toy look and the manga loo
 - Comic look: no colour split on lit things (threshold 0.55..0.8 luma), so night windows glow cleanly.
 - Open: manga screentone pitch (4 px) to check at 1080p+; manga accents (speed lines, a single
   spot colour?) if wanted; buses, boats and street props still use the plain materials.
+
+## The comic look ships: menu switch, speed, the film's grade (2026-11-15)
+
+Owner (after a workstation test): good, best at night; it lags; a little too bright and cartoonish
+next to the film; ship it as a pause-menu option.
+- **Menu:** pause menu > "Look: Classic / Comic" (`menu/items.js`, `menu/index.js`). The choice is
+  saved (`localStorage blox.look`) and the page reloads (materials compile for one look). The
+  address wins: `#look=verse`, `#look=manga` (test only, not in the menu), `#look=classic`
+  (`render/verse.js` `chooseLook`, `hashWithLook`, `switchLook`; tests in `test/verse.test.mjs`).
+  The menu says "Comic", not the film's title (its name is the studio's trademark).
+- **Speed:** the comic pass took its depth and normals from the AO pass, so AO had to run at
+  street level, and its normal render drew the whole scene a second time (847 -> 1700 draws in the
+  owner's screenshots). Now `render/depthpass.js` renders the scene into a target with a depth
+  texture and copies it on (one full-screen copy); the pass rebuilds normals from that depth; AO
+  is back to the toy look's rule. Same view: 154 draw calls in Comic vs 206 in Classic.
+- **The film's grade:** a muted palette (only clearly coloured things keep full colour), mids a
+  touch deeper (gamma 1.1), highlights rolled off, blacks lifted toward a cool ink, a paler sky,
+  and split toning: light amber, shade teal by day and violet at night; denser depth haze (fog from
+  45 m). Checked at 13:00, 17:30 and 21:00.

@@ -5,7 +5,7 @@
  * touch (no key hints), match (in a multiplayer match: no fast travel).
  * -> [{ id, label, key, sub }]
  */
-export function menuItems({ has = {}, goalsOff = false, touch = false, match = false } = {}) {
+export function menuItems({ has = {}, goalsOff = false, touch = false, match = false, look = 'Classic' } = {}) {
   const all = [
     { id: 'resume', label: 'Resume', key: 'Esc' },
     { id: 'map', label: 'Map & fast travel', key: '', sub: match ? 'Map only during a match' : '' },
@@ -14,6 +14,7 @@ export function menuItems({ has = {}, goalsOff = false, touch = false, match = f
     { id: 'photo', label: 'Photo mode', key: 'P', need: 'explore' },
     { id: 'trip', label: 'Plan a trip', key: '', need: 'trip' },
     { id: 'goals', label: goalsOff ? 'Goals: off' : 'Goals: on', key: 'O', need: 'goals' },
+    { id: 'look', label: `Look: ${look}`, key: '', sub: 'Classic toy or comic film (reloads)' },
     { id: 'settings', label: 'Settings', key: '', sub: 'Sun, quality, sound' },
     { id: 'help', label: 'Controls & help', key: 'H', need: 'player' },
     { id: 'mp', label: 'Multiplayer', key: '', need: 'mp' },

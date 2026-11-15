@@ -15,8 +15,9 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { GradePass } from './render/grade.js';
-import { lookFromHash, makeVersePass, updateVerse } from './render/verse.js';
+import { LOOK, makeVersePass, updateVerse } from './render/verse.js';
 import { PoolLights } from './render/pools.js';
+import { DepthRenderPass } from './render/depthpass.js';
 import { HorizontalTiltShiftShader } from 'three/examples/jsm/shaders/HorizontalTiltShiftShader.js';
 import { VerticalTiltShiftShader } from 'three/examples/jsm/shaders/VerticalTiltShiftShader.js';
 
@@ -29,7 +30,10 @@ export class Post {
     const c = new EffectComposer(renderer);
     c.setPixelRatio(renderer.getPixelRatio());
     c.setSize(width, height);
-    c.addPass(new RenderPass(scene, camera));
+    // the look is fixed at load (render/verse.js LOOK); the painted looks keep the scene's depth
+    this.look = typeof location !== 'undefined' ? LOOK : null;
+    this.scenePass = this.look ? new DepthRenderPass(scene, camera) : new RenderPass(scene, camera);
+    c.addPass(this.scenePass);
     const gtao = new GTAOPass(scene, camera, width, height);
     this.aoScale = 1;
     const setAoSize = gtao.setSize.bind(gtao);
@@ -45,12 +49,10 @@ export class Post {
     c.addPass(this.bloom);
     this.tilt = [new ShaderPass(HorizontalTiltShiftShader), new ShaderPass(VerticalTiltShiftShader)];
     for (const p of this.tilt) c.addPass(p);
-    // the comic-print focus, test flag only (#look=verse; render/verse.js)
-    this.look = typeof location !== 'undefined' ? lookFromHash(location.hash) : null;
     this.grade = new GradePass();
     c.addPass(this.grade);
     if (this.look) { // the painted looks (verse, manga): crisp, no miniature blur, a little more contact shade
-      this.verse = makeVersePass(gtao, this.look); c.addPass(this.verse); globalThis.__bloxTwos = true;
+      this.verse = makeVersePass(this.scenePass, this.look); c.addPass(this.verse); globalThis.__bloxTwos = true;
       for (const p of this.tilt) p.enabled = false;
       gtao.blendIntensity = 1.2;
       this.pools = new PoolLights(); // lamps and shop windows light their surroundings at night
@@ -75,13 +77,6 @@ export class Post {
 
   setAO(on) {
     this.aoWanted = on;
-    if (this.verse) { // the comic pass reads the AO pass's depth and normals: keep it rendering
-      // (only a light contact shade where the toy look would have AO off)
-      this.gtao.enabled = this.quality.ao !== 'off';
-      this.gtao.blendIntensity = on && this.aoInRange !== false ? 1.2 : 0.55;
-      this.verse.uniforms.depthOk.value = this.gtao.enabled ? 1 : 0;
-      return;
-    }
     this.gtao.enabled = on && this.quality.ao !== 'off' && this.aoInRange !== false;
   }
 

@@ -15,6 +15,8 @@ controller works too)
   market days, boats on the Maas, and a day/night cycle with lit windows.
 - **Playable.** Fly over it like a map, or drop in anywhere and walk in third person with an
   open-world camera (mouse, keyboard, gamepad or touch).
+- **Two looks.** The classic toy look, or a comic-film look (pause menu > Look): painted
+  materials, ink outlines, a film grade and real light pools at night.
 - **Made for the browser.** The world streams around the camera, with per-chunk LOD and baked far
   silhouettes so the whole city stays visible.
 
