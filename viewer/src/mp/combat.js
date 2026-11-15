@@ -4,6 +4,7 @@
 // opens with the spread, tracers, hit markers, health, and the touch buttons. The numbers and
 // the hit maths are weapons.js; the room decides the damage (relay/src/ctf.js shoot).
 import * as THREE from 'three';
+import { comicFx } from '../render/comicfx.js';
 import { WEAPONS, PICKUP_R, PICKUP_BACK_S, Gun, spreadDir, hitTest, wallT, meleeTarget, pickupSpots } from './weapons.js';
 import { TEAM_HEX } from './model.js';
 import { standSpot } from '../player/spot.js';
@@ -569,6 +570,7 @@ export class Combat {
     this.flashT = 0.03 + 0.015 * (fe.flash || 1);
     this.pendingTracer = { ends, kind: w };
     this.sound.play(w, 1);
+    comicFx(w === 'shotgun' ? 'shotgun' : 'shot');
   }
 
   stepFx(dt) {

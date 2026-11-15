@@ -33,6 +33,7 @@ export async function initAudio(ctx) {
   let ac = null, synth = null, offSince = 0, suspendTimer = 0, started = false;
 
   const wanted = () => !prefs.muted && prefs.volume > 0 && !document.hidden;
+  let duckK = 1; // the city steps back while your own music plays (music/spotify.js)
   function apply() {
     if (!wanted()) {
       if (!synth) return;
@@ -48,7 +49,7 @@ export async function initAudio(ctx) {
     if (offSince && performance.now() - offSince > 1000) synth.resetBuses(); // drop sounds queued before the mute
     offSince = 0;
     if (ac.state !== 'running') ac.resume().catch(() => {});
-    synth.setVolume(masterGain(prefs), started ? FADE_TAU_S : FADE_IN_TAU_S);
+    synth.setVolume(masterGain(prefs) * duckK, started ? FADE_TAU_S : FADE_IN_TAU_S);
     started = true;
   }
   const ui = bindAudioUI(prefs, { onChange: () => { savePrefs(store, prefs); if (gestured) apply(); } });
@@ -124,6 +125,8 @@ export async function initAudio(ctx) {
       if ((tickAcc += dt) >= TICK_S) { tickAcc = 0; layers(life); }
     },
     prefs, ui,
+    /** Your music playing (true) or not: the city's sounds go down to a third, or back. */
+    duck(on) { duckK = on ? 0.33 : 1; if (synth && wanted()) synth.setVolume(masterGain(prefs) * duckK, 0.8); },
     state: () => ({ context: ac?.state || 'none', gestured, prefs: { ...prefs }, mix: last }),
   };
   window.__bloxAudio = api;

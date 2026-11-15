@@ -847,3 +847,19 @@ Owner passed on outside advice (written for Unity; the ideas that apply to this 
   (`SHOT_SOUND`: rifle crack and thump, scout loud crack with a long tail, shotgun boom and pump).
 - `scripts/check.sh viewer` now also bundles the whole game (a syntax error in a module no test
   imports had slipped through); CI runs it.
+
+## The comic look reacts to the action (2026-11-15)
+
+Owner, with a clip of the film's headphones scene (cuts and colour shifts on the beat, tilted
+camera on the action, the colour plates splitting on fast foreground motion): make the look react,
+big on a hit or knock-out, small but noticeable when you run someone over.
+`render/comicfx.js` (`comicFx(kind, at)` fires a window event; `ComicFx` in `post.js` decays the
+state and feeds the comic pass): hit (action lines from the target, a ring of halftone dots, the
+plates jump apart), headshot (stronger, "PATS!"), knock-out (plus a magenta-violet two-colour
+flash, a few degrees of camera tilt, a 70 ms held frame and a Dutch sound word: KNAL!, BOEM!,
+KRAK!), hurt / knocked out (a red flash, tilt), running someone over (a small dot burst and a jolt
+of the plates), brushing past (a slight jolt), firing (the plates twitch, the shotgun more), a raid
+wave (the palette swings to red-violet and settles), a capture (a flash). Hooks: `mp/index.js`
+(hits, hurts, waves, captures), `mp/combat.js` (my shots), `life/index.js` (walker bumps, now with
+where they happened). Painted looks only; the classic look is unchanged. Everything fades in
+under a second.

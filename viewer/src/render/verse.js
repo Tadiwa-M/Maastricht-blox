@@ -45,10 +45,10 @@ export const PAINTED_LOOK = LOOK === 'verse' || LOOK === 'manga';
 export const twosTick = (t, hz = VERSE.twosHz) => Math.floor(t * hz);
 
 const shader = {
-  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, fovScale: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, dpr: { value: 1 }, phone: { value: 0 }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, fovScale: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, dpr: { value: 1 }, phone: { value: 0 }, fxImpact: { value: 0 }, fxAt: { value: new THREE.Vector2(0.5, 0.5) }, fxSplit: { value: 0 }, fxDuo: { value: 0 }, fxLines: { value: 1 }, fxDuoLo: { value: new THREE.Vector3() }, fxDuoHi: { value: new THREE.Vector3() }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 fovScale; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float dpr; uniform float phone; uniform float focus; uniform vec2 res;
+    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 fovScale; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float dpr; uniform float phone; uniform float fxImpact; uniform vec2 fxAt; uniform float fxSplit; uniform float fxDuo; uniform float fxLines; uniform vec3 fxDuoLo; uniform vec3 fxDuoHi; uniform float focus; uniform vec2 res;
     varying vec2 vUv;
     float dist(vec2 uv) { float d = texture2D(tDepth, uv).x; return depthOk > 0.5 ? (near * far) / (far - d * (far - near)) : focus; } // (no depth: all in focus, no lines)
     vec3 vpos(vec2 uv) { float z = dist(uv); return vec3((uv * 2.0 - 1.0) * fovScale * z, -z); }
@@ -156,8 +156,10 @@ const shader = {
       float bright = smoothstep(0.55, 0.8, luma(base)); // lit windows and lamps stay clean
       // the print slip only on soft shapes: lights stay clean glows
       float slip = coc * (1.0 - bright) * (1.0 - sky);
-      vec2 dir = normalize(vec2(1.0, 0.35)) / res * slip * ${VERSE.maxSlip.toFixed(1)};
-      vec3 c = vec3(slip > 0.01 ? texture2D(tDiffuse, vUv + dir).r : base.r, base.g, slip > 0.01 ? texture2D(tDiffuse, vUv - dir).b : base.b);
+      // the plates slip out of focus, and jump apart for a moment on the action (render/comicfx.js)
+      float slipPx = slip * ${VERSE.maxSlip.toFixed(1)} + fxSplit * 3.5;
+      vec2 dir = normalize(vec2(1.0, 0.35)) / res * slipPx;
+      vec3 c = vec3(slipPx > 0.03 ? texture2D(tDiffuse, vUv + dir).r : base.r, base.g, slipPx > 0.03 ? texture2D(tDiffuse, vUv - dir).b : base.b);
       c = treat(c);
       c = mix(vec3(luma(c)), c, 1.0 - sky * 0.35); // a hazier, paler sky
       // a modelled look: fine lines where a shape passes in front of another (depth) and lighter
@@ -186,6 +188,18 @@ const shader = {
       float hpitch = max(3.0, res.y / 260.0);
       float hk = inkHatch(f, n0, shade, hpitch) * (1.0 - sky) * (0.45 + 0.55 * near) * detail;
       c = mix(c, c * 0.55, hk * (0.32 + 0.28 * soft));
+      // the action (render/comicfx.js): lines bursting from the impact, a ring of dots running out,
+      // a two-colour flash
+      if (fxImpact > 0.001) {
+        vec2 d = (vUv - fxAt) * vec2(res.x / res.y, 1.0);
+        float r = length(d), a = atan(d.y, d.x);
+        float ray = step(0.86, hHash(vec2(floor(a * 64.0), 7.0))) * smoothstep(0.16, 0.42, r) * (1.0 - smoothstep(0.55, 1.2, r)); // (the target itself stays clear)
+        c = mix(c, vec3(0.04, 0.035, 0.05), ray * fxImpact * 0.6 * fxLines);
+        float ring = (1.0 - fxImpact) * 0.32 + 0.04;
+        float band = 1.0 - smoothstep(0.0, 0.045, abs(r - ring));
+        c = mix(c, c * 0.35, band * fxImpact * dots(f, 0.785, 4.0, 0.75));
+      }
+      if (fxDuo > 0.001) c = mix(c, mix(fxDuoLo, fxDuoHi, smoothstep(0.04, 0.85, luma(c))), fxDuo);
       #ifdef MANGA
         gl_FragColor = vec4(manga(base, z, sky, dEdge, nEdge, near, f, n0), 1.0);
       #else

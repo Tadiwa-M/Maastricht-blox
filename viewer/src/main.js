@@ -254,6 +254,8 @@ async function initHooks(ctx) {
   // [report hook] the "Report a mistake" button (src/report/)
   try { out.push(await (await import('./report/index.js')).initReport?.(ctx)); } catch (e) { console.error('report', e); }
   try { out.push(await (await import('./audio/index.js')).initAudio?.(ctx)); } catch (e) { console.error('audio', e); }
+  // [music hook] your own Spotify in a dock while you play (src/music/spotify.js); after audio (it ducks the city)
+  if (!ctx.still) try { window.__bloxMusic = (await import('./music/spotify.js')).initMusic?.(); } catch (e) { console.error('music', e); }
   try { out.push(await (await import('./explore/index.js')).initExplore?.(ctx)); } catch (e) { console.error('explore', e); }
   try { out.push(await (await import('./activities/index.js')).initActivities?.(ctx)); } catch (e) { console.error('activities', e); }
   try { out.push(await (await import('./goals/index.js')).initGoals?.(ctx)); } catch (e) { console.error('goals', e); }

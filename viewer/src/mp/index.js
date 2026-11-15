@@ -16,6 +16,7 @@ import { loadChoices, encodeChoices } from '../figure/custom.js';
 import { Combat } from './combat.js';
 import { captureParts } from '../figure/rig.js';
 import { LocalRoom } from './localroom.js';
+import { comicFx } from '../render/comicfx.js';
 import { WalkGraph, nearestNode, findPath } from '../life/walkgraph.js';
 
 const SEND_S = 0.1, IDLE_SEND_S = 1, SPAWN_GIVE_UP_S = 20;
@@ -175,15 +176,17 @@ export async function initMultiplayer(ctx) {
   function onMessage(m) {
     if (!model) return;
     const now = performance.now();
+    if (m.t === 'ev' && m.k === 'raid' && m.big) comicFx('wave'); // the comic look reacts (render/comicfx.js)
+    if (m.t === 'ev' && m.k === 'capture') comicFx('capture');
     for (const e of model.apply(m)) {
       if (e.k === 'pos') view.push(e.id, e.p, e.yaw, e.speed, now);
       else if (e.k === 'spawn' && e.at) { spawn = { at: e.at, t: 0 }; boundary.reset(); combat?.respawn(model.config?.hp || 100, model.config?.spawnSafeS || 0); }
       else if (e.k === 'take') combat?.taken(e.i, e.mine, e.s);
       else if (e.k === 'shot' && e.melee) combat?.sound.play('knife', 0.9); // a raider's swipe: no tracer
       else if (e.k === 'shot') { lastWeapon.set(e.by, e.w); const ob = view?.others.get(e.by); if (ob) ob.shotT = 0; combat?.tracer(toThree(e.o, origin), toThree(e.e, origin), e.w); }
-      else if (e.k === 'hurt') combat?.hurt(e.hp, view.posOf(e.by));
-      else if (e.k === 'hitmark') combat?.hitmark(e.kill);
-      else if (e.k === 'killed') { knockMe(e.by); combat?.killed(model.config?.respawnS || 4, () => { const at = model?.spawn(); if (at && model.phase === 'play') { spawn = { at, t: 0 }; boundary.reset(); } }); }
+      else if (e.k === 'hurt') { combat?.hurt(e.hp, view.posOf(e.by)); comicFx('hurt'); }
+      else if (e.k === 'hitmark') { combat?.hitmark(e.kill); comicFx(e.kill ? 'kill' : e.head ? 'head' : 'hit', view?.posOf(e.id)); }
+      else if (e.k === 'killed') { knockMe(e.by); comicFx('down'); combat?.killed(model.config?.respawnS || 4, () => { const at = model?.spawn(); if (at && model.phase === 'play') { spawn = { at, t: 0 }; boundary.reset(); } }); }
       else if (e.k === 'knock') knockMe(e.by);
       else if (e.k === 'scatter') view.scatter(e.id, e.by === model.me ? player()?.state?.().pos : view.posOf(e.by));
       else if (e.k === 'toast') ui.toast(e.text, e.big);

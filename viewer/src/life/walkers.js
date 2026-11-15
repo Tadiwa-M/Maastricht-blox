@@ -391,7 +391,7 @@ export class Pedestrians {
           m.scatter = new Scatter(captureParts(m.v, pose), [ux * sp, 2.4, -uz * sp], (x, z3) => this.ground(x, -z3), this.rand);
           g.pause = Math.max(g.pause, 3.5); g.look = [seen.x, seen.z]; g.lookT = 4; g.flee = 0;
         }
-        this.onBump?.(kind);
+        this.onBump?.(kind, [at.x, this.memberY(g, at.x, at.z), -at.z]); // (three.js position, for the comic look's reaction)
       }
     }
   }

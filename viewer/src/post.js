@@ -18,6 +18,7 @@ import { GradePass } from './render/grade.js';
 import { LOOK, makeVersePass, updateVerse } from './render/verse.js';
 import { PoolLights } from './render/pools.js';
 import { DepthRenderPass } from './render/depthpass.js';
+import { ComicFx } from './render/comicfx.js';
 import { HorizontalTiltShiftShader } from 'three/examples/jsm/shaders/HorizontalTiltShiftShader.js';
 import { VerticalTiltShiftShader } from 'three/examples/jsm/shaders/VerticalTiltShiftShader.js';
 
@@ -56,6 +57,7 @@ export class Post {
       for (const p of this.tilt) p.enabled = false;
       gtao.blendIntensity = 1.2;
       this.pools = new PoolLights(); // lamps and shop windows light their surroundings at night
+      this.fx = new ComicFx(); // the look reacting to hits, knock-outs, waves (render/comicfx.js)
     }
     this.composer = c;
     this.tiltOn = !this.verse; // (the comic look is crisp: no miniature blur)
@@ -137,6 +139,11 @@ export class Post {
       const focus = at ? Math.hypot(cam.position.x - at[0], cam.position.y - at[1] - 1.2, cam.position.z - at[2]) : (this.focusTarget ? cam.position.distanceTo(this.focusTarget) : 30);
       updateVerse(this.verse, cam, focus, this.width, this.height, this.night, this.composer.renderer.getPixelRatio());
       this.pools.update(cam, this.night);
+      if (this.fx.holding) return; // a held impact frame: the last picture stays up a moment
+      const t = performance.now(), dt = Math.min(0.1, (t - (this.fxT || t)) / 1000);
+      this.fxT = t;
+      const roll = this.fx.update(dt, cam, this.verse.uniforms);
+      if (roll) { cam.rotateZ(roll); this.composer.render(); cam.rotateZ(-roll); return; } // the film's tilt on the action
     }
     this.composer.render();
   }

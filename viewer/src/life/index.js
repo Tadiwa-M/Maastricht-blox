@@ -8,6 +8,7 @@
 // The city's day: routines (routines.js: who is where when), events by date (calendar.js), the
 // real weather near real time (weather.js), people reacting to the player (reactions.js).
 import * as THREE from 'three';
+import { comicFx } from '../render/comicfx.js';
 import { MaterialSet } from '../materials.js';
 import { placeholderModels } from '../placeholders.js';
 import { LifeClock, zonedWeekTime, parseDay } from './clock.js';
@@ -227,7 +228,7 @@ export async function initLife(ctx) {
       const room = (x, z, y) => { const c = cityOf(ctx); return !c?.isSolid || (c.isSolid(x, y + 1.0, -z) !== true && c.isSolid(x, y + 1.6, -z) !== true); };
       state.walkers = new Pedestrians({ graph, ground: ground.walk, room, cap: FIGURES_BY_TIER.high });
       // the player running into someone (walkers.js bumps): the player feels it and loses speed
-      state.walkers.onBump = (kind) => { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('blox:bump', { detail: { kind } })); };
+      state.walkers.onBump = (kind, at) => { if (typeof window !== 'undefined') { window.dispatchEvent(new CustomEvent('blox:bump', { detail: { kind } })); comicFx(kind === 'knock' ? 'knock' : 'shove', at); } };
       hideDemo(models.character.name);
     }
   }

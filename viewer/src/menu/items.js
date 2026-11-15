@@ -15,6 +15,7 @@ export function menuItems({ has = {}, goalsOff = false, touch = false, match = f
     { id: 'trip', label: 'Plan a trip', key: '', need: 'trip' },
     { id: 'goals', label: goalsOff ? 'Goals: off' : 'Goals: on', key: 'O', need: 'goals' },
     { id: 'look', label: `Look: ${look}`, key: '', sub: 'Classic toy or comic film (reloads)' },
+    { id: 'music', label: 'Music', key: '', sub: 'Play your Spotify while you play', need: 'music' },
     { id: 'settings', label: 'Settings', key: '', sub: 'Sun, quality, sound' },
     { id: 'help', label: 'Controls & help', key: 'H', need: 'player' },
     { id: 'mp', label: 'Multiplayer', key: '', need: 'mp' },

@@ -78,7 +78,7 @@ test('model: shots, hits and knock-outs become effects; the heat map keeps the s
   assert.deepEqual(m.apply({ t: 'ev', k: 'shot', by: 1, w: 'rifle', o: [0, 0, 0], e: [1, 1, 1] }), [], 'my own shot is already drawn');
   assert.equal(m.apply({ t: 'ev', k: 'shot', by: 2, w: 'rifle', o: [0, 0, 0], e: [1, 1, 1] })[0].k, 'shot');
   assert.deepEqual(m.apply({ t: 'ev', k: 'hit', id: 1, by: 2, hp: 52 }), [{ k: 'hurt', hp: 52, by: 2 }]);
-  assert.deepEqual(m.apply({ t: 'ev', k: 'hit', id: 2, by: 1, hp: 0, head: true }), [{ k: 'hitmark', head: true, kill: true }]);
+  assert.deepEqual(m.apply({ t: 'ev', k: 'hit', id: 2, by: 1, hp: 0, head: true }), [{ k: 'hitmark', head: true, kill: true, id: 2 }]); // (id: where the comic look's burst goes)
   const out = m.apply({ t: 'ev', k: 'kill', id: 1, by: 2, at: [176300, 317900] });
   assert.equal(out[0].k, 'killed');
   assert.match(out[1].text, /B knocked you out/);

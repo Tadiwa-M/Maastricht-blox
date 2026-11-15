@@ -1906,3 +1906,11 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   Markt, 8 waves to dawn (guide 18). Bugs found on the way: the client sends JSON text (the local
   room parses it), raiders knocked out by me never crumbled (fixed), my position went stale on slow
   frames (the local room keeps it fresh).
+
+## 2026-11-15 (late): your Spotify; the comic look reacts
+
+- Owner: connect Spotify while playing; the look should react to the action like the film. Music
+  dock with Spotify's own player (any link; whole songs when signed in; the city ducks while it
+  plays; guide 21). Beat-reactive visuals from Spotify are not possible (protected audio, closed
+  analysis API), so the comic look reacts to game events instead: action lines, dot bursts, plate
+  splits, two-colour flashes, tilts, held frames and Dutch sound words (guide 06).

@@ -91,7 +91,7 @@ export async function initMenu(ctx) {
 
   function renderMain() {
     const has = { player: !!player(), explore: !!explore(), trip: !!window.__bloxTrip, goals: !!window.__bloxGoals,
-      mp: !!document.getElementById('mp-open') };
+      mp: !!document.getElementById('mp-open'), music: !!window.__bloxMusic };
     const list = menuItems({ has, goalsOff: !!window.__bloxGoals?.flow?.off, touch: touch(), match: match(), look: lookName() });
     const box = main.querySelector('.bx-items');
     box.innerHTML = '';
@@ -191,6 +191,7 @@ export async function initMenu(ctx) {
       case 'map': showPage('map'); break;
       case 'settings': showPage('settings'); break;
       case 'look': switchLook(nextLook()); break;
+      case 'music': close({ resume: false }); window.__bloxMusic?.open(); break;
       case 'character': close({ resume: false }); inWalk(() => p?.openCreator?.()); break;
       case 'journal': close({ resume: false }); ex?.journal(true); break;
       case 'photo': close(); inWalk(() => ex?.photo(true)); break;
