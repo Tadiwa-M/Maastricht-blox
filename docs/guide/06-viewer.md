@@ -635,3 +635,14 @@ additive instanced meshes (pools on the ground, camera-facing glows), fading in 
 look work toward a cinematic night (owner's reference: warm lamp pools between deep shade).
 Tests: `test/lamps.test.mjs`. Checked on the full city at 21:00 east of the Markt.
 
+## The comic-print focus (test flag `#look=verse`, 2026-11-15)
+
+Work toward the owner's Spider-Verse reference; not a menu setting until it is right. With
+`#look=verse` in the address: `render/verse.js` adds a pass before the grade that reads the depth
+the AO pass renders anyway. What is in focus (the player, or the orbit target) stays a clean
+render; what is in front of or beyond it is "printed badly" instead of blurred: the colour plates
+slip apart, a halftone screen and fine diagonal hatching come in, more the further from focus.
+Figures animate on twos: `figure/crowd.js` poses them 12 times a second (between ticks the last
+pose stays) while the camera moves smoothly. Needs the AO pass (High and Medium).
+Open: style-aware lighting (hard light shapes, rim light), neon accents, and the night.
+

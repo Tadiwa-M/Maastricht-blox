@@ -65,10 +65,21 @@ export class FigureCrowd {
     };
   }
 
-  begin(eye = this.eye) { for (const e of this.meshes.values()) e.n = 0; this.count = 0; this.hi = 0; this.eye = eye; }
+  begin(eye = this.eye) {
+    // animation on twos (the comic look, render/verse.js): a new pose only 12 times a second;
+    // between ticks the figures keep their last pose (add/end do nothing)
+    if (globalThis.__bloxTwos) {
+      const tick = Math.floor(performance.now() / (1000 / 12));
+      this.hold = tick === this.lastTick;
+      this.lastTick = tick;
+      if (this.hold) return;
+    } else this.hold = false;
+    for (const e of this.meshes.values()) e.n = 0; this.count = 0; this.hi = 0; this.eye = eye;
+  }
 
   /** Add one figure. pose: { x, y, z (three.js metres, feet), rotY, mode, phase, speed, t, look }. */
   add(v, pose) {
+    if (this.hold) return true;
     if (this.count >= this.cap) return false;
     const e0 = this.eye;
     if (e0 && this.cullDist2 && (pose.x - e0.x) ** 2 + (pose.y - e0.y) ** 2 + (pose.z - e0.z) ** 2 > this.cullDist2) return false; // too small to see
@@ -87,11 +98,13 @@ export class FigureCrowd {
 
   /** Add loose parts of a figure (scattered pieces): parts = [{ key, mat: Float32Array(16), colourKey }]. */
   addParts(v, parts) {
+    if (this.hold) return;
     this._cols = variantColours(v);
     for (const p of parts) this._emit(p.key, p.mat, p.colourKey);
   }
 
   end() {
+    if (this.hold) return;
     for (const { mesh, n } of this.meshes.values()) {
       mesh.count = n;
       mesh.visible = n > 0;

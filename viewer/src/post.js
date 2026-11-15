@@ -15,6 +15,7 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { GradePass } from './render/grade.js';
+import { lookFromHash, makeVersePass, updateVerse } from './render/verse.js';
 import { HorizontalTiltShiftShader } from 'three/examples/jsm/shaders/HorizontalTiltShiftShader.js';
 import { VerticalTiltShiftShader } from 'three/examples/jsm/shaders/VerticalTiltShiftShader.js';
 
@@ -43,6 +44,9 @@ export class Post {
     c.addPass(this.bloom);
     this.tilt = [new ShaderPass(HorizontalTiltShiftShader), new ShaderPass(VerticalTiltShiftShader)];
     for (const p of this.tilt) c.addPass(p);
+    // the comic-print focus, test flag only (#look=verse; render/verse.js)
+    this.look = typeof location !== 'undefined' ? lookFromHash(location.hash) : null;
+    if (this.look === 'verse') { this.verse = makeVersePass(gtao); c.addPass(this.verse); globalThis.__bloxTwos = true; }
     this.grade = new GradePass();
     c.addPass(this.grade);
     this.composer = c;
@@ -102,6 +106,7 @@ export class Post {
   /** Blur strength from camera distance; focus band centred on the orbit target. */
   updateTiltShift(target) {
     if (!this.tiltOn) return;
+    this.focusTarget = target;
     const dist = this.camera.position.distanceTo(target);
     const amount = THREE.MathUtils.smoothstep(dist, TILT_NEAR, TILT_FAR) * TILT_MAX;
     const focus = target.clone().project(this.camera).y * 0.5 + 0.5; // 0 = bottom, 1 = top
@@ -116,5 +121,13 @@ export class Post {
     this.composer.setSize(width, height);
   }
 
-  render() { this.composer.render(); }
+  render() {
+    if (this.verse) { // the focus follows what the camera looks at
+      const p = globalThis.__bloxPlayer, cam = this.camera;
+      const at = p?.mode === 'walk' && p.ctrl ? p.ctrl.pos : null;
+      const focus = at ? Math.hypot(cam.position.x - at[0], cam.position.y - at[1] - 1.2, cam.position.z - at[2]) : (this.focusTarget ? cam.position.distanceTo(this.focusTarget) : 30);
+      updateVerse(this.verse, cam, focus, this.width, this.height);
+    }
+    this.composer.render();
+  }
 }
