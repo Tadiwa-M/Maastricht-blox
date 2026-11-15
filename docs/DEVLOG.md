@@ -1931,3 +1931,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Weather you can see and hear: rain streaks with the real wind, wet streets with puddles, snow
   that settles, an overcast sky, thunderstorms with lightning and thunder; the rain sound now
   follows the live weather (it only read #rain= before) (guide 06).
+- The sky follows the real cloud cover (was fixed at half), greyer in rain; night clouds hide stars.

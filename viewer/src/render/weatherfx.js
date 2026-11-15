@@ -105,8 +105,12 @@ export class WeatherFx {
     this.cover += ((snow > 0 ? 1 : 0) - this.cover) * Math.min(1, dt * (snow > 0 ? 0.006 : 0.01));
     weatherUniforms.uWet.value = this.wet; weatherUniforms.uSnowCover.value = this.cover;
     // an overcast sky dims the sun (scene.js reads it on the next time update)
-    const s = Math.max(0.3, sunFactor(w));
-    if (Math.abs(s - this.sun) > 0.02) { this.sun = s; this.stage.weatherSun = s; this.stage.setTime?.(this.stage.hours ?? 12); }
+    // and the sky shows the real cloud cover, greyer in rain or snow
+    const s = Math.max(0.3, sunFactor(w)), cl = Math.max(0, Math.min(1, w?.cloud ?? 0.4)), gr = Math.min(1, (w?.rain || 0) + (w?.snow ? 0.4 : 0));
+    if (Math.abs(s - this.sun) > 0.02 || Math.abs(cl - (this.stage.weatherCloud ?? -1)) > 0.03 || Math.abs(gr - (this.stage.weatherGrey ?? -1)) > 0.03) {
+      this.sun = s; this.stage.weatherSun = s; this.stage.weatherCloud = cl; this.stage.weatherGrey = gr;
+      this.stage.setTime?.(this.stage.hours ?? 12);
+    }
     // lightning in a storm, every 8 to 30 s
     if (w?.storm) {
       if (this.t >= this.nextBolt) {

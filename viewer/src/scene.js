@@ -138,6 +138,7 @@ export class Stage {
     this.scene.environment = this.sky.set({
       top, horizon: hor, sunDir: this.sunDir, sunColor: this.sun.color, sunGlow: 1 - THREE.MathUtils.smoothstep(n, 0, 0.3),
       stars: THREE.MathUtils.smoothstep(n, 0.6, 1),
+      clouds: this.weatherCloud ?? 0.4, grey: this.weatherGrey ?? 0, // the real sky (render/weatherfx.js)
     });
     this.scene.fog.color.copy(hor);
     // scattered sunlight in the haze (render/haze.js): the sun's colour, a touch brighter

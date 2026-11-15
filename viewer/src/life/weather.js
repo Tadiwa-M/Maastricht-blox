@@ -89,6 +89,7 @@ export function weatherState({ hash = {}, live = null, near = false, ctxRain = n
   if ('snow' in hash) w.snow = hash.snow;
   if ('storm' in hash) w.storm = hash.storm;
   if (w.snow && w.rain === 0) w.rain = 0.6;
+  if (!useLive && w.rain > 0) w.cloud = Math.max(w.cloud, 0.65 + 0.35 * w.rain); // a test rain or snow comes with clouds
   w.live = useLive && !('rain' in hash) && !('tempC' in hash) && !('snow' in hash) && !('storm' in hash);
   w.terrace = terraceWeather(w);
   w.crowd = crowdWeather(w);
