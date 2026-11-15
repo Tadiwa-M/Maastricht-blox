@@ -748,3 +748,19 @@ All behind `#look=verse`.
   point lights evaluated in the painted surface and figure shaders, so they light paving, walls
   and people in their own colours. Shops: 60 % warm, 18 % soft white, a few pink, teal or cool
   (neon accents). The additive pool discs are off in this look (glows stay). `test/pools.test.mjs`.
+
+## Characters and vehicles finished like film props (comic test look, 2026-11-15)
+
+Owner: object textures for people, bikes and cars, the player above all (the camera follows them).
+- Shared plumbing `render/pools.js` `addPartVaryings`: local position, normal and vertex colour,
+  world position for the night pools, and small pattern helpers (lines, stitched boxes).
+- Figures (`render/figuresurface.js`; figures face -z, the earlier crease was on the back, fixed):
+  face (brows, warm cheeks, matte skin), hands (knuckle lines), hair strands, tops (zip with teeth,
+  collar, stitched pockets, side seams, back yoke and centre seam, neck label, waist wrinkles, hem),
+  sleeves (ribbed cuffs), hips (belt and buckle, front pockets, stitched back pockets and yoke),
+  trousers (crease, seams with light stitching, worn knees, twill), shoes (sole and welt, laces,
+  toe cap). Detail is sized for a figure 2 to 5 m away and fades where it would be under a pixel.
+- Vehicles (`render/vehiclesurface.js`, `VehicleFleet.materialFor`): paint vs trim from the vertex
+  colours: deep clear-coated paint with sharp reflections and road dirt up from the sills, matte
+  trims, mirror-dark glass, tyres with tread and a sidewall ring, metal rims with five spokes, an
+  enamelled bike frame. `test/partsurface.test.mjs`.

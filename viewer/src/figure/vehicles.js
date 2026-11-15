@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { rbox, sphere, cyl, torus, tube as tubeN, place, merge, tint } from './geom.js';
 import { figureMaterial } from './parts.js';
+import { VEHICLE_LOOK, vehicleKindOf, vehicleMaterialFor } from '../render/vehiclesurface.js';
 
 export const BIKE = { wheelR: 0.34, rear: 0.25, front: -0.84, bb: -0.17 };
 const HUB_Y = BIKE.wheelR;
@@ -169,7 +170,7 @@ export class VehicleFleet {
     this.night = 0;
     this.meshes = new Map();
     for (const [key, cap] of Object.entries(caps)) {
-      const mesh = new THREE.InstancedMesh(G[key], key === 'carLights' ? this.lightMaterial : this.material, cap);
+      const mesh = new THREE.InstancedMesh(G[key], key === 'carLights' ? this.lightMaterial : this.materialFor(key), cap);
       mesh.name = `vehicle:${key}`;
       mesh.count = 0; mesh.frustumCulled = false; mesh.castShadow = shadows && key !== 'carLights'; mesh.receiveShadow = key !== 'carLights';
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -188,6 +189,15 @@ export class VehicleFleet {
   setNight(n) { this.night = n; }
 
   begin() { for (const e of this.meshes.values()) e.n = 0; }
+
+  /** The shared toy material, or in the comic look one per kind of part (render/vehiclesurface.js). */
+  materialFor(key) {
+    const kind = VEHICLE_LOOK ? vehicleKindOf(key) : null;
+    if (!kind) return this.material;
+    this.kindMats ||= new Map();
+    if (!this.kindMats.has(kind)) this.kindMats.set(kind, vehicleMaterialFor(this.material, kind));
+    return this.kindMats.get(kind);
+  }
 
   put(key, mat, col) {
     const e = this.meshes.get(key);

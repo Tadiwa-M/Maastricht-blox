@@ -80,3 +80,43 @@ export const POOL_GLSL = `
     }
     return sum;
   }`;
+
+/**
+ * Shader plumbing shared by part materials (figures, vehicles): local position/normal and the
+ * vertex colour (vLocP, vLocN, vLocC), world position/normal (vWP, vWN), and the pools added to
+ * the direct diffuse light. Call from onBeforeCompile; `fragCommon` goes after <common>.
+ */
+export function addPartVaryings(sh, fragCommon = '') {
+  Object.assign(sh.uniforms, poolUniforms);
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vLocP; varying vec3 vLocN; varying vec3 vLocC; varying vec3 vWP; varying vec3 vWN;')
+    .replace('#include <begin_vertex>', `#include <begin_vertex>
+      vLocP = position; vLocN = normal;
+      #ifdef USE_COLOR
+        vLocC = color.rgb;
+      #else
+        vLocC = vec3(1.0);
+      #endif
+      vec4 locW = vec4(transformed, 1.0); vec3 locWN = objectNormal;
+      #ifdef USE_INSTANCING
+        locW = instanceMatrix * locW; locWN = mat3(instanceMatrix) * locWN;
+      #endif
+      vWP = (modelMatrix * locW).xyz; vWN = normalize(mat3(modelMatrix) * locWN);`);
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', `#include <common>
+      varying vec3 vLocP; varying vec3 vLocN; varying vec3 vLocC; varying vec3 vWP; varying vec3 vWN;
+      float fHash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
+      float fNoise(vec3 p) {
+        vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(mix(fHash(i), fHash(i + vec3(1, 0, 0)), f.x), mix(fHash(i + vec3(0, 1, 0)), fHash(i + vec3(1, 1, 0)), f.x), f.y),
+                   mix(mix(fHash(i + vec3(0, 0, 1)), fHash(i + vec3(1, 0, 1)), f.x), mix(fHash(i + vec3(0, 1, 1)), fHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+      }
+      float fLine(float x, float w) { float a = fwidth(x) + 1e-5; return 1.0 - smoothstep(w - a, w + a, abs(x)); }
+      float fBox(vec2 p, vec2 lo, vec2 hi, float w) { // outline of a rectangle (stitched pocket)
+        float inX = step(lo.x - w, p.x) * step(p.x, hi.x + w), inY = step(lo.y - w, p.y) * step(p.y, hi.y + w);
+        return max(fLine(p.x - lo.x, w) + fLine(p.x - hi.x, w), 0.0) * inY + max(fLine(p.y - lo.y, w) + fLine(p.y - hi.y, w), 0.0) * inX;
+      }
+      ${POOL_GLSL}
+      ${fragCommon}`)
+    .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\nreflectedLight.directDiffuse += diffuseColor.rgb * poolLight(vWP, normalize(vWN));');
+}

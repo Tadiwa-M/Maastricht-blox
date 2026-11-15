@@ -1861,3 +1861,9 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   pools and details. Figure parts by material, foliage/bark/grass/soil/copper textures, glazing
   bars in windows, lamps and shop windows as real point lights at night (guide 06). Ray tracing:
   not for the browser game (see the reply); the look comes from materials and motivated light.
+
+## 2026-11-15: comic look, characters and vehicles
+
+- Owner: textures for people, bikes and cars, especially the player. Figure parts and vehicle parts
+  get their own materials and sewn/painted detail (guide 06). Checked at 720p only: the finest
+  detail (stitching, laces) needs a look on a real screen.
