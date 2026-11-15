@@ -676,3 +676,22 @@ Owner: not a violet filter over the city, but the city's own colours handled the
   the focus distance, at most 2.6 px) and never on bright lights. Checked at 13:00, 18:00, 21:00.
 - Open: the comic night still leans blue in the streets; lit shopfronts and neon; style-aware lighting.
 
+## Crisp and modelled (2026-11-15)
+
+Owner: the crisp, detailed look of a comic film (the train in the reference stills: a detailed 3D
+model, coloured and drawn). `render/verse.js` now runs after the grade and adds:
+- a light unsharp mask (not on bright lights), so brick and window detail reads at full resolution;
+- fine lines where one shape passes in front of another (depth edges from the AO pass) and lighter
+  ones at creases (its normals), drawn in a darker shade of the surface's own colour, fading out by
+  260 m and out of focus; a faint warm rim on edges turning away from the eye;
+- people in front of the focus count half (a passer-by stays readable), the sky is never printed,
+  and the halftone and hatching sit only in the shade of out-of-focus areas (a zero-size dot drew a
+  speck at every grid point; fixed);
+- the cool/warm hue shift scales with the value, and only clearly coloured surfaces get the extra
+  chroma, so moonlit and sky-lit paving stays grey instead of turning navy or violet.
+- In verse mode `post.js` turns the tilt-shift blur off and the AO blend up (1.2).
+- Night brighter for every look (`look.js`): blue-hour fill #6f7fb4, night fill #a4a3bc, ground
+  bounce #4c4652, night exposure 2.15. Checked at 13:00 and 21:00 (Stationsstraat), both looks.
+- Open: lit shopfronts and neon; style-aware lighting; the night streets in the comic look still
+  read a little blue.
+
