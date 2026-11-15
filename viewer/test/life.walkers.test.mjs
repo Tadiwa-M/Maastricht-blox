@@ -204,3 +204,14 @@ test('queueing: behind someone waiting at the kerb people stop short; passers-by
   separate([front, other]);
   assert.equal(other.slow, undefined, 'the other direction is not held up');
 });
+
+test('bots route on the walk graph: the shortest way round, the nearest node, nothing across a gap', async () => {
+  const { WalkGraph, findPath, nearestNode } = await import('../src/life/walkgraph.js');
+  // a square 0-1-2-3 with a long way round, plus an island node 4
+  const g = new WalkGraph({ nodes: [0, 0, 10, 0, 10, 10, 0, 10, 100, 100, 101, 100], edges: [0, 1, 1, 2, 2, 3, 3, 0, 4, 5] });
+  assert.deepEqual(findPath(g, 0, 2).length, 3);
+  assert.deepEqual(findPath(g, 0, 1), [0, 1]);
+  assert.equal(findPath(g, 0, 4), null);
+  assert.equal(nearestNode(g, 9, 1), 1);
+  assert.equal(nearestNode(g, 500, 500, 10), -1);
+});

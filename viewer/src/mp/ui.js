@@ -21,6 +21,8 @@ const CSS = `
   font: 13px/1.4 system-ui, sans-serif; box-shadow: 0 20px 50px rgba(0,0,0,.5); display: grid; gap: 10px; }
 #mp-panel[hidden] { display: none; }
 #mp-panel > div { display: grid; gap: 10px; }
+#mp-panel .solo { display: grid; gap: 6px; padding: 10px; border-radius: 10px; background: rgba(255,255,255,.05); }
+#mp-panel .solo b { font-size: 11px; letter-spacing: .12em; color: #F2A900; }
 #mp-panel button.close { position: absolute; top: 6px; right: 6px; width: 34px; height: 34px; padding: 0; border-radius: 50%;
   background: rgba(255,255,255,.1); color: #f6f3ea; font: 400 22px/1 system-ui, sans-serif; }
 #mp-panel h3 { margin: 0; font: 400 22px/1 'Anton', Impact, sans-serif; letter-spacing: .06em; }
@@ -133,13 +135,28 @@ export class MpUi {
     if (this.view !== 'room') this.renderStart();
   }
 
+  /** Solo games, played in this browser (mp/localroom.js): they work without the game server. */
+  soloHtml() {
+    return `<div class="solo"><b>PLAY SOLO</b>
+      <button class="go raid">Defend Maastricht: night raid</button>
+      <div class="note">They come out of the caves through the Helpoort in waves. Stop them carrying the banner off the Markt until dawn.</div>
+      <button class="bots">Capture the flag with bots</button></div>`;
+  }
+
+  wireSolo() {
+    this.panel.querySelector('.raid')?.addEventListener('click', () => this.on.solo('raid'));
+    this.panel.querySelector('.bots')?.addEventListener('click', () => this.on.solo('bots'));
+  }
+
   renderStart(msg = '') {
     this.view = 'start';
     this.btn.classList.remove('in');
     if (this.availability !== 'ok') {
       const soon = this.availability === 'soon' || this.availability === 'unknown';
-      this.body.innerHTML = `<h3>CAPTURE THE FLAG</h3>
-        <p class="rules">${soon ? 'Multiplayer coming soon: race your friends from the Markt to the Vrijthof and back.' : 'The game server cannot be reached right now. Try again in a minute.'}</p>`;
+      this.body.innerHTML = `${this.soloHtml()}<h3>CAPTURE THE FLAG</h3>
+        <p class="rules">${soon ? 'Multiplayer coming soon: race your friends from the Markt to the Vrijthof and back.' : 'The game server cannot be reached right now. Try again in a minute.'}</p>
+        <div class="msg">${esc(msg)}</div>`;
+      this.wireSolo();
       return;
     }
     this.body.innerHTML = `<h3>CAPTURE THE FLAG</h3>
@@ -149,7 +166,8 @@ export class MpUi {
       <input name="nick" maxlength="12" placeholder="Your nickname" autocomplete="nickname" value="${esc(this.nick)}">
       <button class="go create">Create a room</button>
       <div class="row"><input name="code" class="code" maxlength="4" placeholder="CODE" autocomplete="off" value="${esc(this.code)}"><button class="join">Join</button></div>
-      <div class="msg">${esc(msg)}</div>`;
+      <div class="msg">${esc(msg)}</div>${this.soloHtml()}`;
+    this.wireSolo();
     const nick = this.panel.querySelector('[name=nick]'), code = this.panel.querySelector('[name=code]');
     const name = () => { this.nick = cleanNick(nick.value); return this.nick; };
     const need = () => { if (name()) return true; this.message('Choose a nickname first'); nick.focus(); return false; };
@@ -190,11 +208,25 @@ export class MpUi {
     else action = '<div class="note">Waiting for the host to start.</div>';
     const over = room.phase === 'over' && room.winner
       ? `<div class="msg">${room.winner === 'draw' ? 'A draw!' : room.winner === model.team ? 'Your team won!' : `${TEAM_NAMES[room.winner]} won`} ${room.score.blue}-${room.score.yellow}</div>${model.kills?.length ? '<canvas class="heat" width="220" height="220" style="display:block;margin:8px auto;border-radius:10px"></canvas><div class="note">Where the knock-outs happened</div>' : ''}` : '';
-    this.body.innerHTML = `<h3>ROOM</h3><div class="code-big">${esc(room.code)}</div>
+    if (room.mode === 'raid') { // the night raid: no teams to show, the waves and the banner
+      const r = room.raid || {};
+      const end = room.phase === 'over' ? `<div class="msg">${room.winner === 'blue' ? `Dawn! Maastricht is safe. ${r.kills} raiders stopped.` : `The banner is gone: Maastricht has fallen. Wave ${r.wave}, ${r.kills} raiders stopped.`}</div>
+        <button class="go start">Defend it again</button>` : '<div class="note">Raid on: wave and banner at the top.</div>';
+      this.body.innerHTML = `<h3>NIGHT RAID</h3>
+        <p class="rules">Guard the banner on the Markt. Raiders that reach it carry it toward the Helpoort: knock them out, or run into the carrier. Lose it ${cfg.winCaps || 3} times and the city falls. Survive ${r.waves || 8} waves.</p>
+        ${end}<button class="leave">Stop</button>`;
+    } else {
+      const solo = room.mode === 'bots';
+      this.body.innerHTML = solo
+        ? `<h3>PRACTICE</h3><div class="note">You and 3 bots against 4 bots. You are on <b style="color:${TEAM_HEX[model.team] || '#fff'}">${TEAM_NAMES[model.team] || '...'}</b>.</div>
+          <div class="teams">${teams}</div>${over}${room.phase === 'over' ? '<button class="go start">Play again</button>' : '<div class="note">Match on: see the score at the top.</div>'}
+          <button class="leave">Stop</button>`
+        : `<h3>ROOM</h3><div class="code-big">${esc(room.code)}</div>
       <div class="note">Friends join with this code (Play, then Join). You are on <b style="color:${TEAM_HEX[model.team] || '#fff'}">${TEAM_NAMES[model.team] || '...'}</b>.</div>
       <div class="teams">${teams}</div>${over}${action}
       <div class="msg">${esc(status)}</div>
       <button class="leave">Leave the room</button>`;
+    }
     const heat = this.panel.querySelector('.heat');
     if (heat && cfg.bases) drawHeat(heat, model.kills, cfg);
     this.panel.querySelector('.start')?.addEventListener('click', () => this.on.start());
@@ -209,7 +241,9 @@ export class MpUi {
     if (!on) return;
     const s = model.room.score;
     const mine = model.carrying(model.me) ? ' ⚑' : '';
-    const html = `<span class="me" style="background:${TEAM_HEX[model.team]}"></span>
+    const r = model.room.raid;
+    const html = r ? `<span class="t">WAVE ${r.wave || 0}/${r.waves}</span><span class="sc" style="background:#9b2c2c">✕ ${r.kills}</span>
+      <span class="t">${'⚑'.repeat(Math.max(0, r.lives))}<span style="opacity:.3">${'⚑'.repeat(Math.max(0, (model.config?.winCaps || 3) - r.lives))}</span></span>` : `<span class="me" style="background:${TEAM_HEX[model.team]}"></span>
       <span class="sc" style="background:${TEAM_HEX.blue}">${s.blue}</span><span class="t">${clock(model.timeLeft(now))}${mine}</span>
       <span class="sc" style="background:${TEAM_HEX.yellow}">${s.yellow}</span>`;
     if (html !== this.lastPill) { this.pillEl.innerHTML = html; this.lastPill = html; }

@@ -15,6 +15,8 @@ import { posMessage, newPid, parseCode, cleanNick, rdToUnity, threeToRd, toThree
 import { loadChoices, encodeChoices } from '../figure/custom.js';
 import { Combat } from './combat.js';
 import { captureParts } from '../figure/rig.js';
+import { LocalRoom } from './localroom.js';
+import { WalkGraph, nearestNode, findPath } from '../life/walkgraph.js';
 
 const SEND_S = 0.1, IDLE_SEND_S = 1, SPAWN_GIVE_UP_S = 20;
 const STATUS = { connecting: 'Connecting...', on: '', reconnecting: 'Connection lost: reconnecting...' };
@@ -66,21 +68,71 @@ export async function initMultiplayer(ctx) {
       else connect(code);
     },
     start: () => conn?.send({ t: 'start' }),
+    solo: (mode) => { conn?.leave?.(); teardown(); connect('SOLO', mode); ui.show(false); },
     leave: () => { conn?.leave(); teardown(); ui.renderStart(); },
   }, { nick, code: hashCode || '' });
   ui.setAvailability('unknown');
   setTimeout(async () => ui.setAvailability(await probe(relay)), hashCode ? 0 : 2500);
   if (hashCode) ui.show(true);
 
+  /**
+   * Routes and sight for the bots (mp/bots.js), in RD metres: the pedestrian graph of the whole
+   * city (life/index.js keeps its document), the ground height, and whether the line between
+   * two people at chest height is clear of the city's bricks.
+   */
+  let walkGraph = null;
+  function makeNav() {
+    const doc = window.__bloxLife?.walkDoc;
+    if (!walkGraph && doc) { try { walkGraph = new WalkGraph(doc); } catch { walkGraph = null; } }
+    const U = (rd) => rdToUnity(rd, origin), RD = (u) => [u[0] + origin[0], u[1] + origin[1]];
+    const height = (rd) => { const [x, z] = U(rd); return ground(x, -z) ?? city?.approxGround?.(x, -z) ?? 0; };
+    return {
+      height,
+      path: walkGraph ? (from, to) => {
+        const [ax, az] = U(from), [bx, bz] = U(to);
+        const a = nearestNode(walkGraph, ax, az, 40), b = nearestNode(walkGraph, bx, bz, 40);
+        const nodes = findPath(walkGraph, a, b, 12000);
+        if (!nodes) return null;
+        return [...nodes.map((q) => RD([walkGraph.x[q], walkGraph.z[q]])), [...to]];
+      } : null,
+      los: (a, ay, b, by) => {
+        if (!city?.isSolid) return true;
+        const [ax, az] = U(a), [bx, bz] = U(b), L = Math.hypot(bx - ax, bz - az), n = Math.ceil(L / 1.5);
+        for (let k = 1; k < n; k++) {
+          const t = k / n, y = ay + (by - ay) * t + 1.4;
+          if (city.isSolid(ax + (bx - ax) * t, y, -(az + (bz - az) * t)) === true) return false;
+        }
+        return true;
+      },
+      spawnNear: walkGraph ? (rd, r) => {
+        const [x, z] = U(rd), q = walkGraph.spawnNear(x, z, r + 6, Math.random, Math.max(0, r - 6));
+        return q >= 0 ? RD([walkGraph.x[q], walkGraph.z[q]]) : null;
+      } : null,
+    };
+  }
+
+  /** The raid is a night: the clock jumps to 22:30 (the lamps and windows come on). */
+  function nightFalls() {
+    const L = window.__bloxLife;
+    if (L?.clock && (L.clock.hours > 6 && L.clock.hours < 21)) L.clock.setHours(22.5);
+  }
+
   function remember(n) { nick = cleanNick(n); set(local, NICK_KEY, nick); }
 
-  function connect(code) {
+  function connect(code, solo = null) {
     model = new MatchModel();
     view = view || new RoomView(stage.scene, ground, origin);
     combat = combat || new Combat({ scene: stage.scene, camera, city, origin, player, send: (m) => conn?.send(m), toast: (t) => ui.toast(t),
       // where to go: the enemy flag (wherever it is), or home once I carry it
       objective: () => {
         if (!model?.team || !model.config || model.phase !== 'play') return null;
+        if (model.room?.mode === 'raid') { // the banner, when it is off the Markt: on the ground, or the raider running with it
+          const b = model.room.flags?.blue;
+          if (!b || b.st === 'home') return null;
+          const p3 = b.st === 'carried' ? view?.posOf(b.by) : toThree([b.at[0], 0, b.at[1]], origin);
+          if (!p3) return null;
+          return { at: [p3[0], -p3[2]], label: b.st === 'carried' ? 'Stop the banner carrier' : 'The banner', colour: '#c0392b' };
+        }
         const theirs = model.team === 'blue' ? 'yellow' : 'blue';
         const home = model.carrying(model.me) === theirs;
         const f = model.room?.flags?.[theirs];
@@ -89,14 +141,18 @@ export async function initMultiplayer(ctx) {
         const [x, z] = rdToUnity(rd, origin);
         return { at: [x, -z], label: home ? `Home: ${model.baseName(model.team)}` : `${TEAM_NAMES[theirs]} flag`, colour: home ? TEAM_HEX[model.team] : TEAM_HEX[theirs] };
       },
-      // every other player on screen, for the gun at their side (the weapon they last fired)
-      figures: () => (model && view ? model.players.filter((p) => p.id !== model.me && p.on && view.others.get(p.id)?.prev)
+      // every other player on screen, for the gun at their side (the weapon they last fired); raiders carry none
+      figures: () => (model && view ? model.players.filter((p) => p.id !== model.me && p.on && p.look !== 'raider' && view.others.get(p.id)?.prev)
         .map((p) => { const o = view.others.get(p.id); let hand = null; if (o.variant) for (const q of captureParts(o.variant, o.pose)) if (q.key === 'hand') hand = q.mat;
           return { id: p.id, pos: [o.pose.x, o.pose.y, o.pose.z], yaw: -o.pose.rotY, team: p.team, w: lastWeapon.get(p.id) || 'rifle', hidden: !!o.scatter, hand }; }) : []),
       // living enemies as the room last drew them (three.js feet)
       enemies: () => (model && view ? model.players.filter((p) => p.team !== model.team && p.on && view.others.get(p.id)?.prev && !view.others.get(p.id).scatter)
         .map((p) => { const o = view.others.get(p.id); return { id: p.id, pos: [o.pose.x, o.pose.y, o.pose.z], scale: o.variant?.scale || 1 }; }) : []) });
-    conn = new Connection({ relay, code, who: () => ({ pid, name: nick, look: look() }), onMessage, onStatus });
+    const who = () => ({ pid, name: nick || 'You', look: look() });
+    if (solo) {
+      conn = new LocalRoom({ mode: solo, who, onMessage, onStatus, nav: makeNav() });
+      if (solo === 'raid') nightFalls();
+    } else conn = new Connection({ relay, code, who, onMessage, onStatus });
     ui.renderRoom(model, STATUS.connecting);
   }
 
@@ -123,6 +179,7 @@ export async function initMultiplayer(ctx) {
       if (e.k === 'pos') view.push(e.id, e.p, e.yaw, e.speed, now);
       else if (e.k === 'spawn' && e.at) { spawn = { at: e.at, t: 0 }; boundary.reset(); combat?.respawn(model.config?.hp || 100, model.config?.spawnSafeS || 0); }
       else if (e.k === 'take') combat?.taken(e.i, e.mine, e.s);
+      else if (e.k === 'shot' && e.melee) combat?.sound.play('knife', 0.9); // a raider's swipe: no tracer
       else if (e.k === 'shot') { lastWeapon.set(e.by, e.w); const ob = view?.others.get(e.by); if (ob) ob.shotT = 0; combat?.tracer(toThree(e.o, origin), toThree(e.e, origin), e.w); }
       else if (e.k === 'hurt') combat?.hurt(e.hp, view.posOf(e.by));
       else if (e.k === 'hitmark') combat?.hitmark(e.kill);
@@ -193,7 +250,7 @@ export async function initMultiplayer(ctx) {
   stage.render = (target) => { render(target); combat?.afterRender(); if (view && model) view.placeLabels(camera, model); };
 
   // for checks and tuning from the console
-  window.__bloxMp = { get model() { return model; }, get combat() { return combat; }, get view() { return view; } };
+  window.__bloxMp = { get model() { return model; }, get combat() { return combat; }, get view() { return view; }, get conn() { return conn; } };
 
   let lastT = 0;
   return {

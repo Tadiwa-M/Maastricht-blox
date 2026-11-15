@@ -195,6 +195,12 @@ priority roads from OSM into `streets.json`), owner play-tests on the GPU PC
 **Exit G1:** a play-test on the owner's PC where walking feels fluid, a custom character, cars
 that stop at lights and junctions, and people who visibly go somewhere.
 
+**Game direction (owner, 2026-11-15): protecting Maastricht.** Day: the living city and its jobs;
+night: raiders from the marl caves (Sint-Pietersberg) come for the city; underground: explore and
+mine the caves for marl to spend on gear, lamps and barricades (fortify and repair, never wreck the
+real city); a light story in chapters through the NPCs. First step done: the solo night raid and
+capture the flag with bots (guide 18). Next: raider kinds, cave entrances, co-op raids online.
+
 **Next world rebuild backlog (owner, 2026-11-15)**: items that need the pipeline and a full world
 rebuild on the workstation, batched for the next one:
 - Facade detail: window sills, cornices, shop signs and awnings (`pipeline/.../facade/`).

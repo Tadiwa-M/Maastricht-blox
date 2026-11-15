@@ -190,3 +190,34 @@ knock-outs, flags); the client knows the walls, so it claims hits and the room c
   Edge: PlayStation and Xbox pads) and the older `hapticActuators[0].pulse` (Firefox). When a pad
   connects it buzzes once and the toast says whether this browser gives it rumble at all.
 
+
+## Solo games: bots and the night raid (2026-11-15)
+
+Owner: play alone tonight; protecting Maastricht as the game's frame; the raids test the guns.
+Both run **in this browser** (no game server needed): `mp/localroom.js` `LocalRoom` runs the
+relay's own rules (`relay/src/ctf.js`, imported unchanged) behind the same interface as a socket
+(`send`, `live`, `stop`, `leave`; answers through `onMessage` a microtask later), so the model,
+the view and combat work exactly as online. The Play panel offers both, even when the relay is
+offline.
+- **Capture the flag with bots** (`mode 'bots'`): you and 3 bots against 4, Markt against Vrijthof,
+  starts at once. `mp/bots.js`: attackers fetch the enemy flag, defenders stand round their base and
+  chase intruders, anyone runs into an enemy carrier or touches a dropped own flag, a carrier runs
+  home. They shoot the nearest enemy in sight (42 m; line of sight through the city's bricks at
+  chest height), not on full auto (0.32-0.6 s between shots), hitting 70 % close and 18 % at range,
+  12 % of hits to the head; knocked out, they start again at their base.
+- **Defend Maastricht: night raid** (`mode 'raid'`): the clock jumps to 22:30; raiders (marl-pale,
+  dark rags, a head taller; `view.js` `raiderVariant`; no names over their heads unless carrying)
+  come out in waves ~135 m from the Markt toward the Helpoort, go for anyone within 16 m, else for
+  the city's banner (the blue flag on the Markt) and carry it toward the Helpoort. A swipe is two
+  shotgun pellets of damage (30) every 0.9 s at 2.1 m, heard as a whoosh, no tracer. Knock them out
+  (they crumble), or run into the carrier (the normal tag rule). Waves: 2 + 2 per wave (cap 14),
+  tougher each wave (+8 % health), 8 waves to dawn; lose the banner 3 times and the city falls.
+  The pill shows the wave, raiders stopped and the banners left; the objective marker points at the
+  banner when it is off the Markt.
+- Routes: `life/walkgraph.js` `findPath` (A*) and `nearestNode` on the whole city's walk graph;
+  `mp/index.js` `makeNav` turns them into RD metres with ground height and line of sight.
+- In the local room my own position never goes stale (a slow frame must not make me untouchable).
+- Tests: `test/localroom.test.mjs` (bots start and act, my messages, every wave to dawn, raiders hurt
+  a person by the banner), `test/life.walkers.test.mjs` (routes).
+- Open: bots in online rooms (needs the relay), smarter bots (cover, flanking), raid variety
+  (raider kinds, the cave entrances, co-op raids online).

@@ -350,3 +350,59 @@ export function separate(walkers, body = 0.3, maxLateral = 3) {
     }
   }
 }
+
+/** The node nearest (x, z) within rMax metres (any node with neighbours), or -1. */
+export function nearestNode(graph, x, z, rMax = 60) {
+  const c = graph.cell;
+  let best = -1, bd = rMax;
+  for (let i = Math.floor((x - rMax) / c); i <= Math.floor((x + rMax) / c); i++) {
+    for (let j = Math.floor((z - rMax) / c); j <= Math.floor((z + rMax) / c); j++) {
+      for (const q of graph.buckets.get(graph.key(i, j)) || []) {
+        const d = Math.hypot(graph.x[q] - x, graph.z[q] - z);
+        if (d < bd) { bd = d; best = q; }
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Shortest path from node a to node b (A*, straight-line heuristic) -> [node, ...] from a to b,
+ * or null when b can't be reached within maxVisit nodes (bots: life is short).
+ */
+export function findPath(graph, a, b, maxVisit = 20000) {
+  if (a < 0 || b < 0) return null;
+  if (a === b) return [a];
+  const g = new Map([[a, 0]]), from = new Map(), open = [[graph.dist(a, b), a]], closed = new Set();
+  const push = (f, q) => { // a small binary heap on f
+    open.push([f, q]);
+    for (let k = open.length - 1; k > 0;) { const p = (k - 1) >> 1; if (open[p][0] <= open[k][0]) break; [open[p], open[k]] = [open[k], open[p]]; k = p; }
+  };
+  const pop = () => {
+    const top = open[0], last = open.pop();
+    if (open.length) {
+      open[0] = last;
+      for (let k = 0; ;) { const l = 2 * k + 1, r = l + 1; let m = k;
+        if (l < open.length && open[l][0] < open[m][0]) m = l;
+        if (r < open.length && open[r][0] < open[m][0]) m = r;
+        if (m === k) break; [open[m], open[k]] = [open[k], open[m]]; k = m; }
+    }
+    return top;
+  };
+  while (open.length && closed.size < maxVisit) {
+    const [, q] = pop();
+    if (q === b) {
+      const path = [b];
+      for (let k = b; from.has(k);) { k = from.get(k); path.push(k); }
+      return path.reverse();
+    }
+    if (closed.has(q)) continue;
+    closed.add(q);
+    for (const m of graph.neighbours(q)) {
+      if (closed.has(m)) continue;
+      const gm = g.get(q) + graph.dist(q, m);
+      if (gm < (g.get(m) ?? Infinity)) { g.set(m, gm); from.set(m, q); push(gm + graph.dist(m, b), m); }
+    }
+  }
+  return null;
+}

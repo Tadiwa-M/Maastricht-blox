@@ -60,7 +60,7 @@ export class MatchModel {
         out.push(msg.id === this.me ? { k: 'killed', by: msg.by } : { k: 'scatter', id: msg.id, by: msg.by });
       }
       const text = this.eventText(msg);
-      if (text) out.push({ k: 'toast', text, big: ['capture', 'over', 'start'].includes(msg.k) });
+      if (text) out.push({ k: 'toast', text, big: ['capture', 'over', 'start'].includes(msg.k) || !!msg.big });
     } else if (msg.t === 'error') out.push({ k: 'toast', text: msg.error });
     return out;
   }
@@ -68,6 +68,19 @@ export class MatchModel {
   /** The line shown for a room event, or '' for none. */
   eventText(e) {
     const me = this.me, my = this.team, T = (t) => TEAM_NAMES[t] || t;
+    if (this.room?.mode === 'raid') { // the night raid speaks for itself
+      switch (e.k) {
+        case 'raid': return e.text || '';
+        case 'start': return '';
+        case 'pickup': return e.team === 'blue' ? (e.id === me ? '' : 'They have the banner! Stop the carrier') : 'You took their totem! Bring it to the Markt';
+        case 'capture': return e.team === 'yellow' ? 'They carried the banner off!' : 'Their totem is ours!';
+        case 'drop': return e.team === 'blue' ? 'The banner is down: get to it!' : '';
+        case 'return': return e.team === 'blue' ? 'The banner is back on the Markt' : '';
+        case 'kill': return e.id === me ? 'They got you!' : e.by === me && e.head ? 'Headshot!' : '';
+        case 'over': return e.winner === 'blue' ? 'Dawn! Maastricht is safe' : 'The banner is lost. Maastricht has fallen';
+        default: return '';
+      }
+    }
     switch (e.k) {
       case 'join': return e.id === me ? '' : `${this.name(e.id)} joined`;
       case 'leave': return `${e.name || 'Someone'} left`;

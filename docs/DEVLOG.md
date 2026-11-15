@@ -1897,3 +1897,12 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   laptop on Low untouched); no way to close the room panel on a phone (close button, auto-close at
   match start); guns should feel like guns (recoil recovery, shake, flash, kick-back, sounds).
   check.sh bundles the game now.
+
+## 2026-11-15 (night): solo play, bots and the night raid
+
+- Owner: bots in capture the flag and a night raid, "protecting Maastricht" as the frame. Both run
+  in the browser on the relay's own rules (`mp/localroom.js`), so no server is needed: CTF 4 v 4
+  with bots, and "Defend Maastricht", waves of raiders from the caves going for the banner on the
+  Markt, 8 waves to dawn (guide 18). Bugs found on the way: the client sends JSON text (the local
+  room parses it), raiders knocked out by me never crumbled (fixed), my position went stale on slow
+  frames (the local room keeps it fresh).

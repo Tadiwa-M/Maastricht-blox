@@ -19,10 +19,21 @@ const v3 = new THREE.Vector3();
 
 /** The figure for a look code (figure/custom.js), else one picked by the player's id. */
 export function lookVariant(look, id) {
+  if (look === 'raider') return raiderVariant(id);
   const ch = decodeChoices(look);
   if (ch) return customVariant(ch);
   const v = makeVariant(1000 + id * 7, { kind: 'adult' });
   if (v.acc === 'bag' || v.acc === 'umbrella') v.acc = 'none';
+  return v;
+}
+
+/** A raider from the caves: marl-pale skin, dark ragged clothes, a head taller, nothing in hand. */
+export function raiderVariant(id) {
+  const v = makeVariant(5000 + id * 13, { kind: 'adult' });
+  v.acc = 'none';
+  v.scale = (v.scale || 1) * 1.12;
+  v.colours = { ...v.colours, skin: '#c9b98f', hair: '#3a332b', top: id % 3 ? '#2d2a26' : '#3b2f27', bottom: '#1f1c19', shoe: '#14120f', hat: '#2d2a26', acc: '#2d2a26' };
+  delete v._c;
   return v;
 }
 
@@ -93,7 +104,7 @@ export class RoomView {
     this.group = new THREE.Group();
     this.group.name = 'multiplayer';
     scene.add(this.group);
-    this.crowd = new FigureCrowd(8, { lod: false, twos: false }); // (their guns follow their hands)
+    this.crowd = new FigureCrowd(24, { lod: false, twos: false }); // (their guns follow their hands)
     this.group.add(this.crowd.group);
     this.flags = { blue: makeFlag('blue'), yellow: makeFlag('yellow') };
     this.rings = {};
@@ -211,6 +222,7 @@ export class RoomView {
     v3.project(camera);
     if (far || v3.z > 1 || Math.abs(v3.x) > 1.1 || Math.abs(v3.y) > 1.1) { el.style.display = 'none'; return; }
     const carrying = model.carrying(p.id);
+    if (p.look === 'raider' && !carrying) { el.style.display = 'none'; return; } // a crowd of raiders needs no names; the one with the banner does
     const text = `${carrying ? '⚑ ' : ''}${p.name}`;
     if (el.textContent !== text) el.textContent = text;
     el.style.borderColor = TEAM_HEX[p.team];
