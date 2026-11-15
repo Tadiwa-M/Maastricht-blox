@@ -1,19 +1,34 @@
 # 21. Your music (Spotify)
 
-Owner, 2026-11-15: let players connect their Spotify while they play.
+Owner, 2026-11-15: connect Spotify while playing; then "a proper button, log in, change it from the
+pause menu", using the Spotify Developer app the owner already has for Melody Search.
 
-- `viewer/src/music/spotify.js`: a dock at the bottom left ("♫ Music", also pause menu > Music).
-  Paste any Spotify link (playlist, album, track, artist, show, episode; `open.spotify.com/...` or
-  `spotify:type:id`; `parseSpotify`, tested in `test/spotify.test.mjs`) and Spotify's own player
-  appears in the dock, 80 px tall, and keeps playing while you play; ▾ tucks it away (still playing).
-- Signed in to Spotify in the same browser, it plays whole songs; otherwise Spotify plays previews.
-- Spotify's iFrame API (`open.spotify.com/embed/iframe-api/v1`) reports play and pause; while music
-  plays the city's sounds go down to a third (`window.__bloxAudio.duck`). If the API can't load,
-  a plain embed is used (no ducking).
-- No account data touches the game: the player lives in Spotify's own frame. The last link is kept
-  on this device (`localStorage blox.music`).
-- Not done on purpose: a full "log in with Spotify" (Web Playback SDK) needs a Spotify Developer
-  app, Premium for every listener, and Spotify's quota approval past 25 users.
-- Not possible: visuals reacting to the beat of Spotify music (its audio is protected and its
-  track-analysis data is closed to new apps). The comic look reacts to game events instead
-  (guide 06, `render/comicfx.js`).
+**Where:** pause menu > Music opens the music panel. While something plays, a small now-playing chip
+(cover, song, play/pause) sits at the bottom left; tapping it opens the panel. No link box on screen.
+
+**Connected (Spotify login, `viewer/src/music/auth.js`):** Authorization Code with PKCE: no client
+secret and no server, so the game can share Melody Search's Spotify app (Melody Search's Flask
+server uses the secret; this site only needs the public Client ID). Tokens stay on this device
+(localStorage `blox.spotify`) and refresh themselves. With Premium the Web Playback SDK makes the
+game a Spotify device ("Maastricht Blox"): your playlists, play/pause, skip, volume in the panel.
+Without Premium (the SDK's account error) your playlists play in Spotify's embedded player instead.
+
+**Not connected, or no app configured:** "Play a Spotify link instead" (a small link in the panel)
+takes any Spotify link (`parseSpotify`); Spotify's embedded player plays it (whole songs when signed
+in to Spotify in this browser, else previews). The embedded player shows in the panel and keeps
+playing, out of sight, when the panel is closed.
+
+The city's own sounds go down to a third while music plays (`window.__bloxAudio.duck`).
+
+**Setup (owner, once), in the Spotify Developer Dashboard, the Melody Search app > Settings:**
+1. Redirect URIs: add `https://tadiwa-m.github.io/Maastricht_larper/` (exactly, with the slash);
+   for local tests also `http://127.0.0.1:8080/` (open the local site at 127.0.0.1, not localhost).
+2. APIs used: tick Web API and Web Playback SDK.
+3. User Management: add the Spotify accounts allowed to log in (development mode's allowlist).
+4. The Client ID goes in `viewer/build.mjs` `SPOTIFY_CLIENT_ID` (public by design), or set
+   `BLOX_SPOTIFY_ID` before `scripts/site.ps1`. Empty: the panel offers links only.
+
+Tests: `test/spotify.test.mjs` (links, the PKCE challenge against RFC 7636's example, the login
+address, the way back, token expiry).
+Not possible: visuals synced to the beat of Spotify music (protected audio; the analysis API is
+closed to new apps). The comic look reacts to game events instead (guide 06).

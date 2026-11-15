@@ -1914,3 +1914,11 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   plays; guide 21). Beat-reactive visuals from Spotify are not possible (protected audio, closed
   analysis API), so the comic look reacts to game events instead: action lines, dot bursts, plate
   splits, two-colour flashes, tilts, held frames and Dutch sound words (guide 06).
+
+## 2026-11-15 (late): Spotify login and a proper music panel
+
+- Owner: the paste box looked ugly; a real button, log in, control it from the pause menu, reuse the
+  Melody Search Spotify app. Music panel (pause menu > Music) with Connect Spotify (PKCE, no secret:
+  shares the Melody Search app's Client ID), the Web Playback SDK for Premium (playlists, skip,
+  volume), the embedded player otherwise, links tucked behind a small text link, a now-playing chip
+  at the bottom left. Needs the owner's Client ID and redirect URI (guide 21).
