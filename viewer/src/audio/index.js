@@ -68,7 +68,21 @@ export async function initAudio(ctx) {
   const steps = new StepClock(strideAt), air = new AirWatch();
   let lastPos = null, lastT = null, tickAcc = 0, hashRain = rainLevel(null, location.hash);
   window.addEventListener('hashchange', () => { hashRain = rainLevel(null, location.hash); });
-  const rain = () => (Number.isFinite(ctx.weather?.rain) ? rainLevel(ctx.weather) : hashRain);
+  // the rain you hear is the rain life uses (the real weather, or #rain=); snow falls silently
+  const rain = () => { const w = window.__bloxLife?.weather; if (w && Number.isFinite(w.rain)) return w.snow ? 0 : rainLevel(w); return Number.isFinite(ctx.weather?.rain) ? rainLevel(ctx.weather) : hashRain; };
+  // thunder after a lightning flash (render/weatherfx.js): a low rumble, later the farther the bolt
+  window.addEventListener('blox:lightning', (e) => {
+    if (!synth || !wanted() || ac.state !== 'running') return;
+    try {
+      const t = ac.currentTime + (e.detail?.delay ?? 1), len = 2.8;
+      const buf = ac.createBuffer(1, Math.ceil(ac.sampleRate * len), ac.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) { const k = i / d.length; d[i] = (Math.random() * 2 - 1) * (k < 0.04 ? k / 0.04 : (1 - k) ** 1.6) * (0.7 + 0.3 * Math.sin(i / 900)); }
+      const n = ac.createBufferSource(); n.buffer = buf;
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 160;
+      const g = ac.createGain(); g.gain.value = 0.9 * masterGain(prefs) * duckK;
+      n.connect(lp).connect(g).connect(ac.destination); n.start(t);
+    } catch { /* no audio */ }
+  });
 
   /** Where the ear is: on the walking player, else at the camera (riding: in the bus). */
   function ear() {

@@ -85,3 +85,23 @@ test('the feed: polls, keeps the last reading through hiccups, fails quietly off
   assert.equal(await junk.poll(5), null);
   assert.equal(calls, 3);
 });
+
+test('snow and thunderstorms from the weather code; #snow and #storm for testing', async () => {
+  const { parseOpenMeteo, hashWeather, weatherState } = await import('../src/life/weather.js');
+  const snow = parseOpenMeteo({ current: { precipitation: 0.2, snowfall: 0.3, weather_code: 73, temperature_2m: -1, interval: 900 } });
+  assert.equal(snow.snow, true); assert.ok(snow.rain >= 0.4); assert.equal(snow.storm, false);
+  const storm = parseOpenMeteo({ current: { precipitation: 1.5, rain: 1.5, weather_code: 95, temperature_2m: 18, interval: 900 } });
+  assert.equal(storm.storm, true); assert.equal(storm.snow, false);
+  assert.deepEqual(hashWeather('#snow=1'), { snow: true, rain: 0.6 });
+  assert.equal(hashWeather('#storm=1').storm, true);
+  const w = weatherState({ hash: hashWeather('#snow=1') });
+  assert.equal(w.snow, true); assert.equal(w.live, false);
+});
+
+test('weather on screen: an overcast or wet sky dims the sun; wind slants the rain', async () => {
+  const { sunFactor, windDrift } = await import('../src/render/weatherfx.js');
+  assert.equal(sunFactor({ cloud: 0.4, rain: 0 }), 1);
+  assert.ok(sunFactor({ cloud: 1, rain: 1 }) < 0.5);
+  assert.equal(Math.hypot(...windDrift(0)), 0);
+  assert.ok(Math.hypot(...windDrift(40)) > Math.hypot(...windDrift(10)));
+});

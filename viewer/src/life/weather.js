@@ -7,9 +7,12 @@
 // life/index.js publishes the result as window.__bloxLife.weather (see weatherState).
 
 export const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=50.85&longitude=5.69'
-  + '&current=precipitation,rain,cloud_cover,wind_speed_10m,temperature_2m';
+  + '&current=precipitation,rain,snowfall,weather_code,cloud_cover,wind_speed_10m,temperature_2m';
 export const POLL_S = 900, STALE_S = 3 * 3600;
-export const MILD = { rain: 0, tempC: 15, cloud: 0.4, wind: 10 }; // no weather source: a dry, mild day
+export const MILD = { rain: 0, tempC: 15, cloud: 0.4, wind: 10, snow: false, storm: false }; // no weather source: a dry, mild day
+// WMO weather codes (Open-Meteo weather_code): snow 71-77 and 85-86, thunderstorms 95-99
+export const isSnowCode = (c) => (c >= 71 && c <= 77) || c === 85 || c === 86;
+export const isStormCode = (c) => c >= 95 && c <= 99;
 
 /** Rain 0 (dry) .. 1 (pouring) from a rate in mm per hour. */
 export function rainLevel(mmH) {
@@ -26,8 +29,11 @@ export function parseOpenMeteo(doc) {
   const perHour = Number.isFinite(c.interval) && c.interval > 0 ? 3600 / c.interval : 1;
   const tempC = Number.isFinite(c.temperature_2m) ? c.temperature_2m : null;
   if (tempC === null && !Number.isFinite(c.precipitation) && !Number.isFinite(c.rain)) return null;
+  const code = Number.isFinite(c.weather_code) ? c.weather_code : -1;
+  const snowing = isSnowCode(code) || (Number.isFinite(c.snowfall) && c.snowfall > 0);
   return {
-    rain: rainLevel(mm * perHour),
+    snow: snowing, storm: isStormCode(code),
+    rain: snowing ? Math.max(0.4, rainLevel(Math.max(mm, (c.snowfall || 0) / 0.7) * perHour)) : rainLevel(mm * perHour),
     tempC: tempC ?? MILD.tempC,
     cloud: Number.isFinite(c.cloud_cover) ? Math.max(0, Math.min(1, c.cloud_cover / 100)) : MILD.cloud,
     wind: Number.isFinite(c.wind_speed_10m) ? c.wind_speed_10m : MILD.wind,
@@ -64,6 +70,8 @@ export function hashWeather(hash = '') {
   const p = new URLSearchParams(String(hash).replace(/^#/, '')), out = {};
   if (p.has('rain') && Number.isFinite(+p.get('rain'))) out.rain = Math.max(0, Math.min(1, +p.get('rain')));
   if (p.has('temp') && Number.isFinite(+p.get('temp'))) out.tempC = +p.get('temp');
+  if (p.has('snow')) { out.snow = p.get('snow') !== '0'; if (out.snow && !('rain' in out)) out.rain = 0.6; }
+  if (p.has('storm')) { out.storm = p.get('storm') !== '0'; if (out.storm && !('rain' in out)) out.rain = 0.9; }
   return out;
 }
 
@@ -78,7 +86,10 @@ export function weatherState({ hash = {}, live = null, near = false, ctxRain = n
   if (Number.isFinite(ctxRain)) w.rain = ctxRain;
   if ('rain' in hash) w.rain = hash.rain;
   if ('tempC' in hash) w.tempC = hash.tempC;
-  w.live = useLive && !('rain' in hash) && !('tempC' in hash);
+  if ('snow' in hash) w.snow = hash.snow;
+  if ('storm' in hash) w.storm = hash.storm;
+  if (w.snow && w.rain === 0) w.rain = 0.6;
+  w.live = useLive && !('rain' in hash) && !('tempC' in hash) && !('snow' in hash) && !('storm' in hash);
   w.terrace = terraceWeather(w);
   w.crowd = crowdWeather(w);
   return w;

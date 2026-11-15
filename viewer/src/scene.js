@@ -142,6 +142,8 @@ export class Stage {
     this.scene.fog.color.copy(hor);
     // scattered sunlight in the haze (render/haze.js): the sun's colour, a touch brighter
     this.hazeColor = this.sun.color.clone().multiplyScalar(L.haze);
+    this.hours = hours;
+    this.sun.intensity *= this.weatherSun ?? 1; // an overcast or wet sky (render/weatherfx.js)
     this.renderer.toneMappingExposure = L.exposure;
     if (this.post?.verse) { // comic test look: a film's lighting, a stronger key against a coloured fill
       this.sun.intensity *= 1.15; this.hemi.intensity *= 0.78;

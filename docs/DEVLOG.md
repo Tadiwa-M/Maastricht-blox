@@ -1928,3 +1928,6 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   `terraces.js` `parasolsOpen`); running into people showed no reaction (now a visible dot burst,
   jolt and small word); raiders should be monsters, not smiling people (backlog, PLAN.md); High
   quality on the phone looks like the desktop.
+- Weather you can see and hear: rain streaks with the real wind, wet streets with puddles, snow
+  that settles, an overcast sky, thunderstorms with lightning and thunder; the rain sound now
+  follows the live weather (it only read #rain= before) (guide 06).

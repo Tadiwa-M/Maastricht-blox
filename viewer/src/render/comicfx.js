@@ -30,11 +30,13 @@ export const FX = {
   shotgun: { split: 0.35 },
   wave: { duo: 0.65, duoCol: 'raid', roll: 0.04, decay: 1.4 },
   capture: { duo: 0.45, decay: 0.7 },
+  lightning: { duo: 0.6, duoCol: 'white', decay: 0.35, split: 0.5 },
 };
 const DUO = { // shadow colour, light colour (linear-ish display values)
   verse: [[0.16, 0.04, 0.34], [1.0, 0.36, 0.62]],
   red: [[0.28, 0.02, 0.08], [1.0, 0.45, 0.35]],
   raid: [[0.12, 0.02, 0.18], [0.95, 0.22, 0.28]],
+  white: [[0.3, 0.33, 0.45], [1.0, 1.0, 1.0]],
 };
 
 /** Fire a comic reaction from anywhere (no-op outside the browser). */

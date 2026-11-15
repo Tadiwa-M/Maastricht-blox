@@ -866,3 +866,21 @@ under a second.
 - (2026-11-15) Running someone over now reads: a dot burst with a few short lines, a stronger jolt
   of the plates and a small word (PATS!, BONK!, OEPS!). On a phone, Low renders at 1x and the fine
   detail fades (by design); High looks like the desktop.
+
+## Weather you can see and hear (2026-11-15)
+
+Owner: people carried umbrellas (the real Maastricht weather said rain) but there was no rain to
+see or hear. `render/weatherfx.js` (`WeatherFx`, updated by `life/index.js` with the weather life
+already uses: live Open-Meteo, or `#rain=`, `#snow=1`, `#storm=1`):
+- **Rain:** streaks falling round the camera (up to 9000 on High, 1500 on Lite), slanted by the real
+  wind, as many as the rain is heavy; one draw call, moved on the GPU (wrapping round the camera).
+- **Wet streets** (`render/surface.js` `uWet`, every look): ground darkens and gets a sheen, puddles
+  nearly mirror the sky and the lamps; wets in seconds, dries over minutes.
+- **Snow:** flakes drifting; roofs and streets slowly turn white while it snows (`uSnowCover`) and
+  thaw after. Snow comes from the weather code (71-77, 85-86) or snowfall.
+- **Overcast:** a grey or wet sky dims the sun (`scene.js` `weatherSun`, `sunFactor`).
+- **Storms** (weather code 95-99): lightning every 8-30 s (the city flashes and flickers), thunder
+  0.5-3 s later (`audio`, 'blox:lightning'), a white flash in the comic look.
+- **Sound fix:** the rain sound read only `#rain=` and never the live weather; it now follows the
+  weather life uses (snow is silent).
+Tests: `test/life.weather.test.mjs` (snow/storm codes, test flags, sun dimming, wind drift).

@@ -9,6 +9,7 @@
 // real weather near real time (weather.js), people reacting to the player (reactions.js).
 import * as THREE from 'three';
 import { comicFx } from '../render/comicfx.js';
+import { WeatherFx } from '../render/weatherfx.js';
 import { MaterialSet } from '../materials.js';
 import { placeholderModels } from '../placeholders.js';
 import { LifeClock, zonedWeekTime, parseDay } from './clock.js';
@@ -288,7 +289,7 @@ export async function initLife(ctx) {
       state.walkers.dressFor = outfit || (Number.isFinite(tempC) && tempC < 8) ? (v) => dress(v, { outfit, tempC }) : null;
     }
   }
-  let parasolsWere = null;
+  let parasolsWere = null, weatherFx = null;
   function rebuildProps() {
     props.begin();
     state.terraces?.props(props, parasolsOpen(clock.hours));
@@ -376,6 +377,8 @@ export async function initLife(ctx) {
     t += dt;
     swayUniforms.uSwayT.value = t; // leaves in the wind (materials.js): the real wind decides how much
     swayUniforms.uSwayAmp.value = swayAmp(state.weather?.wind);
+    // rain, snow, wet streets, an overcast sky, lightning (render/weatherfx.js)
+    if (!ctx.still) { weatherFx ||= new WeatherFx(stage, { tier: tier() }); weatherFx.update(dt, state.weather, camera); }
     windowUniforms.uWinT.value = clock.sec;
     const at = target(), R = livingRadius();
     const trafficEnv = (buses) => trafficEnvFor(state, clock, buses, state.busHalf);

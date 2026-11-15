@@ -29,6 +29,8 @@ export const KIND_OF = {
   leaf: 'foliage', leaf_light: 'foliage', trunk: 'bark', grass: 'grass', grass_dark: 'grass', soil: 'soil', copper_green: 'copper',
 };
 const MAX = 32;
+/** The weather on the ground (render/weatherfx.js): uWet 0..1 (sheen, puddles), uSnowCover 0..1. */
+export const weatherUniforms = { uWet: { value: 0 }, uSnowCover: { value: 0 } };
 export const surfaceUniforms = { uSurfKey: { value: Array.from({ length: MAX }, () => new THREE.Vector4(0, 0, -1, 0)) } };
 const seen = new Set();
 let used = 0;
@@ -51,12 +53,21 @@ export function registerSurfaceEntry(entry) {
 
 const GLSL = `
   varying vec3 vSurfP; varying vec3 vSurfN;
-  uniform vec4 uSurfKey[${MAX}];
+  uniform vec4 uSurfKey[${MAX}]; uniform float uWet; uniform float uSnowCover;
   float sHash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
   float sNoise(vec3 p) { // value noise
     vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
     return mix(mix(mix(sHash(i), sHash(i + vec3(1, 0, 0)), f.x), mix(sHash(i + vec3(0, 1, 0)), sHash(i + vec3(1, 1, 0)), f.x), f.y),
                mix(mix(sHash(i + vec3(0, 0, 1)), sHash(i + vec3(1, 0, 1)), f.x), mix(sHash(i + vec3(0, 1, 1)), sHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+  }
+  float puddleAt(vec3 p) { return smoothstep(0.52, 0.66, sNoise(p * 0.32) * 0.7 + sNoise(p * 1.4) * 0.3); }
+  // the weather on a surface: wet ground darker (puddles more), snow settling on what faces up
+  vec3 weatherSurface(vec3 c) {
+    float up = smoothstep(0.55, 0.9, normalize(vSurfN).y);
+    float pud = puddleAt(vSurfP) * up;
+    c *= 1.0 - uWet * (0.22 * up + 0.25 * pud);
+    float snow = uSnowCover * smoothstep(0.35, 0.8, normalize(vSurfN).y) * (0.75 + 0.25 * sNoise(vSurfP * 3.0));
+    return mix(c, vec3(0.92, 0.94, 0.97), clamp(snow, 0.0, 1.0));
   }
   float surfKind(vec3 c) {
     float s = max(c.r + c.g + c.b, 1e-4), L = dot(c, vec3(0.2126, 0.7152, 0.0722));
@@ -163,7 +174,7 @@ export function installSurface(m, key, textured = true) {
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (sh, r) => {
     if (prev) prev.call(m, sh, r);
-    Object.assign(sh.uniforms, surfaceUniforms, poolUniforms);
+    Object.assign(sh.uniforms, surfaceUniforms, poolUniforms, weatherUniforms);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vSurfP; varying vec3 vSurfN;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -175,7 +186,9 @@ export function installSurface(m, key, textured = true) {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>\n${GLSL}\n${POOL_GLSL}`)
       .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\nreflectedLight.directDiffuse += diffuseColor.rgb * poolLight(vSurfP, normalize(vSurfN));')
-      .replace('#include <color_fragment>', textured ? '#include <color_fragment>\ndiffuseColor.rgb = paintSurface(diffuseColor.rgb);' : '#include <color_fragment>');
+      .replace('#include <color_fragment>', `#include <color_fragment>\n${textured ? 'diffuseColor.rgb = paintSurface(diffuseColor.rgb);' : ''}\ndiffuseColor.rgb = weatherSurface(diffuseColor.rgb);`)
+      // wet: a sheen on the ground, puddles nearly mirror (they catch the sky and the lamps)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n{ float upW = smoothstep(0.55, 0.9, normalize(vSurfN).y); roughnessFactor = mix(roughnessFactor, mix(0.32, 0.05, puddleAt(vSurfP)), uWet * upW * (1.0 - uSnowCover)); }')
   };
   const prevKey = m.customProgramCacheKey?.bind(m);
   m.customProgramCacheKey = () => `${prevKey ? prevKey() : ''}|surface:${key}:${textured ? 'paint' : 'pools'}`;
