@@ -624,3 +624,14 @@ Every window used to glow the same way all night (60 % lit, always the same ones
 - Room light is weaker than a lamp (glass emissive x1.15, far x1.2 at night, were x1.6), so lit
   windows no longer wash out the street. Checked on the full city at 21:00 and 03:00.
 
+## Street lamps light the street (2026-11-15)
+
+Every double-lantern lamp post (`lamp_double_1x3`) in the streamed area casts a warm pool of
+light on the street under it and glows round both lanterns at night (`render/lamps.js`): found in
+each streamed item's raw records when it arrives (`lampsFromRecords`, so every chunk in the stream
+radius, not only the full-detail ones; islands through their pose), the nearest 240 drawn as two
+additive instanced meshes (pools on the ground, camera-facing glows), fading in between night
+0.12 and 0.45. No real light sources, so the cost does not grow with the lamps' light. Part of the
+look work toward a cinematic night (owner's reference: warm lamp pools between deep shade).
+Tests: `test/lamps.test.mjs`. Checked on the full city at 21:00 east of the Markt.
+

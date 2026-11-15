@@ -1814,3 +1814,11 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   roll on, brake, turn no tighter than a bicycle, lean into turns, stand up to push off, coast
   with level cranks, and a bell (guide 16). Sets up the bike race.
 
+## 2026-11-15: lamp light at night; the stylised look, honestly
+
+- Owner wants a Spider-Verse-like look (a switchable mode, but only once it is right). Screen
+  filters alone could not get there: the reference is mostly lighting (lamp pools, neon, deep
+  shade) plus depth-driven comic effects and animation on twos. First step in the normal game:
+  street lamps cast warm pools and glow (guide 06). Next: depth-based comic focus and animation
+  on twos behind a test flag, then style-aware lighting; the menu switch waits until it is right.
+

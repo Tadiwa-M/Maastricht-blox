@@ -8,6 +8,7 @@
 // Islands hang under a group at their pose (src/island.js), exactly as in src/lod.js.
 import * as THREE from 'three';
 import { buildWorldMeshes, worldContext } from './bricks.js';
+import { LampLights, lampsFromRecords, LAMP } from './render/lamps.js';
 import { arraysToGeometry, releaseAfterUpload, uploadSoon } from './farmesh.js';
 import { applyIslandPose, worldToLocalThree } from './island.js';
 import { worldFromRecords } from './prepare.js';
@@ -23,6 +24,8 @@ export class CityView {
     this.group = new THREE.Group();
     this.group.name = 'city';
     this.group.add(far.group);
+    this.lamps = new LampLights(); // warm pools and glows under the near zone's street lamps at night (render/lamps.js)
+    this.group.add(this.lamps.group);
     this.views = new Map(); // item key -> view
     this.coverDirty = true;
     this.frame = 0;
@@ -72,11 +75,18 @@ export class CityView {
     delete p.far; // the arrays live in the geometry now (and leave the CPU after upload)
     parent.updateMatrixWorld(true);
     this.group.add(parent);
+    // street lamps in this item light the street at night (from the raw records: every streamed chunk)
+    if (p.records) {
+      const cs = this.index.chunkStuds || 64, I0 = it.kind === 'chunk' ? it.entry.cx * cs : 0, J0 = it.kind === 'chunk' ? it.entry.cy * cs : 0;
+      this.lampType ??= (this.meta.catalogue?.types || this.meta.catalogue?.bricks || this.meta.catalogue || []).find?.((t) => t.name === LAMP.type) || null;
+      this.lamps.add(it.key, lampsFromRecords(p.records, I0, J0, this.lampType, this.index.studM, this.index.plateM), parent);
+    }
     this.views.set(it.key, view);
     this.coverDirty = true;
   }
 
   remove(it) {
+    this.lamps.remove(it.key);
     const v = this.views.get(it.key);
     if (!v) return;
     this.freeNear(v);
@@ -124,6 +134,7 @@ export class CityView {
   /** Per frame. all: build every wanted near look now (screenshots). */
   update(camera, { all = false } = {}) {
     this.frame++;
+    this.lamps.update(camera, this.mats.night || 0);
     const eye = camera.position;
     const views = [...this.views.values()];
     for (const v of views) v.dist = boxDistance(v.box, eye);
