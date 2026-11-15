@@ -10,7 +10,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 export const VERSE = { twosHz: 12, maxSlip: 1.3, focusSpan: 1.0 };
 export const lookFromHash = (hash) => /(?:^|[#&])look=(verse|manga)(?:&|$)/.exec(hash || '')?.[1] || null;
 /** Looks offered in the pause menu (manga stays a test flag until it is right). */
-export const MENU_LOOKS = [{ id: null, name: 'Classic' }, { id: 'verse', name: 'Comic' }];
+export const MENU_LOOKS = [{ id: null, name: 'Classic' }, { id: 'verse', name: 'Spider-Verse' }]; // (menu/looks.js describes them)
 const STORE_KEY = 'blox.look';
 const safeStore = () => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } };
 

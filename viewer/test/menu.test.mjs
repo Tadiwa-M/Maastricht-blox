@@ -107,7 +107,7 @@ test('menu items follow the modules that are there; key hints only without touch
   assert.deepEqual(bare.map((i) => i.id), ['resume', 'map', 'look', 'settings']);
   assert.ok(bare.every((i) => i.key === ''));
   assert.equal(menuItems({ has: { goals: true }, goalsOff: true }).find((i) => i.id === 'goals').label, 'Goals: off');
-  assert.equal(menuItems({ look: 'Comic' }).find((i) => i.id === 'look').label, 'Look: Comic');
+  assert.equal(menuItems({ look: 'Spider-Verse' }).find((i) => i.id === 'look').label, 'Look: Spider-Verse');
 });
 
 test('focus moves through a grid and wraps', () => {

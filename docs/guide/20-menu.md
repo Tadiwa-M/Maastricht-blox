@@ -74,3 +74,11 @@ entries sit in two columns. All in `menu/style.js` (`.bx-main` rules); the marku
 brand and stripe in `menu/index.js`. Checked at 1280x720, 915x412 and 412x915: every entry on
 screen, none under 40 px high.
 
+
+## The look picker (2026-11-15)
+
+Owner: the Look option should explain itself. Pause menu > Look opens `menu/looks.js`: a card per
+look with a short description (Classic; "Jump into the Spider-Verse", the comic-book film style;
+Manga, coming soon), the look in use marked, and Switch (the page reloads with `#look=...`; the
+choice is saved, `render/verse.js` `switchLook`). The menu line reads "Look: Classic" or
+"Look: Spider-Verse".

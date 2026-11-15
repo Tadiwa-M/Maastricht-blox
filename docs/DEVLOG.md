@@ -1922,3 +1922,5 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   shares the Melody Search app's Client ID), the Web Playback SDK for Premium (playlists, skip,
   volume), the embedded player otherwise, links tucked behind a small text link, a now-playing chip
   at the bottom left. Needs the owner's Client ID and redirect URI (guide 21).
+- Look picker: pause menu > Look opens cards for Classic, "Jump into the Spider-Verse" (described,
+  Switch reloads) and Manga (coming soon) (guide 20).

@@ -8,7 +8,8 @@
 // (moved in while the page is up; on phones #hud is hidden otherwise), Map is the full-screen
 // map with fast travel (map.js, travel.js). API: window.__bloxMenu { isOpen, open(page), close(), toggle() }.
 import { MENU_CSS } from './style.js';
-import { LOOK, MENU_LOOKS, switchLook } from '../render/verse.js';
+import { LOOK, MENU_LOOKS } from '../render/verse.js';
+import { initLooks } from './looks.js';
 import { menuItems, moveFocus, PAUSED_SPEED, resumeSpeed } from './items.js';
 import { MapScreen, builtMask } from './map.js';
 import { mergeStops, segmentTiles, PointGrid, headingFrom } from './mapdata.js';
@@ -182,7 +183,7 @@ export async function initMenu(ctx) {
 
   // the look (render/verse.js): Classic or Comic from the menu; a hash flag can pick the manga test look
   function lookName() { return MENU_LOOKS.find((l) => l.id === LOOK)?.name || (LOOK === 'manga' ? 'Manga (test)' : 'Classic'); }
-  function nextLook() { const i = MENU_LOOKS.findIndex((l) => l.id === LOOK); return MENU_LOOKS[(i + 1) % MENU_LOOKS.length].id; }
+  const looks = initLooks(); // the look picker (menu/looks.js)
 
   function choose(id) {
     const p = player(), ex = explore();
@@ -190,7 +191,7 @@ export async function initMenu(ctx) {
       case 'resume': close(); break;
       case 'map': showPage('map'); break;
       case 'settings': showPage('settings'); break;
-      case 'look': switchLook(nextLook()); break;
+      case 'look': close({ resume: false }); looks?.open(); break;
       case 'music': close({ resume: false }); window.__bloxMusic?.open(); break;
       case 'character': close({ resume: false }); inWalk(() => p?.openCreator?.()); break;
       case 'journal': close({ resume: false }); ex?.journal(true); break;
