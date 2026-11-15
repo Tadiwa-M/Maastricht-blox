@@ -45,10 +45,10 @@ export const PAINTED_LOOK = LOOK === 'verse' || LOOK === 'manga';
 export const twosTick = (t, hz = VERSE.twosHz) => Math.floor(t * hz);
 
 const shader = {
-  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, fovScale: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, dpr: { value: 1 }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, fovScale: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, dpr: { value: 1 }, phone: { value: 0 }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 fovScale; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float dpr; uniform float focus; uniform vec2 res;
+    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 fovScale; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float dpr; uniform float phone; uniform float focus; uniform vec2 res;
     varying vec2 vUv;
     float dist(vec2 uv) { float d = texture2D(tDepth, uv).x; return depthOk > 0.5 ? (near * far) / (far - d * (far - near)) : focus; } // (no depth: all in focus, no lines)
     vec3 vpos(vec2 uv) { float z = dist(uv); return vec3((uv * 2.0 - 1.0) * fovScale * z, -z); }
@@ -170,7 +170,7 @@ const shader = {
       float near = 1.0 - smoothstep(60.0, 260.0, z);
       // fine detail (crease lines, hatching, dots) needs pixels: on a small, low-resolution screen
       // (a phone on Low) it would read as a filter over everything, so it fades out; outlines stay
-      float detail = smoothstep(360.0, 600.0, res.y * dpr); // (a laptop on Low, 700+ px tall, keeps it all)
+      float detail = phone > 0.5 ? smoothstep(360.0, 600.0, res.y * dpr) : 1.0; // phones only: laptops and desktops keep it all
       float line = max(dEdge, nEdge * 0.35 * detail) * near * (1.0 - coc * 0.7) * (1.0 - sky); // (the sky has no normals: no lines in the clouds)
       c = mix(c, c * 0.42, line * 0.85);
       float rim = smoothstep(0.55, 0.92, 1.0 - abs(n0.z)) * near * (1.0 - dEdge) * (1.0 - sky);
@@ -194,6 +194,11 @@ const shader = {
     }`,
 };
 
+/** A phone: a touch screen whose short side is phone-sized (laptops, tablets and desktops are not). */
+export const isPhone = (coarse, shortSide) => !!coarse && shortSide <= 520;
+const IS_PHONE = typeof matchMedia !== 'undefined' && typeof screen !== 'undefined'
+  && isPhone(matchMedia('(pointer: coarse)').matches, Math.min(screen.width, screen.height));
+
 /** The pass (after the grade: it treats the displayed colours). */
 export function makeVersePass(scenePass, look = 'verse') {
   const pass = new ShaderPass(look === 'manga' ? { ...shader, defines: { MANGA: 1 } } : shader);
@@ -205,6 +210,7 @@ export function makeVersePass(scenePass, look = 'verse') {
 export function updateVerse(pass, camera, focus, width, height, night = 0, dpr = 1) {
   const u = pass.uniforms;
   u.dpr.value = dpr;
+  u.phone.value = IS_PHONE ? 1 : 0;
   u.night.value = night;
   u.near.value = camera.near; u.far.value = camera.far; u.focus.value = focus;
   const ty = Math.tan(THREE.MathUtils.degToRad(camera.fov || 50) / 2);

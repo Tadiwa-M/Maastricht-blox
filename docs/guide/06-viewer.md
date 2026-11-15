@@ -836,9 +836,9 @@ Owner passed on outside advice (written for Unity; the ideas that apply to this 
   hand's live position every frame, so between poses it drifted ("floats, sways"). The player's and
   other players' figures now animate every frame (`FigureCrowd` option `twos: false`); crowds keep
   the twos.
-- **Phone on Low looked like a filter:** fine detail (crease lines, hatching, dots) fades out when the
+- **Phone on Low looked like a filter:** on phones only (touch screen, short side <= 520 px; `isPhone`), fine detail (crease lines, hatching, dots) fades out when the
   render is under ~600 px tall (`detail` in `render/verse.js`); a laptop on Low (700+ px) keeps it
-  all, as the owner wanted. Outlines always stay.
+  all and laptops and desktops are never changed, as the owner wanted. Outlines always stay.
 - **Room panel on phones:** a close button that survives every re-render, and the panel closes by
   itself when the match starts (the Play button that toggled it is hidden in a match).
 - **Guns feel like guns** (`mp/weapons.js` `feel`, `mp/combat.js`): part of each kick recovers (rifle
