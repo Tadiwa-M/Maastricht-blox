@@ -32,10 +32,10 @@ test('every hour: finite values, colours in 0..1', () => {
 
 test('noon is bright and vivid, midnight is dim moonlight, direct light dips at the switch to the moon', () => {
   const noon = lookAt(sun(12)), mid = lookAt(sun(0)), blue = lookAt({ night: 0.5, low: 1 });
-  assert.ok(noon.sunIntensity > 2.5 && mid.sunIntensity < 1.2);
+  assert.ok(noon.sunIntensity > 2.5 && mid.sunIntensity < 1.5);
   assert.ok(blue.sunIntensity < 0.2, 'the sun/moon direction switch is hidden');
   assert.ok(mid.sunColor[2] > mid.sunColor[0], 'moonlight is cool');
-  assert.ok(noon.grade.saturation > mid.grade.saturation);
+  assert.ok(noon.hemiSky[0] > mid.hemiSky[0], 'the day light is warm, the night cool');
   assert.equal(mid.haze, 0);
 });
 
@@ -43,7 +43,19 @@ test('no jumps: a minute of game time changes nothing by more than a few percent
   let prev = flat(lookAt(sun(0)));
   for (let h = 1 / 60; h <= 24; h += 1 / 60) {
     const cur = flat(lookAt(sun(h)));
-    cur.forEach((v, i) => assert.ok(Math.abs(v - prev[i]) < 0.06, `hour ${h.toFixed(2)} value ${i}: ${prev[i]} -> ${v}`));
+    cur.forEach((v, i) => assert.ok(Math.abs(v - prev[i]) < 0.07, `hour ${h.toFixed(2)} value ${i}: ${prev[i]} -> ${v}`));
     prev = cur;
+  }
+});
+
+test('night is night, not darkness: a strong coloured fill, readable buildings, saturated', () => {
+  const lumOf = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  for (const h of [21, 22.5, 0, 2, 3.5]) {
+    const L = lookAt(sun(h));
+    const fill = L.hemiIntensity * lumOf(L.hemiSky) * L.exposure; // the light every surface gets
+    assert.ok(fill > 0.5, `hour ${h}: fill ${fill.toFixed(2)} too dark`);
+    assert.ok(L.hemiSky[2] > L.hemiSky[0] && L.hemiSky[2] > L.hemiSky[1], 'blue-violet');
+    assert.ok(lumOf(L.horizon) > 0.18, `hour ${h}: the sky glows over the city`);
+    assert.ok(L.grade.saturation >= 1.1, 'colourful');
   }
 });

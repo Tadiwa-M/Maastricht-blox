@@ -1822,3 +1822,9 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   street lamps cast warm pools and glow (guide 06). Next: depth-based comic focus and animation
   on twos behind a test flag, then style-aware lighting; the menu switch waits until it is right.
 
+## 2026-11-15: a bright, colourful night; street lights on every road
+
+- Owner: night too dark; it should look good at every hour. New night look (blue-violet fill,
+  city glow, brighter moon, more colour), street lights along every road, colourful windows, and
+  a test that keeps the night from going dark again (guide 06).
+

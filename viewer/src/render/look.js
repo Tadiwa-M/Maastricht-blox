@@ -20,11 +20,11 @@ export function hexToRgb(h) {
 const mixRgb = (a, b, t) => a.map((v, i) => lerp(v, b[i], t));
 
 const C = Object.fromEntries(Object.entries({
-  sunNoon: '#fff1dc', sunGold: '#ffa65a', moon: '#a8bde8',
+  sunNoon: '#fff1dc', sunGold: '#ffa65a', moon: '#9fb0ff',
   dayTop: '#2f6fd0', dayHor: '#cfe0ef', goldTop: '#4a6fae', goldHor: '#ffc08a',
-  blueTop: '#1d3470', blueHor: '#c9909a', nightTop: '#070d24', nightHor: '#222f58',
-  hemiDay: '#cfe2f7', hemiGold: '#f2d2b0', hemiBlue: '#5d75b8', hemiNight: '#5068a8',
-  groundDay: '#6b5a48', groundNight: '#1c1a24',
+  blueTop: '#1d3470', blueHor: '#c9909a', nightTop: '#0f1a4c', nightHor: '#3b3f8c',
+  hemiDay: '#cfe2f7', hemiGold: '#f2d2b0', hemiBlue: '#5d75b8', hemiNight: '#6f74e0',
+  groundDay: '#6b5a48', groundNight: '#3c2f63',
 }).map(([k, v]) => [k, hexToRgb(v)]));
 
 /** Weight of the blue-hour key for a night factor (peaks at 0.5). */
@@ -39,7 +39,7 @@ export const blueWeight = (n) => Math.max(0, 1 - Math.abs(n - 0.5) * 2.2);
 export function lookAt({ night: n, low }) {
   const b = blueWeight(n);
   // direct light: sun -> dips through the blue hour -> moon
-  const sunI = n < 0.5 ? lerp(lerp(3.1, 2.5, low), 0.12, smooth(n, 0, 0.5)) : lerp(0.12, 0.95, smooth(n, 0.5, 1));
+  const sunI = n < 0.5 ? lerp(lerp(3.1, 2.5, low), 0.12, smooth(n, 0, 0.5)) : lerp(0.12, 1.15, smooth(n, 0.5, 1));
   // the colour reaches the moon's before the direction switches (no pop at the switch)
   const sunColor = mixRgb(mixRgb(C.sunNoon, C.sunGold, low), C.moon, smooth(n, 0.25, 0.5));
   let top = mixRgb(C.dayTop, C.goldTop, low), hor = mixRgb(C.dayHor, C.goldHor, low * 0.8);
@@ -49,13 +49,13 @@ export function lookAt({ night: n, low }) {
   hemiSky = mixRgb(mixRgb(hemiSky, C.hemiBlue, Math.min(1, n * 2)), C.hemiNight, smooth(n, 0.5, 1));
   return {
     sunColor, sunIntensity: sunI,
-    hemiSky, hemiGround: mixRgb(C.groundDay, C.groundNight, n), hemiIntensity: lerp(lerp(0.6, 0.5, low), 0.5, n) + b * 0.4,
+    hemiSky, hemiGround: mixRgb(C.groundDay, C.groundNight, n), hemiIntensity: lerp(lerp(0.6, 0.5, low), 1.0, n) + b * 0.4, // night: a strong blue-violet fill (a lit city at night, not darkness)
     top, horizon: hor,
-    envIntensity: lerp(0.75, 0.3, n),
+    envIntensity: lerp(0.75, 0.62, n),
     exposure: lerp(1.0, 1.9, n) + b * 0.3,
     haze: (1 - smooth(n, 0, 0.5)) * lerp(0.35, 1.1, low), // sun scattering in the fog, strongest at golden hour, gone before the moon takes over
     grade: {
-      saturation: lerp(1.08, 1.0, n) + low * 0.04 * (1 - n),
+      saturation: lerp(1.08, 1.14, n) + low * 0.04 * (1 - n),
       contrast: lerp(1.08, 1.04, n),
       vignette: lerp(0.16, 0.22, n),
       // shadows cool, highlights warm; at night shadows go bluer, lamps stay warm

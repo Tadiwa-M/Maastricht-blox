@@ -20,6 +20,7 @@ import { Cyclists, parkedBikes } from './cyclists.js';
 import { Cars } from './cars.js';
 import { CrossingMap, footwayAt, walkBias } from './signals.js';
 import { SignalProps } from './signalsdraw.js';
+import { RoadLamps } from './roadlamps.js';
 import { Terraces } from './terraces.js';
 import { Market } from './market.js';
 import { FIGURES_BY_TIER, LIFE_RADIUS_BY_TIER, CYCLISTS_BY_TIER, CARS_BY_TIER, PARKED_BIKES_BY_TIER, nearestWithin, crowdFactor, trafficFactor, liveWeights, marketState } from './density.js';
@@ -239,6 +240,10 @@ export async function initLife(ctx) {
   if (state.cars) { // traffic lights and crossings at their real places (signals.js, signalsdraw.js)
     state.crossings = new CrossingMap(state.cars.g, { footway: walkGraph ? (x, z) => footwayAt(walkGraph, x, z) : null });
     state.signals = new SignalProps({ map: state.crossings, ground, clip: planes });
+    // street lights along every road (roadlamps.js): the city at night is lit
+    const cityQ = cityOf(ctx);
+    state.streetLights = new RoadLamps(state.cars.g, ground, (x, y, z) => cityQ?.isSolid?.(x, y, -z) === true);
+    group.add(state.streetLights.group);
     group.add(state.signals.group);
     if (walkGraph) walkGraph.bias = walkBias(walkGraph, state.crossings); // walk routes use the crossings
     if (state.walkers) state.walkers.crossings = state.crossings;
@@ -377,6 +382,7 @@ export async function initLife(ctx) {
     state.vehicles = state.trains ? buses.concat(state.trains.update(clock, camera)) : buses;
     if (state.crossings) state.crossings.t = clock.sec; // the light clock for walkers and bikes
     state.signals?.update(at, clock.sec, tier()); // round the player, or where the map camera looks
+    state.streetLights?.update(at, camera, stage.night || 0);
     holdTransit(state, clock, dt, at); // (the lag shows from the next frame on)
     const traffic = trafficFactor(clock.hours, clock.day);
     if (state.cars) {

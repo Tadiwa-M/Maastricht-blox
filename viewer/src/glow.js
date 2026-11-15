@@ -27,12 +27,18 @@ export function litShare(hours) {
 }
 const WARM_A = new THREE.Color('#ff9a3c'), WARM_B = new THREE.Color('#ffe1ae');
 const TV_BLUE = new THREE.Color('#7da6ff');
+const COOL = new THREE.Color('#e4ecff'), TEAL = new THREE.Color('#7fe3d6'), PINK = new THREE.Color('#ff9ccf');
 
 /** Glow colour for one window keyed by (feature, I, J, K). Black when unlit. */
 export function windowColor(feature, I, J, K, out = new THREE.Color(), all = false) {
   const h = (salt) => hash3(I + salt * 7919, J ^ (feature * 2654435761), K + salt * 104729);
   if (!all && h(0) >= LIT_SHARE) return out.setRGB(0, 0, 0);
-  if (h(1) < 0.1) return out.copy(TV_BLUE).multiplyScalar(0.35 + h(2) * 0.35);
+  const kind = h(1);
+  if (kind < 0.08) return out.copy(TV_BLUE).multiplyScalar(0.35 + h(2) * 0.35);
+  // the colours a real street has at night: cool LED white, a teal kitchen, a pink bedroom lamp
+  if (kind < 0.2) return out.copy(COOL).multiplyScalar(0.5 + h(2) * 0.6);
+  if (kind < 0.25) return out.copy(TEAL).multiplyScalar(0.45 + h(2) * 0.4);
+  if (kind < 0.29) return out.copy(PINK).multiplyScalar(0.45 + h(2) * 0.4);
   return out.copy(WARM_A).lerp(WARM_B, h(3)).multiplyScalar(0.45 + h(2) * 0.85);
 }
 

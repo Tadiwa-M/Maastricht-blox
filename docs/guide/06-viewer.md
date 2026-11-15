@@ -646,3 +646,19 @@ Figures animate on twos: `figure/crowd.js` poses them 12 times a second (between
 pose stays) while the camera moves smoothly. Needs the AO pass (High and Medium).
 Open: style-aware lighting (hard light shapes, rim light), neon accents, and the night.
 
+## Night is night, not darkness (2026-11-15)
+
+Owner: the night was too dark; the reference keeps night scenes bright, colourful and striking.
+- `render/look.js` night key: a strong blue-violet fill (hemisphere #6f74e0 at 1.0, was #5068a8
+  at 0.5), a violet city glow on the horizon (#3b3f8c), a bluer, brighter moon (1.15), reflections
+  kept at 0.62 (were 0.3), and more saturation at night than by day (1.14). `test/render-look.test.mjs`
+  fails if the fill light, the sky glow or the saturation at any night hour drops below a floor.
+- **Street lights on every road** (`life/roadlamps.js`): planned from the cars' road graph
+  (`roadLampPlan`, every 30 m, alternating sides, the head on an arm over the road edge; car parks
+  and drives stay dark), the nearest 200 within 220 m drawn as a post, an arm and a glowing head,
+  with a warm pool and glow (render/lamps.js). Posts are kept out of walls (`isSolid`) and
+  re-placed every ~3 s while the ground streams in. `test/roadlamps.test.mjs`.
+- **Windows in colour** (`glow.js` `windowColor`): besides warm rooms (71 %) and TV blue (8 %),
+  cool LED white (12 %), teal (5 %) and pink (4 %).
+- Checked on the full city at 21:00, 03:00 (Stationsstraat) and 21:30 (Markt).
+
