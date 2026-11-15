@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { rippleNormalTexture, addRipples } from './ripples.js';
 import { classOf } from './matkey.js';
 import { lookFromHash } from './render/verse.js';
-import { installSurface } from './render/surface.js';
+import { installSurface, registerSurfaceEntry } from './render/surface.js';
 
 // the comic test look paints opaque surfaces (render/surface.js)
 const PAINTED = typeof location !== 'undefined' && lookFromHash(location.hash) === 'verse';
@@ -116,6 +116,7 @@ export class MaterialSet {
   /** { key, material, cls } for a palette entry. */
   forEntry(entry) {
     const cls = this.classOf(entry);
+    if (PAINTED) registerSurfaceEntry(entry);
     if (cls === 'emissive') {
       const key = `emissive:${entry.idx}`;
       if (!this.emissive.has(key)) {

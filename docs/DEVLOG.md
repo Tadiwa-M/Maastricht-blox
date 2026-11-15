@@ -1847,3 +1847,10 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   the filter. Added world-space weathering on opaque materials, a stronger key and depth haze, a
   restrained palette and shadow hatching, all behind `#look=verse` (guide 06). Next: facade detail
   and night light pools.
+
+## 2026-11-15: comic look, material textures; depth bug
+
+- Owner: "it's the textures". World-space textures per material (brick bond, marl blocks, plaster,
+  setts, asphalt, roof rows) in the comic test look, matched from the palette. Found why outlines,
+  focus and the clean sky never worked at street level: the AO pass (their depth source) was off
+  there. Fixed (guide 06).

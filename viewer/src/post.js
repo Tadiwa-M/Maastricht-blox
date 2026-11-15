@@ -73,6 +73,13 @@ export class Post {
 
   setAO(on) {
     this.aoWanted = on;
+    if (this.verse) { // the comic pass reads the AO pass's depth and normals: keep it rendering
+      // (only a light contact shade where the toy look would have AO off)
+      this.gtao.enabled = this.quality.ao !== 'off';
+      this.gtao.blendIntensity = on && this.aoInRange !== false ? 1.2 : 0.55;
+      this.verse.uniforms.depthOk.value = this.gtao.enabled ? 1 : 0;
+      return;
+    }
     this.gtao.enabled = on && this.quality.ao !== 'off' && this.aoInRange !== false;
   }
 

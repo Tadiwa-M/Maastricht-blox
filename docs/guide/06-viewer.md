@@ -711,3 +711,22 @@ detail. First steps, all behind `#look=verse`:
   focus distance), no lines or rim in the sky.
 - Open (the bigger gap): facade detail (frames, sills, cornices, shopfronts, signs), light pools
   and shop spill at night, a warmer brick palette, dramatic camera framing.
+
+## Material textures, and the comic pass's depth fixed (2026-11-15)
+
+Owner: "it's the textures". `render/surface.js` now textures each surface by its material, in
+world space, behind `#look=verse`:
+- brick walls: stretcher bond (22 x 6.8 cm courses), light mortar, a tone per brick (some cooler);
+- marl / limestone walls: 50 x 26 cm blocks, fine joints, a soft mottle; plaster: grain and mottle;
+- setts and pavement on the ground: 20 x 10 cm setts, dark joints, rounded edges; asphalt: speckle
+  and patches; any sloped face: rows of tiles with a shadow line under each row.
+- The material is found by matching the surface colour's chromaticity (and value within -18/+20 %)
+  to the palette colours of those materials, registered as entries are used (`registerSurfaceEntry`,
+  names in `KIND_OF`). Other colours (cars, signs) only get the weathering. Texture fades out where
+  a pixel spans more than half a course. `test/surface.test.mjs`.
+- **Bug found:** the comic pass reads depth and normals from the AO pass, but city mode turns AO
+  off at street level (camera below 40 m), so the depth was stale: sky detection, focus and edge
+  lines never worked in walk mode. In verse mode `post.js` keeps the AO pass rendering (a light
+  0.55 contact shade where AO would be off) and the pass treats everything as in focus when there
+  is no depth (AO tier off). Depth haze (fog from 70 m) moved to `citymode.js`, which sets the fog
+  every frame.
