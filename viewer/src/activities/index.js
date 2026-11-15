@@ -17,7 +17,9 @@ import { MODE } from '../figure/rig.js';
 import { VehicleFleet, BIKE } from '../figure/vehicles.js';
 import { chooseAction, promptText, REACH } from './choose.js';
 import { seatView, leftSeat, SEATED_SPEED } from './seat.js';
-import { RIDE, Pedals, nearestBike, dismount } from './bike.js';
+import { RIDE, Pedals, nearestBike, dismount, riderLean } from './bike.js';
+import { BIKE_LOCO, LOCO } from '../player/locomotion.js';
+import { bell } from './bell.js';
 import { nearestWater, findLanding, waterAt, waterAhead } from './water.js';
 import { Ducks } from './ducks.js';
 import { DuckMeshes } from './duck-mesh.js';
@@ -51,6 +53,15 @@ export async function initActivities(ctx) {
   let queued = false, near = {}, hits = {}, scanT = 0, duckT = 0, t = 0, posed = false, padWas = false;
   const prompt = new Prompt(() => { queued = true; });
   const busyElsewhere = () => !!window.__bloxRide?.state?.ride || document.body.classList.contains('title');
+  // the bell: Space (or the jump button / gamepad A) while riding; a jump does nothing on a bike
+  const ringBell = () => {
+    if (act?.kind !== 'bike' || (bellT > performance.now())) return;
+    bellT = performance.now() + 450;
+    bell();
+  };
+  let bellT = 0;
+  window.addEventListener('keydown', (e) => { if (e.code === 'Space' && !e.repeat) ringBell(); });
+  document.addEventListener('pointerdown', (e) => { if (e.target?.id === 'pl-jump') ringBell(); }, true);
   window.addEventListener('keydown', (e) => {
     if (e.code !== 'KeyG' || e.repeat || /INPUT|TEXTAREA|SELECT/.test(e.target?.tagName || '')) return;
     if (pl.mode === 'walk' && !busyElsewhere()) queued = true;
@@ -96,6 +107,7 @@ export async function initActivities(ctx) {
     if (i >= 0) left.splice(i, 1);
     face(bike.yaw * DEG);
     setSpeeds(RIDE);
+    Object.assign(ctrl.loco.o, BIKE_LOCO); // pedal up to speed, roll on, lean, no spinning on the spot
     act = { kind: 'bike', bike, pedals: new Pedals({ wheelR: BIKE.wheelR }) };
   }
   function getOff() {
@@ -105,6 +117,7 @@ export async function initActivities(ctx) {
     if (parked.shared) Object.assign(b, d.bike, { gone: false });
     else left.push({ ...d.bike, colour: b.colour, y: ctrl.pos[1] });
     setSpeeds(walkO);
+    ctrl.loco.o = { ...LOCO }; // feet again
     ctrl.loco.speed = 0;
     const sx = d.step.x, sz = -d.step.z;
     if (!ctrl.bodyHits(sx, ctrl.pos[1], sz)) { ctrl.pos[0] = sx; ctrl.pos[2] = sz; }
@@ -145,6 +158,7 @@ export async function initActivities(ctx) {
   function land(spot) {
     const yaw = Math.atan2(spot.x - act.seat[0], -(spot.z - act.seat[2])); // facing inland
     setSpeeds(walkO);
+    ctrl.loco.o = { ...LOCO }; // feet again
     restoreCamera();
     act = null;
     pl.enterAtUnity(spot.x, -spot.z, yaw, yaw, true);
@@ -164,7 +178,7 @@ export async function initActivities(ctx) {
   function drawBikes(ride) {
     fleet.begin();
     for (const b of left) fleet.addBike(b.x, b.y, -b.z, -b.yaw * DEG, { colour: b.colour });
-    if (ride) fleet.addBike(...ride.at, ride.rot, { colour: ride.colour, spin: ride.spin });
+    if (ride) fleet.addBike(...ride.at, ride.rot, { colour: ride.colour, spin: ride.spin, bank: ride.bank || 0 });
     fleet.end();
   }
   const override = (feet, yaw, speed, travelled) => {
@@ -172,9 +186,12 @@ export async function initActivities(ctx) {
     posed = true;
     if (act.kind === 'sit') return { x: act.feet[0], y: act.y, z: act.feet[1], rotY: -act.face, mode: MODE.SIT, t };
     if (act.kind === 'boat') return { x: act.seat[0], y: act.seat[1], z: act.seat[2], rotY: -act.face, mode: MODE.IDLE, t };
-    const p = act.pedals.step(travelled);
-    drawBikes({ at: feet, rot: -yaw, colour: act.bike.colour, spin: p.spin });
-    return { x: feet[0], y: feet[1], z: feet[2], rotY: -yaw, mode: MODE.CYCLE, phase: p.phase, speed };
+    const L = ctrl.loco, p = act.pedals.step(travelled, L.pedalling !== false, dtNow);
+    const lean = riderLean(L.speed, L.angVel, L.accel, p.phase);
+    act.bank = (act.bank || 0) + (lean.bank + lean.rock - (act.bank || 0)) * Math.min(1, dtNow * 8);
+    drawBikes({ at: feet, rot: -yaw, colour: act.bike.colour, spin: p.spin, bank: -act.bank });
+    return { x: feet[0], y: feet[1], z: feet[2], rotY: -yaw, mode: MODE.CYCLE, phase: p.phase, speed, bank: -act.bank, stand: lean.standing,
+      look: Math.max(-0.5, Math.min(0.5, (L.steer || 0) * 0.6)) }; // eyes into the turn
   };
   if (pl.character) pl.character.override = override;
 
@@ -217,7 +234,12 @@ export async function initActivities(ctx) {
     return edge;
   }
 
+  let dtNow = 1 / 60, padAWas = false;
   function update(dt) {
+    dtNow = Math.min(0.1, dt || dtNow);
+    const padA = [...(navigator.getGamepads?.() || [])].some((g) => g?.connected && g.buttons[0]?.pressed);
+    if (padA && !padAWas) ringBell();
+    padAWas = padA;
     t += dt;
     const walking = pl.mode === 'walk' && !busyElsewhere();
     if (padPressed() && walking) queued = true;
@@ -251,7 +273,7 @@ export async function initActivities(ctx) {
     if (act?.kind !== 'bike') drawBikes(null);
   }
 
-  const api = { get state() { return act ? { kind: act.kind, pending: !!act.pending } : null; }, near: () => ({ ...near }), ducks, parked, left, update };
+  const api = { ringBell, get state() { return act ? { kind: act.kind, pending: !!act.pending } : null; }, near: () => ({ ...near }), ducks, parked, left, update };
   window.__bloxActivities = api;
   return api;
 }

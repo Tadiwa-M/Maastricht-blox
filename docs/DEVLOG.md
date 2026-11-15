@@ -1808,3 +1808,9 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   and real backwards steps (guide 09). Animation assets were considered: the figure has its own
   rig and a captured gait already, so retargeting a pack would cost more than it gives.
 
+## 2026-11-15: bike riding feels like a bike
+
+- Riding was a fast walk (instant speed, spins on the spot, no lean). Now: pedal up to speed,
+  roll on, brake, turn no tighter than a bicycle, lean into turns, stand up to push off, coast
+  with level cranks, and a bell (guide 16). Sets up the bike race.
+

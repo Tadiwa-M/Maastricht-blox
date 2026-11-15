@@ -22,11 +22,28 @@ export function nearestBike(bikes, x, z, r = 2) {
 
 /** Pedal phase and wheel angle from the distance ridden. */
 export class Pedals {
-  constructor({ crankM = CRANK_M, wheelR = 0.34 } = {}) { Object.assign(this, { crankM, wheelR, dist: 0 }); }
-  step(travelled) {
+  constructor({ crankM = CRANK_M, wheelR = 0.34 } = {}) { Object.assign(this, { crankM, wheelR, dist: 0, crank: 0 }); }
+  /** travelled m; pedalling: the legs push (else the cranks stop level and the bike rolls). */
+  step(travelled, pedalling = true, dt = 0) {
     this.dist += travelled;
-    return { phase: (this.dist / this.crankM) * Math.PI * 2, spin: -this.dist / this.wheelR };
+    if (pedalling) this.crank += (travelled / this.crankM) * Math.PI * 2;
+    else { // coasting: cranks settle level (feet side by side), as people do
+      const rest = Math.round((this.crank - Math.PI / 2) / Math.PI) * Math.PI + Math.PI / 2;
+      this.crank += (rest - this.crank) * Math.min(1, dt * 6);
+    }
+    return { phase: this.crank, spin: -this.dist / this.wheelR };
   }
+}
+
+/**
+ * How the rider sits on a moving bike: bank (rad, roll into the turn, as physics wants: tan =
+ * v * yaw rate / g, capped), standing (0..1: out of the saddle when pushing hard from slow), and a
+ * side-to-side rock while standing. speed m/s, angVel rad/s (+ clockwise), accel m/s².
+ */
+export function riderLean(speed, angVel, accel, phase = 0) {
+  const bank = Math.max(-0.45, Math.min(0.45, Math.atan((speed * angVel) / 9.81)));
+  const standing = Math.max(0, Math.min(1, (accel - 1.2) / 1.0)) * (speed < 4.5 ? 1 : 0);
+  return { bank, standing, rock: standing * 0.09 * Math.sin(phase) };
 }
 
 /**

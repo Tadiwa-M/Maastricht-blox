@@ -75,8 +75,9 @@ export function jointAngles(v, pose, out = {}) {
     if (sip > 0.85) { const u = Math.sin(((sip - 0.85) / 0.15) * Math.PI); out.sh[1] = 0.5 + 0.6 * u; out.elbow[1] = 0.95 + 1.2 * u; out.headPitch += 0.2 * u; }
     out.headYaw += 0.45 * Math.sin(t * 0.3 + seed);
   } else if (mode === MODE.CYCLE) {
-    out.pelvisY = SADDLE.h / s + 0.03;
-    out.lean = 0.42; out.headPitch = 0.36;
+    const up = Math.max(0, Math.min(1, pose.stand || 0)); // out of the saddle, pushing hard
+    out.pelvisY = SADDLE.h / s + 0.03 + up * 0.13 / s;
+    out.lean = 0.42 + up * 0.18; out.headPitch = 0.36 - up * 0.1;
     const down = (SADDLE.h - SADDLE.bbH) / s - 0.02, fwd = SADDLE.back / s, r = SADDLE.crank / s;
     for (let q = 0; q < 2; q++) {
       const a = (pose.phase || 0) + q * Math.PI;

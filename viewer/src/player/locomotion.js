@@ -27,6 +27,16 @@ export const LOCO = {
   sharpTurnCost: 0.55, // share of the speed kept in a 90 deg turn
 };
 
+// A bicycle (o.bike): it builds speed by pedalling, rolls on when you stop pedalling, brakes
+// harder when you pull back, and cannot turn tighter than its wheels allow (no pivots: at walking
+// pace you can still steer round slowly, as when walking it).
+export const BIKE_LOCO = {
+  bike: true, accel: 2.6, brake: 4.2, hardBrake: 6.5, coast: 0.45, // m/s²
+  minRadius: 2.4, // m: tightest turn while rolling
+  turnSlow: 1.4, // rad/s at a crawl
+  turnMax: 2.4, // rad/s
+};
+
 const smooth = (cur, want, rate, dt) => cur + (want - cur) * Math.min(1, rate * dt);
 
 export class Locomotion {
@@ -52,6 +62,7 @@ export class Locomotion {
    */
   update(dt, want, wantSpeed, grip = 1) {
     const o = this.o;
+    if (o.bike) return this.ride(dt, want, wantSpeed, grip);
     const h0 = this.heading, s0 = this.speed;
     let target = 0;
     if (want !== null && want !== undefined && wantSpeed > 0) {
@@ -83,6 +94,34 @@ export class Locomotion {
     if (dt > 0) {
       this.angVel = smooth(this.angVel, angleDelta(h0, this.heading) / dt, 12, dt);
       this.accel = smooth(this.accel, (this.speed - s0) / dt, 8, dt);
+    }
+    return this;
+  }
+
+  /** The bicycle step (o.bike): see BIKE_LOCO. */
+  ride(dt, want, wantSpeed, grip = 1) {
+    const o = this.o, h0 = this.heading, s0 = this.speed;
+    let rate = o.coast, target = 0;
+    if (want !== null && want !== undefined && wantSpeed > 0) {
+      const d = angleDelta(this.heading, want);
+      this.steer = d;
+      if (Math.abs(d) > 2.3 && this.speed > 0.8) { rate = o.hardBrake; target = 0; } // pulling back: brake, no U-turn on the spot
+      else {
+        const turn = this.speed < 0.6 ? o.turnSlow : Math.min(o.turnMax, this.speed / o.minRadius);
+        const step = turn * grip * dt;
+        this.heading += Math.max(-step, Math.min(step, d));
+        target = wantSpeed * (1 - 0.35 * Math.min(1, Math.abs(d) / (Math.PI / 2)));
+        rate = target > this.speed ? o.accel : o.brake;
+      }
+    } else this.steer = smooth(this.steer, 0, 4, dt);
+    const ds = Math.max(-rate * grip * dt, Math.min(rate * grip * dt, target - this.speed));
+    this.speed = Math.max(0, this.speed + ds);
+    this.pedalling = target > this.speed - 0.05 && target > 0.3; // the legs push only while asked to go
+    this.heading = ((this.heading % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    this.pivoting = false;
+    if (dt > 0) {
+      this.angVel = smooth(this.angVel, angleDelta(h0, this.heading) / dt, 10, dt);
+      this.accel = smooth(this.accel, (this.speed - s0) / dt, 6, dt);
     }
     return this;
   }

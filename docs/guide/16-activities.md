@@ -64,3 +64,19 @@ then a boat in reach, then the ducks.
 
 Tests: `viewer/test/activities.test.mjs`. Debug: `window.__bloxActivities` (`state`, `near()`,
 `ducks`, `parked`, `left`).
+
+## Riding that feels like a bicycle (2026-11-15)
+
+- **Physics** (`player/locomotion.js` `ride`, options `BIKE_LOCO`, set on mounting and undone on
+  getting off): pedalling builds speed at 2.6 m/s² (cruising in about two seconds, flat out in
+  three), letting go rolls on (0.45 m/s² of drag), pulling back brakes hard (6.5 m/s²) instead of
+  spinning round, and the tightest turn is a 2.4 m radius at speed; at a crawl it turns slowly,
+  as when walking the bike round.
+- **Rider** (`activities/bike.js` `riderLean`, `Pedals`): bike and rider lean into turns as
+  physics wants (tan = speed x turn rate / g, up to 26 degrees), out of the saddle when pushing
+  off hard from slow (a rock from side to side), the head looks into the turn, and when coasting
+  the cranks stop level with the feet side by side while the wheels keep turning.
+- **Bell**: Space, the jump button or gamepad A while riding: two synthesised rings
+  (`activities/bell.js`), quiet and silent when sound is off.
+- Tests: `test/bike.ride.test.mjs`. Not seen on screen yet: the headless check cannot drive a ride.
+

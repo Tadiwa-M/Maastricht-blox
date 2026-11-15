@@ -200,8 +200,9 @@ export class VehicleFleet {
   root(x, y, z, rotY) { return this._root.compose(this._v.set(x, y, z), this._q.setFromAxisAngle(this._up, rotY), this._one); }
 
   /** A bicycle at three.js (x, y, z), heading rotY; opts.colour (hex or Color), opts.spin (wheel angle, rad). */
-  addBike(x, y, z, rotY, { colour = '#22385A', spin = 0 } = {}) {
+  addBike(x, y, z, rotY, { colour = '#22385A', spin = 0, bank = 0 } = {}) {
     const root = this.root(x, y, z, rotY);
+    if (bank) root.multiply(this._t.makeRotationZ(bank)); // leaning into a turn, about the tyres' contact line
     this.put('bikeFrame', root, colour instanceof THREE.Color ? colour : this._col.set(colour));
     for (const az of [BIKE.rear, BIKE.front]) {
       this._w.multiplyMatrices(root, this._t.makeTranslation(0, HUB_Y, az)).multiply(this._t.makeRotationX(spin));
