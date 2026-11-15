@@ -1924,3 +1924,7 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   at the bottom left. Needs the owner's Client ID and redirect URI (guide 21).
 - Look picker: pause menu > Look opens cards for Classic, "Jump into the Spider-Verse" (described,
   Switch reloads) and Manga (coming soon) (guide 20).
+- Owner on mobile: parasols open at night (terrace parasols now fold from 21:30 to 10:00,
+  `terraces.js` `parasolsOpen`); running into people showed no reaction (now a visible dot burst,
+  jolt and small word); raiders should be monsters, not smiling people (backlog, PLAN.md); High
+  quality on the phone looks like the desktop.

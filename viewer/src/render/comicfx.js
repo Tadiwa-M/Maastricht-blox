@@ -7,7 +7,8 @@
 //           tilts a few degrees, a held impact frame, a big sound word (KNAL! BOEM! KRAK!)
 //   hurt    I am hit: the plates jump, a red flash
 //   down    I am knocked out: a long red-violet flash and tilt
-//   knock   I ran someone over: a small dot burst and a jolt of the plates (subtle)
+//   knock   I ran someone over: a dot burst, a few short lines, a jolt of the plates, a small word
+//   land    a hard landing: the plates jolt
 //   shove   I brushed someone aside: a slight jolt
 //   shot    I fired: the plates twitch (the shotgun more)
 //   wave    a raid wave comes: the palette swings to deep red-violet and settles
@@ -22,7 +23,8 @@ export const FX = {
   kill: { impact: 1, split: 1, duo: 0.55, roll: 0.035, hold: 70, word: ['KNAL!', 'BOEM!', 'KRAK!'], wordSize: 1 },
   hurt: { split: 0.8, duo: 0.35, duoCol: 'red' },
   down: { split: 1, duo: 0.6, duoCol: 'red', roll: -0.05, hold: 90, decay: 0.8 },
-  knock: { impact: 0.32, split: 0.45, lines: 0 },
+  knock: { impact: 0.5, split: 0.6, lines: 0.5, word: ['PATS!', 'BONK!', 'OEPS!'], wordSize: 0.55 },
+  land: { split: 0.35 },
   shove: { split: 0.18 },
   shot: { split: 0.12 },
   shotgun: { split: 0.35 },

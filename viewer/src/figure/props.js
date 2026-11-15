@@ -29,6 +29,13 @@ function parasol() {
     place(cyl(0.025, 0.025, 2.5, 0.85, 8), { at: [0, 1.25, 0] }), place(sphere(0.04, 0.85, 8, 6), { at: [0, 2.58, 0] })]);
 }
 
+/** A folded parasol: the canopy gathered round the pole, tied (terraces at night). */
+function parasolClosed() {
+  const canopy = new THREE.ConeGeometry(0.16, 1.25, 10, 1, false);
+  return merge([place(tint(canopy, 1), { at: [0, 1.95, 0], rot: [Math.PI, 0, 0] }),
+    place(cyl(0.025, 0.025, 2.5, 0.85, 8), { at: [0, 1.25, 0] }), place(sphere(0.04, 0.85, 8, 6), { at: [0, 2.58, 0] })]);
+}
+
 /** Stall frame + counter + crates; goods baked with vertex colours (instance colour = white). */
 function stallBase() {
   const { w, d } = STALL, parts = [];
@@ -72,12 +79,12 @@ function rack() { // a row of low hoops for 6 bikes, 0.7 m apart along x
 let geoCache = null;
 export function PROP_GEOS() {
   if (geoCache) return geoCache;
-  geoCache = { table: table(), chair: chair(), parasol: parasol(), 'stall:base': stallBase(), rack: rack() };
+  geoCache = { table: table(), chair: chair(), parasol: parasol(), 'parasol:closed': parasolClosed(), 'stall:base': stallBase(), rack: rack() };
   AWNINGS.forEach((c, q) => { geoCache[`stall:awning:${q}`] = awning(c); });
   return geoCache;
 }
 
-const DEFAULT_COL = { table: '#5C6062', chair: '#5C6062', parasol: '#F2F0EA', rack: '#8C9196', 'stall:base': '#ffffff' };
+const DEFAULT_COL = { table: '#5C6062', chair: '#5C6062', parasol: '#F2F0EA', 'parasol:closed': '#F2F0EA', rack: '#8C9196', 'stall:base': '#ffffff' };
 
 export class PropSet {
   constructor({ caps = {}, clippingPlanes = null, shadows = true, material = null } = {}) {
@@ -86,7 +93,7 @@ export class PropSet {
     this.group.name = 'props';
     this.meshes = new Map();
     const G = PROP_GEOS();
-    const base = { table: 300, chair: 1200, parasol: 200, 'stall:base': 80, rack: 120 };
+    const base = { table: 300, chair: 1200, parasol: 200, 'parasol:closed': 200, 'stall:base': 80, rack: 120 };
     for (const [key, geo] of Object.entries(G)) {
       const cap = caps[key] ?? base[key] ?? 80;
       const mesh = new THREE.InstancedMesh(geo, this.material, cap);

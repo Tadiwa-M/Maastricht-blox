@@ -863,3 +863,6 @@ wave (the palette swings to red-violet and settles), a capture (a flash). Hooks:
 (hits, hurts, waves, captures), `mp/combat.js` (my shots), `life/index.js` (walker bumps, now with
 where they happened). Painted looks only; the classic look is unchanged. Everything fades in
 under a second.
+- (2026-11-15) Running someone over now reads: a dot burst with a few short lines, a stronger jolt
+  of the plates and a small word (PATS!, BONK!, OEPS!). On a phone, Low renders at 1x and the fine
+  detail fades (by design); High looks like the desktop.

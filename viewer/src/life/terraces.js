@@ -25,6 +25,9 @@ export function terraceShare(hours, day, rain = 0, weather = null) {
   return s;
 }
 
+/** Parasols are up in the daytime (10:00 to 21:30), folded at night and in the early morning. */
+export const parasolsOpen = (hours) => hours >= 10 && hours < 21.5;
+
 const PARASOL = ['#F2F0EA', '#C8102E', '#2F5A3C', '#22385A', '#EFE3C2', '#D6A445'];
 const FURNITURE = ['#5C6062', '#1E1F21', '#8F7A57', '#F2F0EA', '#6E4A33'];
 
@@ -104,14 +107,14 @@ export class Terraces {
     return true;
   }
 
-  /** Props: tables, chairs, parasols into a PropSet (three.js coordinates). */
-  props(props) {
+  /** Props: tables, chairs, parasols into a PropSet (three.js coordinates); open: parasols up (else folded). */
+  props(props, open = true) {
     for (const { layout, ok } of this.active) {
       layout.tables.forEach((t, q) => {
         if (!ok[q]) return;
         const y = this.ground(t.x, t.z);
         props.add('table', t.x, y, -t.z, 0, { colour: layout.tableColour });
-        if (layout.parasol && q % 2 === 0) props.add('parasol', t.x, y, -t.z, 0, { colour: layout.parasol });
+        if (layout.parasol && q % 2 === 0) props.add(open ? 'parasol' : 'parasol:closed', t.x, y, -t.z, 0, { colour: layout.parasol });
       });
       for (const c of layout.chairs) {
         if (!ok[c.table]) continue;

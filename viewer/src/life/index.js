@@ -22,7 +22,7 @@ import { Cars } from './cars.js';
 import { CrossingMap, footwayAt, walkBias } from './signals.js';
 import { SignalProps } from './signalsdraw.js';
 import { RoadLamps } from './roadlamps.js';
-import { Terraces } from './terraces.js';
+import { Terraces, parasolsOpen } from './terraces.js';
 import { Market } from './market.js';
 import { FIGURES_BY_TIER, LIFE_RADIUS_BY_TIER, CYCLISTS_BY_TIER, CARS_BY_TIER, PARKED_BIKES_BY_TIER, nearestWithin, crowdFactor, trafficFactor, liveWeights, marketState } from './density.js';
 import { FigureCrowd } from '../figure/crowd.js';
@@ -288,9 +288,10 @@ export async function initLife(ctx) {
       state.walkers.dressFor = outfit || (Number.isFinite(tempC) && tempC < 8) ? (v) => dress(v, { outfit, tempC }) : null;
     }
   }
+  let parasolsWere = null;
   function rebuildProps() {
     props.begin();
-    state.terraces?.props(props);
+    state.terraces?.props(props, parasolsOpen(clock.hours));
     state.market?.props(props);
     for (const r of parked.racks) props.add('rack', r.x, ground(r.x, r.z), -r.z, (-r.yaw * Math.PI) / 180);
     props.end();
@@ -417,6 +418,8 @@ export async function initLife(ctx) {
       state.walkers.update(dt, at, R, vehicles);
     }
     let dirty = state.terraces ? state.terraces.refresh(at) : false;
+    const shade = parasolsOpen(clock.hours); // parasols fold at night
+    if (shade !== parasolsWere) { parasolsWere = shade; dirty = true; }
     if (state.market?.refresh(clock)) dirty = true;
     if (dirty || !props.built) { rebuildProps(); props.built = true; }
     crowd.begin(camera.position); fleet.begin();
