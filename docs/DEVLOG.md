@@ -1828,3 +1828,8 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   city glow, brighter moon, more colour), street lights along every road, colourful windows, and
   a test that keeps the night from going dark again (guide 06).
 
+## 2026-11-15: the city's own colours, comic handling
+
+- Owner: Maastricht's colours in that style, not a purple filter. Neutral night fill; the comic
+  test pass now groups values and keeps each colour's hue (guide 06). Still in progress.
+

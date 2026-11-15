@@ -20,11 +20,11 @@ export function hexToRgb(h) {
 const mixRgb = (a, b, t) => a.map((v, i) => lerp(v, b[i], t));
 
 const C = Object.fromEntries(Object.entries({
-  sunNoon: '#fff1dc', sunGold: '#ffa65a', moon: '#9fb0ff',
+  sunNoon: '#fff1dc', sunGold: '#ffa65a', moon: '#b4c0f0',
   dayTop: '#2f6fd0', dayHor: '#cfe0ef', goldTop: '#4a6fae', goldHor: '#ffc08a',
-  blueTop: '#1d3470', blueHor: '#c9909a', nightTop: '#0f1a4c', nightHor: '#3b3f8c',
-  hemiDay: '#cfe2f7', hemiGold: '#f2d2b0', hemiBlue: '#5d75b8', hemiNight: '#6f74e0',
-  groundDay: '#6b5a48', groundNight: '#3c2f63',
+  blueTop: '#1d3470', blueHor: '#c9909a', nightTop: '#0f1a4c', nightHor: '#34407a',
+  hemiDay: '#cfe2f7', hemiGold: '#f2d2b0', hemiBlue: '#5d75b8', hemiNight: '#9298bc',
+  groundDay: '#6b5a48', groundNight: '#3d3a48',
 }).map(([k, v]) => [k, hexToRgb(v)]));
 
 /** Weight of the blue-hour key for a night factor (peaks at 0.5). */

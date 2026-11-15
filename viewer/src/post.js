@@ -46,9 +46,9 @@ export class Post {
     for (const p of this.tilt) c.addPass(p);
     // the comic-print focus, test flag only (#look=verse; render/verse.js)
     this.look = typeof location !== 'undefined' ? lookFromHash(location.hash) : null;
-    if (this.look === 'verse') { this.verse = makeVersePass(gtao); c.addPass(this.verse); globalThis.__bloxTwos = true; }
     this.grade = new GradePass();
     c.addPass(this.grade);
+    if (this.look === 'verse') { this.verse = makeVersePass(gtao); c.addPass(this.verse); globalThis.__bloxTwos = true; }
     this.composer = c;
     this.tiltOn = true;
     this.aoWanted = true; // the HUD toggle

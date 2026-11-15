@@ -662,3 +662,17 @@ Owner: the night was too dark; the reference keeps night scenes bright, colourfu
   cool LED white (12 %), teal (5 %) and pink (4 %).
 - Checked on the full city at 21:00, 03:00 (Stationsstraat) and 21:30 (Markt).
 
+## Maastricht's colours, comic handling (2026-11-15)
+
+Owner: not a violet filter over the city, but the city's own colours handled the comic way.
+- Night fill made neutral again (`look.js`: hemisphere #9298bc, moon #b4c0f0): the blue stays in
+  the sky and the distance, lamps and windows carry the colour; the night stays bright (the floor
+  test still holds).
+- `render/verse.js` (test flag `#look=verse`) now treats the graded image's own colours: values
+  in clear groups (a soft three-step blended with the original), a lifted toe (no crushed black),
+  chroma kept with the colour as the value moves (red brick stays red in the shade), more punch
+  for coloured surfaces but not for a colourless shade, and a slight cool-in-shade / warm-in-light
+  hue shift. The print slip and halftone apply only where clearly out of focus (span 0.55..2.6 of
+  the focus distance, at most 2.6 px) and never on bright lights. Checked at 13:00, 18:00, 21:00.
+- Open: the comic night still leans blue in the streets; lit shopfronts and neon; style-aware lighting.
+
