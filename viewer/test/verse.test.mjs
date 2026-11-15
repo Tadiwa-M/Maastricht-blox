@@ -8,6 +8,7 @@ test('only the explicit flag turns it on', () => {
   assert.equal(lookFromHash('#t=21&look=verse&quality=high'), 'verse');
   assert.equal(lookFromHash('#look=verses'), null);
   assert.equal(lookFromHash('#t=21'), null);
+  assert.equal(lookFromHash('#look=manga&t=9'), 'manga');
   assert.equal(lookFromHash(undefined), null);
 });
 

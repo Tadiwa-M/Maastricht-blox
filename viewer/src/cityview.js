@@ -10,7 +10,6 @@ import * as THREE from 'three';
 import { buildWorldMeshes, worldContext } from './bricks.js';
 import { LampLights, lampsFromRecords, LAMP } from './render/lamps.js';
 import { poolSources, shopLightsFromRecords, SHOP_TYPES } from './render/pools.js';
-import { lookFromHash } from './render/verse.js';
 import { arraysToGeometry, releaseAfterUpload, uploadSoon } from './farmesh.js';
 import { applyIslandPose, worldToLocalThree } from './island.js';
 import { worldFromRecords } from './prepare.js';
@@ -27,9 +26,9 @@ export class CityView {
     this.group.name = 'city';
     this.group.add(far.group);
     this.lamps = new LampLights(); // warm pools and glows under the near zone's street lamps at night (render/lamps.js)
-    // the comic test look: shop windows spill light at night (render/pools.js), world space per item
-    this.shops = typeof location !== 'undefined' && lookFromHash(location.hash) === 'verse' ? new Map() : null;
-    if (this.shops) poolSources.add({ lights: () => [...this.shops.values()].flat() });
+    // shop windows spill light at night (render/pools.js), world space per item
+    this.shops = new Map();
+    poolSources.add({ lights: () => [...this.shops.values()].flat() });
     this.group.add(this.lamps.group);
     this.views = new Map(); // item key -> view
     this.coverDirty = true;

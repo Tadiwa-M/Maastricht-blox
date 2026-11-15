@@ -195,6 +195,17 @@ priority roads from OSM into `streets.json`), owner play-tests on the GPU PC
 **Exit G1:** a play-test on the owner's PC where walking feels fluid, a custom character, cars
 that stop at lights and junctions, and people who visibly go somewhere.
 
+**Next world rebuild backlog (owner, 2026-11-15)**: items that need the pipeline and a full world
+rebuild on the workstation, batched for the next one:
+- Facade detail: window sills, cornices, shop signs and awnings (`pipeline/.../facade/`).
+- The roof floating without walls near the hospital in Randwyck.
+- Itteren coverage.
+
+**Looks (owner, 2026-11-15)**: the toy look is the default; `#look=verse` (comic colour) and
+`#look=manga` (ink and screentone) are test flags until they are right, then a menu switch.
+Shared by all looks: window glazing bars, lamps and shop windows as real night lights, printed
+figure detail, tyre/rim/paint detail. Painted looks only: material textures, film materials.
+
 ## 4. Process (how we work)
 
 1. **Outline → tools → plan → phases**: this file.

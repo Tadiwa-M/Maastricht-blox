@@ -7,10 +7,12 @@
 //   wheel   rubber tyres with tread across the face and a sidewall ring; metal rims with spokes
 //   frame   (bike) enamelled steel; grips and saddle matte
 // Pools of light at night (render/pools.js) light them like everything else.
-import { lookFromHash } from './verse.js';
+import { PAINTED_LOOK } from './verse.js';
 import { addPartVaryings } from './pools.js';
 
-export const VEHICLE_LOOK = typeof location !== 'undefined' && lookFromHash(location.hash) === 'verse';
+// every look: tread, rims, paint vs trim; the painted looks: deeper clear coat and road dirt
+export const VEHICLE_LOOK = typeof location !== 'undefined';
+const FILM = PAINTED_LOOK;
 
 /** Material kind of a vehicle mesh key ('body:saloon', 'glass:van', 'carWheel', 'bikeFrame', ...). */
 export function vehicleKindOf(key) {
@@ -28,7 +30,7 @@ const KIND = {
     color: `${paintMask}
       float low = 1.0 - smoothstep(0.18, 0.55, p.y);
       float dirt = low * (0.55 + 0.45 * fNoise(p * vec3(6.0, 14.0, 6.0))) * paint;
-      c = mix(c, c * vec3(0.55, 0.5, 0.45), dirt * 0.45);
+      c = mix(c, c * vec3(0.55, 0.5, 0.45), dirt * ${FILM ? '0.45' : '0.0'});
       c *= 1.0 + (fNoise(p * 90.0) - 0.5) * 0.02 * paint;`,
     rough: `${paintMask} roughnessFactor = mix(0.78, roughnessFactor + (1.0 - smoothstep(0.18, 0.55, vLocP.y)) * 0.25, paint);`,
     coat: `${paintMask} material.clearcoat *= paint * (1.0 - (1.0 - smoothstep(0.18, 0.55, vLocP.y)) * 0.6);` },
@@ -54,7 +56,7 @@ export function vehicleMaterialFor(base, kind) {
   const spec = KIND[kind];
   if (!spec) return base;
   const m = base.clone();
-  Object.assign(m, spec.params);
+  if (FILM) Object.assign(m, spec.params);
   m.onBeforeCompile = (sh) => {
     addPartVaryings(sh);
     let f = sh.fragmentShader;
@@ -64,6 +66,6 @@ export function vehicleMaterialFor(base, kind) {
     if (spec.coat) f = f.replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>\n{ ${spec.coat} }`);
     sh.fragmentShader = f;
   };
-  m.customProgramCacheKey = () => `vehicle:${kind}`;
+  m.customProgramCacheKey = () => `vehicle:${kind}:${FILM ? 'film' : 'toy'}`;
   return m;
 }

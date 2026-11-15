@@ -764,3 +764,26 @@ Owner: object textures for people, bikes and cars, the player above all (the cam
   colours: deep clear-coated paint with sharp reflections and road dirt up from the sills, matte
   trims, mirror-dark glass, tyres with tread and a sidewall ring, metal rims with five spokes, an
   enamelled bike frame. `test/partsurface.test.mjs`.
+
+## Lessons shared across the looks, and the manga look (2026-11-15)
+
+Owner: carry what works in the comic look over to the toy look and the manga look. One switch
+(`render/verse.js` `LOOK`, `PAINTED_LOOK`): `#look=verse`, `#look=manga`, or neither (the toy look).
+- **Every look** now gets: glazing bars in windows (`materials.js` `paneBars`); lamps and shop
+  windows as real night lights (`render/pools.js`; the additive pool discs are off, glows stay);
+  printed figure detail (seams, zip, pockets, brows, laces; `render/figuresurface.js`) on the toy
+  plastic; tyres with tread, spoked rims, paint vs trim (`render/vehiclesurface.js`).
+- **Painted looks** (verse, manga) also get the material textures and weathering
+  (`render/surface.js`), matte cloth and skin sheen on figures, clear-coat paint and road dirt on
+  cars, the stronger key light, depth haze and the AO pass kept on for depth (the bug found in
+  the comic look: AO off at street level left the pass without depth).
+- Not carried to the toy look on purpose: brick-course and sett textures (the toy look is smooth
+  plastic bricks; the textures are what makes the painted looks read as a film set).
+- **The manga look** (`#look=manga`, the same pass with `MANGA` defined): black ink on paper.
+  The value picks a tone (paper; fine 45-degree screentone; dense screentone; cross-hatching;
+  solid black), ink lines at silhouettes (bold) and creases (fine) from the AO pass's depth and
+  normals, lighter far away, the sky as paper, distance going pale, night lifted (L^0.55) so it
+  stays readable. Material textures show up as tone. Figures animate on twos as in the comic look.
+- Comic look: no colour split on lit things (threshold 0.55..0.8 luma), so night windows glow cleanly.
+- Open: manga screentone pitch (4 px) to check at 1080p+; manga accents (speed lines, a single
+  spot colour?) if wanted; buses, boats and street props still use the plain materials.

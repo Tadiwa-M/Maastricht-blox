@@ -158,7 +158,8 @@ const GLSL = `
     return max(c * (1.0 + jit) * (1.0 - dark), 0.0);
   }`;
 
-export function installSurface(m, key) {
+/** textured: the painted looks (textures, weathering, matte); otherwise only the night pools. */
+export function installSurface(m, key, textured = true) {
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (sh, r) => {
     if (prev) prev.call(m, sh, r);
@@ -174,10 +175,11 @@ export function installSurface(m, key) {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>\n${GLSL}\n${POOL_GLSL}`)
       .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\nreflectedLight.directDiffuse += diffuseColor.rgb * poolLight(vSurfP, normalize(vSurfN));')
-      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = paintSurface(diffuseColor.rgb);');
+      .replace('#include <color_fragment>', textured ? '#include <color_fragment>\ndiffuseColor.rgb = paintSurface(diffuseColor.rgb);' : '#include <color_fragment>');
   };
   const prevKey = m.customProgramCacheKey?.bind(m);
-  m.customProgramCacheKey = () => `${prevKey ? prevKey() : ''}|surface:${key}`;
+  m.customProgramCacheKey = () => `${prevKey ? prevKey() : ''}|surface:${key}:${textured ? 'paint' : 'pools'}`;
+  if (!textured) return m;
   if ('clearcoat' in m) m.clearcoat = 0;
   m.roughness = Math.max(m.roughness, 0.72);
   return m;

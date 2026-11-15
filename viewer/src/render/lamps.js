@@ -3,10 +3,8 @@
 // soft glow round each of its two lanterns. Light shapes drawn additively (no light sources: two
 // instanced meshes for every lamp in view), fading in at dusk. lampsFromRecords() is pure (tested).
 import * as THREE from 'three';
-import { lookFromHash } from './verse.js';
 import { poolSources, lampPool } from './pools.js';
 
-const LIT = typeof location !== 'undefined' && lookFromHash(location.hash) === 'verse'; // real pools (render/pools.js)
 
 export const LAMP = { type: 'lamp_double_1x3', poolR: 5.5, glowR: 0.9, cap: 240, from: 0.12, full: 0.45 };
 const WARM = [1.0, 0.72, 0.38];
@@ -69,7 +67,7 @@ export class LampLights {
     this.dirty = true;
     this._m = new THREE.Matrix4(); this._v = new THREE.Vector3(); this._s = new THREE.Vector3(); this._q = new THREE.Quaternion();
     this._qi = new THREE.Quaternion();
-    if (LIT) { this.pools.visible = false; poolSources.add(this); } // the comic look lights the ground for real
+    this.pools.visible = false; poolSources.add(this); // lamps light the ground for real (render/pools.js); the discs stay for scenes without it
   }
 
   /** Pool light sources (render/pools.js): one per lamp head in the near zone. */

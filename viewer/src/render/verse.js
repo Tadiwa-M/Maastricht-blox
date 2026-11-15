@@ -8,16 +8,20 @@ import * as THREE from 'three';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
 export const VERSE = { twosHz: 12, maxSlip: 1.3, focusSpan: 1.0 };
-export const lookFromHash = (hash) => (/(?:^|[#&])look=verse(?:&|$)/.test(hash || '') ? 'verse' : null);
+export const lookFromHash = (hash) => /(?:^|[#&])look=(verse|manga)(?:&|$)/.exec(hash || '')?.[1] || null;
+/** The look of this page: null (the toy look), 'verse' (comic colour) or 'manga' (ink and screentone). */
+export const LOOK = typeof location !== 'undefined' ? lookFromHash(location.hash) : null;
+/** Painted looks: textured materials, figures and vehicles finished as film props. */
+export const PAINTED_LOOK = LOOK === 'verse' || LOOK === 'manga';
 
 /** The animation-on-twos tick for a time in seconds (a new pose only when it changes). */
 export const twosTick = (t, hz = VERSE.twosHz) => Math.floor(t * hz);
 
 const shader = {
-  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, tNormal: { value: null }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, tNormal: { value: null }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform sampler2D tNormal; uniform float near; uniform float far; uniform float depthOk; uniform float focus; uniform vec2 res;
+    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform sampler2D tNormal; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float focus; uniform vec2 res;
     varying vec2 vUv;
     float dist(vec2 uv) { float d = texture2D(tDepth, uv).x; return depthOk > 0.5 ? (near * far) / (far - d * (far - near)) : focus; } // (no depth: all in focus, no lines)
     vec3 nrm(vec2 uv) { return texture2D(tNormal, uv).rgb * 2.0 - 1.0; } // view-space normal (the AO pass)
@@ -48,6 +52,30 @@ const shader = {
       vec3 shift = mix(cool, warm, smoothstep(0.25, 0.7, L2)) * clamp(L2 / 0.45, 0.25, 1.0);
       return clamp(vec3(L2) + chroma + shift, 0.0, 1.0);
     }
+    #ifdef MANGA
+    // ink on paper: the value picks a tone (paper, fine screentone, dense screentone, cross-hatching,
+    // solid black); lines in ink at silhouettes (bold) and creases (fine), lighter with distance;
+    // the sky is paper; lights stay paper white. Night is lifted so it stays readable.
+    vec3 manga(vec3 base, float z, float sky, float dEdge, float nEdge, float nearK, vec2 f) {
+      float L = luma(base);
+      L = mix(L, pow(L, 0.55), night);
+      L = mix(L, 1.0, smoothstep(250.0, 1400.0, z) * 0.55); // aerial: distance goes pale
+      float s = sin(0.785), co = cos(0.785);
+      vec2 q = mat2(co, -s, s, co) * f / 4.0; // a 45-degree screen, 4 px pitch
+      float dotR = length(fract(q) - 0.5);
+      float tone = 1.0;
+      float t1 = 1.0 - smoothstep(0.5, 0.56, L), t2 = 1.0 - smoothstep(0.3, 0.36, L), t3 = 1.0 - smoothstep(0.16, 0.21, L), t4 = 1.0 - smoothstep(0.05, 0.08, L); // mostly paper
+      tone -= t1 * (1.0 - smoothstep(0.17, 0.23, dotR)) * (1.0 - t2);         // fine dots
+      tone -= t2 * (1.0 - smoothstep(0.3, 0.36, dotR)) * (1.0 - t3);          // dense dots
+      float h1 = step(0.62, fract((f.x + f.y) / 3.5)), h2 = step(0.62, fract((f.x - f.y) / 3.5));
+      tone -= t3 * max(h1, h2 * t3) * (1.0 - t4) * 0.95;                      // cross-hatching
+      tone = mix(tone, 0.0, t4);                                              // solid black
+      tone = mix(tone, 1.0, sky);
+      float ink = max(dEdge, nEdge * 0.5) * mix(0.35, 1.0, nearK) * (1.0 - sky);
+      vec3 paper = vec3(0.965, 0.955, 0.925), black = vec3(0.07, 0.065, 0.075);
+      return mix(black, paper, clamp(tone, 0.0, 1.0) * (1.0 - ink));
+    }
+    #endif
     void main() {
       vec2 px = 1.0 / res;
       vec3 base = texture2D(tDiffuse, vUv).rgb;
@@ -60,7 +88,7 @@ const shader = {
       float rel = (z < focus ? (focus - z) * 0.5 : z - focus) / max(focus, 0.5);
       float sky = max(step(far * 0.92, z), step(2400.0, z)); // cleared depth, or the sky dome (3 km round the camera)
       float coc = smoothstep(${VERSE.focusSpan.toFixed(2)}, 4.0, rel);
-      float bright = smoothstep(0.82, 0.98, luma(base));
+      float bright = smoothstep(0.55, 0.8, luma(base)); // lit windows and lamps stay clean
       // the print slip only on soft shapes: lights stay clean glows
       float slip = coc * (1.0 - bright) * (1.0 - sky);
       vec2 dir = normalize(vec2(1.0, 0.35)) / res * slip * ${VERSE.maxSlip.toFixed(1)};
@@ -86,21 +114,26 @@ const shader = {
       c *= 1.0 - 0.18 * dots(f, 0.42, 5.0, soft * shade * 0.8);
       // fine hatching drawn into the shadows, in focus too (the reference's shaded side), fading with distance
       c *= 1.0 - (0.05 + 0.08 * soft) * shade * shade * (0.4 + 0.6 * near) * smoothstep(0.55, 0.85, fract((f.x - f.y * 0.6) / 3.2));
-      gl_FragColor = vec4(c, 1.0);
+      #ifdef MANGA
+        gl_FragColor = vec4(manga(base, z, sky, dEdge, nEdge, near, f), 1.0);
+      #else
+        gl_FragColor = vec4(c, 1.0);
+      #endif
     }`,
 };
 
 /** The pass (after the grade: it treats the displayed colours). */
-export function makeVersePass(gtao) {
-  const pass = new ShaderPass(shader);
+export function makeVersePass(gtao, look = 'verse') {
+  const pass = new ShaderPass(look === 'manga' ? { ...shader, defines: { MANGA: 1 } } : shader);
   pass.uniforms.tDepth.value = gtao.depthTexture;
   pass.uniforms.tNormal.value = gtao.normalTexture;
   return pass;
 }
 
 /** Per frame: the camera and the focus distance (m: to the player, or the orbit target). */
-export function updateVerse(pass, camera, focus, width, height) {
+export function updateVerse(pass, camera, focus, width, height, night = 0) {
   const u = pass.uniforms;
+  u.night.value = night;
   u.near.value = camera.near; u.far.value = camera.far; u.focus.value = focus;
   u.res.value.set(width, height);
 }

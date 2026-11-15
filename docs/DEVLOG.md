@@ -1867,3 +1867,10 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Owner: textures for people, bikes and cars, especially the player. Figure parts and vehicle parts
   get their own materials and sewn/painted detail (guide 06). Checked at 720p only: the finest
   detail (stitching, laces) needs a look on a real screen.
+
+## 2026-11-15: lessons carried to every look; manga look
+
+- Owner: rebuild-only items to the backlog (facade detail, the Randwyck roof, Itteren; PLAN.md);
+  carry the comic look's lessons to the toy and manga looks. Every look: window bars, real night
+  pools, printed figure detail, tyre and rim detail. Manga built as `#look=manga` on the comic
+  pass (ink lines from depth, screentone, hatching). Toy look keeps smooth bricks on purpose.

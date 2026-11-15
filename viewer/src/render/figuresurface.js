@@ -11,10 +11,12 @@
 //          stitching, worn knees, a twill grain
 //   shoe   sole band with a welt line, laces, a toe cap
 // Accessories keep the toy material.
-import { lookFromHash } from './verse.js';
+import { PAINTED_LOOK } from './verse.js';
 import { addPartVaryings } from './pools.js';
 
-export const FIGURE_LOOK = typeof location !== 'undefined' && lookFromHash(location.hash) === 'verse';
+// every look gets the printed detail; the painted looks also the film materials (matte cloth, skin sheen)
+export const FIGURE_LOOK = typeof location !== 'undefined';
+const FILM = PAINTED_LOOK;
 
 /** Material kind of a figure part key ('head', 'hair:short', 'top:shirt', 'lo:thigh', ...). */
 export function figureKindOf(key) {
@@ -113,7 +115,7 @@ export function figureMaterialFor(base, kind) {
   const spec = KIND[kind];
   if (!spec) return base;
   const m = base.clone();
-  for (const [k, v] of Object.entries(spec.params)) {
+  for (const [k, v] of Object.entries(FILM ? spec.params : {})) {
     if (k === 'sheenColor') m.sheenColor.set(v); else m[k] = v;
   }
   m.onBeforeCompile = (sh) => {
@@ -121,6 +123,6 @@ export function figureMaterialFor(base, kind) {
     sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} diffuseColor.rgb = max(c, 0.0); }`);
   };
-  m.customProgramCacheKey = () => `figure:${kind}`;
+  m.customProgramCacheKey = () => `figure:${kind}:${FILM ? 'film' : 'toy'}`;
   return m;
 }
