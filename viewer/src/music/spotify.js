@@ -126,6 +126,7 @@ export function initMusic({ clientId = window.BLOX_SITE?.spotifyClientId || '', 
     if (!st.tokens) { st.sdk?.disconnect(); st.sdk = null; draw(); throw new Error('Logged out of Spotify'); }
     const r = await fetch(`https://api.spotify.com/v1${path}`, { ...opts, headers: { Authorization: `Bearer ${st.tokens.access}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } });
     if (r.status === 204) return null;
+    if (r.status === 403 && !path.startsWith('/me/player')) throw Object.assign(new Error('not on the list'), { notListed: true }); // development mode: only allowlisted accounts
     const data = await r.json().catch(() => null);
     if (!r.ok) throw new Error(data?.error?.message || `Spotify said ${r.status}`);
     return data;
@@ -136,7 +137,12 @@ export function initMusic({ clientId = window.BLOX_SITE?.spotifyClientId || '', 
       st.lists = (d?.items || []).filter(Boolean).map((p) => ({ uri: p.uri, id: p.id, name: p.name, img: p.images?.[0]?.url || '' }));
       const me = await api('/me');
       st.premium = me?.product === 'premium';
-    } catch (e) { st.msg = e.message; }
+    } catch (e) {
+      if (e.notListed) { // the app's development mode lets only the owner's guest list in
+        logout(local); st.sdk?.disconnect(); Object.assign(st, { sdk: null, tokens: null, device: '', lists: null, pasting: true });
+        st.msg = 'Spotify only lets accounts on this game\'s guest list connect for now. Paste a Spotify link below to play your music anyway.';
+      } else st.msg = e.message;
+    }
     draw();
   }
   function startSdk() {

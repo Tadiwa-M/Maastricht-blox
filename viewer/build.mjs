@@ -25,7 +25,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const RELAY_URL = 'https://blox-relay.tmata1907.workers.dev'; // deployed by the owner, scripts/relay.ps1
 // the owner's Spotify Developer app (Melody Search's): its Client ID is public by design (PKCE login,
 // no secret); '' leaves music to Spotify links. BLOX_SPOTIFY_ID overrides. docs/guide/21-music.md
-const SPOTIFY_CLIENT_ID = '';
+const SPOTIFY_CLIENT_ID = '9818b6e351d84e1ab29bf345fa7ee898';
 const args = process.argv.slice(2);
 const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
 const around = opt('--around');

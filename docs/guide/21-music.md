@@ -25,8 +25,14 @@ The city's own sounds go down to a third while music plays (`window.__bloxAudio.
    for local tests also `http://127.0.0.1:8080/` (open the local site at 127.0.0.1, not localhost).
 2. APIs used: tick Web API and Web Playback SDK.
 3. User Management: add the Spotify accounts allowed to log in (development mode's allowlist).
-4. The Client ID goes in `viewer/build.mjs` `SPOTIFY_CLIENT_ID` (public by design), or set
-   `BLOX_SPOTIFY_ID` before `scripts/site.ps1`. Empty: the panel offers links only.
+4. The Client ID is in `viewer/build.mjs` `SPOTIFY_CLIENT_ID` (public by design; `BLOX_SPOTIFY_ID`
+   overrides, `''` offers links only). The redirect URI is the site's own address: no `/callback`
+   (that was Melody Search's Flask route).
+
+Accounts not on the guest list: Spotify refuses their Web API calls (403); the panel says so,
+logs them out and opens the link box, so they still play their music through the embedded player.
+Spotify grants extended quota (open to everyone) only to established organisations, so the guest
+list stays.
 
 Tests: `test/spotify.test.mjs` (links, the PKCE challenge against RFC 7636's example, the login
 address, the way back, token expiry).
