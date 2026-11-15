@@ -79,6 +79,18 @@ export const windDrift = (kmh, dir = [0.6, -0.8]) => { const s = Math.min(14, (k
 /** How much the sun dims (factor) for a weather state: an overcast or wet sky. */
 export const sunFactor = (w) => 1 - 0.55 * Math.max((w?.cloud ?? 0.4) - 0.4, 0) / 0.6 * 0.6 - 0.45 * Math.min(1, w?.rain || 0) - 0.3 * (w?.snow ? 1 : 0);
 
+/** The settings checkbox "Real cloud cover" (off by default: Maastricht is often grey, the game need not be). */
+export function realSky() { try { return localStorage.getItem('blox.realsky') === 'on'; } catch { return false; } }
+if (typeof document !== 'undefined') queueMicrotask(() => {
+  const box = document.getElementById('realsky');
+  if (!box) return;
+  box.checked = realSky();
+  box.addEventListener('change', () => { try { localStorage.setItem('blox.realsky', box.checked ? 'on' : 'off'); } catch { /* blocked */ } });
+});
+
+/** The sky this weather shows: the real cover with the setting on, or when it rains or snows; else a fair sky. */
+export const skyCloud = (w, real) => ((real || (w?.rain || 0) > 0 || w?.snow) ? Math.max(0, Math.min(1, w?.cloud ?? 0.4)) : 0.4);
+
 export class WeatherFx {
   constructor(stage, { tier = 'medium' } = {}) {
     this.stage = stage;
@@ -106,7 +118,7 @@ export class WeatherFx {
     weatherUniforms.uWet.value = this.wet; weatherUniforms.uSnowCover.value = this.cover;
     // an overcast sky dims the sun (scene.js reads it on the next time update)
     // and the sky shows the real cloud cover, greyer in rain or snow
-    const s = Math.max(0.3, sunFactor(w)), cl = Math.max(0, Math.min(1, w?.cloud ?? 0.4)), gr = Math.min(1, (w?.rain || 0) + (w?.snow ? 0.4 : 0));
+    const cl = skyCloud(w, realSky()), s = Math.max(0.3, sunFactor({ ...w, cloud: cl })), gr = Math.min(1, (w?.rain || 0) + (w?.snow ? 0.4 : 0));
     if (Math.abs(s - this.sun) > 0.02 || Math.abs(cl - (this.stage.weatherCloud ?? -1)) > 0.03 || Math.abs(gr - (this.stage.weatherGrey ?? -1)) > 0.03) {
       this.sun = s; this.stage.weatherSun = s; this.stage.weatherCloud = cl; this.stage.weatherGrey = gr;
       this.stage.setTime?.(this.stage.hours ?? 12);

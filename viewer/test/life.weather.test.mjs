@@ -105,3 +105,11 @@ test('weather on screen: an overcast or wet sky dims the sun; wind slants the ra
   assert.equal(Math.hypot(...windDrift(0)), 0);
   assert.ok(Math.hypot(...windDrift(40)) > Math.hypot(...windDrift(10)));
 });
+
+test('the sky shows the real cover only with the setting on, or in rain or snow', async () => {
+  const { skyCloud } = await import('../src/render/weatherfx.js');
+  assert.equal(skyCloud({ cloud: 0.95, rain: 0 }, false), 0.4);
+  assert.equal(skyCloud({ cloud: 0.95, rain: 0 }, true), 0.95);
+  assert.equal(skyCloud({ cloud: 0.9, rain: 0.5 }, false), 0.9);
+  assert.equal(skyCloud({ cloud: 0.9, rain: 0, snow: true }, false), 0.9);
+});

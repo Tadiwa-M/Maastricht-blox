@@ -887,6 +887,6 @@ Tests: `test/life.weather.test.mjs` (snow/storm codes, test flags, sun dimming, 
 - Owner: drops too long, flakes too thick. Raindrops are now short dashes (7-20 cm, varied), finer
   and a little fainter, fading with distance; flakes are fine specks (1-3 px far off, a little
   larger and softer right by the camera), denser (1.3x the rain count) and varied in size.
-- The sky shows the real cloud cover (Open-Meteo `cloud_cover`, `sky.js` `clouds` 0 clear .. 1
+- The sky shows the real cloud cover only in rain or snow, or always with Settings > "Real cloud cover" (off by default; `weatherfx.js` `skyCloud`) (Open-Meteo `cloud_cover`, `sky.js` `clouds` 0 clear .. 1
   overcast; greyer in rain or snow; at night dark clouds hide the stars instead of glowing). Snow
   settles on upward faces over a few minutes while it snows and thaws after (`uSnowCover`).
