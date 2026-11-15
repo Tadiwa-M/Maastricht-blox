@@ -812,3 +812,20 @@ next to the film; ship it as a pause-menu option.
 - Street lights (every look): lantern halos 0.42 m with a steep fall-off (were 0.9 m soft blobs);
   pools as a street light falls off, strong under the lamp and soft at the edge
   (att = (1 - d/r)^2 / (1 + 0.06 d^2), r 10 m), not a flat bright disc.
+
+## Grounded figures and inked hatching (2026-11-15)
+
+Owner passed on outside advice (written for Unity; the ideas that apply to this web renderer):
+- **Contact shadows, every look** (`figure/crowd.js` `CONTACT`): a soft black disc (alpha map,
+  normal blending) under each standing or walking figure's feet, so people stand on the street
+  (AO is off at street level). Riders and sitters get none. Note: a multiply-blended or
+  vertex-alpha version blacked out the whole frame in headless Chromium; the alpha-map version
+  is the one that works.
+- **Figures in the painted palette** (`render/figuresurface.js` `FILM_PALETTE`): toy colours 20 %
+  toward grey and 6 % darker in the painted looks, so people belong to the scene.
+- **Inked hatching like the film** (`render/verse.js` `inkHatch`): parallel lines whose direction
+  follows the surface (screen-space normal snapped to 45-degree steps), width growing with the
+  shade, tapered and broken by a slow noise, a second set across only in the deepest shade; drawn
+  in a darker shade of the colour, in focus too, stronger out of focus. Pitch ~res.y/260 px.
+- **Manga** (test flag): mostly paper and solid blacks (tones only where they shape), a finer 3 px
+  screentone, and the same inked hatching instead of screen-aligned lines.

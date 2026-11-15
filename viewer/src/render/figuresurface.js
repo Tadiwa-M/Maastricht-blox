@@ -32,6 +32,10 @@ export function figureKindOf(key) {
   return null;
 }
 
+// painted looks: the figures' toy colours pulled a little toward the city's palette (less saturated,
+// a touch darker), so people belong to the scene instead of sitting on top of it
+const FILM_PALETTE = 'c = mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, 0.8) * 0.94;';
+
 const CLOTH = `float fold = fNoise(vec3(p.x * 9.0, p.y * 3.5, p.z * 9.0));
   float weave = (fHash(floor(p * 420.0)) - 0.5) * (1.0 - smoothstep(0.3, 0.8, fwidth(p.y * 420.0)));
   float k = 1.0 + (fold - 0.5) * 0.26 + weave * 0.06;`;
@@ -121,7 +125,7 @@ export function figureMaterialFor(base, kind) {
   m.onBeforeCompile = (sh) => {
     addPartVaryings(sh);
     sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-      { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} diffuseColor.rgb = max(c, 0.0); }`);
+      { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} ${FILM ? FILM_PALETTE : ''} diffuseColor.rgb = max(c, 0.0); }`);
   };
   m.customProgramCacheKey = () => `figure:${kind}:${FILM ? 'film' : 'toy'}`;
   return m;

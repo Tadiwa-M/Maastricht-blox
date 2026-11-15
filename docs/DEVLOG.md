@@ -1883,3 +1883,9 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   Manga stays a test flag (#look=manga); next: fewer dots and hatching there.
 - Fixes from the owner's first look: no amber cast on people (gentle split tone, low sheen); street
   lamps with tight halos and pools that fall off like real street lights.
+
+## 2026-11-15: grounded figures, inked hatching
+
+- Owner: outside advice on integrating characters; hatching as close to the film as possible.
+  Contact shadows under every figure (all looks), figure colours pulled into the painted palette,
+  form-following inked hatching (comic and manga), manga lighter (more paper, finer screentone).

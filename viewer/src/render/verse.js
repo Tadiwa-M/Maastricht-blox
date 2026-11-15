@@ -62,6 +62,30 @@ const shader = {
       // (no dot at all for no amount: a zero-size dot still drew a speck at every grid point)
       return (1.0 - smoothstep(-0.07, 0.07, length(fract(p) - 0.5) - sqrt(clamp(amount, 0.0, 1.0)) * 0.55)) * smoothstep(0.0, 0.05, amount);
     }
+    float hHash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    float hNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hHash(i), hHash(i + vec2(1, 0)), f.x), mix(hHash(i + vec2(0, 1)), hHash(i + vec2(1, 1)), f.x), f.y); }
+    // inked hatching like the film's: parallel lines whose direction follows the surface (from its
+    // screen-space normal, in four set directions so it reads drawn, not computed), whose width
+    // grows with the shade, tapered and broken by a slow noise (a pen, not a ruler); a second set
+    // across them only in the deepest shade. f: pixel, n: view normal, shade 0..1, pitch in px.
+    float hatchLines(vec2 f, float ang, float pitch, float w) {
+      vec2 d = vec2(cos(ang), sin(ang));
+      float u = dot(f, vec2(-d.y, d.x)) / pitch;
+      float taper = hNoise(vec2(dot(f, d) / (pitch * 6.0), floor(u) * 1.7));
+      float x = abs(fract(u) - 0.5) * 2.0; // 0 on the line, 1 between lines
+      float ww = w * smoothstep(0.15, 0.55, taper);
+      return 1.0 - smoothstep(ww - 0.12, ww + 0.12, x);
+    }
+    float inkHatch(vec2 f, vec3 n, float shade, float pitch) {
+      float a = atan(n.y, n.x);
+      float ang = floor(a / 0.7854 + 0.5) * 0.7854 + 0.785; // across the form, snapped to 45 degrees
+      float w = mix(0.0, 0.62, smoothstep(0.15, 1.0, shade));
+      float h = hatchLines(f, ang, pitch, w);
+      float cross = hatchLines(f, ang + 1.5708, pitch, mix(0.0, 0.5, smoothstep(0.7, 1.0, shade)));
+      return max(h, cross);
+    }
+
     // the colour treatment: the city's own colours, handled like a comic. Works on lightness and
     // chroma separately so a colour keeps its hue at every value.
     vec3 treat(vec3 c) {
@@ -97,19 +121,19 @@ const shader = {
     // ink on paper: the value picks a tone (paper, fine screentone, dense screentone, cross-hatching,
     // solid black); lines in ink at silhouettes (bold) and creases (fine), lighter with distance;
     // the sky is paper; lights stay paper white. Night is lifted so it stays readable.
-    vec3 manga(vec3 base, float z, float sky, float dEdge, float nEdge, float nearK, vec2 f) {
+    vec3 manga(vec3 base, float z, float sky, float dEdge, float nEdge, float nearK, vec2 f, vec3 nrmM) {
       float L = luma(base);
       L = mix(L, pow(L, 0.55), night);
       L = mix(L, 1.0, smoothstep(250.0, 1400.0, z) * 0.55); // aerial: distance goes pale
       float s = sin(0.785), co = cos(0.785);
-      vec2 q = mat2(co, -s, s, co) * f / 4.0; // a 45-degree screen, 4 px pitch
+      vec2 q = mat2(co, -s, s, co) * f / 3.0; // a 45-degree screen, 3 px pitch (finer: reads as grey, not dots)
       float dotR = length(fract(q) - 0.5);
       float tone = 1.0;
-      float t1 = 1.0 - smoothstep(0.5, 0.56, L), t2 = 1.0 - smoothstep(0.3, 0.36, L), t3 = 1.0 - smoothstep(0.16, 0.21, L), t4 = 1.0 - smoothstep(0.05, 0.08, L); // mostly paper
+      float t1 = 1.0 - smoothstep(0.4, 0.46, L), t2 = 1.0 - smoothstep(0.24, 0.29, L), t3 = 1.0 - smoothstep(0.13, 0.17, L), t4 = 1.0 - smoothstep(0.08, 0.11, L); // mostly paper, solid blacks, tone only where it shapes
       tone -= t1 * (1.0 - smoothstep(0.17, 0.23, dotR)) * (1.0 - t2);         // fine dots
       tone -= t2 * (1.0 - smoothstep(0.3, 0.36, dotR)) * (1.0 - t3);          // dense dots
-      float h1 = step(0.62, fract((f.x + f.y) / 3.5)), h2 = step(0.62, fract((f.x - f.y) / 3.5));
-      tone -= t3 * max(h1, h2 * t3) * (1.0 - t4) * 0.95;                      // cross-hatching
+      float hk = inkHatch(f, nrmM, t3 * 0.8, 3.5);
+      tone -= t3 * hk * (1.0 - t4) * 0.9;                                     // inked hatching along the form
       tone = mix(tone, 0.0, t4);                                              // solid black
       tone = mix(tone, 1.0, sky);
       float ink = max(dEdge, nEdge * 0.5) * mix(0.35, 1.0, nearK) * (1.0 - sky);
@@ -154,10 +178,13 @@ const shader = {
       float soft = smoothstep(0.55, 0.95, slip); // print texture only where it is clearly out of focus
       // the print texture sits in the shade only: lit walls and the street stay clean colour
       c *= 1.0 - 0.18 * dots(f, 0.42, 5.0, soft * shade * 0.8);
-      // fine hatching drawn into the shadows, in focus too (the reference's shaded side), fading with distance
-      c *= 1.0 - (0.05 + 0.08 * soft) * shade * shade * (0.4 + 0.6 * near) * smoothstep(0.55, 0.85, fract((f.x - f.y * 0.6) / 3.2));
+      // inked hatching in the shadows (in focus too, as on the film's shaded sides), stronger out of
+      // focus, fading with distance; drawn in a darker shade of the colour, not black
+      float hpitch = max(3.0, res.y / 260.0);
+      float hk = inkHatch(f, n0, shade, hpitch) * (1.0 - sky) * (0.45 + 0.55 * near);
+      c = mix(c, c * 0.55, hk * (0.32 + 0.28 * soft));
       #ifdef MANGA
-        gl_FragColor = vec4(manga(base, z, sky, dEdge, nEdge, near, f), 1.0);
+        gl_FragColor = vec4(manga(base, z, sky, dEdge, nEdge, near, f, n0), 1.0);
       #else
         gl_FragColor = vec4(c, 1.0);
       #endif

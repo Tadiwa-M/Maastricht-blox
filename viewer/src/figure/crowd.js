@@ -6,7 +6,7 @@
 // the order added, so a mesh only draws as many copies as figures use that part.
 import * as THREE from 'three';
 import { FIGURE_PARTS, figureMaterial, HAIR_STYLES, TOP_STYLES, ACCESSORIES } from './parts.js';
-import { poseFigure, jointAngles } from './rig.js';
+import { poseFigure, jointAngles, MODE } from './rig.js';
 import { FIGURE_LOOK, figureKindOf, figureMaterialFor } from '../render/figuresurface.js';
 
 const LIMBS = { hips: 1, upperArm: 2, foreArm: 2, hand: 2, thigh: 2, shin: 2, shoe: 2, head: 1, 'lo:upperArm': 2, 'lo:foreArm': 2, 'lo:thigh': 2, 'lo:shin': 2 };
@@ -17,6 +17,21 @@ export function variantColours(v) {
   v._c = {};
   for (const [k, hex] of Object.entries(v.colours)) v._c[k] = new THREE.Color(hex);
   return v._c;
+}
+
+export const CONTACT = { r: 0.45, dark: 0.4 }; // radius (m), the ground's brightness right under the feet
+
+const contactGeometry = () => new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2);
+let contactTex = null;
+function contactTexture() { // a soft round falloff (alpha map: green channel)
+  if (contactTex) return contactTex;
+  const n = 32, data = new Uint8Array(n * n * 4);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const r = Math.min(1, Math.hypot(x + 0.5 - n / 2, y + 0.5 - n / 2) / (n / 2)), a = Math.round(255 * (1 - r) ** 1.6);
+    data.set([a, a, a, 255], (y * n + x) * 4);
+  }
+  contactTex = new THREE.DataTexture(data, n, n); contactTex.needsUpdate = true;
+  return contactTex;
 }
 
 export class FigureCrowd {
@@ -50,6 +65,15 @@ export class FigureCrowd {
       this.group.add(mesh);
       this.meshes.set(key, { mesh, n: 0, cap: n, m: mesh.instanceMatrix.array, c: mesh.instanceColor.array });
     }
+    // contact shadows: a soft darkening of the ground under each figure's feet (multiplied in), so
+    // people stand on the street instead of floating over it (the AO pass is off at street level)
+    this.contact = new THREE.InstancedMesh(contactGeometry(), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true,
+      opacity: 1 - CONTACT.dark, alphaMap: contactTexture(), depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), cap);
+    this.contact.name = 'figure:contact'; this.contact.count = 0; this.contact.frustumCulled = false; this.contact.renderOrder = 1;
+    this.contact.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.group.add(this.contact);
+    this.nContact = 0;
+    this._cm = new THREE.Matrix4();
     this.count = 0;
     this.lod = lod; this.hiDist2 = hiDist * hiDist; this.hiCap = hiCap; this.hi = 0;
     this.cullDist2 = 0; // > 0: figures farther than this from the eye are not drawn (life/index.js sets it)
@@ -85,7 +109,7 @@ export class FigureCrowd {
       this.lastTick = tick;
       if (this.hold) return;
     } else this.hold = false;
-    for (const e of this.meshes.values()) e.n = 0; this.count = 0; this.hi = 0; this.eye = eye;
+    for (const e of this.meshes.values()) e.n = 0; this.count = 0; this.hi = 0; this.eye = eye; this.nContact = 0;
   }
 
   /** Add one figure. pose: { x, y, z (three.js metres, feet), rotY, mode, phase, speed, t, look }. */
@@ -104,6 +128,10 @@ export class FigureCrowd {
       if (!lo) this.hi++;
     }
     poseFigure(v, pose, this._emit, jointAngles(v, pose, this._J), lo);
+    if (pose.mode !== MODE.SIT && pose.mode !== MODE.CYCLE) { // (riders and sitters are off their feet)
+      this._cm.makeScale(CONTACT.r, 1, CONTACT.r).setPosition(pose.x, pose.y + 0.015, pose.z);
+      this.contact.setMatrixAt(this.nContact++, this._cm);
+    }
     return true;
   }
 
@@ -116,6 +144,8 @@ export class FigureCrowd {
 
   end() {
     if (this.hold) return;
+    this.contact.count = this.nContact;
+    this.contact.instanceMatrix.needsUpdate = true;
     for (const { mesh, n } of this.meshes.values()) {
       mesh.count = n;
       mesh.visible = n > 0;
@@ -127,5 +157,5 @@ export class FigureCrowd {
   /** Meshes that draw (= draw calls of the crowd in the main pass). */
   drawCalls() { let k = 0; for (const { mesh } of this.meshes.values()) if (mesh.visible && mesh.count > 0) k++; return k; }
 
-  dispose() { for (const { mesh } of this.meshes.values()) mesh.dispose(); this.material.dispose(); for (const m of this.kindMats?.values() || []) m.dispose(); }
+  dispose() { this.contact.dispose(); for (const { mesh } of this.meshes.values()) mesh.dispose(); this.material.dispose(); for (const m of this.kindMats?.values() || []) m.dispose(); }
 }
