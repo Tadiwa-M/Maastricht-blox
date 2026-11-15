@@ -730,3 +730,21 @@ world space, behind `#look=verse`:
   0.55 contact shade where AO would be off) and the pass treats everything as in focus when there
   is no depth (AO tier off). Depth haze (fog from 70 m) moved to `citymode.js`, which sets the fog
   every frame.
+
+## Figures, living textures, window bars, real night pools (comic test look, 2026-11-15)
+
+All behind `#look=verse`.
+- **Figures** (`render/figuresurface.js`, used by `figure/crowd.js` `materialFor`): each part kind
+  gets its own clone of the figure material: skin (matte, warm sheen at the edges), hair (strand
+  streaks, sheen), tops (fold shading, side seams, hem and cuff, a fabric sheen), trousers (front
+  crease, side seams, worn knees, twill), shoes (a sole band). Patterns in the part's own space.
+- **More materials** (`render/surface.js`): foliage (leaf clusters with dark gaps, sunlit tops),
+  bark furrows, grass blades, soil clods, copper verdigris runs; texture fades also at grazing
+  angles (no stripes).
+- **Window bars** (`materials.js` `paneBars`): every pane gets a painted frame, a middle bar and a
+  transom (not emissive), so windows read as sash windows by day and by night.
+- **Real pools of light** (`render/pools.js`): the nearest 48 street-lamp heads and shop windows
+  (`shop_window_1x2x4`, `window_1x2x3`; a spot 1.5 m out from the front, 0.9 m up) are shadowless
+  point lights evaluated in the painted surface and figure shaders, so they light paving, walls
+  and people in their own colours. Shops: 60 % warm, 18 % soft white, a few pink, teal or cool
+  (neon accents). The additive pool discs are off in this look (glows stay). `test/pools.test.mjs`.

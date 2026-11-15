@@ -1854,3 +1854,10 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   setts, asphalt, roof rows) in the comic test look, matched from the palette. Found why outlines,
   focus and the clean sky never worked at street level: the AO pass (their depth source) was off
   there. Fixed (guide 06).
+
+## 2026-11-15: comic look, figures and night pools
+
+- Owner: crisper, detailed figures; different stuff should look different (concrete vs trees);
+  pools and details. Figure parts by material, foliage/bark/grass/soil/copper textures, glazing
+  bars in windows, lamps and shop windows as real point lights at night (guide 06). Ray tracing:
+  not for the browser game (see the reply); the look comes from materials and motivated light.

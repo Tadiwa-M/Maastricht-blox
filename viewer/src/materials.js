@@ -84,9 +84,32 @@ function windowGlass(extra = {}) {
       .replace('#include <common>', '#include <common>\nvarying vec3 vGlow; varying float vRoomY;')
       // a room lit from the ceiling: the light falls off toward the sill
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= vGlow * (0.55 + 0.6 * smoothstep(0.0, 1.0, vRoomY));');
+    if (PAINTED) paneBars(sh);
   };
-  m.customProgramCacheKey = () => 'window-glass';
+  m.customProgramCacheKey = () => (PAINTED ? 'window-glass-bars' : 'window-glass');
   return m;
+}
+
+// The comic test look: glazing bars in every pane (a painted frame round the edge, a middle bar and
+// a transom), so windows read as Maastricht sash windows, not dark slots. In the pane's own space.
+function paneBars(sh) {
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vPaneP; varying vec3 vPaneN;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPaneP = position; vPaneN = normal;');
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', `#include <common>
+      varying vec3 vPaneP; varying vec3 vPaneN; float paneBar = 0.0;
+      float barLine(float x, float w) { float a = fwidth(x) + 1e-5; return 1.0 - smoothstep(w - a, w + a, abs(x)); }`)
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      {
+        float u = abs(vPaneN.z) > 0.5 ? vPaneP.x : vPaneP.z, v = vPaneP.y;
+        float edge = max(barLine(abs(u) - 0.5, 0.06), barLine(abs(v) - 0.5, 0.06));
+        paneBar = max(edge, max(barLine(u, 0.025), barLine(v - 0.12, 0.022)));
+        paneBar *= 1.0 - smoothstep(0.25, 0.5, fwidth(u) * 6.0); // gone where a bar would be under a pixel
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.76, 0.72), paneBar);
+      }`)
+    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.6, paneBar);')
+    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= 1.0 - paneBar;');
 }
 
 export class MaterialSet {

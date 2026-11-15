@@ -16,6 +16,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { GradePass } from './render/grade.js';
 import { lookFromHash, makeVersePass, updateVerse } from './render/verse.js';
+import { PoolLights } from './render/pools.js';
 import { HorizontalTiltShiftShader } from 'three/examples/jsm/shaders/HorizontalTiltShiftShader.js';
 import { VerticalTiltShiftShader } from 'three/examples/jsm/shaders/VerticalTiltShiftShader.js';
 
@@ -52,6 +53,7 @@ export class Post {
       this.verse = makeVersePass(gtao); c.addPass(this.verse); globalThis.__bloxTwos = true;
       for (const p of this.tilt) p.enabled = false;
       gtao.blendIntensity = 1.2;
+      this.pools = new PoolLights(); // lamps and shop windows light their surroundings at night
     }
     this.composer = c;
     this.tiltOn = !this.verse; // (the comic look is crisp: no miniature blur)
@@ -139,6 +141,7 @@ export class Post {
       const at = p?.mode === 'walk' && p.ctrl ? p.ctrl.pos : null;
       const focus = at ? Math.hypot(cam.position.x - at[0], cam.position.y - at[1] - 1.2, cam.position.z - at[2]) : (this.focusTarget ? cam.position.distanceTo(this.focusTarget) : 30);
       updateVerse(this.verse, cam, focus, this.width, this.height);
+      this.pools.update(cam, this.night);
     }
     this.composer.render();
   }

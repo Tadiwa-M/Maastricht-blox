@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { FIGURE_PARTS, figureMaterial, HAIR_STYLES, TOP_STYLES, ACCESSORIES } from './parts.js';
 import { poseFigure, jointAngles } from './rig.js';
+import { FIGURE_LOOK, figureKindOf, figureMaterialFor } from '../render/figuresurface.js';
 
 const LIMBS = { hips: 1, upperArm: 2, foreArm: 2, hand: 2, thigh: 2, shin: 2, shoe: 2, head: 1, 'lo:upperArm': 2, 'lo:foreArm': 2, 'lo:thigh': 2, 'lo:shin': 2 };
 
@@ -38,7 +39,7 @@ export class FigureCrowd {
     this.meshes = new Map();
     for (const [key, geo] of Object.entries(geos)) {
       const n = (key.startsWith('lo:') || key === 'acc:umbrella' || !lod ? cap : Math.min(cap, hiCap)) * (LIMBS[key] || 1);
-      const mesh = new THREE.InstancedMesh(geo, this.material, n);
+      const mesh = new THREE.InstancedMesh(geo, this.materialFor(key), n);
       mesh.name = `figure:${key}`;
       mesh.count = 0;
       mesh.frustumCulled = false;
@@ -63,6 +64,16 @@ export class FigureCrowd {
       const c = this._cols[colourKey] || this._cols.top;
       e.c[i * 3] = c.r; e.c[i * 3 + 1] = c.g; e.c[i * 3 + 2] = c.b;
     };
+  }
+
+  /** The material of a part: the shared toy material, or in the comic look one per kind of stuff. */
+  materialFor(key) {
+    if (!FIGURE_LOOK) return this.material;
+    const kind = figureKindOf(key);
+    if (!kind) return this.material;
+    this.kindMats ||= new Map();
+    if (!this.kindMats.has(kind)) this.kindMats.set(kind, figureMaterialFor(this.material, kind));
+    return this.kindMats.get(kind);
   }
 
   begin(eye = this.eye) {
@@ -116,5 +127,5 @@ export class FigureCrowd {
   /** Meshes that draw (= draw calls of the crowd in the main pass). */
   drawCalls() { let k = 0; for (const { mesh } of this.meshes.values()) if (mesh.visible && mesh.count > 0) k++; return k; }
 
-  dispose() { for (const { mesh } of this.meshes.values()) mesh.dispose(); this.material.dispose(); }
+  dispose() { for (const { mesh } of this.meshes.values()) mesh.dispose(); this.material.dispose(); for (const m of this.kindMats?.values() || []) m.dispose(); }
 }

@@ -9,6 +9,8 @@
 import * as THREE from 'three';
 import { buildWorldMeshes, worldContext } from './bricks.js';
 import { LampLights, lampsFromRecords, LAMP } from './render/lamps.js';
+import { poolSources, shopLightsFromRecords, SHOP_TYPES } from './render/pools.js';
+import { lookFromHash } from './render/verse.js';
 import { arraysToGeometry, releaseAfterUpload, uploadSoon } from './farmesh.js';
 import { applyIslandPose, worldToLocalThree } from './island.js';
 import { worldFromRecords } from './prepare.js';
@@ -25,6 +27,9 @@ export class CityView {
     this.group.name = 'city';
     this.group.add(far.group);
     this.lamps = new LampLights(); // warm pools and glows under the near zone's street lamps at night (render/lamps.js)
+    // the comic test look: shop windows spill light at night (render/pools.js), world space per item
+    this.shops = typeof location !== 'undefined' && lookFromHash(location.hash) === 'verse' ? new Map() : null;
+    if (this.shops) poolSources.add({ lights: () => [...this.shops.values()].flat() });
     this.group.add(this.lamps.group);
     this.views = new Map(); // item key -> view
     this.coverDirty = true;
@@ -80,6 +85,14 @@ export class CityView {
       const cs = this.index.chunkStuds || 64, I0 = it.kind === 'chunk' ? it.entry.cx * cs : 0, J0 = it.kind === 'chunk' ? it.entry.cy * cs : 0;
       this.lampType ??= (this.meta.catalogue?.types || this.meta.catalogue?.bricks || this.meta.catalogue || []).find?.((t) => t.name === LAMP.type) || null;
       this.lamps.add(it.key, lampsFromRecords(p.records, I0, J0, this.lampType, this.index.studM, this.index.plateM), parent);
+      if (this.shops) {
+        const cat = this.meta.catalogue?.types || this.meta.catalogue?.bricks || this.meta.catalogue || [];
+        this.shopTypes ??= SHOP_TYPES.map((n) => cat.find?.((t) => t.name === n)).filter(Boolean);
+        const v = new THREE.Vector3();
+        const ls = shopLightsFromRecords(p.records, I0, J0, this.shopTypes, this.index.studM, this.index.plateM)
+          .map((l) => ({ ...l, p: v.fromArray(l.p).applyMatrix4(parent.matrixWorld).toArray() }));
+        if (ls.length) this.shops.set(it.key, ls); else this.shops.delete(it.key);
+      }
     }
     this.views.set(it.key, view);
     this.coverDirty = true;
@@ -87,6 +100,7 @@ export class CityView {
 
   remove(it) {
     this.lamps.remove(it.key);
+    this.shops?.delete(it.key);
     const v = this.views.get(it.key);
     if (!v) return;
     this.freeNear(v);
