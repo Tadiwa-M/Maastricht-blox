@@ -884,3 +884,6 @@ already uses: live Open-Meteo, or `#rain=`, `#snow=1`, `#storm=1`):
 - **Sound fix:** the rain sound read only `#rain=` and never the live weather; it now follows the
   weather life uses (snow is silent).
 Tests: `test/life.weather.test.mjs` (snow/storm codes, test flags, sun dimming, wind drift).
+- Owner: drops too long, flakes too thick. Raindrops are now short dashes (7-20 cm, varied), finer
+  and a little fainter, fading with distance; flakes are fine specks (1-3 px far off, a little
+  larger and softer right by the camera), denser (1.3x the rain count) and varied in size.

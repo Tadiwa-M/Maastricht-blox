@@ -13,12 +13,14 @@ import * as THREE from 'three';
 import { weatherUniforms } from './surface.js';
 import { comicFx } from './comicfx.js';
 
-export const PRECIP = { box: [44, 26, 44], counts: { high: 9000, medium: 5000, low: 2600, lite: 1500 }, rainSpeed: 9, snowSpeed: 1.1, streak: 0.55 };
+// drops are short (a raindrop seen in a frame is a short dash, not a long line) and fine; flakes are
+// small specks of different sizes, the near ones larger and softer (out of focus, as in the film's snow)
+export const PRECIP = { box: [40, 24, 40], counts: { high: 12000, medium: 7000, low: 3500, lite: 2000 }, rainSpeed: 8.5, snowSpeed: 0.9, streak: [0.07, 0.2] };
 
 const VERT = `
   attribute float aEnd; attribute float aId;
   uniform float uTime; uniform vec3 uCam; uniform vec3 uBox; uniform vec2 uWind; uniform float uAmount; uniform float uSpeed; uniform float uStreak; uniform float uSnow; uniform float uPx;
-  varying float vA;
+  varying float vA; varying float vSoft; varying float vFade;
   void main() {
     vec3 p = position;
     float fall = uTime * uSpeed * (0.85 + 0.3 * fract(aId * 7.31));
@@ -27,19 +29,24 @@ const VERT = `
     p.xz = mod(p.xz + drift - uCam.xz + uBox.xz * 0.5, uBox.xz) + uCam.xz - uBox.xz * 0.5;
     // the streak's other end trails up and back along the fall (wind slant)
     vec3 v = normalize(vec3(uWind.x, -uSpeed, uWind.y));
-    p -= v * aEnd * uStreak;
+    p -= v * aEnd * mix(${PRECIP.streak[0].toFixed(2)}, ${PRECIP.streak[1].toFixed(2)}, fract(aId * 3.77)) * uStreak;
     vA = step(fract(aId * 0.6180339) , uAmount); // as many drops as the rain is heavy
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
-    gl_PointSize = uPx * (uSnow > 0.5 ? 2.2 : 1.0) * clamp(18.0 / -mv.z, 0.6, 3.0);
+    float d = -mv.z;
+    // flakes: 1 to 3 px far away, bigger and softer close to the camera; drops fade with distance
+    float size = mix(0.7, 1.6, fract(aId * 5.13));
+    gl_PointSize = uPx * size * clamp(9.0 / d, 0.9, 6.0);
+    vSoft = smoothstep(2.5, 0.6, d);
+    vFade = mix(0.55, 1.0, fract(aId * 2.31)) * (1.0 - smoothstep(14.0, 22.0, d));
   }`;
 const FRAG = `
   uniform vec3 uColor; uniform float uOpacity; uniform float uSnow;
-  varying float vA;
+  varying float vA; varying float vSoft; varying float vFade;
   void main() {
     if (vA < 0.5) discard;
-    float a = uOpacity;
-    if (uSnow > 0.5) { vec2 c = gl_PointCoord - 0.5; a *= 1.0 - smoothstep(0.25, 0.5, length(c)); }
+    float a = uOpacity * vFade;
+    if (uSnow > 0.5) { float r = length(gl_PointCoord - 0.5); a *= (1.0 - smoothstep(mix(0.3, 0.05, vSoft), 0.5, r)) * mix(1.0, 0.45, vSoft); }
     gl_FragColor = vec4(uColor, a);
   }`;
 
@@ -61,8 +68,8 @@ function precipMaterial(snow) {
   return new THREE.ShaderMaterial({
     vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false, fog: false,
     uniforms: { uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uBox: { value: new THREE.Vector3(...PRECIP.box) }, uWind: { value: new THREE.Vector2() },
-      uAmount: { value: 0 }, uSpeed: { value: snow ? PRECIP.snowSpeed : PRECIP.rainSpeed }, uStreak: { value: snow ? 0 : PRECIP.streak }, uSnow: { value: snow ? 1 : 0 },
-      uPx: { value: 2.0 }, uColor: { value: new THREE.Color(snow ? '#ffffff' : '#c8d4e6') }, uOpacity: { value: snow ? 0.85 : 0.32 } },
+      uAmount: { value: 0 }, uSpeed: { value: snow ? PRECIP.snowSpeed : PRECIP.rainSpeed }, uStreak: { value: snow ? 0 : 1 }, uSnow: { value: snow ? 1 : 0 },
+      uPx: { value: 2.0 }, uColor: { value: new THREE.Color(snow ? '#f4f6ff' : '#b9c6da') }, uOpacity: { value: snow ? 0.95 : 0.32 } },
   });
 }
 
@@ -77,7 +84,7 @@ export class WeatherFx {
     this.stage = stage;
     const n = PRECIP.counts[tier] ?? PRECIP.counts.medium;
     this.rain = new THREE.LineSegments(precipGeometry(n, false), precipMaterial(false));
-    this.snow = new THREE.Points(precipGeometry(Math.round(n * 0.6), true), precipMaterial(true));
+    this.snow = new THREE.Points(precipGeometry(Math.round(n * 1.3), true), precipMaterial(true)); // (a snowfall is dense)
     for (const o of [this.rain, this.snow]) { o.frustumCulled = false; o.renderOrder = 3; o.visible = false; stage.scene.add(o); }
     this.t = 0; this.wet = 0; this.cover = 0; this.flash = 0; this.nextBolt = 0; this.sun = 1;
   }
