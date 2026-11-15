@@ -23,8 +23,8 @@ const C = Object.fromEntries(Object.entries({
   sunNoon: '#fff1dc', sunGold: '#ffa65a', moon: '#b4c0f0',
   dayTop: '#2f6fd0', dayHor: '#cfe0ef', goldTop: '#4a6fae', goldHor: '#ffc08a',
   blueTop: '#1d3470', blueHor: '#c9909a', nightTop: '#0f1a4c', nightHor: '#34407a',
-  hemiDay: '#cfe2f7', hemiGold: '#f2d2b0', hemiBlue: '#5d75b8', hemiNight: '#9298bc',
-  groundDay: '#6b5a48', groundNight: '#3d3a48',
+  hemiDay: '#cfe2f7', hemiGold: '#f2d2b0', hemiBlue: '#6f7fb4', hemiNight: '#a4a3bc',
+  groundDay: '#6b5a48', groundNight: '#4c4652',
 }).map(([k, v]) => [k, hexToRgb(v)]));
 
 /** Weight of the blue-hour key for a night factor (peaks at 0.5). */
@@ -52,7 +52,7 @@ export function lookAt({ night: n, low }) {
     hemiSky, hemiGround: mixRgb(C.groundDay, C.groundNight, n), hemiIntensity: lerp(lerp(0.6, 0.5, low), 1.0, n) + b * 0.4, // night: a strong blue-violet fill (a lit city at night, not darkness)
     top, horizon: hor,
     envIntensity: lerp(0.75, 0.62, n),
-    exposure: lerp(1.0, 1.9, n) + b * 0.3,
+    exposure: lerp(1.0, 2.15, n) + b * 0.35, // a bright night: readable streets, the sky and windows say it is night
     haze: (1 - smooth(n, 0, 0.5)) * lerp(0.35, 1.1, low), // sun scattering in the fog, strongest at golden hour, gone before the moon takes over
     grade: {
       saturation: lerp(1.08, 1.14, n) + low * 0.04 * (1 - n),

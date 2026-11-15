@@ -1833,3 +1833,10 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Owner: Maastricht's colours in that style, not a purple filter. Neutral night fill; the comic
   test pass now groups values and keeps each colour's hue (guide 06). Still in progress.
 
+
+## 2026-11-15: comic look crisp and modelled; brighter night
+
+- Owner: the crisp, detailed comic-film look (a detailed model, coloured and drawn). The test pass
+  (`#look=verse`) gains sharpening, edge and crease lines in the surface's own darker colour, a rim,
+  a clean sky and print texture only in out-of-focus shade; tinted greys stay grey. Night fill and
+  exposure raised for all looks (guide 06). Still behind the test flag; open: shopfronts, neon, lighting.

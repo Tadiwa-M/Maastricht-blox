@@ -48,9 +48,13 @@ export class Post {
     this.look = typeof location !== 'undefined' ? lookFromHash(location.hash) : null;
     this.grade = new GradePass();
     c.addPass(this.grade);
-    if (this.look === 'verse') { this.verse = makeVersePass(gtao); c.addPass(this.verse); globalThis.__bloxTwos = true; }
+    if (this.look === 'verse') { // crisp: no miniature blur, a little more contact shade
+      this.verse = makeVersePass(gtao); c.addPass(this.verse); globalThis.__bloxTwos = true;
+      for (const p of this.tilt) p.enabled = false;
+      gtao.blendIntensity = 1.2;
+    }
     this.composer = c;
-    this.tiltOn = true;
+    this.tiltOn = !this.verse; // (the comic look is crisp: no miniature blur)
     this.aoWanted = true; // the HUD toggle
     this.quality = { ao: 'full', bloom: 'always' };
     this.night = 0;
@@ -99,14 +103,15 @@ export class Post {
   }
 
   setTiltShift(on) {
+    if (this.verse) on = false;
     this.tiltOn = on;
     for (const p of this.tilt) p.enabled = on;
   }
 
   /** Blur strength from camera distance; focus band centred on the orbit target. */
   updateTiltShift(target) {
-    if (!this.tiltOn) return;
     this.focusTarget = target;
+    if (!this.tiltOn) return;
     const dist = this.camera.position.distanceTo(target);
     const amount = THREE.MathUtils.smoothstep(dist, TILT_NEAR, TILT_FAR) * TILT_MAX;
     const focus = target.clone().project(this.camera).y * 0.5 + 0.5; // 0 = bottom, 1 = top
