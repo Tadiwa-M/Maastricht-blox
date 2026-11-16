@@ -1932,3 +1932,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   that settles, an overcast sky, thunderstorms with lightning and thunder; the rain sound now
   follows the live weather (it only read #rain= before) (guide 06).
 - The sky follows the real cloud cover (was fixed at half), greyer in rain; night clouds hide stars.
+- Bike easier (owner: too wobbly): tighter turns (min radius 1.3 m), quicker steering, a calmer eased lean (max 0.28 rad), less rocking.

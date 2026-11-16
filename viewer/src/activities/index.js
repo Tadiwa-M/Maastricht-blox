@@ -188,7 +188,7 @@ export async function initActivities(ctx) {
     if (act.kind === 'boat') return { x: act.seat[0], y: act.seat[1], z: act.seat[2], rotY: -act.face, mode: MODE.IDLE, t };
     const L = ctrl.loco, p = act.pedals.step(travelled, L.pedalling !== false, dtNow);
     const lean = riderLean(L.speed, L.angVel, L.accel, p.phase);
-    act.bank = (act.bank || 0) + (lean.bank + lean.rock - (act.bank || 0)) * Math.min(1, dtNow * 8);
+    act.bank = (act.bank || 0) + (lean.bank + lean.rock - (act.bank || 0)) * Math.min(1, dtNow * 3.5); // eased: no twitchy lean
     drawBikes({ at: feet, rot: -yaw, colour: act.bike.colour, spin: p.spin, bank: -act.bank });
     return { x: feet[0], y: feet[1], z: feet[2], rotY: -yaw, mode: MODE.CYCLE, phase: p.phase, speed, bank: -act.bank, stand: lean.standing,
       look: Math.max(-0.5, Math.min(0.5, (L.steer || 0) * 0.6)) }; // eyes into the turn

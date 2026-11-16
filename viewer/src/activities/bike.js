@@ -41,9 +41,9 @@ export class Pedals {
  * side-to-side rock while standing. speed m/s, angVel rad/s (+ clockwise), accel m/s².
  */
 export function riderLean(speed, angVel, accel, phase = 0) {
-  const bank = Math.max(-0.45, Math.min(0.45, Math.atan((speed * angVel) / 9.81)));
+  const bank = Math.max(-0.28, Math.min(0.28, 0.6 * Math.atan((speed * angVel) / 9.81))); // a calm lean, no wobble
   const standing = Math.max(0, Math.min(1, (accel - 1.2) / 1.0)) * (speed < 4.5 ? 1 : 0);
-  return { bank, standing, rock: standing * 0.09 * Math.sin(phase) };
+  return { bank, standing, rock: standing * 0.04 * Math.sin(phase) };
 }
 
 /**

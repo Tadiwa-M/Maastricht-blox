@@ -36,7 +36,7 @@ test('turning: no tighter than the minimum radius at speed, slowly at a crawl', 
 });
 
 test('lean into the turn the right way and no more than a rider can; stand up pushing off; cranks level when coasting', () => {
-  assert.ok(riderLean(6, 1, 0).bank > 0.4 && riderLean(6, 1, 0).bank <= 0.45);
+  assert.ok(riderLean(6, 1, 0).bank > 0.2 && riderLean(6, 1, 0).bank <= 0.28); // a calm lean
   assert.ok(riderLean(6, -0.5, 0).bank < 0, 'left turn leans left');
   assert.equal(riderLean(0, 2, 0).bank, 0);
   assert.ok(riderLean(2, 0, 2.6).standing > 0.9 && riderLean(6, 0, 2.6).standing === 0, 'out of the saddle only from slow');

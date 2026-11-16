@@ -32,9 +32,10 @@ export const LOCO = {
 // pace you can still steer round slowly, as when walking it).
 export const BIKE_LOCO = {
   bike: true, accel: 2.6, brake: 4.2, hardBrake: 6.5, coast: 0.45, // m/s²
-  minRadius: 2.4, // m: tightest turn while rolling
-  turnSlow: 1.4, // rad/s at a crawl
-  turnMax: 2.4, // rad/s
+  // easy to ride (owner: balance is not something to worry about): tight turns, quick response
+  minRadius: 1.3, // m: tightest turn while rolling
+  turnSlow: 2.6, // rad/s at a crawl
+  turnMax: 3.4, // rad/s
 };
 
 const smooth = (cur, want, rate, dt) => cur + (want - cur) * Math.min(1, rate * dt);
@@ -105,12 +106,12 @@ export class Locomotion {
     if (want !== null && want !== undefined && wantSpeed > 0) {
       const d = angleDelta(this.heading, want);
       this.steer = d;
-      if (Math.abs(d) > 2.3 && this.speed > 0.8) { rate = o.hardBrake; target = 0; } // pulling back: brake, no U-turn on the spot
+      if (Math.abs(d) > 2.3 && this.speed > 1.5) { rate = o.hardBrake; target = 0; } // pulling back: brake, no U-turn on the spot
       else {
         const turn = this.speed < 0.6 ? o.turnSlow : Math.min(o.turnMax, this.speed / o.minRadius);
         const step = turn * grip * dt;
         this.heading += Math.max(-step, Math.min(step, d));
-        target = wantSpeed * (1 - 0.35 * Math.min(1, Math.abs(d) / (Math.PI / 2)));
+        target = wantSpeed * (1 - 0.2 * Math.min(1, Math.abs(d) / (Math.PI / 2)));
         rate = target > this.speed ? o.accel : o.brake;
       }
     } else this.steer = smooth(this.steer, 0, 4, dt);
