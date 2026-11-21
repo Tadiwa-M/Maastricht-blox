@@ -263,7 +263,18 @@ export async function initLife(ctx) {
   }
   // the Christmas market on the Vrijthof (life/xmas.js), from the week before Magisch Maastricht
   if (SEASON.market && !ctx.still) {
-    state.xmas = new XmasMarket({ origin: originRD, ground, solid: (x, y, z) => cityOf(ctx)?.isSolid?.(x, y, -z) === true, state: SEASON.market });
+    // chalets keep off the roads round the square (the cars' road graph, roads 3.5 m either side)
+    const g = state.cars?.g, roadNear = (x, z) => {
+      if (!g) return false;
+      for (let e = 0; e < g.count; e++) {
+        const a = g.from[e], b = g.to[e], ax = g.x[a], az = g.z[a], dx = g.x[b] - ax, dz = g.z[b] - az, L2 = dx * dx + dz * dz || 1;
+        if (Math.abs(ax - x) > 150 && Math.abs(g.x[b] - x) > 150) continue;
+        const u = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2));
+        if (Math.hypot(x - ax - dx * u, z - az - dz * u) < 4.5) return true;
+      }
+      return false;
+    };
+    state.xmas = new XmasMarket({ origin: originRD, ground, solid: (x, y, z) => cityOf(ctx)?.isSolid?.(x, y, -z) === true, state: SEASON.market, road: roadNear });
     group.add(state.xmas.group);
   }
   if (streets?.pois?.length) state.terraces = new Terraces({ pois: inRect(streets.pois, rect), ground });

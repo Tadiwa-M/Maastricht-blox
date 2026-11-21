@@ -908,3 +908,9 @@ From the owner's photos (Bosscherweg, Markt, Maagdendries, the Vrijthof). No wor
   fenced off by printed banner panels (as in the photos), while open the chalet counters are lit
   at night and light the square. Spots inside buildings are skipped.
 - Tests: `test/season.test.mjs`.
+- (Owner: the market covers the whole Vrijthof.) Chalets now fill the square in back-to-back rows
+  with aisles (`chaletLayout(keep)`: open ground only, level, nothing within 2.2 m, off the cars'
+  roads; ~230 on the real square), each with a string of bulbs along its eaves; the wheel's spokes
+  are glowing bars in red, blue and white with a slow pulse; a giant lit gift box (red, white bands,
+  a bow) beside the wheel; the square's trees found as thin solid columns and wound with white, ice
+  blue or gold lights (spiral up the trunk, sprinkled through the crown).

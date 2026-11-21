@@ -26,6 +26,7 @@ test('festive: lights from mid-November; the market built the week before Magisc
 
 test('the chalets stand in rows on the square, none on top of another', () => {
   const c = chaletLayout();
-  assert.ok(c.length > 40);
-  for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++) assert.ok(Math.hypot(c[i].x - c[j].x, c[i].z - c[j].z) > 3);
+  assert.ok(c.length > 60, `${c.length} spots`);
+  // footprints (2.4 m deep east-west, 3.2 m wide north-south) touch at most
+  for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++) assert.ok(Math.abs(c[i].x - c[j].x) >= 2.39 || Math.abs(c[i].z - c[j].z) >= 3.19, `${i} ${j}`);
 });
