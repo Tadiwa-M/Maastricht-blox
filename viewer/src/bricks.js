@@ -5,6 +5,7 @@
 // whole city is drawn in a handful of draw calls. Per-instance data: transform, colour
 // (with a small deterministic variation) and, for glass, the night glow colour.
 import * as THREE from 'three';
+import { leafShadows } from './render/season.js';
 import { bodyParts, studGeometry, INSET } from './geometry.js';
 import { typeExtent, typeCell, studCells, ROT_MASK, NO_VARIATION, HIDE_STUDS } from './world.js';
 import { brickMatrix, gridToThree } from './placement.js';
@@ -71,7 +72,7 @@ class Bucket {
     mesh.instanceMatrix.needsUpdate = true;
     mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-    mesh.castShadow = !this.material.transparent;
+    mesh.castShadow = !this.material.transparent && !(this.sway && !leafShadows()); // bare trees: no leafy shadow (render/season.js)
     mesh.receiveShadow = true;
     mesh.name = this.key;
     return mesh;

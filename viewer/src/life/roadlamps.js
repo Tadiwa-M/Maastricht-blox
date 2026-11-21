@@ -5,6 +5,8 @@
 import * as THREE from 'three';
 import { roadHalf } from './signals.js';
 import { LampLights } from '../render/lamps.js';
+import { crownFrame, crownBulbs, bulbColour } from '../render/festive.js';
+import { poolSources } from '../render/pools.js';
 
 export const LIGHT = { step: 30, edgeIn: 6, kerb: 0.7, height: 6.2, arm: 1.3, near: 220, cap: 200, repick: 20,
   skip: new Set(['service']) }; // (car parks and drives stay dark)
@@ -33,8 +35,9 @@ export function roadLampPlan(g, o = LIGHT) {
 
 export class RoadLamps {
   /** g: RoadGraph; ground(x, z) -> y (Unity); solid(x, y, z) -> bool (Unity), to keep posts out of buildings. */
-  constructor(g, ground, solid = () => false) {
-    Object.assign(this, { ground, solid });
+  /** festive(x, z): a light crown beside this lamp (the old town while render/season.js says festive). */
+  constructor(g, ground, solid = () => false, festive = null) {
+    Object.assign(this, { ground, solid, festive });
     this.plan = roadLampPlan(g);
     this.light = new LampLights();
     const mat = new THREE.MeshStandardMaterial({ color: '#4a4f57', roughness: 0.5, metalness: 0.3 });
@@ -45,6 +48,13 @@ export class RoadLamps {
     this.group = new THREE.Group();
     this.group.name = 'street lights';
     this.group.add(this.posts, this.arms, this.heads, this.light.group);
+    if (festive) { // light crowns (render/festive.js), one beside each old-town lamp
+      this.crowns = new THREE.InstancedMesh(crownFrame(), new THREE.MeshStandardMaterial({ color: '#f2f2ee', roughness: 0.4, metalness: 0.4 }), LIGHT.cap);
+      this.bulbs = new THREE.InstancedMesh(crownBulbs(), new THREE.MeshBasicMaterial({ color: bulbColour(0), toneMapped: false }), LIGHT.cap);
+      for (const m of [this.crowns, this.bulbs]) { m.count = 0; m.frustumCulled = false; m.castShadow = m === this.crowns; this.group.add(m); }
+      this.crownSpots = [];
+      poolSources.add({ lights: () => (this.night > 0.15 ? this.crownSpots : []) }); // a soft warm glow round each crown
+    }
     this.at = null;
     this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._p = new THREE.Vector3(); this._s = new THREE.Vector3(); this._up = new THREE.Vector3(0, 1, 0);
   }
@@ -55,6 +65,8 @@ export class RoadLamps {
     // re-pick on a move, and every ~3 s (the ground under far posts streams in later)
     if (!this.at || this.since > 180 || Math.hypot(at[0] - this.at[0], at[1] - this.at[1]) > LIGHT.repick) { this.since = 0; this.place(at); }
     this.heads.material.emissiveIntensity = night * 2.2;
+    this.night = night;
+    if (this.bulbs) bulbColour(night, this.bulbs.material.color);
     this.light.update(camera, night);
   }
 
@@ -81,6 +93,22 @@ export class RoadLamps {
       i++;
     }
     for (const m of [this.posts, this.arms, this.heads]) { m.count = i; m.instanceMatrix.needsUpdate = true; }
+    if (this.crowns) { // beside each old-town lamp, 1.6 m along the kerb
+      let c = 0;
+      this.crownSpots = [];
+      for (const [, l] of near) {
+        if (c >= LIGHT.cap) break;
+        if (!this.festive(l.x, l.z)) continue;
+        const ax = l.hx - l.x, az = l.hz - l.z, L = Math.hypot(ax, az) || 1;
+        const x = l.x - (az / L) * 1.6, z = l.z + (ax / L) * 1.6, y = this.ground(x, z);
+        if (!Number.isFinite(y) || this.solid(x, y + 1.5, z) || this.solid(x, y + 4.5, z)) continue;
+        this._m.compose(this._p.set(x, y, -z), this._q.setFromAxisAngle(this._up, (c * 0.7) % 6.28), this._s.set(1, 1, 1));
+        this.crowns.setMatrixAt(c, this._m); this.bulbs.setMatrixAt(c, this._m);
+        if (this.crownSpots.length < 16) this.crownSpots.push({ p: [x, y + 4.4, -z], r: 4.5, c: [0.55, 0.38, 0.2] });
+        c++;
+      }
+      for (const m of [this.crowns, this.bulbs]) { m.count = c; m.instanceMatrix.needsUpdate = true; }
+    }
     this.light.add('roads', lamps);
   }
 }

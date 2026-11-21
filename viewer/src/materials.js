@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { rippleNormalTexture, addRipples } from './ripples.js';
 import { classOf } from './matkey.js';
 import { PAINTED_LOOK } from './render/verse.js';
-import { installSurface, registerSurfaceEntry } from './render/surface.js';
+import { installSurface, registerSurfaceEntry, registerLeafEntry } from './render/surface.js';
 
 // the comic test look paints opaque surfaces (render/surface.js)
 const PAINTED = PAINTED_LOOK; // (every look: window bars and real night pools; painted looks: textures too)
@@ -140,6 +140,7 @@ export class MaterialSet {
   forEntry(entry) {
     const cls = this.classOf(entry);
     if (PAINTED) registerSurfaceEntry(entry);
+    registerLeafEntry(entry); // the season turns and drops leaves in every look (render/season.js)
     if (cls === 'emissive') {
       const key = `emissive:${entry.idx}`;
       if (!this.emissive.has(key)) {

@@ -16,6 +16,7 @@
 // installSurface(material, key) chains onto any onBeforeCompile the material already has.
 import * as THREE from 'three';
 import { POOL_GLSL, poolUniforms } from './pools.js';
+import { seasonUniforms } from './season.js';
 
 export const SURFACE = { brick: 0.06, stain: 0.18, streak: 0.09, cell: [0.8, 0.48, 0.8] };
 export const KINDS = { brick: 1, stone: 2, plaster: 3, setts: 4, asphalt: 5, roof: 6, foliage: 7, bark: 8, grass: 9, soil: 10, copper: 11 };
@@ -41,6 +42,18 @@ export function surfaceKey(c) {
   return [c.r / s, c.g / s, 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b];
 }
 
+/** Leaf colours (every look: the season turns and drops them), found by chromaticity like the kinds. */
+export const leafUniforms = { uLeafKey: { value: Array.from({ length: 4 }, () => new THREE.Vector3(0, 0, -1)) } };
+let leaves = 0;
+const leafSeen = new Set();
+/** Note a palette entry in use: a leaf colour is registered for the season. */
+export function registerLeafEntry(entry) {
+  if (!/^leaf/.test(entry?.name || '') || leafSeen.has(entry.name) || leaves >= 4) return;
+  leafSeen.add(entry.name);
+  const [r, g, L] = surfaceKey(new THREE.Color(entry.srgb));
+  leafUniforms.uLeafKey.value[leaves++].set(r, g, L);
+}
+
 /** Note a palette entry in use; its colour gets its material's texture. Returns the kind or null. */
 export function registerSurfaceEntry(entry) {
   const kind = KIND_OF[entry?.name];
@@ -54,6 +67,7 @@ export function registerSurfaceEntry(entry) {
 const GLSL = `
   varying vec3 vSurfP; varying vec3 vSurfN;
   uniform vec4 uSurfKey[${MAX}]; uniform float uWet; uniform float uSnowCover;
+  uniform vec3 uLeafKey[4]; uniform float uLeafTurn; uniform float uLeafBare; uniform float uLitter; uniform float uLeafFresh;
   float sHash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
   float sNoise(vec3 p) { // value noise
     vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -68,6 +82,44 @@ const GLSL = `
     c *= 1.0 - uWet * (0.22 * up + 0.25 * pud);
     float snow = uSnowCover * smoothstep(0.35, 0.8, normalize(vSurfN).y) * (0.75 + 0.25 * sNoise(vSurfP * 3.0));
     return mix(c, vec3(0.92, 0.94, 0.97), clamp(snow, 0.0, 1.0));
+  }
+  // the season (render/season.js): is this a leaf brick? (its colour, before any treatment)
+  float isLeafColour(vec3 c) {
+    float s = max(c.r + c.g + c.b, 1e-4), L = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    vec2 ch = c.rg / s;
+    for (int i = 0; i < 4; i++) {
+      vec3 k = uLeafKey[i];
+      if (k.z < 0.0) break;
+      if (distance(ch, k.xy) < 0.012 && L > k.z * 0.7 && L < k.z * 1.35) return 1.0;
+    }
+    return 0.0;
+  }
+  // leaves turn (each leaf-brick cell on its own day: yellow, orange, brown) and fall (bare: the
+  // cell is not drawn); fresh light green in spring
+  vec3 seasonLeaf(vec3 c, float leaf) {
+    if (leaf < 0.5) return c;
+    vec3 cell = floor(vSurfP / vec3(0.5, 0.4, 0.5) + 0.01);
+    float h = sHash(cell), h2 = sHash(cell + 7.3);
+    if (h2 < uLeafBare) discard;
+    float L = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    vec3 tone = h < 0.55 ? vec3(0.62, 0.45, 0.05) : h < 0.85 ? vec3(0.62, 0.24, 0.04) : vec3(0.3, 0.15, 0.05);
+    float turned = step(h * 0.9 + 0.05, uLeafTurn);
+    c = mix(c, tone * (0.6 + 1.6 * L), turned);
+    return mix(c, c * vec3(1.15, 1.3, 0.8), uLeafFresh * 0.6);
+  }
+  // fallen leaves on the ground in autumn: scattered leaf-sized flecks in the season's colours
+  vec3 litter(vec3 c) {
+    if (uLitter < 0.01) return c;
+    float up = smoothstep(0.85, 0.97, normalize(vSurfN).y);
+    vec2 q = vSurfP.xz * 12.0;
+    q = mat2(0.8, -0.6, 0.6, 0.8) * q; // not along the bricks
+    vec3 cell = vec3(floor(q), 0.0);
+    vec2 f = fract(q) - 0.5 - (vec2(sHash(cell), sHash(cell + 1.7)) - 0.5) * 0.4;
+    float h = sHash(cell + 5.1), clump = smoothstep(0.35, 0.75, sNoise(vSurfP * 0.25));
+    float leafShape = 1.0 - smoothstep(0.18, 0.26, length(f * vec2(1.0, 1.6)));
+    float on = step(h, uLitter * (0.06 + 0.32 * clump)) * leafShape * up * (1.0 - smoothstep(0.06, 0.18, fwidth(q.x)));
+    vec3 tone = mix(vec3(0.5, 0.34, 0.05), vec3(0.32, 0.14, 0.04), sHash(cell + 3.0));
+    return mix(c, tone, on * 0.8);
   }
   float surfKind(vec3 c) {
     float s = max(c.r + c.g + c.b, 1e-4), L = dot(c, vec3(0.2126, 0.7152, 0.0722));
@@ -174,7 +226,7 @@ export function installSurface(m, key, textured = true) {
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (sh, r) => {
     if (prev) prev.call(m, sh, r);
-    Object.assign(sh.uniforms, surfaceUniforms, poolUniforms, weatherUniforms);
+    Object.assign(sh.uniforms, surfaceUniforms, poolUniforms, weatherUniforms, leafUniforms, seasonUniforms);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vSurfP; varying vec3 vSurfN;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -186,7 +238,7 @@ export function installSurface(m, key, textured = true) {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>\n${GLSL}\n${POOL_GLSL}`)
       .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\nreflectedLight.directDiffuse += diffuseColor.rgb * poolLight(vSurfP, normalize(vSurfN));')
-      .replace('#include <color_fragment>', `#include <color_fragment>\n${textured ? 'diffuseColor.rgb = paintSurface(diffuseColor.rgb);' : ''}\ndiffuseColor.rgb = weatherSurface(diffuseColor.rgb);`)
+      .replace('#include <color_fragment>', `#include <color_fragment>\nfloat leafK = (uLeafTurn + uLeafBare + uLeafFresh) > 0.001 ? isLeafColour(diffuseColor.rgb) : 0.0;\n${textured ? 'diffuseColor.rgb = paintSurface(diffuseColor.rgb);' : ''}\ndiffuseColor.rgb = seasonLeaf(diffuseColor.rgb, leafK);\nif (leafK < 0.5) diffuseColor.rgb = litter(diffuseColor.rgb);\ndiffuseColor.rgb = weatherSurface(diffuseColor.rgb);`)
       // wet: a sheen on the ground, puddles nearly mirror (they catch the sky and the lamps)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n{ float upW = smoothstep(0.55, 0.9, normalize(vSurfN).y); roughnessFactor = mix(roughnessFactor, mix(0.32, 0.05, puddleAt(vSurfP)), uWet * upW * (1.0 - uSnowCover)); }')
   };

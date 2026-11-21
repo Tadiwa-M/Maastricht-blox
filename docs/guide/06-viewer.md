@@ -890,3 +890,21 @@ Tests: `test/life.weather.test.mjs` (snow/storm codes, test flags, sun dimming, 
 - The sky shows the real cloud cover only in rain or snow, or always with Settings > "Real cloud cover" (off by default; `weatherfx.js` `skyCloud`) (Open-Meteo `cloud_cover`, `sky.js` `clouds` 0 clear .. 1
   overcast; greyer in rain or snow; at night dark clouds hide the stars instead of glowing). Snow
   settles on upward faces over a few minutes while it snows and thaws after (`uSnowCover`).
+
+## Seasons, festive lights and the Christmas market (2026-11-21)
+
+From the owner's photos (Bosscherweg, Markt, Maagdendries, the Vrijthof). No world rebuild.
+- **Seasons** (`render/season.js`, from the date; `#date=YYYY-MM-DD` or `#season=` to test): leaf
+  bricks (found by their palette colour in `render/surface.js`, every look and level of detail)
+  turn yellow, orange and brown from 20 September to 5 November, fall from 25 October to
+  10 December (92 % bare, each leaf cell on its own day), come back light green in April; bare
+  trees cast no leafy shadow (`bricks.js`). Fallen leaves fleck the ground in autumn, clumped.
+- **Festive light crowns** (`render/festive.js`, `life/roadlamps.js`): from 14 November to 6 January,
+  a pole with a white wire crown strung with warm bulbs beside each street lamp in the old town;
+  the bulbs glow (and bloom) at night with a soft pool of light.
+- **Christmas market on the Vrijthof** (`life/xmas.js`): a white Ferris wheel (30 m, 24 gondolas,
+  rim lights, turning slowly when open) on the south side, ~50 wooden chalets with red, brown and
+  grey roofs, a carousel with a striped roof; the week before Magisch Maastricht opens it stands
+  fenced off by printed banner panels (as in the photos), while open the chalet counters are lit
+  at night and light the square. Spots inside buildings are skipped.
+- Tests: `test/season.test.mjs`.

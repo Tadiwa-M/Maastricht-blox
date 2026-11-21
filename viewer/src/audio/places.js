@@ -32,7 +32,7 @@ const GREEN_RD = [
   ['vrijthof-trees', ...PLACES_RD.vrijthof, 90, 0.35],
 ];
 /** The old town (cobbled streets): a circle around the Vrijthof and the Markt. */
-const OLD_TOWN_RD = [176300, 317800, 650];
+export const OLD_TOWN_RD = [176300, 317800, 650]; // (also the festive lights, life/index.js)
 
 /**
  * Unity-metre places for a world origin:

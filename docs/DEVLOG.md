@@ -1933,3 +1933,12 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   follows the live weather (it only read #rain= before) (guide 06).
 - The sky follows the real cloud cover (was fixed at half), greyer in rain; night clouds hide stars.
 - Bike easier (owner: too wobbly): tighter turns (min radius 1.3 m), quicker steering, a calmer eased lean (max 0.28 rad), less rocking.
+
+## 2026-11-21: seasons, festive lights, Christmas market
+
+- Owner's photo batches: autumn trees and fallen leaves from the date, light crowns in the old town,
+  the Vrijthof Christmas market (wheel, chalets, carousel, banner fence while building) (guide 06).
+- Queued from the owner (same day): a JoJo-style manga look; one great game mode instead of several;
+  haptics on laptop pads; the gun really held; more guns, pickups and loadouts; Call of Duty-style
+  shooting camera; a first-time walkthrough (look switch, how to enter walk mode); fewer people
+  and vehicles away from where people really are (no walkers on roofs, no cars driving nowhere).

@@ -8,6 +8,9 @@
 // The city's day: routines (routines.js: who is where when), events by date (calendar.js), the
 // real weather near real time (weather.js), people reacting to the player (reactions.js).
 import * as THREE from 'three';
+import { SEASON } from '../render/season.js';
+import { OLD_TOWN_RD } from '../audio/places.js';
+import { XmasMarket } from './xmas.js';
 import { comicFx } from '../render/comicfx.js';
 import { WeatherFx } from '../render/weatherfx.js';
 import { MaterialSet } from '../materials.js';
@@ -217,6 +220,10 @@ export async function initLife(ctx) {
     }
     hideDemo('bus');
   }
+  // (Maastricht's named places: the routines below, the festive lights)
+  const originRD = ctx.originRD || (typeof window !== 'undefined' ? window.BLOX_SITE?.originRD : null)
+    || ctx.world?.manifest?.originRD || [175700, 316500];
+  const places = placesUnity(originRD);
   let walkDoc = data?.walkways || null;
   if (!walkDoc && world.count > 0) walkDoc = walkwaysFromWorld(world, { blocked: islandBlocker(ctx.islands) });
   state.walkDoc = walkDoc; // the trip guide's green line routes on it (plan/ingame.js)
@@ -244,12 +251,20 @@ export async function initLife(ctx) {
     state.signals = new SignalProps({ map: state.crossings, ground, clip: planes });
     // street lights along every road (roadlamps.js): the city at night is lit
     const cityQ = cityOf(ctx);
-    state.streetLights = new RoadLamps(state.cars.g, ground, (x, y, z) => cityQ?.isSolid?.(x, y, -z) === true);
+    // the festive season: light crowns beside the old town's lamps (render/season.js, render/festive.js)
+    const [ox, oz, orr] = [OLD_TOWN_RD[0] - originRD[0], OLD_TOWN_RD[1] - originRD[1], OLD_TOWN_RD[2]];
+    const festive = SEASON.festive ? (x, z) => Math.hypot(x - ox, z - oz) < orr : null;
+    state.streetLights = new RoadLamps(state.cars.g, ground, (x, y, z) => cityQ?.isSolid?.(x, y, -z) === true, festive);
     group.add(state.streetLights.group);
     group.add(state.signals.group);
     if (walkGraph) walkGraph.bias = walkBias(walkGraph, state.crossings); // walk routes use the crossings
     if (state.walkers) state.walkers.crossings = state.crossings;
     if (state.cyclists) state.cyclists.crossings = state.crossings;
+  }
+  // the Christmas market on the Vrijthof (life/xmas.js), from the week before Magisch Maastricht
+  if (SEASON.market && !ctx.still) {
+    state.xmas = new XmasMarket({ origin: originRD, ground, solid: (x, y, z) => cityOf(ctx)?.isSolid?.(x, y, -z) === true, state: SEASON.market });
+    group.add(state.xmas.group);
   }
   if (streets?.pois?.length) state.terraces = new Terraces({ pois: inRect(streets.pois, rect), ground });
   if (streets?.market?.poly?.length >= 6) {
@@ -259,9 +274,6 @@ export async function initLife(ctx) {
   const parked = parkedBikes((streets?.bikes || []).filter(([x, z]) => !rect || (x > rect[0] && x < rect[2] && z > rect[1] && z < rect[3])));
   state.parked = parked; // (activities: a bike the player takes is not drawn at its rack too)
   // the day's routines and events at Maastricht's named places (routines.js, calendar.js)
-  const originRD = ctx.originRD || (typeof window !== 'undefined' ? window.BLOX_SITE?.originRD : null)
-    || ctx.world?.manifest?.originRD || [175700, 316500];
-  const places = placesUnity(originRD);
   state.events = [];
   let marketWas = null;
   /**
@@ -388,6 +400,7 @@ export async function initLife(ctx) {
     if (state.crossings) state.crossings.t = clock.sec; // the light clock for walkers and bikes
     state.signals?.update(at, clock.sec, tier()); // round the player, or where the map camera looks
     state.streetLights?.update(at, camera, stage.night || 0);
+    state.xmas?.update(dt, stage.night || 0);
     holdTransit(state, clock, dt, at); // (the lag shows from the next frame on)
     const traffic = trafficFactor(clock.hours, clock.day);
     if (state.cars) {
