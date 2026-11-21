@@ -47,10 +47,10 @@ export const TEXTURED_LOOK = LOOK === 'verse';
 export const twosTick = (t, hz = VERSE.twosHz) => Math.floor(t * hz);
 
 const shader = {
-  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, fovScale: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, dpr: { value: 1 }, phone: { value: 0 }, fxImpact: { value: 0 }, fxAt: { value: new THREE.Vector2(0.5, 0.5) }, fxSplit: { value: 0 }, fxDuo: { value: 0 }, fxLines: { value: 1 }, fxDuoLo: { value: new THREE.Vector3() }, fxDuoHi: { value: new THREE.Vector3() }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, fovScale: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, dpr: { value: 1 }, phone: { value: 0 }, fxImpact: { value: 0 }, fxAt: { value: new THREE.Vector2(0.5, 0.5) }, fxSplit: { value: 0 }, fxDuo: { value: 0 }, fxLines: { value: 1 }, fxDuoLo: { value: new THREE.Vector3() }, fxDuoHi: { value: new THREE.Vector3() }, mSkyA: { value: new THREE.Vector3(0.16, 0.62, 0.66) }, mSkyB: { value: new THREE.Vector3(0.42, 0.3, 0.72) }, mShade: { value: new THREE.Vector3(0.3, 0.2, 0.5) }, uSpeedK: { value: 0 }, uTime: { value: 0 }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 fovScale; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float dpr; uniform float phone; uniform float fxImpact; uniform vec2 fxAt; uniform float fxSplit; uniform float fxDuo; uniform float fxLines; uniform vec3 fxDuoLo; uniform vec3 fxDuoHi; uniform float focus; uniform vec2 res;
+    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 fovScale; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float dpr; uniform float phone; uniform float fxImpact; uniform vec2 fxAt; uniform float fxSplit; uniform float fxDuo; uniform float fxLines; uniform vec3 fxDuoLo; uniform vec3 fxDuoHi; uniform vec3 mSkyA; uniform vec3 mSkyB; uniform vec3 mShade; uniform float uSpeedK; uniform float uTime; uniform float focus; uniform vec2 res;
     varying vec2 vUv;
     float dist(vec2 uv) { float d = texture2D(tDepth, uv).x; return depthOk > 0.5 ? (near * far) / (far - d * (far - near)) : focus; } // (no depth: all in focus, no lines)
     vec3 vpos(vec2 uv) { float z = dist(uv); return vec3((uv * 2.0 - 1.0) * fovScale * z, -z); }
@@ -140,13 +140,13 @@ const shader = {
       float sat = 1.0 - min(min(pure.r, pure.g), pure.b);
       // the colour itself, clean and bright; greys (stone, paving) stay grey, not a pale blue
       vec3 lit = mix(vec3(min(0.97, 0.5 + L * 1.1)), mix(vec3(1.0), pure, 0.8) * 0.95, smoothstep(0.12, 0.35, sat));
-      vec3 shadow = mix(hue(pure, 0.28) * 0.5, vec3(0.3, 0.2, 0.5), 0.38); // its own colour, darker, leaning violet
+      vec3 shadow = mix(hue(pure, 0.28) * 0.5, mShade, 0.42); // its own colour, darker, leaning into the scene's shade colour (render/mangafx.js)
       float w = fwidth(L) * 1.5 + 0.004;
       float litK = smoothstep(0.19 - w, 0.19 + w, L); // one crisp terminator
       vec3 c = mix(shadow, lit, litK);
       c = mix(c, vec3(0.05, 0.03, 0.09), 1.0 - smoothstep(0.035 - w, 0.045 + w, L)); // the deepest dark is ink
       // the sky: flat and graphic
-      vec3 skyc = mix(vec3(0.16, 0.62, 0.66), vec3(0.42, 0.3, 0.72), vUv.y) * mix(1.0, 0.45, night);
+      vec3 skyc = mix(mSkyB, mSkyA, vUv.y) * mix(1.0, 0.45, night); // the scene's unreal sky (render/mangafx.js)
       c = mix(c, skyc, sky);
       c = mix(c, mix(c, vec3(0.86, 0.82, 0.92), 0.35), smoothstep(400.0, 1600.0, z) * (1.0 - sky)); // distance: paler
       // hatching: thin, only in the shadow near its edge, near the camera
@@ -154,6 +154,13 @@ const shader = {
       float hk = inkHatch(f, nrmM, hs, 4.0) * nearK;
       c = mix(c, vec3(0.06, 0.03, 0.1), hk * 0.7 * (1.0 - sky));
       float ink = max(dEdge, nEdge * 0.6) * mix(0.55, 1.0, nearK) * (1.0 - sky);
+      // speed lines at the edges while sprinting
+      if (uSpeedK > 0.01) {
+        vec2 d = (vUv - 0.5) * vec2(res.x / res.y, 1.0);
+        float a = atan(d.y, d.x), r = length(d);
+        float ln = step(0.8, hHash(vec2(floor(a * 110.0), floor(uTime * 14.0)))) * smoothstep(0.42, 0.75, r);
+        ink = max(ink, ln * uSpeedK * 0.85);
+      }
       return mix(clamp(c, 0.0, 1.0), vec3(0.03, 0.02, 0.05), ink);
     }
     #endif

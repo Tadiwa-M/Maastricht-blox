@@ -1950,3 +1950,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Manga look rebuilt JoJo-style and added to the Look menu (guide 06).
 - Performance: dynamic resolution (follows the frame time, before dropping a tier), pool lights capped by tier, dry-weather shader skip (guide 06).
 - Manga crisper: cel shading, flat surfaces, no phantom hatch lines; dynamic resolution no longer halves pixels on a capped display (remote desktop).
+- Manga look: ink outlines on characters (inverted hull), menacing ゴ lettering, palette swings, speed lines, katakana sound words (guide 06).

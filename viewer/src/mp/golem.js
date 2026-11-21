@@ -4,6 +4,7 @@
 // (6 draw calls for any number); posed each frame from where the room says they are. Knocked out,
 // one sinks and tips over into the ground.
 import * as THREE from 'three';
+import { OUTLINE_ON, outlineFor } from '../render/outline.js';
 
 export const GOLEM = { scale: 1.3, cap: 32 };
 const MARL = '#cdbb86', DARK = '#8f7f55';
@@ -29,8 +30,10 @@ export class Golems {
       const n = GOLEM.cap * (k === 'arm' || k === 'leg' ? 2 : 1);
       const mesh = new THREE.InstancedMesh(g, m, n);
       mesh.count = 0; mesh.frustumCulled = false; mesh.castShadow = k !== 'eyes';
-      this.meshes[k] = { mesh, n: 0 };
+      const outline = OUTLINE_ON && k !== 'eyes' ? outlineFor(mesh) : null;
+      this.meshes[k] = { mesh, n: 0, outline };
       this.group.add(mesh);
+      if (outline) this.group.add(outline);
     }
     scene.add(this.group);
     this._m = new THREE.Matrix4(); this._b = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._e = new THREE.Euler(); this._v = new THREE.Vector3(); this._s = new THREE.Vector3(1, 1, 1);
@@ -57,7 +60,7 @@ export class Golems {
     at('head', 0, sh + 0.02, -0.3, 0.15); at('eyes', 0, sh + 0.02, -0.3, 0.15);
   }
 
-  end() { for (const e of Object.values(this.meshes)) { e.mesh.count = e.n; e.mesh.instanceMatrix.needsUpdate = true; } }
+  end() { for (const e of Object.values(this.meshes)) { e.mesh.count = e.n; e.mesh.instanceMatrix.needsUpdate = true; if (e.outline) e.outline.count = e.n; } }
 }
 
 function mergeEyes() { // two glowing slits on the front of the head (head origin at the neck, front -z)

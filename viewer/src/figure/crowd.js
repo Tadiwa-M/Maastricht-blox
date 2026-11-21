@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { FIGURE_PARTS, figureMaterial, HAIR_STYLES, TOP_STYLES, ACCESSORIES } from './parts.js';
 import { poseFigure, jointAngles, MODE } from './rig.js';
 import { FIGURE_LOOK, figureKindOf, figureMaterialFor } from '../render/figuresurface.js';
+import { OUTLINE_ON, outlineFor } from '../render/outline.js';
 
 const LIMBS = { hips: 1, upperArm: 2, foreArm: 2, hand: 2, thigh: 2, shin: 2, shoe: 2, head: 1, 'lo:upperArm': 2, 'lo:foreArm': 2, 'lo:thigh': 2, 'lo:shin': 2 };
 
@@ -65,7 +66,9 @@ export class FigureCrowd {
       mesh.setColorAt(0, new THREE.Color(1, 1, 1));
       mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
       this.group.add(mesh);
-      this.meshes.set(key, { mesh, n: 0, cap: n, m: mesh.instanceMatrix.array, c: mesh.instanceColor.array });
+      const outline = OUTLINE_ON ? outlineFor(mesh) : null; // ink line round the figure (render/outline.js)
+      if (outline) this.group.add(outline);
+      this.meshes.set(key, { mesh, outline, n: 0, cap: n, m: mesh.instanceMatrix.array, c: mesh.instanceColor.array });
     }
     // contact shadows: a soft darkening of the ground under each figure's feet (multiplied in), so
     // people stand on the street instead of floating over it (the AO pass is off at street level)
@@ -148,9 +151,10 @@ export class FigureCrowd {
     if (this.hold) return;
     this.contact.count = this.nContact;
     this.contact.instanceMatrix.needsUpdate = true;
-    for (const { mesh, n } of this.meshes.values()) {
+    for (const { mesh, n, outline } of this.meshes.values()) {
       mesh.count = n;
       mesh.visible = n > 0;
+      if (outline) { outline.count = n; outline.visible = n > 0; }
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
     }

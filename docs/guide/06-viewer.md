@@ -943,3 +943,12 @@ per block, a worker for the walkers' simulation.
   `inkHatch`, every look). The manga shader is now anime cel shading: two flat tones with one crisp
   edge, the lit tone the surface's own clean colour (greys stay grey), the shadow its colour darker
   and leaning violet, ink in the deepest dark, a few hatch lines at the shadow's edge, bold outlines.
+- (Owner: only the colours felt like that world; the outlines, the style and the atmosphere did
+  not.) Manga look: **ink outlines** round every figure, golem and vehicle (`render/outline.js`:
+  the inverted hull of anime games, back faces pushed out a fixed 2.6 CSS px along the normals,
+  sharing the instance matrices: even and unbroken at any distance or resolution). **Atmosphere**
+  (`render/mangafx.js`): the menacing katakana ゴ rise in a column beside you when you stand still
+  for 2.5 s, aim, or face a raid wave; the sky and shadow colour swing between unreal schemes (teal
+  and violet, lime and gold, pink and purple, orange and teal; 75 s each, 6 s crossfade; a knock-out
+  or wave throws it to pink and purple); ink speed lines at the screen edges when sprinting; sound
+  words in katakana (バシッ, ドン!, ドドド, バーン, ゴン, ドサッ).

@@ -19,6 +19,8 @@ import { LOOK, makeVersePass, updateVerse } from './render/verse.js';
 import { PoolLights } from './render/pools.js';
 import { DepthRenderPass } from './render/depthpass.js';
 import { ComicFx } from './render/comicfx.js';
+import { MangaFx } from './render/mangafx.js';
+import { outlineUniforms } from './render/outline.js';
 import { HorizontalTiltShiftShader } from 'three/examples/jsm/shaders/HorizontalTiltShiftShader.js';
 import { VerticalTiltShiftShader } from 'three/examples/jsm/shaders/VerticalTiltShiftShader.js';
 
@@ -57,6 +59,7 @@ export class Post {
       for (const p of this.tilt) p.enabled = false;
       gtao.blendIntensity = 1.2;
       this.fx = new ComicFx(); // the look reacting to hits, knock-outs, waves (render/comicfx.js)
+      if (this.look === 'manga') this.mfx = new MangaFx(); // menace lettering, palette swings, speed lines
     }
     this.composer = c;
     this.pools = new PoolLights(); // lamps and shop windows light their surroundings at night (every look)
@@ -144,6 +147,8 @@ export class Post {
       const t = performance.now(), dt = Math.min(0.1, (t - (this.fxT || t)) / 1000);
       this.fxT = t;
       const roll = this.fx.update(dt, cam, this.verse.uniforms);
+      this.mfx?.update(dt, cam, this.verse.uniforms);
+      outlineUniforms.uScreenH.value = this.height;
       if (roll) { cam.rotateZ(roll); this.composer.render(); cam.rotateZ(-roll); return; } // the film's tilt on the action
     }
     this.composer.render();

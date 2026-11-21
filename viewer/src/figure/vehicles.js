@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { rbox, sphere, cyl, torus, tube as tubeN, place, merge, tint } from './geom.js';
 import { figureMaterial } from './parts.js';
 import { VEHICLE_LOOK, vehicleKindOf, vehicleMaterialFor } from '../render/vehiclesurface.js';
+import { OUTLINE_ON, outlineFor } from '../render/outline.js';
 
 export const BIKE = { wheelR: 0.34, rear: 0.25, front: -0.84, bb: -0.17 };
 const HUB_Y = BIKE.wheelR;
@@ -176,7 +177,9 @@ export class VehicleFleet {
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.setColorAt(0, WHITE);
       this.group.add(mesh);
-      this.meshes.set(key, { mesh, n: 0, cap, m: mesh.instanceMatrix.array, c: mesh.instanceColor.array });
+      const outline = OUTLINE_ON && (key.startsWith('body:') || key === 'bikeFrame' || key === 'carWheel') ? outlineFor(mesh) : null;
+      if (outline) this.group.add(outline);
+      this.meshes.set(key, { mesh, outline, n: 0, cap, m: mesh.instanceMatrix.array, c: mesh.instanceColor.array });
     }
     this._root = new THREE.Matrix4(); this._w = new THREE.Matrix4(); this._t = new THREE.Matrix4();
     this._q = new THREE.Quaternion(); this._v = new THREE.Vector3(); this._one = new THREE.Vector3(1, 1, 1);
@@ -247,8 +250,9 @@ export class VehicleFleet {
   }
 
   end() {
-    for (const { mesh, n } of this.meshes.values()) {
+    for (const { mesh, n, outline } of this.meshes.values()) {
       mesh.count = n; mesh.visible = n > 0;
+      if (outline) { outline.count = n; outline.visible = n > 0; }
       mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
     }
   }

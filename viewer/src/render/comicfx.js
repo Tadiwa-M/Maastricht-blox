@@ -16,6 +16,10 @@
 // at: three.js position of the impact (or null: the middle of the screen). Sound words are
 // Dutch comic onomatopoeia, our own lettering.
 import * as THREE from 'three';
+import { LOOK } from './verse.js';
+
+// the manga look letters its sound words in katakana
+const KANA = { 'PATS!': 'バシッ', 'KNAL!': 'ドン!', 'BOEM!': 'ドドド', 'KRAK!': 'バーン', 'BONK!': 'ゴン', 'OEPS!': 'ドサッ' };
 
 export const FX = {
   hit: { impact: 0.55, split: 0.5 },
@@ -82,7 +86,8 @@ export class ComicFx {
 
   word(text, at, size) {
     const b = document.createElement('b');
-    b.textContent = text;
+    b.textContent = LOOK === 'manga' ? KANA[text] || text : text;
+    if (LOOK === 'manga') { b.style.color = '#ff3fa4'; b.style.fontFamily = "'Noto Sans JP', 'Yu Gothic', 'Meiryo', sans-serif"; b.style.fontWeight = '900'; }
     b.style.setProperty('--r', `${(Math.random() - 0.5) * 24}deg`);
     b.style.setProperty('--s', String(size));
     this.wordAt = at; this.wordEl = b;
