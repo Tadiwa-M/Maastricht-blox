@@ -244,11 +244,28 @@ export function rumble(pad, { ms, weak, strong }) {
   const act = pad?.vibrationActuator;
   if (act?.playEffect && (!act.effects || act.effects.includes('dual-rumble'))) {
     act.playEffect('dual-rumble', { startDelay: 0, duration: ms, weakMagnitude: weak, strongMagnitude: strong })?.catch?.(() => {});
+    // pads with trigger motors (Xbox, and DualSense where the browser maps them) feel it in the triggers too
+    if (act.effects?.includes('trigger-rumble')) act.playEffect('trigger-rumble', { startDelay: 0, duration: ms, leftTrigger: weak * 0.6, rightTrigger: strong })?.catch?.(() => {});
     return true;
   }
   const old = pad?.hapticActuators?.[0];
   if (old?.pulse) { old.pulse(Math.max(weak, strong), ms)?.catch?.(() => {}); return true; }
   return false;
+}
+
+/**
+ * What this browser says about each connected controller's rumble (Settings > Test controller
+ * rumble): -> [{ name, how: 'dual-rumble' | 'pulse' | null, effects }]; buzzes each one that can.
+ */
+export function rumbleReport(nav = typeof navigator !== 'undefined' ? navigator : null) {
+  const out = [];
+  for (const pad of [...(nav?.getGamepads?.() || [])]) {
+    if (!pad?.connected) continue;
+    const act = pad.vibrationActuator, how = act?.playEffect ? 'dual-rumble' : pad.hapticActuators?.[0]?.pulse ? 'pulse' : null;
+    rumble(pad, { ms: 400, weak: 0.8, strong: 1 });
+    out.push({ name: pad.id.replace(/\s*\(.*$/, '').slice(0, 40), how, effects: act?.effects ? [...act.effects] : null });
+  }
+  return out;
 }
 
 /** Can this gamepad rumble from a web page? (said when it connects) */

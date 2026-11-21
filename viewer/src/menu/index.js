@@ -45,7 +45,8 @@ export async function initMenu(ctx) {
     '<div class="bx-card"><div class="bx-brand"><b>Maastricht</b><span>Blox<i></i><i></i><i></i><i></i></span></div>'
     + '<div class="bx-stripe"><i></i><i></i><i></i></div><div class="bx-head"><h2>Paused</h2></div><div class="bx-where"></div><div class="bx-live"></div><div class="bx-items"></div></div>');
   const settings = el('div', { className: 'bx-page bx-settings', hidden: true },
-    '<div class="bx-card"><div class="bx-head"><h2>Settings</h2><button class="bx-back" type="button">Back</button></div><div class="bx-slot"></div></div>');
+    '<div class="bx-card"><div class="bx-head"><h2>Settings</h2><button class="bx-back" type="button">Back</button></div><div class="bx-slot"></div>'
+    + '<div class="bx-rumble"><button class="bx-item" type="button"><span>Test controller rumble<small>Press a button on the controller first</small></span></button><div class="bx-rumble-msg"></div></div></div>');
   const mapPage = el('div', { className: 'bx-page bx-map', hidden: true }, `<canvas></canvas>
     <div class="bx-maptop"><button class="bx-back" type="button">Back</button><h2>Map</h2><button class="bx-back resume" type="button">Resume</button></div>
     <div class="bx-zoom"><button class="zin" type="button" aria-label="Zoom in">+</button><button class="zout" type="button" aria-label="Zoom out">&minus;</button><button class="me" type="button" aria-label="Centre on you">You</button></div>
@@ -166,6 +167,14 @@ export async function initMenu(ctx) {
 
   btn.addEventListener('click', () => open('main'));
   settings.querySelector('.bx-back').onclick = () => showPage('main');
+  // why a controller doesn't rumble: say what this browser reports (mp/combat.js rumbleReport)
+  settings.querySelector('.bx-rumble button').onclick = async () => {
+    const { rumbleReport } = await import('../mp/combat.js');
+    const r = rumbleReport(), msg = settings.querySelector('.bx-rumble-msg');
+    msg.textContent = !r.length ? 'No controller seen yet: press any button on it, then try again.'
+      : r.map((p) => (p.how ? `${p.name}: rumble sent. Felt nothing? This browser accepts rumble but the connection drops it: try a USB cable, or Chrome or Edge (Firefox and Safari do not rumble controllers).`
+        : `${p.name}: this browser gives this controller no rumble. Try Chrome or Edge, over USB.`)).join(' ');
+  };
   mapPage.querySelector('.bx-back').onclick = () => showPage('main');
   mapPage.querySelector('.resume').onclick = () => close();
 

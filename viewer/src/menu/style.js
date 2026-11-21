@@ -2,6 +2,8 @@
 // Title-screen look: the main page is a column down the left (brand with the yellow brick badge,
 // Limburg stripe, big Anton entries) with the paused city in view beside it; other pages are cards.
 export const MENU_CSS = `
+.bx-rumble { margin-top: 12px; display: grid; gap: 6px; }
+.bx-rumble-msg { font: 12px/1.4 system-ui, sans-serif; color: #c3c6dc; }
 #bx-menu-btn { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px));
   z-index: 7; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 9px; cursor: pointer;
   background: rgba(16, 20, 58, .72); backdrop-filter: blur(6px); box-shadow: 0 2px 0 rgba(0,0,0,.35), 0 4px 14px rgba(0,0,0,.25);
