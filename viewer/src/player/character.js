@@ -56,6 +56,24 @@ export class Character {
   /** Swap the figure's look (character creator); a fresh variant object (the crowd caches per variant). */
   setVariant(v) { this.variant = v; }
 
+  /** World matrices [left, right] of both hands in the current pose (Float32Array(16) each), or null. */
+  hands() {
+    const out = [];
+    for (const p of captureParts(this.variant, this.pose)) if (p.key === 'hand') out.push(p.mat);
+    return out.length === 2 ? out : null;
+  }
+
+  /** The figure see-through (0 solid .. 1 gone): the shooting camera fades it when it is in the way. */
+  setFade(k) {
+    const o = 1 - Math.max(0, Math.min(0.85, k));
+    if (o === this.opacity) return;
+    this.opacity = o;
+    for (const { mesh } of this.crowd.meshes.values()) {
+      const m = mesh.material;
+      m.transparent = o < 1; m.opacity = o; m.depthWrite = o >= 1; m.needsUpdate = m.transparentWas !== m.transparent; m.transparentWas = m.transparent;
+    }
+  }
+
   /** World matrix (Float32Array(16)) of the right hand in the current pose, or null. */
   rightHand() {
     let hand = null;

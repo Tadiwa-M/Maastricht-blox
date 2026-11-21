@@ -9,7 +9,9 @@ import { WEAPONS, PICKUP_R, PICKUP_BACK_S, Gun, spreadDir, hitTest, wallT, melee
 import { TEAM_HEX } from './model.js';
 import { standSpot } from '../player/spot.js';
 
-const HIP_DIST = 3.0, EYE_DIST = 0.05, TRACER_S = 0.09, DARK = '#4b4f5c';
+const HIP_DIST = 2.6, EYE_DIST = 0.05, TRACER_S = 0.09, DARK = '#4b4f5c';
+export const COMBAT_SHOULDER = 0.85; // m: the hip-fire camera over the right shoulder
+const _L = new THREE.Vector3(), _R = new THREE.Vector3(), _D = new THREE.Vector3(), _T = new THREE.Vector3(), _UP = new THREE.Vector3(0, 1, 0), _M = new THREE.Matrix4(), _Q = new THREE.Quaternion();
 const CSS = `
 #cb { position: fixed; inset: 0; pointer-events: none; z-index: 4; font-family: system-ui, sans-serif; }
 #cb[hidden] { display: none; }
@@ -481,7 +483,7 @@ export class Combat {
       for (const b of this.btns) b.hidden = !(on && this.touch);
       if (on && !this.tipped) { this.tipped = true; this.tipT = TIP_S; this.tipEl.classList.remove('gone'); } // how to play, once per room
       if (on) { this.saved = { o: { minDist: f.o.minDist, shoulder: f.o.shoulder, fov: f.o.fov }, dist: f.aimDist, recenter: P.settings.recenter }; P.settings.recenter = false; }
-      else { this.restoreCamera(); const P = this.player(); if (P?.character) P.character.aim = null; this.hands.visible = this.side.visible = false; this.fire = this.aiming = false; for (const p of this.pickups) p.g.visible = false; }
+      else { this.restoreCamera(); const P = this.player(); if (P?.character) { P.character.aim = null; P.character.setFade?.(0); } this.hands.visible = this.side.visible = false; this.fire = this.aiming = false; for (const p of this.pickups) p.g.visible = false; }
     }
     this.stepFx(dt);
     if (this.tipT > 0 && (this.tipT -= dt) <= 0) this.tipEl.classList.add('gone');
@@ -498,6 +500,10 @@ export class Combat {
     } else this.downEl.hidden = true;
 
     this.stepPickups(dt, st, alive);
+    // the shooting camera (Call of Duty: your aim is never blocked): from the hip the camera sits
+    // over the right shoulder (the figure to the left of the crosshair); aiming goes to the eyes
+    // (the gun in the hands); the figure fades when the camera is close to it
+    const hipShoulder = Math.max(this.saved.o.shoulder || 0, COMBAT_SHOULDER);
     // aim: ease in and out; the follow camera moves to the eyes and narrows its view
     const wantAim = alive && this.aiming && !this.gun.reloading && !def.melee ? 1 : 0;
     this.aim += (wantAim - this.aim) * Math.min(1, dt * 14);
@@ -509,8 +515,9 @@ export class Combat {
       f.aimYaw = wrap(f.aimYaw - wrap(f.aimYaw - this.prevAim[0]) * (1 - sens));
       f.aimPitch -= (f.aimPitch - this.prevAim[1]) * (1 - sens);
     }
-    f.o.minDist = EYE_DIST; f.o.shoulder = lerp(this.saved.o.shoulder, 0, a); f.o.fov = lerp(this.saved.o.fov, fov, a);
+    f.o.minDist = EYE_DIST; f.o.shoulder = lerp(hipShoulder, 0, a); f.o.fov = lerp(this.saved.o.fov, fov, a);
     f.aimDist = lerp(HIP_DIST, EYE_DIST, a);
+    P?.character?.setFade?.(a > 0.02 && a < 0.98 ? Math.min(1, a * 2.2) : 0); // see-through while the camera passes through it
 
     // a click shorter than a frame still fires (tap is cleared once the gun has seen it)
     // V: a quick stab with whatever is in the hands (the knife comes out, then the gun is back)
@@ -627,6 +634,23 @@ export class Combat {
     const sk = this.sprintK || 0, rk = (this.readyK ?? 0) * (1 - sk), lowK = 1 - rk;
     const downP = -0.55 * (1 - sk) - 0.7 * sk, across = 0.35 * (1 - sk) + 0.75 * sk;
     model.side.rotation.set(-f.pitch * rk + downP * lowK + this.kick * (def.feel?.back || 0) * 1.6, -yaw + across * lowK, 0.3 * lowK, 'YXZ');
+    // truly in the hands: the grip in the right hand, the barrel out through the left (the support
+    // hand the rig puts on the fore-end); the old aim pose only when the hands are apart (a carry)
+    const both = alive && !eyes && !def.melee ? P?.character?.hands?.() : null;
+    if (both) {
+      _L.set(both[0][12], both[0][13], both[0][14]); _R.set(both[1][12], both[1][13], both[1][14]);
+      _D.subVectors(_L, _R);
+      const len = _D.length();
+      if (len > 0.12 && len < 0.85) {
+        _D.divideScalar(len);
+        _M.lookAt(_R, _T.copy(_R).add(_D), _UP); // -z (the barrel) toward the support hand
+        _Q.setFromRotationMatrix(_M);
+        const k = Math.min(1, (0.85 - len) / 0.2); // ease out toward a one-hand carry
+        model.side.quaternion.slerp(_Q, k);
+        model.side.position.lerp(_T.copy(_R).addScaledVector(_UP, 0.01), k);
+        if (this.kick > 0) model.side.rotateX(this.kick * (def.feel?.back || 0) * 1.6);
+      }
+    }
     if (!def.melee && this.kick > 0) { // the gun jumps back into the shoulder
       const b = this.kick * (def.feel?.back || 0);
       model.side.position.x -= Math.sin(yaw) * b; model.side.position.z += Math.cos(yaw) * b;
