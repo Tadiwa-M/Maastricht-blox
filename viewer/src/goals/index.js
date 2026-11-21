@@ -329,7 +329,7 @@ export async function initGoals(ctx) {
   // ---- the card -------------------------------------------------------------------------------
   let prompt = false, idle = false;
   function cardView() {
-    if (prompt) {
+    if (prompt && !window.__bloxTourOn) {
       return { head: 'Welcome to Maastricht', title: `${touch ? 'Double-tap' : 'Double-click'} the <b>Markt</b> to walk there`,
         sub: 'Or anywhere else in town. The golden light marks the Markt.', short: 'Walk on the Markt',
         actions: [{ label: 'OK', on: () => { prompt = false; } }] };

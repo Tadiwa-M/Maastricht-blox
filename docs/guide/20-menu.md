@@ -82,3 +82,13 @@ look with a short description (Classic; "Jump into the Spider-Verse", the comic-
 Manga, coming soon), the look in use marked, and Switch (the page reloads with `#look=...`; the
 choice is saved, `render/verse.js` `switchLook`). The menu line reads "Look: Classic" or
 "Look: Spider-Verse".
+
+## First-time walkthrough (2026-11-21)
+
+Owner: new players don't know to zoom in and double-tap, nor what to do, nor about the looks.
+`menu/tour.js`: on the first visit (localStorage `blox.tour`), once the title screen is gone, a card
+at the top in four steps: (1) how to get into the street, or "Drop me on the Markt" (flies the map
+there if it isn't loaded, then enters walk mode); (2) moving, and what to do (tourists with a !,
+bikes, ducks); (3) "Jump into the Spider-Verse" (opens the look picker); (4) Defend Maastricht and
+capture the flag (opens Play). Steps move on by themselves when the player does the thing; Skip
+ends it; pause menu > Tour plays it again. The goals card's own welcome waits while the tour runs.

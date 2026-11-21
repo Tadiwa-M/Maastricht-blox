@@ -263,6 +263,8 @@ async function initHooks(ctx) {
   try { out.push(await (await import('./mp/index.js')).initMultiplayer?.(ctx)); } catch (e) { console.error('mp', e); }
   // [menu hook] the pause menu, full-screen map and fast travel (src/menu/); last: it drives the others
   try { out.push(await (await import('./menu/index.js')).initMenu?.(ctx)); } catch (e) { console.error('menu', e); }
+  // [tour hook] the first-time walkthrough (src/menu/tour.js)
+  if (!ctx.still) try { window.__bloxTour = (await import('./menu/tour.js')).initTour(); } catch (e) { console.error('tour', e); }
   return out.filter((h) => h && typeof h === 'object');
 }
 

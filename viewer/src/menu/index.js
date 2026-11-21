@@ -92,7 +92,7 @@ export async function initMenu(ctx) {
 
   function renderMain() {
     const has = { player: !!player(), explore: !!explore(), trip: !!window.__bloxTrip, goals: !!window.__bloxGoals,
-      mp: !!document.getElementById('mp-open'), music: !!window.__bloxMusic };
+      mp: !!document.getElementById('mp-open'), music: !!window.__bloxMusic, tour: !!window.__bloxTour };
     const list = menuItems({ has, goalsOff: !!window.__bloxGoals?.flow?.off, touch: touch(), match: match(), look: lookName() });
     const box = main.querySelector('.bx-items');
     box.innerHTML = '';
@@ -184,6 +184,7 @@ export async function initMenu(ctx) {
   // the look (render/verse.js): Classic or Comic from the menu; a hash flag can pick the manga test look
   function lookName() { return MENU_LOOKS.find((l) => l.id === LOOK)?.name || (LOOK === 'manga' ? 'Manga (test)' : 'Classic'); }
   const looks = initLooks(); // the look picker (menu/looks.js)
+  window.__bloxLooks = looks;
 
   function choose(id) {
     const p = player(), ex = explore();
@@ -193,6 +194,7 @@ export async function initMenu(ctx) {
       case 'settings': showPage('settings'); break;
       case 'look': close({ resume: false }); looks?.open(); break;
       case 'music': close({ resume: false }); window.__bloxMusic?.open(); break;
+      case 'tour': close(); window.__bloxTour?.start(); break;
       case 'character': close({ resume: false }); inWalk(() => p?.openCreator?.()); break;
       case 'journal': close({ resume: false }); ex?.journal(true); break;
       case 'photo': close(); inWalk(() => ex?.photo(true)); break;

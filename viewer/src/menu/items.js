@@ -18,6 +18,7 @@ export function menuItems({ has = {}, goalsOff = false, touch = false, match = f
     { id: 'music', label: 'Music', key: '', sub: 'Play your Spotify while you play', need: 'music' },
     { id: 'settings', label: 'Settings', key: '', sub: 'Sun, quality, sound' },
     { id: 'help', label: 'Controls & help', key: 'H', need: 'player' },
+    { id: 'tour', label: 'Tour', key: '', sub: 'What there is to do, again', need: 'tour' },
     { id: 'mp', label: 'Multiplayer', key: '', need: 'mp' },
   ];
   return all.filter((it) => !it.need || has[it.need]).map(({ need, ...it }) => ({ ...it, key: touch ? '' : it.key, sub: it.sub || '' }));

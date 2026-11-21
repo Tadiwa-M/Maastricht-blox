@@ -1943,3 +1943,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   shooting camera; a first-time walkthrough (look switch, how to enter walk mode); fewer people
   and vehicles away from where people really are (no walkers on roofs, no cars driving nowhere).
 - Crowds scale with how busy the place really is (old town busy, outskirts nearly empty); no walkers on roofs (guide 05).
+- First-time walkthrough: four steps (drop in, what to do, the looks, the games), skippable, replay from the pause menu (guide 20).
