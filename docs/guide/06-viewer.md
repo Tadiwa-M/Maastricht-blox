@@ -914,3 +914,11 @@ From the owner's photos (Bosscherweg, Markt, Maagdendries, the Vrijthof). No wor
   are glowing bars in red, blue and white with a slow pulse; a giant lit gift box (red, white bands,
   a bow) beside the wheel; the square's trees found as thin solid columns and wound with white, ice
   blue or gold lights (spiral up the trunk, sprinkled through the crown).
+
+## The manga look, JoJo style, in the menu (2026-11-21)
+
+Owner: the manga look should be like JoJo's Bizarre Adventure (references: flat loud colour, odd
+palettes, heavy ink). `render/verse.js` (MANGA): three flat tones per surface, the shade hue-turned
+toward violet and magenta, the light pale and warm, colour louder than life; a flat teal-to-violet
+sky; ink outlines two pixels out (bold), solid black in the deepest shade, hatching only in the
+shade (the darker half of the middle tone lightly); distance paler. In the Look menu as "Manga".

@@ -6,7 +6,7 @@ import { LOOK, switchLook } from '../render/verse.js';
 export const LOOKS = [
   { id: null, name: 'Classic', text: 'The toy city: smooth plastic bricks, soft daylight and a miniature tilt-shift blur.' },
   { id: 'verse', name: 'Jump into the Spider-Verse', text: 'A comic-book film come to life: inked outlines, halftone dots and hatching, painted textures, people animated on twos, and colours that split and flash when the action hits.' },
-  { id: 'manga', name: 'Manga', text: 'Black ink on paper: screentone, cross-hatching and bold lines, like a printed manga page.', soon: true },
+  { id: 'manga', name: 'Manga', text: 'A bizarre-adventure manga page: flat, loud pop colours, shadows in violet and magenta, heavy black ink outlines and hatching.' },
 ];
 
 const CSS = `

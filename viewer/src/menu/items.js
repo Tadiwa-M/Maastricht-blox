@@ -14,7 +14,7 @@ export function menuItems({ has = {}, goalsOff = false, touch = false, match = f
     { id: 'photo', label: 'Photo mode', key: 'P', need: 'explore' },
     { id: 'trip', label: 'Plan a trip', key: '', need: 'trip' },
     { id: 'goals', label: goalsOff ? 'Goals: off' : 'Goals: on', key: 'O', need: 'goals' },
-    { id: 'look', label: `Look: ${look}`, key: '', sub: 'Classic, Spider-Verse, Manga' },
+    { id: 'look', label: `Look: ${look}`, key: '', sub: 'Classic, Spider-Verse or Manga' },
     { id: 'music', label: 'Music', key: '', sub: 'Play your Spotify while you play', need: 'music' },
     { id: 'settings', label: 'Settings', key: '', sub: 'Sun, quality, sound' },
     { id: 'help', label: 'Controls & help', key: 'H', need: 'player' },

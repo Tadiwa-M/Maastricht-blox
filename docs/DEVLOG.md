@@ -1947,3 +1947,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Arsenal: SMG, pistol, LMG; loadouts; reserve ammo; ammo boxes and medkits; health regen; the gun held in both hands; over-the-shoulder hip camera (guide 18). Relay redeploy needed for online rooms.
 - Raiders are marl golems with glowing eyes (no more smiling people); bots keep apart.
 - Haptics: trigger rumble where the pad has it; Settings > Test controller rumble says what the browser reports (owner: no rumble on the laptop).
+- Manga look rebuilt JoJo-style and added to the Look menu (guide 06).

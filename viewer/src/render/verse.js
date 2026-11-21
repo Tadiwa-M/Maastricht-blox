@@ -10,7 +10,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 export const VERSE = { twosHz: 12, maxSlip: 1.3, focusSpan: 1.0 };
 export const lookFromHash = (hash) => /(?:^|[#&])look=(verse|manga)(?:&|$)/.exec(hash || '')?.[1] || null;
 /** Looks offered in the pause menu (manga stays a test flag until it is right). */
-export const MENU_LOOKS = [{ id: null, name: 'Classic' }, { id: 'verse', name: 'Spider-Verse' }]; // (menu/looks.js describes them)
+export const MENU_LOOKS = [{ id: null, name: 'Classic' }, { id: 'verse', name: 'Spider-Verse' }, { id: 'manga', name: 'Manga' }]; // (menu/looks.js describes them)
 const STORE_KEY = 'blox.look';
 const safeStore = () => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } };
 
@@ -118,27 +118,39 @@ const shader = {
       return o * 0.95 + vec3(0.018, 0.022, 0.034);
     }
     #ifdef MANGA
-    // ink on paper: the value picks a tone (paper, fine screentone, dense screentone, cross-hatching,
-    // solid black); lines in ink at silhouettes (bold) and creases (fine), lighter with distance;
-    // the sky is paper; lights stay paper white. Night is lifted so it stays readable.
+    // the JoJo manga look (owner's references): flat, bold pop colour in three tones per surface,
+    // the shade pushed toward violet and magenta and the light toward a pale warm, colours far more
+    // saturated than life; heavy black ink: thick outlines, solid black in the deepest shade, cross
+    // hatching through the shade band; a flat graphic sky (teal to violet). Night lifted to read.
+    vec3 hue(vec3 c, float a) { // rotate the hue (radians) about the grey axis
+      const vec3 k = vec3(0.57735);
+      float ca = cos(a);
+      return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
+    }
     vec3 manga(vec3 base, float z, float sky, float dEdge, float nEdge, float nearK, vec2 f, vec3 nrmM) {
       float L = luma(base);
-      L = mix(L, pow(L, 0.55), night);
-      L = mix(L, 1.0, smoothstep(250.0, 1400.0, z) * 0.55); // aerial: distance goes pale
-      float s = sin(0.785), co = cos(0.785);
-      vec2 q = mat2(co, -s, s, co) * f / 3.0; // a 45-degree screen, 3 px pitch (finer: reads as grey, not dots)
-      float dotR = length(fract(q) - 0.5);
-      float tone = 1.0;
-      float t1 = 1.0 - smoothstep(0.4, 0.46, L), t2 = 1.0 - smoothstep(0.24, 0.29, L), t3 = 1.0 - smoothstep(0.13, 0.17, L), t4 = 1.0 - smoothstep(0.08, 0.11, L); // mostly paper, solid blacks, tone only where it shapes
-      tone -= t1 * (1.0 - smoothstep(0.17, 0.23, dotR)) * (1.0 - t2);         // fine dots
-      tone -= t2 * (1.0 - smoothstep(0.3, 0.36, dotR)) * (1.0 - t3);          // dense dots
-      float hk = inkHatch(f, nrmM, t3 * 0.8, 3.5);
-      tone -= t3 * hk * (1.0 - t4) * 0.9;                                     // inked hatching along the form
-      tone = mix(tone, 0.0, t4);                                              // solid black
-      tone = mix(tone, 1.0, sky);
-      float ink = max(dEdge, nEdge * 0.5) * mix(0.35, 1.0, nearK) * (1.0 - sky);
-      vec3 paper = vec3(0.965, 0.955, 0.925), black = vec3(0.07, 0.065, 0.075);
-      return mix(black, paper, clamp(tone, 0.0, 1.0) * (1.0 - ink));
+      L = mix(L, pow(L, 0.6), night * 0.8);
+      // three flat tones
+      float band = L < 0.16 ? 0.0 : L < 0.42 ? 1.0 : 2.0;
+      vec3 chroma = base - luma(base);
+      vec3 flatc = vec3(mix(0.2, mix(0.48, 0.86, step(1.5, band)), step(0.5, band))) + chroma * 2.2;
+      // shade: toward violet and magenta; light: pale and warm
+      vec3 shade = hue(flatc, 0.55) * vec3(0.85, 0.6, 1.15) + vec3(0.06, 0.0, 0.1);
+      vec3 light = flatc * vec3(1.06, 1.0, 0.9) + vec3(0.04, 0.03, 0.0);
+      vec3 c = band < 0.5 ? shade * 0.75 : band < 1.5 ? mix(shade, flatc, 0.45) : light;
+      c = mix(vec3(luma(c)), c, 1.35); // louder than life
+      // the sky: a flat graphic gradient
+      vec3 skyc = mix(vec3(0.16, 0.62, 0.66), vec3(0.42, 0.3, 0.72), vUv.y) * mix(1.0, 0.45, night);
+      c = mix(c, skyc, sky);
+      c = mix(c, mix(vec3(luma(c)), c, 0.6) * 1.08 + 0.05, smoothstep(300.0, 1500.0, z) * (1.0 - sky)); // distance: paler
+      // ink: hatching across the shade band, solid black in the deepest shade, thick outlines
+      // (only in the shade: the darker half of the middle tone lightly, the shade tone fully)
+      float hs = band < 0.5 ? 0.9 : band < 1.5 ? (1.0 - smoothstep(0.18, 0.3, L)) * 0.55 : 0.0;
+      float hk = inkHatch(f, nrmM, hs, 5.0) * (0.4 + 0.6 * nearK);
+      c = mix(c, vec3(0.05, 0.03, 0.08), hk * 0.75 * (1.0 - sky));
+      c = mix(c, vec3(0.04, 0.02, 0.06), (1.0 - smoothstep(0.05, 0.1, L)) * (1.0 - sky));
+      float ink = max(dEdge, nEdge * 0.7) * mix(0.5, 1.0, nearK) * (1.0 - sky);
+      return mix(clamp(c, 0.0, 1.0), vec3(0.03, 0.02, 0.05), ink);
     }
     #endif
     void main() {
@@ -168,6 +180,10 @@ const shader = {
       vec3 n0 = nrm(vUv);
       float zx = dist(vUv + vec2(px.x, 0.0)), zy = dist(vUv + vec2(0.0, px.y)), zx2 = dist(vUv - vec2(px.x, 0.0)), zy2 = dist(vUv - vec2(0.0, px.y));
       float dEdge = smoothstep(0.035, 0.08, (abs(zx - z) + abs(zy - z) + abs(zx2 - z) + abs(zy2 - z)) / max(z, 0.5));
+      #ifdef MANGA // bold brush lines: also two pixels out
+        float zX = dist(vUv + vec2(px.x * 2.0, 0.0)), zY = dist(vUv + vec2(0.0, px.y * 2.0)), zX2 = dist(vUv - vec2(px.x * 2.0, 0.0)), zY2 = dist(vUv - vec2(0.0, px.y * 2.0));
+        dEdge = max(dEdge, smoothstep(0.05, 0.11, (abs(zX - z) + abs(zY - z) + abs(zX2 - z) + abs(zY2 - z)) / max(z, 0.5)));
+      #endif
       float nEdge = smoothstep(0.6, 1.1, (1.0 - dot(n0, nrm(vUv + vec2(px.x, 0.0)))) + (1.0 - dot(n0, nrm(vUv + vec2(0.0, px.y)))));
       float near = 1.0 - smoothstep(60.0, 260.0, z);
       // fine detail (crease lines, hatching, dots) needs pixels: on a small, low-resolution screen

@@ -191,7 +191,7 @@ export async function initMenu(ctx) {
   }
 
   // the look (render/verse.js): Classic or Comic from the menu; a hash flag can pick the manga test look
-  function lookName() { return MENU_LOOKS.find((l) => l.id === LOOK)?.name || (LOOK === 'manga' ? 'Manga (test)' : 'Classic'); }
+  function lookName() { return MENU_LOOKS.find((l) => l.id === LOOK)?.name || 'Classic'; }
   const looks = initLooks(); // the look picker (menu/looks.js)
   window.__bloxLooks = looks;
 

@@ -20,7 +20,7 @@ test('the saved look applies unless the address says otherwise; switching keeps 
   assert.equal(chooseLook('', null), null);
   assert.equal(hashWithLook('#t=9&look=verse&quality=high', null), '#t=9&quality=high&look=classic');
   assert.equal(hashWithLook('', 'verse'), '#look=verse');
-  assert.deepEqual(MENU_LOOKS.map((l) => l.id), [null, 'verse']);
+  assert.deepEqual(MENU_LOOKS.map((l) => l.id), [null, 'verse', 'manga']);
   assert.equal(isPhone(true, 412), true, 'a phone');
   assert.equal(isPhone(false, 400), false, 'a small laptop window is not a phone');
   assert.equal(isPhone(true, 800), false, 'a touch laptop or tablet is not a phone');
