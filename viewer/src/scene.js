@@ -157,8 +157,15 @@ export class Stage {
   }
 
   /** Apply a quality tier (src/quality.js): pixel ratio, shadow map size, AO and bloom. */
+  /** Dynamic resolution (quality.js DynamicResolution): a share 0.5..1 of the tier's pixel ratio. */
+  setResolutionScale(s) {
+    this.resScale = s;
+    if (this.tier) this.setQuality(this.tier);
+  }
+
   setQuality(tier) {
-    const pr = Math.min(window.devicePixelRatio || 1, tier.pixelRatio);
+    this.tier = tier;
+    const pr = Math.min(window.devicePixelRatio || 1, tier.pixelRatio) * (this.resScale ?? 1);
     if (pr !== this.renderer.getPixelRatio()) {
       this.renderer.setPixelRatio(pr);
       this.renderer.setSize(this.width, this.height, false);

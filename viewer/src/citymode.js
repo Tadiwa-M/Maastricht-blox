@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
 import { MaterialSet } from './materials.js';
 import { World } from './world.js';
-import { TIERS, MODES, initialTier, FrameGovernor, FpsMeter } from './quality.js';
+import { TIERS, MODES, initialTier, FrameGovernor, FpsMeter, DynamicResolution } from './quality.js';
 import { Stage } from './scene.js';
 import { FarRegions } from './farregion.js';
 import { decodeBxf } from './farbake.js';
@@ -212,7 +212,9 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const gpu = gpuInfo(stage.renderer);
   const gpuTier = autoTierFor(gpu.cls);
   const floor = gpu.cls === 'software' ? 'lite' : 'low';
-  let tierName = initialTier(mode, size, gpuTier), governor = new FrameGovernor(tierName, { floor });
+  // owner: 60 fps on any device. The resolution follows the frame time (quality.js DynamicResolution)
+  const drs = typeof location !== 'undefined' && /[#&]drs=0/.test(location.hash) ? null : new DynamicResolution();
+  let tierName = initialTier(mode, size, gpuTier), governor = new FrameGovernor(tierName, { floor, slowMs: drs ? 24 : 40 });
   if (gpu.cls === 'software' && !still && !film) {
     cover.whenGone(() => showNotice('Your browser is drawing without the graphics card (hardware acceleration is off), so the city will be slow. '
       + 'Turn on "Use graphics acceleration when available" in the browser settings and restart it.'));
@@ -252,7 +254,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     viewScale = -1; // re-apply the height-scaled radii below
     ui?.tier(mode, name);
   }
-  function setMode(m) { mode = m; governor = new FrameGovernor(initialTier(m, size, gpuTier), { floor }); applyTier(initialTier(m, size, gpuTier)); }
+  function setMode(m) { mode = m; governor = new FrameGovernor(initialTier(m, size, gpuTier), { floor, slowMs: drs ? 24 : 40 }); applyTier(initialTier(m, size, gpuTier)); }
   applyTier(tierName);
 
   const controls = new MapControls(stage.camera, canvas);
@@ -381,7 +383,9 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
       r.info.reset();
       stage.render(controls.target);
       if (firstFrame === null) { firstFrame = performance.now(); times.firstFrame = firstFrame - t0; }
-      if (mode === 'auto' && !still && ms > 0) { const next = governor.sample(ms); if (next) applyTier(next); }
+      // dynamic resolution first (every mode; #drs=0 turns it off); a tier lower only when it has no pixels left to give
+      if (!still && ms > 0 && drs) { const s = drs.sample(ms); if (s !== null) stage.setResolutionScale(s); }
+      if (mode === 'auto' && !still && ms > 0 && (!drs || drs.atFloor)) { const next = governor.sample(ms); if (next) applyTier(next); }
     }
     if (now - lastStats > 250 || still) {
       lastStats = now;

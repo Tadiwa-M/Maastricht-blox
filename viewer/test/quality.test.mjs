@@ -74,3 +74,15 @@ test('performance mode: on by default, #perf wins over the saved choice', async 
   assert.equal(perfMode(new URLSearchParams('perf=1'), store('off')), true);
   assert.equal(perfMode(new URLSearchParams('perf=0'), store('on')), false);
 });
+
+test('dynamic resolution: fewer pixels while missing 60 fps, back up once it runs at the display pace, never below the floor', async () => {
+  const { DynamicResolution } = await import('../src/quality.js');
+  const d = new DynamicResolution();
+  for (let k = 0; k < 200; k++) d.sample(30); // 33 fps
+  assert.ok(d.atFloor, `scale ${d.scale}`);
+  for (let k = 0; k < 2000; k++) d.sample(16.7); // vsync again
+  assert.ok(d.scale > 0.8, `back up: ${d.scale}`);
+  const e = new DynamicResolution();
+  for (let k = 0; k < 2000; k++) e.sample(16.7);
+  assert.equal(e.scale, 1, 'already smooth: full resolution');
+});

@@ -77,6 +77,7 @@ const GLSL = `
   float puddleAt(vec3 p) { return smoothstep(0.52, 0.66, sNoise(p * 0.32) * 0.7 + sNoise(p * 1.4) * 0.3); }
   // the weather on a surface: wet ground darker (puddles more), snow settling on what faces up
   vec3 weatherSurface(vec3 c) {
+    if (uWet < 0.001 && uSnowCover < 0.001) return c; // dry: nothing to work out (most of the time)
     float up = smoothstep(0.55, 0.9, normalize(vSurfN).y);
     float pud = puddleAt(vSurfP) * up;
     c *= 1.0 - uWet * (0.22 * up + 0.25 * pud);

@@ -56,10 +56,10 @@ export class Post {
       this.verse = makeVersePass(this.scenePass, this.look); c.addPass(this.verse); globalThis.__bloxTwos = true;
       for (const p of this.tilt) p.enabled = false;
       gtao.blendIntensity = 1.2;
-      this.pools = new PoolLights(); // lamps and shop windows light their surroundings at night
       this.fx = new ComicFx(); // the look reacting to hits, knock-outs, waves (render/comicfx.js)
     }
     this.composer = c;
+    this.pools = new PoolLights(); // lamps and shop windows light their surroundings at night (every look)
     this.tiltOn = !this.verse; // (the comic look is crisp: no miniature blur)
     this.aoWanted = true; // the HUD toggle
     this.quality = { ao: 'full', bloom: 'always' };
@@ -70,6 +70,7 @@ export class Post {
   /** Tier settings: ao 'full' | 'half' | 'off', bloom 'always' | 'night', aa (edge smoothing in the grade pass). */
   setQuality({ ao, bloom, aa = false }) {
     this.quality = { ao, bloom };
+    this.pools.cap = ao === 'full' ? 48 : ao === 'half' ? 24 : 12; // lights a pixel adds up: fewer on the cheaper tiers
     this.grade.aa = aa;
     const scale = ao === 'half' ? 0.5 : 1;
     if (scale !== this.aoScale) { this.aoScale = scale; this.resize(this.width, this.height); }
@@ -133,12 +134,12 @@ export class Post {
   }
 
   render() {
+    this.pools.update(this.camera, this.night);
     if (this.verse) { // the focus follows what the camera looks at
       const p = globalThis.__bloxPlayer, cam = this.camera;
       const at = p?.mode === 'walk' && p.ctrl ? p.ctrl.pos : null;
       const focus = at ? Math.hypot(cam.position.x - at[0], cam.position.y - at[1] - 1.2, cam.position.z - at[2]) : (this.focusTarget ? cam.position.distanceTo(this.focusTarget) : 30);
       updateVerse(this.verse, cam, focus, this.width, this.height, this.night, this.composer.renderer.getPixelRatio());
-      this.pools.update(cam, this.night);
       if (this.fx.holding) return; // a held impact frame: the last picture stays up a moment
       const t = performance.now(), dt = Math.min(0.1, (t - (this.fxT || t)) / 1000);
       this.fxT = t;

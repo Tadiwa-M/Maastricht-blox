@@ -922,3 +922,16 @@ palettes, heavy ink). `render/verse.js` (MANGA): three flat tones per surface, t
 toward violet and magenta, the light pale and warm, colour louder than life; a flat teal-to-violet
 sky; ink outlines two pixels out (bold), solid black in the deepest shade, hatching only in the
 shade (the darker half of the middle tone lightly); distance paler. In the Look menu as "Manga".
+
+## Toward 60 fps everywhere (2026-11-21)
+
+Owner: 60 fps on any device. Before dropping detail, the render resolution now follows the frame
+time (`quality.js` `DynamicResolution`, `scene.js` `setResolutionScale`; every quality mode, `#drs=0`
+turns it off): 10 % fewer pixels each way per half second while frames miss 60 fps, down to half;
+6 % back after 3 s at the display's own pace; a step up that makes it slow sets a ceiling (retried
+every 2 min). Auto quality drops a tier only once the resolution has nothing left to give (and at
+24 ms now, was 40). Also: night light pools capped by tier (48 high, 24 medium, 12 low/lite) and
+updated in every look; the wet/snow shader returns at once when dry. Checked headless: the software
+renderer settles at half resolution, the picture stays clean.
+Still open (bigger jobs): merge near-chunk meshes per material, frustum-cull the instanced crowds
+per block, a worker for the walkers' simulation.

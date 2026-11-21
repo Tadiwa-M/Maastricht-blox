@@ -44,7 +44,7 @@ export const lampPool = (head) => ({ p: head, r: POOL.lampR, c: WARM.map((v) => 
 
 /** Per frame: the nearest lights to the camera into the shared uniforms, scaled by the night. */
 export class PoolLights {
-  constructor() { this.lastEye = null; this.picked = []; }
+  constructor() { this.lastEye = null; this.picked = []; this.cap = POOL.cap; }
 
   update(camera, night) {
     const k = Math.max(0, Math.min(1, (night - POOL.from) / (POOL.full - POOL.from)));
@@ -57,7 +57,7 @@ export class PoolLights {
       const d2 = (l) => (l.p[0] - eye.x) ** 2 + (l.p[1] - eye.y) ** 2 + (l.p[2] - eye.z) ** 2;
       for (const l of all) l.d2 = d2(l);
       all.sort((a, b) => a.d2 - b.d2);
-      this.picked = all.slice(0, POOL.cap);
+      this.picked = all.slice(0, Math.min(POOL.cap, this.cap));
     }
     const P = poolUniforms.uPoolP.value, C = poolUniforms.uPoolC.value;
     this.picked.forEach((l, i) => { P[i].set(l.p[0], l.p[1], l.p[2], l.r); C[i].set(l.c[0] * k, l.c[1] * k, l.c[2] * k); });

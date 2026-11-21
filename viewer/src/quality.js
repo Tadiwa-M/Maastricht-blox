@@ -83,6 +83,44 @@ export class FrameGovernor {
   }
 }
 
+/**
+ * Dynamic resolution (owner: 60 fps on any device): the render resolution follows the frame time.
+ * Every windowMs it looks at the mean frame interval: slower than slowMs (missing 60 fps) -> 10 %
+ * fewer pixels each way (down to min); at the display's own pace (vsync, about 16.7 ms) for upMs ->
+ * try 6 % more (up to 1); a try that makes it slow again sets a ceiling for a while. sample(ms) ->
+ * the new scale, or null to stay. atFloor: no more pixels to give (then the tier may drop).
+ */
+export class DynamicResolution {
+  constructor({ min = 0.5, slowMs = 18.5, fastMs = 17.4, windowMs = 500, upMs = 3000 } = {}) {
+    Object.assign(this, { min, slowMs, fastMs, windowMs, upMs });
+    this.scale = 1; this.ceiling = 1; this.sum = 0; this.n = 0; this.span = 0; this.calm = 0; this.lastUp = 0; this.t = 0;
+  }
+  get atFloor() { return this.scale <= this.min + 1e-6; }
+  sample(ms) {
+    this.t += ms; this.sum += ms; this.n++; this.span += ms;
+    if (this.span < this.windowMs) return null;
+    const avg = this.sum / this.n;
+    this.sum = 0; this.n = 0; this.span = 0;
+    if (this.t - this.lastUp > 120000) this.ceiling = 1; // try the full resolution again now and then
+    if (avg > this.slowMs) {
+      this.calm = 0;
+      if (this.t - this.lastUp < 1500) this.ceiling = Math.max(this.min, this.scale / 1.06 - 0.01); // that step up was too much
+      const next = Math.max(this.min, this.scale * 0.9);
+      if (next !== this.scale) { this.scale = next; return next; }
+      return null;
+    }
+    if (avg <= this.fastMs) {
+      this.calm += this.windowMs;
+      if (this.calm >= this.upMs && this.scale < this.ceiling) {
+        this.calm = 0; this.lastUp = this.t;
+        this.scale = Math.min(this.ceiling, this.scale * 1.06);
+        return this.scale;
+      }
+    } else this.calm = 0;
+    return null;
+  }
+}
+
 /** Frames per second and mean frame time over a sliding window of real frame intervals. */
 export class FpsMeter {
   constructor(windowMs = 1000) { this.windowMs = windowMs; this.times = []; this.last = null; }
