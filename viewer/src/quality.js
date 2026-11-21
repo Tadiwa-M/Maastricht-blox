@@ -93,6 +93,7 @@ export class FrameGovernor {
 export class DynamicResolution {
   constructor({ min = 0.5, slowMs = 18.5, fastMs = 17.4, windowMs = 500, upMs = 3000 } = {}) {
     Object.assign(this, { min, slowMs, fastMs, windowMs, upMs });
+    this.min0 = min;
     this.scale = 1; this.ceiling = 1; this.sum = 0; this.n = 0; this.span = 0; this.calm = 0; this.lastUp = 0; this.t = 0;
   }
   get atFloor() { return this.scale <= this.min + 1e-6; }
@@ -102,11 +103,18 @@ export class DynamicResolution {
     const avg = this.sum / this.n;
     this.sum = 0; this.n = 0; this.span = 0;
     if (this.t - this.lastUp > 120000) this.ceiling = 1; // try the full resolution again now and then
+    // a drop that bought nothing: the frame rate is capped elsewhere (a remote desktop, a 30 Hz
+    // screen, the CPU): go back to where it was and stop trying for a while
+    if (this.dropFrom && this.t - this.dropAt < 1200) {
+      if (avg > this.dropAvg * 0.94) { this.scale = this.dropFrom; this.min = Math.max(this.min, this.dropFrom); this.dropFrom = 0; this.lockUntil = this.t + 60000; return this.scale; }
+      this.dropFrom = 0;
+    }
+    if (this.lockUntil && this.t > this.lockUntil) { this.lockUntil = 0; this.min = this.min0; }
     if (avg > this.slowMs) {
       this.calm = 0;
       if (this.t - this.lastUp < 1500) this.ceiling = Math.max(this.min, this.scale / 1.06 - 0.01); // that step up was too much
       const next = Math.max(this.min, this.scale * 0.9);
-      if (next !== this.scale) { this.scale = next; return next; }
+      if (next !== this.scale) { this.dropFrom = this.scale; this.dropAvg = avg; this.dropAt = this.t; this.scale = next; return next; }
       return null;
     }
     if (avg <= this.fastMs) {

@@ -8,11 +8,11 @@
 import * as THREE from 'three';
 import { rippleNormalTexture, addRipples } from './ripples.js';
 import { classOf } from './matkey.js';
-import { PAINTED_LOOK } from './render/verse.js';
+import { TEXTURED_LOOK } from './render/verse.js';
 import { installSurface, registerSurfaceEntry, registerLeafEntry } from './render/surface.js';
 
 // the comic test look paints opaque surfaces (render/surface.js)
-const PAINTED = PAINTED_LOOK; // (every look: window bars and real night pools; painted looks: textures too)
+const PAINTED = TEXTURED_LOOK; // (every look: window bars and real night pools; painted looks: textures too)
 
 // Leaves in the wind: bricks flagged per instance (aSway, set by bricks.js for the leaf colours)
 // drift a few centimetres, in a slow wave that runs through a canopy (phase from where the brick

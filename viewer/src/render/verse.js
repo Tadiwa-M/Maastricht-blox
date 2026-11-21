@@ -40,6 +40,8 @@ export function switchLook(id) {
 }
 /** Painted looks: textured materials, figures and vehicles finished as film props. */
 export const PAINTED_LOOK = LOOK === 'verse' || LOOK === 'manga';
+/** Material textures and weathering: the comic film only (cel shading wants flat surfaces). */
+export const TEXTURED_LOOK = LOOK === 'verse';
 
 /** The animation-on-twos tick for a time in seconds (a new pose only when it changes). */
 export const twosTick = (t, hz = VERSE.twosHz) => Math.floor(t * hz);
@@ -75,7 +77,7 @@ const shader = {
       float taper = hNoise(vec2(dot(f, d) / (pitch * 6.0), floor(u) * 1.7));
       float x = abs(fract(u) - 0.5) * 2.0; // 0 on the line, 1 between lines
       float ww = w * smoothstep(0.15, 0.55, taper);
-      return 1.0 - smoothstep(ww - 0.12, ww + 0.12, x);
+      return (1.0 - smoothstep(ww - 0.12, ww + 0.12, x)) * smoothstep(0.0, 0.08, ww); // (no width: no line at all)
     }
     float inkHatch(vec2 f, vec3 n, float shade, float pitch) {
       float a = atan(n.y, n.x);
@@ -128,28 +130,30 @@ const shader = {
       return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
     }
     vec3 manga(vec3 base, float z, float sky, float dEdge, float nEdge, float nearK, vec2 f, vec3 nrmM) {
+      // anime cel shading (owner's JoJo stills): two flat tones with a crisp edge between them, the
+      // lit tone a clean bright version of the surface's colour, the shadow turned violet; solid
+      // ink only in the deepest dark; a few hatch lines along the shadow's edge; bold outlines
       float L = luma(base);
       L = mix(L, pow(L, 0.6), night * 0.8);
-      // three flat tones
-      float band = L < 0.16 ? 0.0 : L < 0.42 ? 1.0 : 2.0;
-      vec3 chroma = base - luma(base);
-      vec3 flatc = vec3(mix(0.2, mix(0.48, 0.86, step(1.5, band)), step(0.5, band))) + chroma * 2.2;
-      // shade: toward violet and magenta; light: pale and warm
-      vec3 shade = hue(flatc, 0.55) * vec3(0.85, 0.6, 1.15) + vec3(0.06, 0.0, 0.1);
-      vec3 light = flatc * vec3(1.06, 1.0, 0.9) + vec3(0.04, 0.03, 0.0);
-      vec3 c = band < 0.5 ? shade * 0.75 : band < 1.5 ? mix(shade, flatc, 0.45) : light;
-      c = mix(vec3(luma(c)), c, 1.35); // louder than life
-      // the sky: a flat graphic gradient
+      float mx = max(max(base.r, base.g), base.b);
+      vec3 pure = base / max(mx, 0.03); // the colour at full value
+      float sat = 1.0 - min(min(pure.r, pure.g), pure.b);
+      // the colour itself, clean and bright; greys (stone, paving) stay grey, not a pale blue
+      vec3 lit = mix(vec3(min(0.97, 0.5 + L * 1.1)), mix(vec3(1.0), pure, 0.8) * 0.95, smoothstep(0.12, 0.35, sat));
+      vec3 shadow = mix(hue(pure, 0.28) * 0.5, vec3(0.3, 0.2, 0.5), 0.38); // its own colour, darker, leaning violet
+      float w = fwidth(L) * 1.5 + 0.004;
+      float litK = smoothstep(0.19 - w, 0.19 + w, L); // one crisp terminator
+      vec3 c = mix(shadow, lit, litK);
+      c = mix(c, vec3(0.05, 0.03, 0.09), 1.0 - smoothstep(0.035 - w, 0.045 + w, L)); // the deepest dark is ink
+      // the sky: flat and graphic
       vec3 skyc = mix(vec3(0.16, 0.62, 0.66), vec3(0.42, 0.3, 0.72), vUv.y) * mix(1.0, 0.45, night);
       c = mix(c, skyc, sky);
-      c = mix(c, mix(vec3(luma(c)), c, 0.6) * 1.08 + 0.05, smoothstep(300.0, 1500.0, z) * (1.0 - sky)); // distance: paler
-      // ink: hatching across the shade band, solid black in the deepest shade, thick outlines
-      // (only in the shade: the darker half of the middle tone lightly, the shade tone fully)
-      float hs = band < 0.5 ? 0.9 : band < 1.5 ? (1.0 - smoothstep(0.18, 0.3, L)) * 0.55 : 0.0;
-      float hk = inkHatch(f, nrmM, hs, 5.0) * (0.4 + 0.6 * nearK);
-      c = mix(c, vec3(0.05, 0.03, 0.08), hk * 0.75 * (1.0 - sky));
-      c = mix(c, vec3(0.04, 0.02, 0.06), (1.0 - smoothstep(0.05, 0.1, L)) * (1.0 - sky));
-      float ink = max(dEdge, nEdge * 0.7) * mix(0.5, 1.0, nearK) * (1.0 - sky);
+      c = mix(c, mix(c, vec3(0.86, 0.82, 0.92), 0.35), smoothstep(400.0, 1600.0, z) * (1.0 - sky)); // distance: paler
+      // hatching: thin, only in the shadow near its edge, near the camera
+      float hs = (1.0 - litK) * smoothstep(0.1, 0.18, L) * 0.4;
+      float hk = inkHatch(f, nrmM, hs, 4.0) * nearK;
+      c = mix(c, vec3(0.06, 0.03, 0.1), hk * 0.7 * (1.0 - sky));
+      float ink = max(dEdge, nEdge * 0.6) * mix(0.55, 1.0, nearK) * (1.0 - sky);
       return mix(clamp(c, 0.0, 1.0), vec3(0.03, 0.02, 0.05), ink);
     }
     #endif

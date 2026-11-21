@@ -1949,3 +1949,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Haptics: trigger rumble where the pad has it; Settings > Test controller rumble says what the browser reports (owner: no rumble on the laptop).
 - Manga look rebuilt JoJo-style and added to the Look menu (guide 06).
 - Performance: dynamic resolution (follows the frame time, before dropping a tier), pool lights capped by tier, dry-weather shader skip (guide 06).
+- Manga crisper: cel shading, flat surfaces, no phantom hatch lines; dynamic resolution no longer halves pixels on a capped display (remote desktop).

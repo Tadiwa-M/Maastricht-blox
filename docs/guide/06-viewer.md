@@ -935,3 +935,11 @@ updated in every look; the wet/snow shader returns at once when dry. Checked hea
 renderer settles at half resolution, the picture stays clean.
 Still open (bigger jobs): merge near-chunk meshes per material, frustum-cull the instanced crowds
 per block, a worker for the walkers' simulation.
+- (Owner, on the workstation: "not as crisp".) Three causes, fixed: (1) dynamic resolution had
+  halved the pixels because the remote desktop caps the frame rate; a drop that buys no speed is
+  now undone and not retried for a minute (`DynamicResolution`); (2) the brick textures and stains
+  turned into violet blotches under the manga colours: the manga look now has flat cel surfaces
+  (`TEXTURED_LOOK` is the comic look only); (3) a zero-width hatch still drew a faint line (fixed in
+  `inkHatch`, every look). The manga shader is now anime cel shading: two flat tones with one crisp
+  edge, the lit tone the surface's own clean colour (greys stay grey), the shadow its colour darker
+  and leaning violet, ink in the deepest dark, a few hatch lines at the shadow's edge, bold outlines.
