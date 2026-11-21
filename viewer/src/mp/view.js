@@ -4,6 +4,7 @@
 // ring of team-coloured tiles round each base. three.js + a DOM layer for the names; the
 // smoothing is interp.js, the room's state model.js.
 import * as THREE from 'three';
+import { Golems, GOLEM } from './golem.js';
 import { FigureCrowd } from '../figure/crowd.js';
 import { makeVariant } from '../figure/variants.js';
 import { customVariant, decodeChoices } from '../figure/custom.js';
@@ -31,7 +32,7 @@ export function lookVariant(look, id) {
 export function raiderVariant(id) {
   const v = makeVariant(5000 + id * 13, { kind: 'adult' });
   v.acc = 'none';
-  v.scale = (v.scale || 1) * 1.12;
+  v.scale = GOLEM.scale; // (the hit spheres scale with it: a golem is a big target)
   v.colours = { ...v.colours, skin: '#c9b98f', hair: '#3a332b', top: id % 3 ? '#2d2a26' : '#3b2f27', bottom: '#1f1c19', shoe: '#14120f', hat: '#2d2a26', acc: '#2d2a26' };
   delete v._c;
   return v;
@@ -163,6 +164,8 @@ export class RoomView {
     for (const o of this.others.values()) o.shotT = (o.shotT ?? 9) + dt;
     const present = new Set();
     this.crowd.begin(camera.position);
+    this.golems ||= new Golems(this.group);
+    this.golems.begin();
     for (const p of model.players) {
       if (p.id === model.me || !p.on) continue;
       const o = this.others.get(p.id);
@@ -176,16 +179,21 @@ export class RoomView {
       o.prev = s;
       const m = o.motion.update(dt, { speed, travelled, angVel: 0, accel: 0, steer: 0, grounded: true, vy: 0 }, o.variant.scale);
       Object.assign(o.pose, { x: s.x, y: s.y, z: s.z, rotY: -s.yaw }, m, { aim: model.phase === 'play' ? 1 : 0, aimPitch: 0, aimSprint: Math.max(0, Math.min(1, (speed - 4) / 1.2)), aimReady: (o.shotT ?? 9) < 1.4 ? 1 : 0 }); // at the hip unless they just fired // in a match everyone holds their gun
-      if (o.scatter) {
+      if (p.look === 'raider') { // a cave golem (mp/golem.js), not a figure; knocked out, it sinks away
+        o.walkT = (o.walkT || 0) + dt * Math.max(0.6, speed) * 2.2;
+        if (o.scatter) { o.sink = Math.min(1, (o.sink || 0) + dt * 0.9); if (o.sink >= 1) o.scatter = null; } else o.sink = 0;
+        this.golems.add(s.x, s.y, s.z, -s.yaw, o.walkT, speed, o.sink);
+      } else if (o.scatter) {
         const stand = o.scatter.gathering ? captureParts(o.variant, { ...o.pose, mode: MODE.IDLE, t: 0 }) : null;
         this.crowd.addParts(o.variant, o.scatter.update(dt, stand));
         if (o.scatter.done) o.scatter = null;
       } else this.crowd.add(o.variant, o.pose);
-      this.gem(p.id, p.team, s.x, s.y + 2.2 * o.variant.scale, s.z);
+      if (p.look !== 'raider') this.gem(p.id, p.team, s.x, s.y + 2.2 * o.variant.scale, s.z); // (golems wear no team gem)
       o.head = [s.x, s.y + 2.55 * o.variant.scale, s.z];
       o.info = p;
     }
     this.crowd.end();
+    this.golems.end();
     for (const [id, o] of this.others) {
       if (present.has(id)) continue;
       o.head = null;

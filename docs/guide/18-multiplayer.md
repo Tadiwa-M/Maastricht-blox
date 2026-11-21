@@ -219,6 +219,7 @@ offline.
 - In the local room my own position never goes stale (a slow frame must not make me untouchable).
 - Tests: `test/localroom.test.mjs` (bots start and act, my messages, every wave to dawn, raiders hurt
   a person by the banner), `test/life.walkers.test.mjs` (routes).
+- Raiders are now cave golems (`mp/golem.js`): marl-stone blocks, glowing eye slits, long swinging arms, hunched; they keep 1.8 m apart; knocked out they sink and tip into the ground.
 - Open: bots in online rooms (needs the relay), smarter bots (cover, flanking), raid variety
   (raider kinds, the cave entrances, co-op raids online).
 

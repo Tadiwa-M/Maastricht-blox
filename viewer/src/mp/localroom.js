@@ -120,6 +120,14 @@ export class LocalRoom {
         if (m.t === 'p' && g.players[b.id]) this.post({ t: 'p', i: b.id, p: m.p, r: m.r, s: m.s });
       }
     }
+    // bots keep a body's width apart (golems heaped into one pile)
+    const bs = [...this.bots.values()].filter((b) => b.at && !(g.players[b.id]?.down > now));
+    for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
+      const a = bs[i].at, b = bs[j].at, dx = b[0] - a[0], dz = b[1] - a[1], d = Math.hypot(dx, dz);
+      if (d >= 1.8) continue;
+      const push = (1.8 - (d || 0.01)) / 2, ux = d > 1e-3 ? dx / d : 1, uz = d > 1e-3 ? dz / d : 0;
+      a[0] -= ux * push; a[1] -= uz * push; b[0] += ux * push; b[1] += uz * push;
+    }
     const t = tick(g, now);
     events.push(...t.events); this.changed ||= t.changed;
     if (this.raid) this.raidStep(now, events);

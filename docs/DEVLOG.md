@@ -1945,3 +1945,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Crowds scale with how busy the place really is (old town busy, outskirts nearly empty); no walkers on roofs (guide 05).
 - First-time walkthrough: four steps (drop in, what to do, the looks, the games), skippable, replay from the pause menu (guide 20).
 - Arsenal: SMG, pistol, LMG; loadouts; reserve ammo; ammo boxes and medkits; health regen; the gun held in both hands; over-the-shoulder hip camera (guide 18). Relay redeploy needed for online rooms.
+- Raiders are marl golems with glowing eyes (no more smiling people); bots keep apart.
