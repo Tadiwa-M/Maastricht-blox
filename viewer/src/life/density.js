@@ -8,6 +8,21 @@ export const LIFE_RADIUS_BY_TIER = { high: 180, medium: 135, low: 85, lite: 54 }
 export const FIGURES_BY_TIER = { high: 900, medium: 500, low: 200, lite: 80 }; // walkers within the tier's radius
 export const CYCLISTS_BY_TIER = { high: 140, medium: 80, low: 30, lite: 12 };
 export const CARS_BY_TIER = { high: 110, medium: 65, low: 25, lite: 10 };
+
+/**
+ * How busy this spot is, 0..1 of the busiest (the old town's shopping streets), from where it is
+ * (owner: Maastricht has ~120,000 people, ~2,250 per km²; a crowd in the middle of nowhere breaks
+ * the spell): the walk graph's own weights round here (shops, squares and main streets weigh more)
+ * against the same sum round the old town's middle, and the distance from the old town (the centre
+ * busy, the neighbourhoods quieter, the fields and the edges of town nearly empty).
+ * weightHere / weightCentre: sums of node weights within the living radius; dTown: metres from the
+ * old town's middle. People use it at full strength, bikes and cars (they come through) less.
+ */
+export function busyness(weightHere, weightCentre, dTown) {
+  const streets = weightCentre > 0 ? Math.min(1, weightHere / weightCentre) : 1;
+  const town = 0.12 + 0.88 * Math.exp(-((Math.max(0, dTown - 350) / 1100) ** 2));
+  return Math.max(0.02, Math.min(1, Math.sqrt(streets) * town));
+}
 // parked bikes: ~2,200 triangles each (and again for shadows); only the nearest within a range
 export const PARKED_BIKES_BY_TIER = { high: { r: 140, cap: 300 }, medium: { r: 90, cap: 160 }, low: { r: 55, cap: 80 }, lite: { r: 30, cap: 30 } };
 

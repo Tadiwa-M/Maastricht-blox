@@ -56,7 +56,7 @@ export function makeGround(ctx, world = ctx.world) {
   // People keep off roofs: where the top surface stands well above the street around it and there
   // is standing room at street level underneath (a platform canopy, an arcade, an awning), walk
   // under it. A wall walk or a hill keeps its top (solid underneath); a bridge over water too.
-  const under = new Map();
+  const under = new Map(), roofs = new Set();
   groundAt.walk = (x, z) => {
     const y = groundAt(x, z);
     const city = cityOf(ctx);
@@ -75,9 +75,12 @@ export function makeGround(ctx, world = ctx.world) {
       if (Number.isFinite(v) && v < y - 2 && v >= low - 1.5 && city.isSolid(x, v + 1.2, -z) === false
         && city.isWater?.(x, v - 0.05, -z) !== true) out = v;
     }
+    if (out === y && y - low > ROOF_M) roofs.add(key); // a roof with no way under it: no place for people
     if (known) { if (under.size > 200000) under.clear(); under.set(key, out); }
     return out;
   };
+  /** Is (x, z) a roof people would stand on (well above the street round it, no room under)? */
+  groundAt.isRoof = (x, z) => { groundAt.walk(x, z); return roofs.has(Math.floor(x * 2) * 65536 + Math.floor(z * 2)); };
   groundAt.flat = flat;
   groundAt.reset = () => { cache.clear(); under.clear(); };
   return groundAt;

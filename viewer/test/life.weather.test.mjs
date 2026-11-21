@@ -113,3 +113,11 @@ test('the sky shows the real cover only with the setting on, or in rain or snow'
   assert.equal(skyCloud({ cloud: 0.9, rain: 0.5 }, false), 0.9);
   assert.equal(skyCloud({ cloud: 0.9, rain: 0, snow: true }, false), 0.9);
 });
+
+test('busyness: the old town busy, the neighbourhoods quieter, the edge of town nearly empty', async () => {
+  const { busyness } = await import('../src/life/density.js');
+  const centre = busyness(100, 100, 0), hood = busyness(30, 100, 1500), edge = busyness(5, 100, 3500);
+  assert.equal(centre, 1);
+  assert.ok(hood > 0.1 && hood < 0.4, `hood ${hood}`);
+  assert.ok(edge < 0.05, `edge ${edge}`);
+});

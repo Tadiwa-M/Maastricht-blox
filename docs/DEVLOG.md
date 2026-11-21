@@ -1942,3 +1942,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   haptics on laptop pads; the gun really held; more guns, pickups and loadouts; Call of Duty-style
   shooting camera; a first-time walkthrough (look switch, how to enter walk mode); fewer people
   and vehicles away from where people really are (no walkers on roofs, no cars driving nowhere).
+- Crowds scale with how busy the place really is (old town busy, outskirts nearly empty); no walkers on roofs (guide 05).

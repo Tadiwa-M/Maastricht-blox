@@ -681,3 +681,14 @@ unchanged timing) drives every lamp and every rule.
 - Seen on screen: the new body details by day. The lights are covered by tests only (no car was
   in frame in the night check).
 
+
+## Crowds where people really are (2026-11-21)
+
+Owner: full crowds in the middle of nowhere, people on roofs, cars driving nowhere broke the spell
+(Maastricht: ~120,000 people, ~2,250 per km²). `life/density.js` `busyness(weightHere,
+weightCentre, dTown)`: the walk graph's weights round the camera target against the same sum round
+the old town's middle, times a falloff with distance from the old town (full within ~350 m, ~30 %
+at 1.5 km, a few % at the edge of town). Walkers scale with it fully, bikes 15-100 %, cars 25-100 %
+(recomputed every 2 s; `window.__bloxLife.busy`). Roofs: `life/ground.js` `isRoof` (a top more than
+2.5 m above the street round it with no room under it); nobody spawns there, and a group that walks
+onto one is sent elsewhere.

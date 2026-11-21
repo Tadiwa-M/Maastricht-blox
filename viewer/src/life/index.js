@@ -28,7 +28,7 @@ import { SignalProps } from './signalsdraw.js';
 import { RoadLamps } from './roadlamps.js';
 import { Terraces, parasolsOpen } from './terraces.js';
 import { Market } from './market.js';
-import { FIGURES_BY_TIER, LIFE_RADIUS_BY_TIER, CYCLISTS_BY_TIER, CARS_BY_TIER, PARKED_BIKES_BY_TIER, nearestWithin, crowdFactor, trafficFactor, liveWeights, marketState } from './density.js';
+import { FIGURES_BY_TIER, LIFE_RADIUS_BY_TIER, CYCLISTS_BY_TIER, CARS_BY_TIER, PARKED_BIKES_BY_TIER, nearestWithin, crowdFactor, trafficFactor, liveWeights, marketState, busyness } from './density.js';
 import { FigureCrowd } from '../figure/crowd.js';
 import { VehicleFleet } from '../figure/vehicles.js';
 import { PropSet } from '../figure/props.js';
@@ -234,7 +234,7 @@ export async function initLife(ctx) {
       walkGraph = graph;
       // a person standing at y there: is the body (1 m and 1.6 m up) clear of walls? unknown: yes
       const room = (x, z, y) => { const c = cityOf(ctx); return !c?.isSolid || (c.isSolid(x, y + 1.0, -z) !== true && c.isSolid(x, y + 1.6, -z) !== true); };
-      state.walkers = new Pedestrians({ graph, ground: ground.walk, room, cap: FIGURES_BY_TIER.high });
+      state.walkers = new Pedestrians({ graph, ground: ground.walk, room, cap: FIGURES_BY_TIER.high, roof: ground.isRoof || (() => false) });
       // the player running into someone (walkers.js bumps): the player feels it and loses speed
       state.walkers.onBump = (kind, at) => { if (typeof window !== 'undefined') { window.dispatchEvent(new CustomEvent('blox:bump', { detail: { kind } })); comicFx(kind === 'knock' ? 'knock' : 'shove', at); } };
       hideDemo(models.character.name);
@@ -312,7 +312,7 @@ export async function initLife(ctx) {
       state.walkers.dressFor = outfit || (Number.isFinite(tempC) && tempC < 8) ? (v) => dress(v, { outfit, tempC }) : null;
     }
   }
-  let parasolsWere = null, weatherFx = null;
+  let parasolsWere = null, weatherFx = null, busy = 0, busyT = 0, busyRef = 0;
   function rebuildProps() {
     props.begin();
     state.terraces?.props(props, parasolsOpen(clock.hours));
@@ -413,9 +413,18 @@ export async function initLife(ctx) {
     state.streetLights?.update(at, camera, stage.night || 0);
     state.xmas?.update(dt, stage.night || 0);
     holdTransit(state, clock, dt, at); // (the lag shows from the next frame on)
+    // how busy it is here (density.js busyness): the crowds, bikes and cars scale with it
+    if ((busyT -= dt) <= 0 || !busy) {
+      busyT = 2;
+      const sumNear = (x, z) => { if (!walkGraph) return 0; let w = 0; for (let i = Math.floor((x - R) / walkGraph.cell); i <= Math.floor((x + R) / walkGraph.cell); i++) for (let j = Math.floor((z - R) / walkGraph.cell); j <= Math.floor((z + R) / walkGraph.cell); j++) for (const q of walkGraph.buckets.get(walkGraph.key(i, j)) || []) if (Math.hypot(walkGraph.x[q] - x, walkGraph.z[q] - z) < R) w += walkGraph.w[q]; return w; };
+      const [tx, tz] = [OLD_TOWN_RD[0] - originRD[0], OLD_TOWN_RD[1] - originRD[1]];
+      busyRef ||= sumNear(tx, tz) || 1;
+      busy = busyness(sumNear(at[0], at[1]), busyRef, Math.hypot(at[0] - tx, at[1] - tz));
+      state.busy = busy;
+    }
     const traffic = trafficFactor(clock.hours, clock.day);
     if (state.cars) {
-      state.cars.setCount(Math.round(by(CARS_BY_TIER) * traffic), at);
+      state.cars.setCount(Math.round(by(CARS_BY_TIER) * traffic * (0.25 + 0.75 * busy)), at);
       state.cars.update(dt, at, R, trafficEnv(buses));
     }
     // every vehicle's footprint near the action: people and bikes wait for them and keep clear
@@ -426,7 +435,7 @@ export async function initLife(ctx) {
       : { x: b.x, z: b.z, yaw: b.yaw, halfW: busHalf[0], halfL: busHalf[1], v: b.v }));
     if (state.cars) vehicles.push(...state.cars.footprints(at, 200, R + 15)); // every car where the people and bikes are
     if (state.cyclists) {
-      state.cyclists.setCount(Math.round(by(CYCLISTS_BY_TIER) * traffic), at);
+      state.cyclists.setCount(Math.round(by(CYCLISTS_BY_TIER) * traffic * (0.15 + 0.85 * busy)), at);
       state.cyclists.update(dt, at, R, vehicles);
     }
     reweigh();
@@ -434,7 +443,7 @@ export async function initLife(ctx) {
       state.walkers.setRain(rainNow());
       // the day curve x the night (routines.js) x the events x the weather, at most 1.6
       const out = Math.min(1.6, crowdFactor(clock.hours, clock.day) * nightFactor(clock.hours, clock.day) * eventCrowd(state.events) * state.weather.crowd);
-      state.walkers.setCount(Math.round(by(FIGURES_BY_TIER) * out), at);
+      state.walkers.setCount(Math.round(by(FIGURES_BY_TIER) * out * busy), at);
       const seen = watch.sample(playerSample(typeof window !== 'undefined' ? window.__bloxPlayer : null), dt, false);
       if (seen) {
         const hit = knockSignal || hitByVehicle(seen.x, seen.z, vehicles);

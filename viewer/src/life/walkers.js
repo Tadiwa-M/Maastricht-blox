@@ -92,8 +92,9 @@ export class Pedestrians {
    * graph: WalkGraph. ground(x, z) -> y (Unity metres). cap: most people.
    * room(x, z, y) -> false where a person standing at height y would be inside a wall (life/index.js).
    */
-  constructor({ graph, ground, room = () => true, cap = FIGURES_BY_TIER.high, seed = 7 }) {
-    Object.assign(this, { graph, ground, room, cap });
+  /** roof(x, z): a roof, not a street (life/ground.js isRoof): nobody spawns or stays there. */
+  constructor({ graph, ground, room = () => true, cap = FIGURES_BY_TIER.high, seed = 7, roof = () => false }) {
+    Object.assign(this, { graph, ground, room, cap, roof });
     this.rand = rng(seed);
     this.groups = [];
     this.people = 0; // people in active groups
@@ -109,7 +110,12 @@ export class Pedestrians {
 
   /** (Re)place group g on a node near (x, z), at least rMin away; new people each time. */
   spawn(g, x, z, rMin) {
-    const n = this.graph.spawnNear(x, z, this.radius, this.rand, rMin);
+    let n = -1;
+    for (let tries = 0; tries < 4 && n < 0; tries++) { // not on a roof
+      const q = this.graph.spawnNear(x, z, this.radius, this.rand, rMin);
+      if (q < 0) return false;
+      if (!this.roof(this.graph.x[q], this.graph.z[q])) n = q;
+    }
     if (n < 0) return false;
     const r = this.rand;
     const size = g.size || groupSize(r());
@@ -178,7 +184,7 @@ export class Pedestrians {
     const r = this.rand;
     for (const g of active) {
       const k = g.walker;
-      if (Math.hypot(k.x - target[0], k.z - target[1]) > radius * 1.25) this.spawn(g, target[0], target[1], radius * 0.5);
+      if (g.offRoof || Math.hypot(k.x - target[0], k.z - target[1]) > radius * 1.25) { g.offRoof = false; this.spawn(g, target[0], target[1], radius * 0.5); }
       this.fitRoom(g, dt);
       this.mind(g, dt);
       // a bus or car coming across: wait at the kerb (don't walk into it), but not forever
@@ -237,6 +243,7 @@ export class Pedestrians {
       g.roomT = 0.3;
       const k = g.walker, y = this.ground(k.x, k.z);
       g.y = y;
+      if (this.roof(k.x, k.z)) { g.offRoof = true; return; } // walked onto a roof: update() sends the group elsewhere
       if (!this.room(k.x, k.z, y)) { k.baseLateral *= 0.5; if (Math.abs(k.baseLateral) < 0.1) k.baseLateral = 0; }
       if (g.size > 1) {
         const side = g.members.some((m) => { const p = this.memberAt(g, m, 0); return !this.room(p.x, p.z, y); });
