@@ -38,7 +38,10 @@ export const CTF = {
   shotFromM: 8, // and start this close to where it last saw the shooter
   // shotgun: damage per pellet that hit (msg.n of 8), short range; knife: one hit, arm's length
   weapons: { rifle: { body: 24, head: 48, minMs: 80 }, scout: { body: 75, head: 150, minMs: 850 },
-    shotgun: { body: 15, head: 20, minMs: 650, pellets: 8, rangeM: 45 }, knife: { body: 1000, head: 1000, minMs: 450, rangeM: 3.5, melee: true } },
+    shotgun: { body: 15, head: 20, minMs: 650, pellets: 8, rangeM: 45 }, knife: { body: 1000, head: 1000, minMs: 450, rangeM: 3.5, melee: true },
+    smg: { body: 17, head: 32, minMs: 55 }, pistol: { body: 26, head: 52, minMs: 140 }, lmg: { body: 23, head: 42, minMs: 75 } },
+  regen: { delayMs: 5000, perS: 25 }, // health comes back after a while without a hit (as the client shows it)
+  medHp: 60, // a medkit
 };
 
 export const other = (team) => (team === 'blue' ? 'yellow' : 'blue');
@@ -77,7 +80,10 @@ export function pickupSpots(bases) {
   const a = bases.blue.at, b = bases.yellow.at, L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
   const f = [(b[0] - a[0]) / L, (b[1] - a[1]) / L], n = [-f[1], f[0]];
   const at = (t, side) => [Math.round(a[0] + f[0] * L * t + n[0] * side), Math.round(a[1] + f[1] * L * t + n[1] * side)];
-  return [{ at: at(0.5, 38), w: 'scout' }, { at: at(0.5, -38), w: 'shotgun' }, { at: at(0.22, -24), w: 'shotgun' }, { at: at(0.78, 24), w: 'shotgun' }];
+  // weapons in mirrored pairs, then ammo boxes and medkits (fair for both sides)
+  return [{ at: at(0.5, 38), w: 'scout' }, { at: at(0.5, -38), w: 'lmg' }, { at: at(0.22, -24), w: 'shotgun' }, { at: at(0.78, 24), w: 'shotgun' },
+    { at: at(0.3, 12), w: 'ammo' }, { at: at(0.7, -12), w: 'ammo' }, { at: at(0.15, 30), w: 'med' }, { at: at(0.85, -30), w: 'med' },
+    { at: at(0.38, -40), w: 'smg' }, { at: at(0.62, 40), w: 'smg' }];
 }
 
 /** The bases of a round: Markt and Vrijthof first, then a random fair pair (same side, 250-550 m apart). */
@@ -263,7 +269,17 @@ export function take(g, id, msg, now) {
   g.taken = g.taken || {};
   if ((g.taken[i] || 0) > now) return result();
   g.taken[i] = now + CTF.pickupBackS * 1000;
-  return result([{ k: 'take', i, id, w: spot.w, s: CTF.pickupBackS }], false);
+  const ev = { k: 'take', i, id, w: spot.w, s: CTF.pickupBackS };
+  if (spot.w === 'med') { regen(p, now); p.hp = Math.min(CTF.hp, (p.hp ?? CTF.hp) + CTF.medHp); ev.hp = p.hp; }
+  return result([ev], false);
+}
+
+/** Health back since the last hit (CTF.regen): applied lazily when it matters (a hit, a medkit). */
+export function regen(p, now) {
+  if (!p.hitAt) { p.hitAt = now; return; } // never hit: nothing to come back
+  const since = now - (p.hitAt || 0) - CTF.regen.delayMs;
+  if (since > 0 && (p.hp ?? CTF.hp) < CTF.hp) p.hp = Math.min(CTF.hp, (p.hp ?? CTF.hp) + (since / 1000) * CTF.regen.perS);
+  p.hitAt = Math.max(p.hitAt || 0, now - CTF.regen.delayMs); // (counted once)
 }
 
 const vec3 = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => Number.isFinite(n) && Math.abs(n) < 1e7);
@@ -287,6 +303,8 @@ export function shoot(g, id, msg, now) {
   if (!q || q.team === p.team || !fresh(q, now) || q.down > now || segDist(q.at, o, e) > CTF.shotSlackM) return result(events, false);
   if ((q.safe || 0) > now) return result(events, false); // just back at the base: not a target yet
   if (w.rangeM && dist(w.melee ? p.at : o, q.at) > w.rangeM + (w.melee ? 0 : CTF.shotSlackM)) return result(events, false);
+  regen(q, now);
+  q.hitAt = now;
   const head = !!msg.head;
   const n = w.pellets ? Math.max(1, Math.min(w.pellets, Math.floor(+msg.n) || 1)) : 1;
   q.hp = Math.max(0, (q.hp ?? CTF.hp) - (head ? w.head : w.body) * n);

@@ -181,7 +181,7 @@ export async function initMultiplayer(ctx) {
     for (const e of model.apply(m)) {
       if (e.k === 'pos') view.push(e.id, e.p, e.yaw, e.speed, now);
       else if (e.k === 'spawn' && e.at) { spawn = { at: e.at, t: 0 }; boundary.reset(); combat?.respawn(model.config?.hp || 100, model.config?.spawnSafeS || 0); }
-      else if (e.k === 'take') combat?.taken(e.i, e.mine, e.s);
+      else if (e.k === 'take') combat?.taken(e.i, e.mine, e.s, e.hp);
       else if (e.k === 'shot' && e.melee) combat?.sound.play('knife', 0.9); // a raider's swipe: no tracer
       else if (e.k === 'shot') { lastWeapon.set(e.by, e.w); const ob = view?.others.get(e.by); if (ob) ob.shotT = 0; combat?.tracer(toThree(e.o, origin), toThree(e.e, origin), e.w); }
       else if (e.k === 'hurt') { combat?.hurt(e.hp, view.posOf(e.by)); comicFx('hurt'); }

@@ -221,3 +221,22 @@ offline.
   a person by the banner), `test/life.walkers.test.mjs` (routes).
 - Open: bots in online rooms (needs the relay), smarter bots (cover, flanking), raid variety
   (raider kinds, the cave entrances, co-op raids online).
+
+## Arsenal, loadouts, supplies, health (2026-11-21)
+
+Owner: one really good game mode; more guns, pickups and loadouts; think Call of Duty.
+- Weapons (`mp/weapons.js`; damage in `relay/src/ctf.js` `CTF.weapons`): rifle, SMG (fast, close),
+  shotgun, LMG (75 rounds, slow reload), pistol (sidearm), scout (scoped, a pickup), knife.
+  Every gun has a magazine and reserve rounds; reloads draw on the reserve; dry: a click.
+- Loadout (Play panel, saved `localStorage blox.loadout`): the primary (rifle, SMG, shotgun, LMG);
+  the pistol and the knife always come along. Slots 1 primary, 2 pistol, 3 pickup, 4 knife (keys 1-4).
+- Pickups (`pickupSpots`, the same maths in the room and the client): ten spots in mirrored pairs:
+  a scout, an LMG, two shotguns, two SMGs, two ammo boxes (every reserve full) and two medkits (the
+  room heals 60).
+- Health comes back like Call of Duty: 25 per second after 5 s without a hit (`CTF.regen`, applied
+  lazily in the room; the client shows the same).
+- The online rooms need the relay redeployed for the new weapons and rules (`scripts/relay.ps1`);
+  solo games use them at once.
+- The shooting camera: from the hip over the right shoulder (0.85 m; the figure left of the
+  crosshair), aiming at the eyes; the figure fades while the camera passes through it. The gun
+  sits in the right hand with its barrel through the left (support) hand.

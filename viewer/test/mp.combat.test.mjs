@@ -22,8 +22,8 @@ test('rifle: automatic at its fire rate, reloads by itself when empty', () => {
 test('scout: one shot per pull, slow bolt; swapping keeps each magazine', () => {
   const g = new Gun();
   assert.ok(g.step(0.01, { swap: true }).swapped);
-  assert.equal(g.w, 'knife', 'nothing picked up yet: rifle, then knife');
-  assert.equal(g.give('rifle'), false);
+  assert.equal(g.w, 'pistol', 'the loadout: rifle, then the pistol sidearm');
+  assert.equal(g.give('ammo'), true, 'an ammo box always helps');
   assert.ok(g.give('scout'));
   assert.equal(g.w, 'scout');
   g.step(0.5, {});
@@ -94,7 +94,7 @@ test('model: shots, hits and knock-outs become effects; the heat map keeps the s
 
 test('knife: no ammo, a pause between stabs, reaches only who stands close in front', () => {
   const g = new Gun();
-  g.step(0.01, { slot: 2 }); g.step(0.5, {});
+  g.step(0.01, { slot: 3 }); g.step(0.5, {});
   assert.equal(g.w, 'knife');
   assert.ok(g.step(0.01, { fire: true }).shot);
   g.step(0.01, {});
@@ -113,7 +113,7 @@ test('knife: no ammo, a pause between stabs, reaches only who stands close in fr
 test('pickups: four weapons mirrored about the middle, the same distance from each base', () => {
   const bases = { blue: { at: [176380, 317990] }, yellow: { at: [176185, 317717] } };
   const spots = pickupSpots(bases), d = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
-  assert.equal(spots.length, 4);
+  assert.equal(spots.length, 10);
   assert.ok(spots.some((s) => s.w === 'scout') && spots.some((s) => s.w === 'shotgun'));
   for (const s of spots.slice(0, 2)) assert.ok(Math.abs(d(s.at, bases.blue.at) - d(s.at, bases.yellow.at)) < 2);
   assert.ok(Math.abs(d(spots[2].at, bases.blue.at) - d(spots[3].at, bases.yellow.at)) < 2, 'each team has a shotgun as near');
@@ -181,7 +181,7 @@ test('ammo cue under the crosshair: quiet with a full magazine, low, reloading w
   assert.ok(r.progress >= 0 && r.progress < 0.2);
   g.give('scout'); g.ammo.scout = 1;
   assert.equal(ammoCue(g).level, 'warn', 'a five-round magazine is low at one');
-  g.step(0.01, { slot: 2 });
+  g.step(0.01, { slot: 3 });
   assert.equal(ammoCue(g), null, 'the knife needs no ammo');
 });
 
@@ -196,4 +196,22 @@ test('rumble: the older Firefox actuator works too; a pad without motors is repo
   assert.ok(!canRumble({ id: 'pad' }) && !canRumble(null));
   const trig = { vibrationActuator: { effects: ['trigger-rumble'], playEffect: () => Promise.resolve() } };
   assert.equal(rumble(trig, { ms: 90, weak: 1, strong: 1 }), false, 'only a kind it cannot play');
+});
+
+test('loadouts and supplies: the chosen primary first, the pistol second; reloads draw on the reserve; an ammo box fills it', async () => {
+  const { PRIMARIES } = await import('../src/mp/weapons.js');
+  const g = new Gun();
+  g.reset('smg');
+  assert.deepEqual(g.slots, ['smg', 'pistol', null, 'knife']);
+  g.ammo.smg = 0; g.spare.smg = 10;
+  g.step(0.01, { reload: true });
+  for (let t = 0; t < 2; t += 0.1) g.step(0.1, {});
+  assert.equal(g.ammo.smg, 10); assert.equal(g.spare.smg, 0);
+  g.ammo.smg = 0;
+  assert.equal(g.step(0.5, { fire: true }).empty, true, 'dry: a click, no reload with nothing left');
+  g.give('ammo');
+  assert.equal(g.spare.smg, WEAPONS.smg.reserve);
+  g.reset('nonsense');
+  assert.equal(g.slots[0], 'rifle');
+  assert.ok(PRIMARIES.length >= 4);
 });

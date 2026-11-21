@@ -54,7 +54,7 @@ export class MatchModel {
       if (msg.k === 'shot' && msg.by !== this.me) out.push({ k: 'shot', by: msg.by, w: msg.w, o: msg.o, e: msg.e });
       if (msg.k === 'hit' && msg.id === this.me) out.push({ k: 'hurt', hp: msg.hp, by: msg.by });
       if (msg.k === 'hit' && msg.by === this.me) out.push({ k: 'hitmark', head: !!msg.head, kill: msg.hp <= 0, id: msg.id });
-      if (msg.k === 'take') out.push({ k: 'take', i: msg.i, mine: msg.id === this.me, w: msg.w, s: msg.s });
+      if (msg.k === 'take') out.push({ k: 'take', i: msg.i, mine: msg.id === this.me, w: msg.w, s: msg.s, hp: msg.hp });
       if (msg.k === 'kill') {
         this.kills.push({ at: msg.at, team: this.player(msg.by)?.team || null }); // the after-match heat map
         out.push(msg.id === this.me ? { k: 'killed', by: msg.by } : { k: 'scatter', id: msg.id, by: msg.by });

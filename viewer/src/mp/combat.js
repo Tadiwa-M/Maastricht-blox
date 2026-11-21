@@ -5,7 +5,7 @@
 // the hit maths are weapons.js; the room decides the damage (relay/src/ctf.js shoot).
 import * as THREE from 'three';
 import { comicFx } from '../render/comicfx.js';
-import { WEAPONS, PICKUP_R, PICKUP_BACK_S, Gun, spreadDir, hitTest, wallT, meleeTarget, pickupSpots } from './weapons.js';
+import { WEAPONS, PICKUP_R, PICKUP_BACK_S, Gun, spreadDir, hitTest, wallT, meleeTarget, pickupSpots, savedPrimary, REGEN } from './weapons.js';
 import { TEAM_HEX } from './model.js';
 import { standSpot } from '../player/spot.js';
 
@@ -98,6 +98,36 @@ export function buildGun(kind, accentHex) {
     box(g, 0.014, 0.022, 0.014, 0, 0.073, -0.58, dark);
     g.userData.muzzle = new THREE.Vector3(0, 0.04, -0.63);
     g.userData.aim = new THREE.Vector3(0, -0.088, -0.62);
+  } else if (kind === 'smg') { // short, a long curved magazine, a folding stock
+    box(g, 0.06, 0.08, 0.3, 0, 0.02, -0.05, dark);
+    box(g, 0.026, 0.026, 0.12, 0, 0.03, -0.26, dark);
+    box(g, 0.04, 0.2, 0.05, 0, -0.11, -0.08, accent);
+    box(g, 0.04, 0.09, 0.05, 0, -0.07, 0.07, dark);
+    box(g, 0.02, 0.02, 0.18, 0.02, 0.01, 0.18, dark);
+    g.userData.muzzle = new THREE.Vector3(0, 0.03, -0.33);
+    g.userData.aim = new THREE.Vector3(0, -0.1, -0.52);
+  } else if (kind === 'pistol') {
+    box(g, 0.035, 0.045, 0.19, 0, 0.03, -0.05, dark);
+    box(g, 0.032, 0.11, 0.045, 0, -0.04, 0.02, accent);
+    g.userData.muzzle = new THREE.Vector3(0, 0.03, -0.16);
+    g.userData.aim = new THREE.Vector3(0, -0.09, -0.42);
+  } else if (kind === 'lmg') { // long, a box magazine under, a bipod folded
+    box(g, 0.08, 0.1, 0.55, 0, 0.02, -0.1, dark);
+    box(g, 0.035, 0.035, 0.36, 0, 0.03, -0.54, dark);
+    box(g, 0.09, 0.09, 0.12, 0, -0.07, -0.08, accent);
+    box(g, 0.055, 0.1, 0.22, 0, 0, 0.27, dark);
+    box(g, 0.045, 0.1, 0.05, 0, -0.07, 0.1, dark);
+    box(g, 0.012, 0.012, 0.25, 0.03, -0.03, -0.45, dark); box(g, 0.012, 0.012, 0.25, -0.03, -0.03, -0.45, dark);
+    g.userData.muzzle = new THREE.Vector3(0, 0.03, -0.74);
+    g.userData.aim = new THREE.Vector3(0, -0.11, -0.7);
+  } else if (kind === 'ammo') { // an olive ammo box with a yellow band
+    box(g, 0.34, 0.2, 0.2, 0, 0, 0, new THREE.MeshStandardMaterial({ color: '#4f5a2c', roughness: 0.7 }));
+    box(g, 0.345, 0.04, 0.205, 0, 0.03, 0, new THREE.MeshStandardMaterial({ color: '#F2C200', roughness: 0.5 }));
+    box(g, 0.12, 0.03, 0.03, 0, 0.12, 0, dark);
+  } else if (kind === 'med') { // a white medkit with a red cross
+    const red = new THREE.MeshStandardMaterial({ color: '#d7263d', roughness: 0.5 });
+    box(g, 0.32, 0.22, 0.12, 0, 0, 0, new THREE.MeshStandardMaterial({ color: '#f4f4f0', roughness: 0.5 }));
+    box(g, 0.16, 0.05, 0.125, 0, 0, 0.002, red); box(g, 0.05, 0.16, 0.125, 0, 0, 0.002, red);
   } else if (kind === 'scout') {
     const wood = new THREE.MeshStandardMaterial({ color: '#8a5a2b', roughness: 0.6 });
     box(g, 0.06, 0.07, 0.5, 0, 0.02, -0.1, dark);
@@ -355,7 +385,7 @@ export class Combat {
       if (!this.active || e.repeat || /INPUT|TEXTAREA/.test(e.target?.tagName || '')) return;
       if (e.code === 'KeyR') this.want.reload = true;
       if (e.code === 'KeyQ') this.want.swap = true;
-      if (/^Digit[123]$/.test(e.code)) this.want.slot = +e.code.slice(5) - 1;
+      if (/^Digit[1234]$/.test(e.code)) this.want.slot = +e.code.slice(5) - 1;
       if (e.code === 'KeyV' || e.code === 'KeyF') this.want.stab = true; // a quick stab whatever is in the hands
     });
     L(window, 'wheel', (e) => { if (this.active && this.aim > 0.5 && this.gun.def.scope) this.zoom2 = e.deltaY < 0; }, { passive: true });
@@ -363,9 +393,9 @@ export class Combat {
   }
 
   /** A new round, or back at the base. */
-  respawn(maxHp = 100, safeS = 0) { this.safeT = safeS; this.maxHp = this.hp = maxHp; this.down = 0; this.gun.reset(); this.aiming = false; this.fire = false; }
+  respawn(maxHp = 100, safeS = 0) { this.safeT = safeS; this.maxHp = this.hp = maxHp; this.down = 0; this.gun.reset(savedPrimary()); this.aiming = false; this.fire = false; this.hurtAt = 0; }
   /** from: the shooter's position (three.js [x, y, z]) or null: an arc on screen points their way for a moment. */
-  hurt(hp, from = null) { this.hp = hp; this.dmg = 1; haptic('hurt'); if (from) { this.hitFrom = [from[0], from[2]]; this.hitDirT = HIT_DIR_S; } }
+  hurt(hp, from = null) { this.hp = hp; this.dmg = 1; this.hurtAt = performance.now(); haptic('hurt'); if (from) { this.hitFrom = [from[0], from[2]]; this.hitDirT = HIT_DIR_S; } }
   /** Knocked out for `seconds`; onBack runs when it is time to stand at the base again. */
   killed(seconds, onBack) { haptic('down'); this.down = seconds; this.onBack = onBack; this.fire = false; this.aiming = false; this.btns[1].classList.remove('on'); }
   hitmark(kill) { haptic(kill ? 'kill' : 'hit'); this.hitT = kill ? 0.5 : 0.18; this.hitEl.className = kill ? 'on kill' : 'on'; }
@@ -419,18 +449,19 @@ export class Combat {
       p.g.visible = this.active && p.y !== null && p.back <= 0;
       p.gun.rotation.y += dt * 1.5;
       if (!p.g.visible || !alive || Math.hypot(st.pos[0] - p.x, st.pos[2] - p.z) > PICKUP_R || Math.abs(st.pos[1] - p.y) > 2.5) continue;
-      if (this.gun.slots[1] === p.w && this.gun.ammo[p.w] === WEAPONS[p.w].mag) continue; // already full
+      if (p.w === 'med' ? this.hp >= this.maxHp : p.w === 'ammo' ? Object.entries(WEAPONS).every(([k, d]) => !d.reserve || this.gun.spare[k] >= d.reserve) : (this.gun.slots.includes(p.w) && this.gun.ammo[p.w] === WEAPONS[p.w].mag && this.gun.spare[p.w] === WEAPONS[p.w].reserve)) continue; // nothing to gain
       if ((p.asked = (p.asked || 0) - dt) > 0) continue;
       p.asked = 0.5; this.send({ t: 'take', i: this.pickups.indexOf(p) }); // the room says who gets it
     }
   }
 
   /** The room: weapon i was taken (by me?) and is gone for `seconds`. */
-  taken(i, mine, seconds = PICKUP_BACK_S) {
+  taken(i, mine, seconds = PICKUP_BACK_S, hp = null) {
     const p = this.pickups[i];
     if (!p) return;
     p.back = seconds;
-    if (mine && this.gun.give(p.w)) { haptic('pickup'); this.zoom2 = false; this.toast?.(`${WEAPONS[p.w].name} picked up`); }
+    if (mine && Number.isFinite(hp)) this.hp = hp; // a medkit: the room healed me
+    if (mine && this.gun.give(p.w)) { haptic('pickup'); this.zoom2 = false; this.toast?.(p.w === 'ammo' ? 'Ammo refilled' : p.w === 'med' ? 'Patched up' : `${WEAPONS[p.w].name} picked up`); }
   }
 
   /** Guns at the other players' sides: figures() -> [{ id, pos, yaw, team, w, hidden }]. */
@@ -500,6 +531,8 @@ export class Combat {
     } else this.downEl.hidden = true;
 
     this.stepPickups(dt, st, alive);
+    // health comes back after a while without a hit (as the room counts it: weapons.js REGEN)
+    if (alive && this.hp < this.maxHp && performance.now() - (this.hurtAt || 0) > REGEN.delay * 1000) this.hp = Math.min(this.maxHp, this.hp + REGEN.rate * dt);
     // the shooting camera (Call of Duty: your aim is never blocked): from the hip the camera sits
     // over the right shoulder (the figure to the left of the crosshair); aiming goes to the eyes
     // (the gun in the hands); the figure fades when the camera is close to it
@@ -692,7 +725,7 @@ export class Combat {
     this.hpEl.parentElement.style.boxShadow = this.safeT > 0 ? '0 0 0 2px #fff, 0 0 14px 4px rgba(255,255,255,.75)' : '';
     this.hpEl.style.width = `${(this.hp / this.maxHp) * 100}%`;
     this.hpEl.style.background = this.hp > 50 ? '#5fd66b' : this.hp > 25 ? '#F2C200' : '#e5484d';
-    const ammo = `${def.melee ? '<span>—</span>' : `<span>${this.gun.ammo[this.gun.w]}</span> / ${def.mag}`}<small>${this.gun.reloading ? 'Reloading' : def.name}</small><em>${this.gun.slots.map((w, i) => (w ? `${i + 1} ${WEAPONS[w].name}` : '')).filter(Boolean).join(' · ')}</em>${this.gun.reloading ? `<u style="width:${this.gun.reloadProgress * 100}%"></u>` : ''}`;
+    const ammo = `${def.melee ? '<span>—</span>' : `<span>${this.gun.ammo[this.gun.w]}</span> / ${this.gun.spare[this.gun.w]}`}<small>${this.gun.reloading ? 'Reloading' : def.name}</small><em>${this.gun.slots.map((w, i) => (w ? `${i + 1} ${WEAPONS[w].name}` : '')).filter(Boolean).join(' · ')}</em>${this.gun.reloading ? `<u style="width:${this.gun.reloadProgress * 100}%"></u>` : ''}`;
     if (ammo !== this.lastAmmo) { this.ammoEl.innerHTML = ammo; this.lastAmmo = ammo; }
   }
 

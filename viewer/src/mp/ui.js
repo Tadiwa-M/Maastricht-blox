@@ -4,7 +4,7 @@
 // Tap or click only (no new keys); hidden on the title screen. Typing never walks the player.
 import { TEAM_HEX, TEAM_NAMES, clock } from './model.js';
 import { cleanNick, parseCode } from './protocol.js';
-import { heatProject } from './weapons.js';
+import { heatProject, PRIMARIES, WEAPONS, LOADOUT_KEY, savedPrimary } from './weapons.js';
 
 const CSS = `
 #mp-open { position: fixed; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(196px + env(safe-area-inset-bottom, 0px));
@@ -22,7 +22,11 @@ const CSS = `
 #mp-panel[hidden] { display: none; }
 #mp-panel > div { display: grid; gap: 10px; }
 #mp-panel .solo { display: grid; gap: 6px; padding: 10px; border-radius: 10px; background: rgba(255,255,255,.05); }
-#mp-panel .solo b { font-size: 11px; letter-spacing: .12em; color: #F2A900; }
+#mp-panel .solo b, #mp-panel .loadout b { font-size: 11px; letter-spacing: .12em; color: #F2A900; }
+#mp-panel .loadout { display: grid; gap: 6px; }
+#mp-panel .loadout .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+#mp-panel button.lo { padding: 8px 4px; background: rgba(255,255,255,.08); color: #f6f3ea; }
+#mp-panel button.lo.on { background: #F2A900; color: #10153a; }
 #mp-panel button.close { position: absolute; top: 6px; right: 6px; width: 34px; height: 34px; padding: 0; border-radius: 50%;
   background: rgba(255,255,255,.1); color: #f6f3ea; font: 400 22px/1 system-ui, sans-serif; }
 #mp-panel h3 { margin: 0; font: 400 22px/1 'Anton', Impact, sans-serif; letter-spacing: .06em; }
@@ -135,15 +139,30 @@ export class MpUi {
     if (this.view !== 'room') this.renderStart();
   }
 
+  /** The loadout: the primary weapon (the pistol and the knife always come along). */
+  loadoutHtml() {
+    const now = savedPrimary();
+    return `<div class="loadout"><b>LOADOUT</b><div class="row">${PRIMARIES.map((w) => `<button class="lo${w === now ? ' on' : ''}" data-w="${w}">${WEAPONS[w].name}</button>`).join('')}</div>
+      <div class="note">+ Pistol and knife. Scouts, LMGs, ammo and medkits lie about the streets.</div></div>`;
+  }
+
+  wireLoadout() {
+    for (const b of this.panel.querySelectorAll('.lo')) b.addEventListener('click', () => {
+      try { localStorage.setItem(LOADOUT_KEY, b.dataset.w); } catch { /* blocked */ }
+      for (const o of this.panel.querySelectorAll('.lo')) o.classList.toggle('on', o === b);
+    });
+  }
+
   /** Solo games, played in this browser (mp/localroom.js): they work without the game server. */
   soloHtml() {
-    return `<div class="solo"><b>PLAY SOLO</b>
+    return `${this.loadoutHtml()}<div class="solo"><b>PLAY SOLO</b>
       <button class="go raid">Defend Maastricht: night raid</button>
       <div class="note">They come out of the caves through the Helpoort in waves. Stop them carrying the banner off the Markt until dawn.</div>
       <button class="bots">Capture the flag with bots</button></div>`;
   }
 
   wireSolo() {
+    this.wireLoadout();
     this.panel.querySelector('.raid')?.addEventListener('click', () => this.on.solo('raid'));
     this.panel.querySelector('.bots')?.addEventListener('click', () => this.on.solo('bots'));
   }
@@ -214,19 +233,20 @@ export class MpUi {
         <button class="go start">Defend it again</button>` : '<div class="note">Raid on: wave and banner at the top.</div>';
       this.body.innerHTML = `<h3>NIGHT RAID</h3>
         <p class="rules">Guard the banner on the Markt. Raiders that reach it carry it toward the Helpoort: knock them out, or run into the carrier. Lose it ${cfg.winCaps || 3} times and the city falls. Survive ${r.waves || 8} waves.</p>
-        ${end}<button class="leave">Stop</button>`;
+        ${room.phase !== 'play' ? this.loadoutHtml() : ''}${end}<button class="leave">Stop</button>`;
     } else {
       const solo = room.mode === 'bots';
       this.body.innerHTML = solo
         ? `<h3>PRACTICE</h3><div class="note">You and 3 bots against 4 bots. You are on <b style="color:${TEAM_HEX[model.team] || '#fff'}">${TEAM_NAMES[model.team] || '...'}</b>.</div>
-          <div class="teams">${teams}</div>${over}${room.phase === 'over' ? '<button class="go start">Play again</button>' : '<div class="note">Match on: see the score at the top.</div>'}
+          <div class="teams">${teams}</div>${over}${room.phase !== 'play' ? this.loadoutHtml() : ''}${room.phase === 'over' ? '<button class="go start">Play again</button>' : '<div class="note">Match on: see the score at the top.</div>'}
           <button class="leave">Stop</button>`
         : `<h3>ROOM</h3><div class="code-big">${esc(room.code)}</div>
       <div class="note">Friends join with this code (Play, then Join). You are on <b style="color:${TEAM_HEX[model.team] || '#fff'}">${TEAM_NAMES[model.team] || '...'}</b>.</div>
-      <div class="teams">${teams}</div>${over}${action}
+      <div class="teams">${teams}</div>${over}${room.phase !== 'play' ? this.loadoutHtml() : ''}${action}
       <div class="msg">${esc(status)}</div>
       <button class="leave">Leave the room</button>`;
     }
+    this.wireLoadout();
     const heat = this.panel.querySelector('.heat');
     if (heat && cfg.bases) drawHeat(heat, model.kills, cfg);
     this.panel.querySelector('.start')?.addEventListener('click', () => this.on.start());
