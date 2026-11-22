@@ -41,7 +41,7 @@ export function switchLook(id) {
 /** Painted looks: textured materials, figures and vehicles finished as film props. */
 export const PAINTED_LOOK = LOOK === 'verse' || LOOK === 'manga';
 /** Material textures and weathering: the comic film only (cel shading wants flat surfaces). */
-export const TEXTURED_LOOK = LOOK === 'verse' || LOOK === 'manga'; // (manga: illustrated, with lighter weathering)
+export const TEXTURED_LOOK = LOOK === 'verse'; // Manga uses clean cel surfaces; the comic look keeps the painted material textures.
 
 /** The animation-on-twos tick for a time in seconds (a new pose only when it changes). */
 export const twosTick = (t, hz = VERSE.twosHz) => Math.floor(t * hz);
@@ -136,28 +136,37 @@ const shader = {
       // round the characters: render/outline.js); the scene's palette from render/mangafx.js
       float L = luma(base);
       L = mix(L, pow(L, 0.6), night * 0.8);
-      float mx = max(max(base.r, base.g), base.b);
-      vec3 pure = base / max(mx, 0.03);
-      float sat = 1.0 - min(min(pure.r, pure.g), pure.b);
-      vec3 deep = clamp(mix(vec3(dot(pure, vec3(0.333))), pure, 1.35), 0.0, 1.0);
-      float litK = smoothstep(0.19, 0.26, L); // a clear but painted terminator
-      float grad = smoothstep(0.26, 0.85, L); // the gradient inside the light
-      vec3 warm = vec3(1.0, 0.86, 0.62), cool = mix(vec3(0.24, 0.3, 0.55), mShade, 0.5);
-      vec3 stone = vec3(0.86, 0.8, 0.7) * (0.78 + 0.26 * grad); // greys: warm cream stone, not blue
-      vec3 litC = mix(stone, deep * (0.72 + 0.28 * grad), smoothstep(0.1, 0.3, sat));
-      litC = mix(litC, litC * warm * 1.12, grad * 0.55); // highlights warm
-      vec3 shC = mix(deep * 0.45, cool, 0.42) * (0.72 + 0.5 * smoothstep(0.05, 0.2, L)); // shadows cool, with depth in them
+      // Keep each material's own hue and value: the old max-channel normalisation made every
+      // saturated surface converge on a similarly bright, plastic-looking colour.
+      float chroma = length(base - vec3(luma(base)));
+      float materialColour = smoothstep(0.018, 0.13, chroma);
+      float litK = smoothstep(0.18, 0.29, L); // two readable light masses, with a painted edge
+      float grad = smoothstep(0.22, 0.88, L); // gentle value movement inside the sunlit mass
+      vec3 warm = vec3(1.055, 1.015, 0.925);
+      vec3 cool = mix(vec3(0.27, 0.31, 0.52), mShade, 0.32);
+      // Saturated materials retain their local colour; neutral stone receives a restrained cream tint.
+      vec3 litC = base * mix(vec3(1.0), warm, 0.18 + grad * 0.22);
+      vec3 warmStone = vec3(0.88, 0.81, 0.70) * (0.84 + 0.16 * grad);
+      litC = mix(warmStone, litC, materialColour);
+      // Shadow colour is the material darkened and nudged toward blue-violet, not replaced by a flat tint.
+      vec3 shC = base * vec3(0.44, 0.46, 0.63);
+      shC = mix(shC, cool * (0.58 + 0.22 * L), 0.22 + (1.0 - materialColour) * 0.10);
       vec3 c = mix(shC, litC, litK);
-      // a brush grain: long soft strokes, not noise
+      // Fine pigment variation plus long, soft brush strokes; both stay subtle to avoid screen-door noise.
       float brush = hNoise(vec2(f.x * 0.045 + f.y * 0.015, f.y * 0.3)) * 0.6 + hNoise(vec2(f.x * 0.11, f.y * 0.7 + f.x * 0.03)) * 0.4;
-      c *= 0.93 + 0.14 * brush * (1.0 - sky);
+      float pigment = hNoise(f * 0.19 + vec2(4.1, 8.7));
+      c *= (0.97 + 0.06 * brush) * (0.985 + 0.03 * pigment) * (1.0 - sky);
+      c += sky * vec3(0.0); // keep the sky clean of surface pigment
       c = mix(c, vec3(0.06, 0.035, 0.1), 1.0 - smoothstep(0.045, 0.07, L)); // the deepest dark: ink
       vec3 skyc = mix(mSkyB, mSkyA, vUv.y) * mix(1.0, 0.45, night);
       c = mix(c, skyc, sky);
-      c = mix(c, mix(c, skyc, 0.35), smoothstep(450.0, 1700.0, z) * (1.0 - sky)); // aerial: into the sky's colour
-      float hs = (1.0 - litK) * smoothstep(0.12, 0.2, L) * 0.3;
+      float haze = smoothstep(360.0, 1500.0, z) * (1.0 - sky);
+      vec3 farTone = mix(c, skyc, 0.42);
+      farTone = mix(farTone, vec3(luma(farTone)), 0.08); // distant architecture loses a little chroma
+      c = mix(c, farTone, haze);
+      float hs = (1.0 - litK) * smoothstep(0.12, 0.2, L) * 0.26;
       float hk = inkHatch(f, nrmM, hs, 4.0) * nearK;
-      c = mix(c, c * 0.35, hk * 0.8 * (1.0 - sky));
+      c = mix(c, c * 0.42, hk * 0.68 * (1.0 - sky));
       // lines: a dark shade of the local colour, full at silhouettes, light at creases, thinner far off
       float ink = max(dEdge * mix(0.45, 0.95, nearK), nEdge * 0.35 * nearK) * (1.0 - sky);
       vec3 lineC = c * 0.22 + vec3(0.02, 0.01, 0.035);
