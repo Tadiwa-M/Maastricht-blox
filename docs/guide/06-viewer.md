@@ -969,3 +969,4 @@ per block, a worker for the walkers' simulation.
   earlier and gently reduces contrast and chroma toward the Manga sky. Manga keeps its existing
   material textures and trace weathering; Classic and Spider-Verse do not use this pass.
 - Combined pass: the look-anime shading kept; shadows lifted toward their lit colour (shade readable at dusk), colour +32 %; brush grain applied off the sky only.
+- Vivid pass (owner: too dull; the dark shadows are right): the shadow lift removed; colour +60 %, contrast +8 %, split toning: golden light, blue-violet shade. Mockup approved first (a paint-over of the render).

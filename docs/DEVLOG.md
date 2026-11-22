@@ -1965,3 +1965,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Validation: source and documentation reviewed; `scripts/check.sh` still needs to be run in a
   project environment with the repository dependencies installed.
 - Manga, combined: the look-anime shading (local colour, cream stone) with the shadow lifted toward its lit colour and colour +32 %, so the shade reads at dusk; the brush grain no longer scales the colour by the sky mask (guide 06).
+- Manga: the shadow lift undone (owner: dark shadows are true to the anime; the problem was dullness); instead colour +60 %, contrast +8 %, split toning (golden light, blue-violet shade) (guide 06).
