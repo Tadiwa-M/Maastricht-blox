@@ -995,3 +995,11 @@ machine and organic mixed).
   a bold print (stripes, zigzag, hearts, checks or a contrast panel), tops a gold chain across the
   chest and a pin, trousers sometimes a racing stripe or a diagonal print; faces heavy angled
   brows with an ink shadow under them and coloured lips.
+- The Stand (`player/stand.js`, manga only): an original design: a tall spirit of armoured blocks in
+  the player's own outfit colours, gold trim (shoulder plates, waist band, a crest), a glowing
+  visor slit, a soft aura, a trail of plates instead of legs; ink-outlined; it rises beside the
+  right shoulder (a little ahead: the camera is behind) when the player strikes a pose or aims,
+  and E (walk mode or a match) throws a rush: punches every 0.07 s for 1.1 s with afterimage fists
+  in front; in a match each punch is a 'stand' shot through the room's rules (`CTF.weapons.stand`:
+  12 damage within 3.8 m), with a hit reaction. `test/stand.test.mjs`. Online rooms need the relay
+  redeployed for the 'stand' weapon; solo games have it at once.

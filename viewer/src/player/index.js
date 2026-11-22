@@ -35,6 +35,8 @@ import { rumble, canRumble, haptic } from '../mp/combat.js';
 import { VehicleContacts, lifeVehicles } from './bump.js';
 import { Scatter } from './scatter.js';
 import { defaultChoices, loadChoices } from '../figure/custom.js';
+import { PROPORTION } from '../figure/rig.js';
+import { Stand } from './stand.js';
 
 const DEG = Math.PI / 180;
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
@@ -52,6 +54,13 @@ export function initPlayer(ctx) {
   const character = new Character(ctx.models, world, { look });
   character.group.visible = false;
   stage.scene.add(character.group);
+  // the manga look: the player's Stand (player/stand.js), in the user's own colours
+  let stand = null;
+  if (PROPORTION.pose) {
+    stand = new Stand(stage.scene, { top: character.variant.colours.top, bottom: character.variant.colours.bottom });
+    window.__bloxStand = stand;
+    window.addEventListener('keydown', (e) => { if (e.code === 'KeyE' && mode === 'walk' && !window.__bloxMp?.combat?.active && !e.repeat) stand.rush(); });
+  }
   const findStreet = world?.features ? streetFinder(world.features.values()) : () => '';
   const S = world?.studM || 0.5;
   const still = /[?&]shot=1/.test(location.search);
@@ -359,6 +368,9 @@ export function initPlayer(ctx) {
         character.update(drawFeet, ctrl.yaw, res.speed, res.travelled, dt,
           { angVel: L.angVel, accel: L.accel, steer: L.steer, grounded: ctrl.grounded, vy: ctrl.vel[1] });
       }
+      // the Stand shows while posing or aiming (and during a rush); each punch goes to the match, if any
+      if (stand) stand.update(dt, drawFeet, character.aim?.yaw ?? ctrl.yaw, (character.poseK || 0) > 0.5 || (window.__bloxMp?.combat?.aim || 0) > 0.5,
+        (at) => window.__bloxMp?.combat?.standPunch?.(at));
       // smooth the followed height (step-ups and landings), keep x/z exact
       smoothFeet[0] = ctrl.pos[0]; smoothFeet[2] = ctrl.pos[2];
       // the map's orbit point walks along: clip planes, shadows and haze are measured from it

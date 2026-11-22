@@ -39,6 +39,7 @@ export const CTF = {
   // shotgun: damage per pellet that hit (msg.n of 8), short range; knife: one hit, arm's length
   weapons: { rifle: { body: 24, head: 48, minMs: 80 }, scout: { body: 75, head: 150, minMs: 850 },
     shotgun: { body: 15, head: 20, minMs: 650, pellets: 8, rangeM: 45 }, knife: { body: 1000, head: 1000, minMs: 450, rangeM: 3.5, melee: true },
+    stand: { body: 12, head: 12, minMs: 60, rangeM: 3.8, melee: true }, // a Stand's punch (the manga look's rush)
     smg: { body: 17, head: 32, minMs: 55 }, pistol: { body: 26, head: 52, minMs: 140 }, lmg: { body: 23, head: 42, minMs: 75 } },
   regen: { delayMs: 5000, perS: 25 }, // health comes back after a while without a hit (as the client shows it)
   medHp: 60, // a medkit

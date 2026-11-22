@@ -404,6 +404,7 @@ export class Combat {
       if (e.code === 'KeyQ') this.want.swap = true;
       if (/^Digit[1234]$/.test(e.code)) this.want.slot = +e.code.slice(5) - 1;
       if (e.code === 'KeyV' || e.code === 'KeyF') this.want.stab = true; // a quick stab whatever is in the hands
+      if (e.code === 'KeyE') this.want.rush = true; // the Stand's rush (the manga look)
     });
     L(window, 'wheel', (e) => { if (this.active && this.aim > 0.5 && this.gun.def.scope) this.zoom2 = e.deltaY < 0; }, { passive: true });
     L(window, 'blur', () => { this.fire = false; this.aiming = false; });
@@ -548,6 +549,9 @@ export class Combat {
     } else this.downEl.hidden = true;
 
     this.stepPickups(dt, st, alive);
+    // the Stand (manga look): a rush on E punches whoever is within reach in front of me
+    if (this.want.rush && alive) { window.__bloxStand?.rush(); }
+    this.want.rush = false;
     // health comes back after a while without a hit (as the room counts it: weapons.js REGEN)
     if (alive && this.hp < this.maxHp && performance.now() - (this.hurtAt || 0) > REGEN.delay * 1000) this.hp = Math.min(this.maxHp, this.hp + REGEN.rate * dt);
     // the shooting camera (Call of Duty: your aim is never blocked): from the hip the camera sits
@@ -584,6 +588,17 @@ export class Combat {
     f.aimPitch = Math.max(f.lim.min, Math.min(f.lim.max, f.aimPitch));
     this.prevAim = [f.aimYaw, f.aimPitch];
     this.draw(dt, st, f, alive);
+  }
+
+  /** One punch of the Stand's rush (player/stand.js): at = where it lands (three.js); the room judges. */
+  standPunch(at) {
+    if (!this.active || this.down > 0) return;
+    const rd = (p) => [Math.round((this.origin[0] + p[0]) * 100) / 100, Math.round(p[1] * 100) / 100, Math.round((this.origin[1] - p[2]) * 100) / 100];
+    let best = null, bd = 3.2;
+    for (const e of this.enemies()) { const d = Math.hypot(e.pos[0] - at[0], e.pos[2] - at[2]); if (d < bd) { bd = d; best = e; } }
+    const me = this.lastPos || at;
+    this.send({ t: 'shot', w: 'stand', o: rd([me[0], me[1] + 1.4, me[2]]), e: rd(best ? [best.pos[0], best.pos[1] + 1.1, best.pos[2]] : at), hit: best ? best.id : 0, head: false });
+    if (best) { haptic('hit'); comicFx('hit', best.pos); }
   }
 
   shoot(st, f) {
