@@ -154,6 +154,7 @@ export class Stage {
     this.night = n;
     this.post?.setNight(n);
     this.post?.setGrade(L.grade);
+    this.post?.setSun?.(this.sunDir);
     return n;
   }
 

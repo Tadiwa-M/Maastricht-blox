@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 
 export const PALETTES = [
+  { top: [0.24, 0.14, 0.52], bottom: [0.93, 0.66, 0.62], shade: [0.3, 0.2, 0.5] }, // violet overhead, warm horizon (the default)
   { top: [0.16, 0.62, 0.66], bottom: [0.42, 0.3, 0.72], shade: [0.3, 0.2, 0.5] },
   { top: [0.66, 0.84, 0.16], bottom: [0.93, 0.86, 0.42], shade: [0.16, 0.32, 0.24] },
   { top: [0.96, 0.46, 0.72], bottom: [0.55, 0.26, 0.78], shade: [0.4, 0.12, 0.44] },

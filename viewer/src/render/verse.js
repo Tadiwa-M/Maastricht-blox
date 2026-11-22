@@ -47,10 +47,10 @@ export const TEXTURED_LOOK = LOOK === 'verse' || LOOK === 'manga'; // both paint
 export const twosTick = (t, hz = VERSE.twosHz) => Math.floor(t * hz);
 
 const shader = {
-  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, fovScale: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, dpr: { value: 1 }, phone: { value: 0 }, fxImpact: { value: 0 }, fxAt: { value: new THREE.Vector2(0.5, 0.5) }, fxSplit: { value: 0 }, fxDuo: { value: 0 }, fxLines: { value: 1 }, fxDuoLo: { value: new THREE.Vector3() }, fxDuoHi: { value: new THREE.Vector3() }, mSkyA: { value: new THREE.Vector3(0.16, 0.62, 0.66) }, mSkyB: { value: new THREE.Vector3(0.42, 0.3, 0.72) }, mShade: { value: new THREE.Vector3(0.3, 0.2, 0.5) }, uSpeedK: { value: 0 }, uTime: { value: 0 }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, fovScale: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, dpr: { value: 1 }, phone: { value: 0 }, fxImpact: { value: 0 }, fxAt: { value: new THREE.Vector2(0.5, 0.5) }, fxSplit: { value: 0 }, fxDuo: { value: 0 }, fxLines: { value: 1 }, fxDuoLo: { value: new THREE.Vector3() }, fxDuoHi: { value: new THREE.Vector3() }, mSkyA: { value: new THREE.Vector3(0.16, 0.62, 0.66) }, mSkyB: { value: new THREE.Vector3(0.42, 0.3, 0.72) }, mShade: { value: new THREE.Vector3(0.3, 0.2, 0.5) }, uSpeedK: { value: 0 }, uTime: { value: 0 }, camRot: { value: new THREE.Matrix3() }, sunXZ: { value: new THREE.Vector2(0.6, -0.8) }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 fovScale; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float dpr; uniform float phone; uniform float fxImpact; uniform vec2 fxAt; uniform float fxSplit; uniform float fxDuo; uniform float fxLines; uniform vec3 fxDuoLo; uniform vec3 fxDuoHi; uniform vec3 mSkyA; uniform vec3 mSkyB; uniform vec3 mShade; uniform float uSpeedK; uniform float uTime; uniform float focus; uniform vec2 res;
+    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 fovScale; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float dpr; uniform float phone; uniform float fxImpact; uniform vec2 fxAt; uniform float fxSplit; uniform float fxDuo; uniform float fxLines; uniform vec3 fxDuoLo; uniform vec3 fxDuoHi; uniform vec3 mSkyA; uniform vec3 mSkyB; uniform vec3 mShade; uniform float uSpeedK; uniform float uTime; uniform mat3 camRot; uniform vec2 sunXZ; uniform float focus; uniform vec2 res;
     varying vec2 vUv;
     float dist(vec2 uv) { float d = texture2D(tDepth, uv).x; return depthOk > 0.5 ? (near * far) / (far - d * (far - near)) : focus; } // (no depth: all in focus, no lines)
     vec3 vpos(vec2 uv) { float z = dist(uv); return vec3((uv * 2.0 - 1.0) * fovScale * z, -z); }
@@ -129,6 +129,27 @@ const shader = {
       float ca = cos(a);
       return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
     }
+    // the painted anime sky: violet overhead, warm at the horizon, cel-shaded cumulus on a cloud
+    // layer seen in perspective (fixed to the world, drifting slowly): a sunlit cream-gold side
+    // toward the sun, a violet underside, a soft ink edge
+    // (three octaves, the last ones weak: big smooth puffs with a little billow at the edge)
+    float fbm2(vec2 p) { return hNoise(p) * 0.62 + hNoise(p * 2.07 + vec2(1.7, 9.2)) * 0.27 + hNoise(p * 4.3 + vec2(5.3, 2.1)) * 0.11; }
+    vec3 mangaSky(vec2 uv) {
+      vec3 d = normalize(camRot * normalize(vec3((uv * 2.0 - 1.0) * fovScale, -1.0)));
+      vec3 col = mix(mSkyB, mSkyA, smoothstep(0.0, 0.55, d.y));
+      if (d.y <= 0.005) return col;
+      vec2 p = d.xz / (d.y + 0.1) * vec2(1.6, 2.3) + vec2(uTime * 0.012, uTime * 0.004); // wider than deep
+      float n = fbm2(p), t = 0.56;
+      float aa = fwidth(n) * 1.2 + 1e-4;
+      float cloud = smoothstep(t - aa, t + aa, n) * smoothstep(0.01, 0.12, d.y);
+      float lit = step(fbm2(p + sunXZ * 0.07), n - 0.008); // the side facing the sun
+      vec3 litC = mix(vec3(1.0, 0.93, 0.74), mSkyB * 1.15 + 0.12, 0.25);
+      vec3 under = mix(mSkyA, vec3(0.78, 0.52, 0.78), 0.55);
+      vec3 cc = mix(under, litC, lit);
+      float edge = (1.0 - smoothstep(0.0, aa * 2.0, abs(n - t))) * smoothstep(0.03, 0.15, d.y);
+      col = mix(col, cc, cloud);
+      return mix(col, col * 0.55 + vec3(0.03, 0.0, 0.06), edge * 0.6);
+    }
     vec3 manga(vec3 base, float z, float sky, float dEdge, float nEdge, float nearK, vec2 f, vec3 nrmM) {
       // an illustrated anime background (Parts 3-5): light and shadow as two clear masses, but
       // painted: gradients inside each, warm highlights and cool shadows, a brush grain; deep
@@ -163,8 +184,8 @@ const shader = {
       float pigment = hNoise(f * 0.19 + vec2(4.1, 8.7));
       c *= mix(1.0, (0.97 + 0.06 * brush) * (0.985 + 0.03 * pigment), 1.0 - sky); // (the grain off the sky, not the colour)
       c = mix(c, vec3(0.06, 0.035, 0.1), 1.0 - smoothstep(0.045, 0.07, L)); // the deepest dark: ink
-      vec3 skyc = mix(mSkyB, mSkyA, vUv.y) * mix(1.0, 0.45, night);
-      c = mix(c, skyc, sky);
+      vec3 skyc = mix(mSkyB, mSkyA, 0.35) * mix(1.0, 0.45, night); // (the haze colour)
+      c = mix(c, mangaSky(vUv) * mix(1.0, 0.45, night), sky);
       float haze = smoothstep(360.0, 1500.0, z) * (1.0 - sky);
       vec3 farTone = mix(c, skyc, 0.42);
       farTone = mix(farTone, vec3(luma(farTone)), 0.08); // distant architecture loses a little chroma
@@ -277,4 +298,5 @@ export function updateVerse(pass, camera, focus, width, height, night = 0, dpr =
   const ty = Math.tan(THREE.MathUtils.degToRad(camera.fov || 50) / 2);
   u.fovScale.value.set(ty * (camera.aspect || 1), ty);
   u.res.value.set(width, height);
+  u.camRot.value.setFromMatrix4(camera.matrixWorld);
 }

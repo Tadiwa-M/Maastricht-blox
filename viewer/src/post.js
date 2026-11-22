@@ -107,6 +107,9 @@ export class Post {
   /** Colour grade for the time of day (render/look.js lookAt().grade). */
   setGrade(g) { this.grade.setGrade(g); }
 
+  /** The sun's direction (world): the painted clouds' lit side faces it. */
+  setSun(dir) { if (this.verse && dir) this.verse.uniforms.sunXZ.value.set(dir.x, dir.z).normalize(); }
+
   setPixelRatio(pr) {
     this.composer.setPixelRatio(pr);
     this.resize(this.width, this.height);

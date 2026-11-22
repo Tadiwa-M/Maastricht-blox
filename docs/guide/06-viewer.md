@@ -970,3 +970,8 @@ per block, a worker for the walkers' simulation.
   material textures and trace weathering; Classic and Spider-Verse do not use this pass.
 - Combined pass: the look-anime shading kept; shadows lifted toward their lit colour (shade readable at dusk), colour +32 %; brush grain applied off the sky only.
 - Vivid pass (owner: too dull; the dark shadows are right): the shadow lift removed; colour +60 %, contrast +8 %, split toning: golden light, blue-violet shade. Mockup approved first (a paint-over of the render).
+- Painted anime sky (manga): violet overhead, warm pink-gold at the horizon (the new default
+  palette); cel-shaded cumulus on a cloud layer in perspective, fixed to the world and drifting
+  (`mangaSky`, three weighted octaves: big smooth puffs), the side facing the sun cream-gold (the
+  sun's direction from `scene.js` via `post.setSun`), violet undersides, a soft ink edge; the haze
+  colour stays a plain mix of the palette. Mockup (a paint-over) first, as agreed.
