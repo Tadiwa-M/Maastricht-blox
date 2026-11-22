@@ -21,6 +21,40 @@ export const FIGURE_LOOK = typeof location !== 'undefined';
 if (LOOK === 'manga') setProportions({ shoulder: 1.3, chest: 1.24, waist: 0.86, leg: 1.12, head: 0.86, arm: 1.07, pose: true });
 const FILM = PAINTED_LOOK;
 
+/**
+ * The manga look's organic silhouette (owner: less stiff, like the mockup): each limb and the
+ * torso reshaped once, in the part's own space: upper arms and thighs swell into a muscle and
+ * taper to the joint below, the shin into a calf, the torso a V from a broad chest to a narrow
+ * waist, hair fuller. Changes the geometry itself (a copy per part), so the ink outline follows.
+ */
+const PROFILE = {
+  upperArm: (y) => 1 + 0.22 * Math.exp(-(((y + 0.09) / 0.09) ** 2)) - 0.14 * smooth(-0.15, -0.28, y),
+  foreArm: (y) => 1 + 0.12 * Math.exp(-(((y + 0.05) / 0.07) ** 2)) - 0.2 * smooth(-0.12, -0.25, y),
+  thigh: (y) => 1 + 0.16 * Math.exp(-(((y + 0.1) / 0.12) ** 2)) - 0.2 * smooth(-0.25, -0.45, y),
+  shin: (y) => 1 + 0.16 * Math.exp(-(((y + 0.09) / 0.08) ** 2)) - 0.22 * smooth(-0.2, -0.41, y),
+  top: (y) => 0.84 + 0.3 * smooth(0.05, 0.42, y) - 0.06 * smooth(0.48, 0.57, y),
+  hips: () => 0.94,
+};
+function smooth(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+const shaped = new Map();
+export function mangaShape(key, geo) {
+  if (LOOK !== 'manga' || !geo) return geo;
+  const k = key.replace(/^lo:/, ''), base = k.startsWith('top:') ? 'top' : k.startsWith('hair:') ? 'hair' : k;
+  const f = PROFILE[base];
+  if (!f && base !== 'hair') return geo;
+  if (shaped.has(key)) return shaped.get(key);
+  const g = geo.clone(), pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    if (base === 'hair') { pos.setXYZ(i, pos.getX(i) * 1.12, 0.12 + (y - 0.12) * 1.3, pos.getZ(i) * 1.12); continue; } // fuller, taller hair
+    const s = f(y);
+    pos.setX(i, pos.getX(i) * s); pos.setZ(i, pos.getZ(i) * (base === 'top' ? 0.6 + 0.4 * s : s));
+  }
+  g.computeVertexNormals(); g.computeBoundingSphere();
+  shaped.set(key, g);
+  return g;
+}
+
 /** Material kind of a figure part key ('head', 'hair:short', 'top:shirt', 'lo:thigh', ...). */
 export function figureKindOf(key) {
   const k = key.replace(/^lo:/, '');

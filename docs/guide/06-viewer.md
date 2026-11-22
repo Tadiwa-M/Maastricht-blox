@@ -1003,3 +1003,9 @@ machine and organic mixed).
   in front; in a match each punch is a 'stand' shot through the room's rules (`CTF.weapons.stand`:
   12 damage within 3.8 m), with a hit reaction. `test/stand.test.mjs`. Online rooms need the relay
   redeployed for the 'stand' weapon; solo games have it at once.
+- (Owner: too stiff; relax the toy theme for the characters.) Manga only: organic silhouettes
+  built into the part geometry (`mangaShape`, so the ink outline follows): biceps and thighs swell
+  and taper to the joint, calves, a V torso from broad chest to narrow waist, fuller and taller
+  hair; everyone stands at ease (`rig.js` `relaxed`: weight on one hip, the free knee bent, a hand
+  in a pocket, the chest turned against the hips, the head tilted; the side by person) instead
+  of straight; a looser walk (more chest and hip roll, bent elbows, freer arms).

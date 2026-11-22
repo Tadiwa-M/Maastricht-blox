@@ -75,6 +75,11 @@ export function jointAngles(v, pose, out = {}) {
       out.bob *= g.bounce; out.chestYaw *= g.roll;
     }
     if (v.acc === 'bag') { out.sh[1] *= 0.3; out.elbow[1] = 0.1; } // the hand with the bag hangs
+    if (PROPORTION.pose) { // the manga look: a looser, swaggering walk
+      out.chestYaw *= 1.9; out.pelvisYaw = (out.pelvisYaw || 0) * 1.6; out.pelvisRoll *= 1.5;
+      for (let q = 0; q < 2; q++) { out.sh[q] *= 1.25; out.elbow[q] += 0.3; out.abd[q] += 0.06; }
+      out.headYaw -= out.chestYaw * 0.4;
+    }
   } else if (mode === MODE.IDLE || mode === MODE.BROWSE) {
     // standing: breathing, the weight shifting slowly from one leg to the other, the head wandering
     const sway = Math.sin(t * 1.1 + seed), shift = Math.sin(t * 0.43 + seed * 1.7);
@@ -90,6 +95,7 @@ export function jointAngles(v, pose, out = {}) {
       set2(out, 'sh', 0.38 + 0.08 * sway, 0.3 - 0.06 * sway); set2(out, 'elbow', 0.95, 1.05); set2(out, 'abd', 0.12, 0.12);
       out.headPitch -= 0.25; out.lean += 0.06;
     } else if (pose.idle) { out.poseKind = pose.poseKind; idleAct(pose.idle, pose.idleK ?? 1, t + seed * 3, out); }
+    else if (PROPORTION.pose) relaxed(out, seed, t); // the manga look: everyone stands at ease, never straight
   } else if (mode === MODE.SIT) {
     out.pelvisY = SEAT_H / s + 0.075;
     set2(out, 'hip', 1.5, 1.5); set2(out, 'knee', -1.48, -1.48); set2(out, 'ankle', 0, 0);
@@ -140,6 +146,17 @@ export function holdGun(k, pitch, out, { sprint = 0, ready = 1, phase = 0, speed
 }
 
 const mix = (a, b, k) => a + (b - a) * k;
+
+/** Standing at ease (the manga look): weight on one hip, the free knee bent, a hand in a pocket, the chest turned against the hips, the head tilted. */
+function relaxed(out, seed, t) {
+  const side = Math.sin(seed * 7.3) > 0 ? 1 : -1, b = 0.015 * Math.sin(t * 1.3 + seed);
+  out.pelvisRoll += 0.09 * side; out.pelvisYaw = (out.pelvisYaw || 0) + 0.18 * side; out.chestYaw = (out.chestYaw || 0) - 0.3 * side;
+  const free = side > 0 ? 0 : 1, pocket = side > 0 ? 1 : 0;
+  out.knee[free] -= 0.32; out.hip[free] += 0.14; out.ankle[free] += 0.12;
+  out.sh[pocket] = -0.12; out.abd[pocket] = 0.24; out.elbow[pocket] = 0.75; // a hand in the pocket
+  out.sh[1 - pocket] += 0.1; out.elbow[1 - pocket] += 0.35; out.abd[1 - pocket] += 0.05;
+  out.headYaw += 0.25 * side; out.headPitch += 0.06 + b; out.lean -= 0.05;
+}
 
 /** Standing activities (IDLE): k 0..1 eases the pose in over the plain idle; t: the person's own clock. */
 function idleAct(kind, k, t, out) {

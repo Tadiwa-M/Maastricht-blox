@@ -1970,3 +1970,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Manga characters, step 1: heroic proportions for every figure; the player strikes original stand-your-ground poses (guide 06). Next: fashion and faces, then the Stand.
 - Manga characters, step 2: bold printed fashion, gold chains and pins, heavy brows (guide 06).
 - Manga characters, step 3: the player's own Stand (original design) beside them when posing or aiming; E throws a rush that hits up close (guide 06).
+- Manga characters less stiff: shaped limbs and V torso in the geometry, relaxed contrapposto stance for everyone, looser walk, fuller hair (guide 06).

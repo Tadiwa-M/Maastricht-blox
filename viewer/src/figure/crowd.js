@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { FIGURE_PARTS, figureMaterial, HAIR_STYLES, TOP_STYLES, ACCESSORIES } from './parts.js';
 import { poseFigure, jointAngles, MODE } from './rig.js';
-import { FIGURE_LOOK, figureKindOf, figureMaterialFor } from '../render/figuresurface.js';
+import { FIGURE_LOOK, figureKindOf, figureMaterialFor, mangaShape } from '../render/figuresurface.js';
 import { OUTLINE_ON, outlineFor } from '../render/outline.js';
 
 const LIMBS = { hips: 1, upperArm: 2, foreArm: 2, hand: 2, thigh: 2, shin: 2, shoe: 2, head: 1, 'lo:upperArm': 2, 'lo:foreArm': 2, 'lo:thigh': 2, 'lo:shin': 2 };
@@ -57,7 +57,7 @@ export class FigureCrowd {
     this.meshes = new Map();
     for (const [key, geo] of Object.entries(geos)) {
       const n = (key.startsWith('lo:') || key === 'acc:umbrella' || !lod ? cap : Math.min(cap, hiCap)) * (LIMBS[key] || 1);
-      const mesh = new THREE.InstancedMesh(geo, this.materialFor(key), n);
+      const mesh = new THREE.InstancedMesh(mangaShape(key, geo), this.materialFor(key), n);
       mesh.name = `figure:${key}`;
       mesh.count = 0;
       mesh.frustumCulled = false;
