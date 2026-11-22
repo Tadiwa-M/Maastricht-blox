@@ -18,7 +18,7 @@ import { addPartVaryings } from './pools.js';
 // every look gets the printed detail; the painted looks also the film materials (matte cloth, skin sheen)
 export const FIGURE_LOOK = typeof location !== 'undefined';
 // the manga look: the heroic build of that world (figure/rig.js PROPORTION)
-if (LOOK === 'manga') setProportions({ shoulder: 1.3, chest: 1.24, waist: 0.86, leg: 1.12, head: 0.86, arm: 1.07, pose: true });
+if (LOOK === 'manga') setProportions({ shoulder: 1.12, chest: 1.06, waist: 0.95, leg: 1.1, head: 0.9, arm: 1.05, pose: true }); // (the anime figure carries most of the build itself)
 const FILM = PAINTED_LOOK;
 
 /**
@@ -38,7 +38,7 @@ const PROFILE = {
 function smooth(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
 const shaped = new Map();
 export function mangaShape(key, geo) {
-  if (LOOK !== 'manga' || !geo) return geo;
+  if (LOOK !== 'manga' || !geo || !key.startsWith('lo:')) return geo; // (the near parts are the anime figure, already shaped: only the far blocks get the profile)
   const k = key.replace(/^lo:/, ''), base = k.startsWith('top:') ? 'top' : k.startsWith('hair:') ? 'hair' : k;
   const f = PROFILE[base];
   if (!f && base !== 'hair') return geo;
@@ -173,12 +173,34 @@ const MANGA_FASHION = {
     if (pick < 0.3) c = mix(c, c * 0.35, fLine(abs(p.x) - 0.05, 0.012));                                // a racing stripe
     else if (pick < 0.45) c = mix(c, mix(c, vec3(1.0), 0.5), step(0.5, fract((p.x + p.y) * 12.0)));     // diagonal print`,
   face: `
+    // anime eyes: an almond of white, a dark iris with a highlight, a heavy upper lid line with a
+    // flick at the outer corner, a thin lower line; the nose's shadow line; the jaw's shadow
+    for (int s = -1; s <= 1; s += 2) {
+      vec2 e = vec2(p.x - float(s) * 0.041, p.y - 0.19);
+      float alm = length(e / vec2(0.03, 0.014 * (1.0 - 0.35 * abs(e.x) / 0.03)));
+      float front = step(p.z, -0.05);
+      c = mix(c, vec3(0.97, 0.96, 0.95), (1.0 - smoothstep(0.9, 1.0, alm)) * front);
+      float iris = 1.0 - smoothstep(0.0105, 0.0125, length(e - vec2(-float(s) * 0.003, 0.0)));
+      c = mix(c, vec3(0.12, 0.08, 0.16), iris * (1.0 - smoothstep(0.9, 1.0, alm)) * front);
+      c = mix(c, vec3(1.0), (1.0 - smoothstep(0.002, 0.003, length(e - vec2(-float(s) * 0.006, 0.004)))) * front);
+      float lid = (1.0 - smoothstep(0.0, 0.0042, abs(e.y - 0.014 * (1.0 - (e.x / 0.03) * (e.x / 0.03)) + 0.001))) * step(abs(e.x), 0.033 + 0.008 * step(0.0, e.x * float(s)));
+      c = mix(c, vec3(0.05, 0.03, 0.07), lid * front);
+      float low = (1.0 - smoothstep(0.0, 0.0016, abs(e.y + 0.013 * (1.0 - (e.x / 0.03) * (e.x / 0.03))))) * step(abs(e.x), 0.026);
+      c = mix(c, c * 0.45, low * front);
+    }
+    float noseL = (1.0 - smoothstep(0.0, 0.003, abs(p.x - 0.008))) * step(0.135, p.y) * step(p.y, 0.175) * step(p.z, -0.05);
+    c = mix(c, c * 0.6, noseL);
+    float jaw = smoothstep(0.13, 0.08, p.y) * smoothstep(0.03, 0.08, abs(p.x)) * step(p.z, 0.02);
+    c = mix(c, c * vec3(0.7, 0.6, 0.78), jaw * 0.55);
     float bshadow = smoothstep(0.235, 0.205, p.y) * smoothstep(0.17, 0.2, p.y) * step(abs(p.x), 0.085) * step(p.z, 0.0);
     c = mix(c, c * vec3(0.45, 0.32, 0.55), bshadow * 0.75);                         // the brow's ink shadow
-    float heavy = (1.0 - smoothstep(0.012, 0.018, abs(p.y - 0.228 + abs(p.x) * 0.25))) * step(abs(p.x), 0.085) * step(0.015, abs(p.x)) * step(p.z, 0.0);
+    float heavy = (1.0 - smoothstep(0.006, 0.009, abs(p.y - 0.218 + (abs(p.x) - 0.04) * 0.3))) * step(abs(p.x), 0.078) * step(0.012, abs(p.x)) * step(p.z, -0.04);
     c = mix(c, vec3(0.08, 0.04, 0.1), heavy);                                        // heavy, angled brows
-    float lips = (1.0 - smoothstep(0.006, 0.01, abs(p.y - 0.115))) * step(abs(p.x), 0.03) * step(p.z, 0.0);
-    c = mix(c, vec3(0.5, 0.18, 0.32), lips * 0.85);                                  // coloured lips`,
+    float lipY = 0.118 - p.x * p.x * 6.0; // a slight downturn: a stern mouth
+    float lips = (1.0 - smoothstep(0.0015, 0.003, abs(p.y - lipY))) * (1.0 - smoothstep(0.016, 0.022, abs(p.x))) * step(p.z, -0.04);
+    c = mix(c, vec3(0.32, 0.1, 0.2), lips * 0.9); // the mouth: one firm line, coloured
+    float lower = (1.0 - smoothstep(0.002, 0.004, abs(p.y - lipY + 0.006))) * (1.0 - smoothstep(0.008, 0.012, abs(p.x))) * step(p.z, -0.04);
+    c = mix(c, c * vec3(0.8, 0.6, 0.7), lower * 0.6);`,
 };
 
 /** A clone of the figure material for a part kind (see KIND), or the material itself. */
@@ -192,7 +214,9 @@ export function figureMaterialFor(base, kind) {
   m.onBeforeCompile = (sh) => {
     addPartVaryings(sh);
     sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-      { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} ${LOOK === 'manga' ? MANGA_FASHION[kind] || '' : ''} ${FILM ? FILM_PALETTE : ''} diffuseColor.rgb = max(c, 0.0); }`);
+      { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} ${LOOK === 'manga' ? MANGA_FASHION[kind] || '' : ''}
+      ${FILM ? FILM_PALETTE : ''}
+      diffuseColor.rgb = max(c, 0.0); }`); // (new lines: a // comment at the end of a block must not swallow the rest)
   };
   m.customProgramCacheKey = () => `figure:${kind}:${FILM ? 'film' : 'toy'}:${LOOK || ''}`;
   return m;

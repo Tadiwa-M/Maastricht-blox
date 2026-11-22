@@ -1971,3 +1971,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Manga characters, step 2: bold printed fashion, gold chains and pins, heavy brows (guide 06).
 - Manga characters, step 3: the player's own Stand (original design) beside them when posing or aiming; E throws a rush that hits up close (guide 06).
 - Manga characters less stiff: shaped limbs and V torso in the geometry, relaxed contrapposto stance for everyone, looser walk, fuller hair (guide 06).
+- The manga look's own figure: an original anime build on the same joints (head, hair, anatomy, tailored clothes, hands), face drawn by shader; fixed a shader comment bug that broke manga faces and trouser prints (guide 06).

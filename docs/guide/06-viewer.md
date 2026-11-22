@@ -1009,3 +1009,21 @@ machine and organic mixed).
   hair; everyone stands at ease (`rig.js` `relaxed`: weight on one hip, the free knee bent, a hand
   in a pocket, the chest turned against the hips, the head tilted; the side by person) instead
   of straight; a looser walk (more chest and hip roll, bent elbows, freer arms).
+
+## The manga look's own figure (2026-11-22)
+
+Owner: the block figures, however reshaped, did not look like that world; build a new figure for the
+manga look (an exception to the brick-style rule for this look only). `figure/animeparts.js`
+`ANIME_PARTS()`: the same joints, part keys and colour slots as the toy figure, so poses, walks,
+the gun, bikes and crowd instancing are unchanged (`figure/crowd.js` picks it in the manga look;
+the far crowd keeps the light block parts). An angular anime head (a sphere carved into a tapered
+jaw and chin, a nose ridge, flat ears), tapered anatomy from lathe profiles (deltoid and biceps,
+forearm, a V torso, thigh, calf), sculpted hair (pompadour, a crown of spikes, an angular fringe,
+spiked bob, locks, top knot, swept tail, a peaked cap with a badge), tailored tops (a stand-up
+collar open at the front, lapels, gold buttons, a long open coat), hands with fingers, pointed
+shoes. The face shader draws almond eyes (white, iris and catch-light, a heavy upper lid with a
+flick, a lower line), angled brows, a nose shadow, a jaw shadow and a firm coloured mouth.
+Found on the way: an injected shader block ending in a // comment swallowed the closing brace, so
+the manga faces and the trouser prints had been failing to compile (fixed; blocks end with a new
+line). Checked in a standalone figure preview (front, three-quarter, close-up) and in the city.
+Open: still rigid segments (no bend through the spine), coat tails that swing, expressions.
