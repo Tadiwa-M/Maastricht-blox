@@ -117,6 +117,36 @@ const KIND = {
       c *= 1.0 - toe * 0.3;` },
 };
 
+// The manga look's fashion (owner: our characters as if from that world): each top and pair of
+// trousers gets a bold printed pattern picked from where the figure stands (stripes, zigzags,
+// hearts, checks, a solid with a contrast panel), tops a gold chain across the chest and a pin;
+// faces heavy brows and a dark ink shadow under them, coloured lips. In the part's own space.
+const MANGA_FASHION = {
+  top: `
+    float pick = fHash(vec3(floor(diffuseColor.r * 9.0), floor(diffuseColor.g * 9.0), floor(diffuseColor.b * 9.0))); // per outfit colour: the same print on a whole top
+    vec3 ink = c * 0.28, light = mix(c, vec3(1.0), 0.55);
+    if (pick < 0.2) c = mix(c, ink, step(0.5, fract(p.y * 18.0)));                                   // bold stripes
+    else if (pick < 0.4) c = mix(c, light, step(0.5, fract(p.x * 14.0 + abs(fract(p.y * 7.0) - 0.5) * 2.0))); // zigzag
+    else if (pick < 0.55) { vec2 q = fract(vec2(p.x, p.y) * 9.0) - 0.5; q.y -= abs(q.x) * 0.5; c = mix(c, vec3(0.95, 0.2, 0.45), step(length(q), 0.24)); } // hearts
+    else if (pick < 0.7) c = mix(c, ink, step(0.0, sin(p.x * 50.0) * sin(p.y * 50.0)));                // checks
+    else c = mix(c, vec3(1.0) - c * 0.6, step(0.06, abs(p.x)) * step(abs(p.x), 0.11));               // a contrast panel
+    // a gold chain across the chest and a pin
+    float chain = fLine(p.y - 0.4 + p.x * 0.6, 0.008) * step(0.0, -p.z) * step(-0.14, p.x) * step(p.x, 0.14);
+    c = mix(c, vec3(1.0, 0.78, 0.2) * (0.8 + 0.4 * step(0.5, fract(p.x * 90.0))), chain);
+    float pin = 1.0 - smoothstep(0.012, 0.016, length(vec2(p.x + 0.1, p.y - 0.46))); c = mix(c, vec3(0.95, 0.85, 0.3), pin * step(0.0, -p.z));`,
+  legs: `
+    float pick = fHash(vec3(floor(diffuseColor.r * 9.0), floor(diffuseColor.g * 9.0) + 3.0, floor(diffuseColor.b * 9.0)));
+    if (pick < 0.3) c = mix(c, c * 0.35, fLine(abs(p.x) - 0.05, 0.012));                                // a racing stripe
+    else if (pick < 0.45) c = mix(c, mix(c, vec3(1.0), 0.5), step(0.5, fract((p.x + p.y) * 12.0)));     // diagonal print`,
+  face: `
+    float bshadow = smoothstep(0.235, 0.205, p.y) * smoothstep(0.17, 0.2, p.y) * step(abs(p.x), 0.085) * step(p.z, 0.0);
+    c = mix(c, c * vec3(0.45, 0.32, 0.55), bshadow * 0.75);                         // the brow's ink shadow
+    float heavy = (1.0 - smoothstep(0.012, 0.018, abs(p.y - 0.228 + abs(p.x) * 0.25))) * step(abs(p.x), 0.085) * step(0.015, abs(p.x)) * step(p.z, 0.0);
+    c = mix(c, vec3(0.08, 0.04, 0.1), heavy);                                        // heavy, angled brows
+    float lips = (1.0 - smoothstep(0.006, 0.01, abs(p.y - 0.115))) * step(abs(p.x), 0.03) * step(p.z, 0.0);
+    c = mix(c, vec3(0.5, 0.18, 0.32), lips * 0.85);                                  // coloured lips`,
+};
+
 /** A clone of the figure material for a part kind (see KIND), or the material itself. */
 export function figureMaterialFor(base, kind) {
   const spec = KIND[kind];
@@ -128,8 +158,8 @@ export function figureMaterialFor(base, kind) {
   m.onBeforeCompile = (sh) => {
     addPartVaryings(sh);
     sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-      { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} ${FILM ? FILM_PALETTE : ''} diffuseColor.rgb = max(c, 0.0); }`);
+      { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} ${LOOK === 'manga' ? MANGA_FASHION[kind] || '' : ''} ${FILM ? FILM_PALETTE : ''} diffuseColor.rgb = max(c, 0.0); }`);
   };
-  m.customProgramCacheKey = () => `figure:${kind}:${FILM ? 'film' : 'toy'}`;
+  m.customProgramCacheKey = () => `figure:${kind}:${FILM ? 'film' : 'toy'}:${LOOK || ''}`;
   return m;
 }

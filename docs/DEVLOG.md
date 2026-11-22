@@ -1968,3 +1968,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Manga: the shadow lift undone (owner: dark shadows are true to the anime; the problem was dullness); instead colour +60 %, contrast +8 %, split toning (golden light, blue-violet shade) (guide 06).
 - Manga: painted anime sky with cel-shaded cumulus lit from the sun's side (guide 06).
 - Manga characters, step 1: heroic proportions for every figure; the player strikes original stand-your-ground poses (guide 06). Next: fashion and faces, then the Stand.
+- Manga characters, step 2: bold printed fashion, gold chains and pins, heavy brows (guide 06).

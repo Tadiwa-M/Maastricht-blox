@@ -991,3 +991,7 @@ machine and organic mixed).
   on the hip; pointing ahead with the other arm folded; a hand at the temple, chin up, back
   arched). The player strikes one after 2.5 s standing still (not while holding a gun), easing in,
   a different one each time; the ゴゴゴ lettering rises at the same moment (render/mangafx.js).
+- Fashion and faces (`render/figuresurface.js` `MANGA_FASHION`, manga only): each outfit colour gets
+  a bold print (stripes, zigzag, hearts, checks or a contrast panel), tops a gold chain across the
+  chest and a pin, trousers sometimes a racing stripe or a diagonal print; faces heavy angled
+  brows with an ink shadow under them and coloured lips.
