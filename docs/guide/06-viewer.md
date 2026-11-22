@@ -960,3 +960,11 @@ per block, a worker for the walkers' simulation.
   saturation); material textures back with only a trace of weathering; lines with intent (a dark
   shade of the local colour on the city, heavier near, light at creases; the characters' ink line
   2 px); a strong sun and deep shade (sun x1.35, fill x0.6).
+
+- **Manga environment refinement (2026-11-22):** the colour pass now preserves the base material's
+  own hue and value instead of normalising every saturated surface toward a similar bright colour.
+  Sunlit surfaces retain their local colour with a restrained warm bias; shadow keeps the material
+  darkened and leans blue-violet. Neutral stone receives a warm cream treatment. Soft value movement
+  and subtle pigment variation add depth without a screen-locked heavy grain. Distance haze begins
+  earlier and gently reduces contrast and chroma toward the Manga sky. Manga keeps its existing
+  material textures and trace weathering; Classic and Spider-Verse do not use this pass.
