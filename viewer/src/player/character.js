@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { FigureCrowd } from '../figure/crowd.js';
 import { makeVariant } from '../figure/variants.js';
 import { customVariant } from '../figure/custom.js';
-import { MODE, captureParts } from '../figure/rig.js';
+import { MODE, IDLE, PROPORTION, captureParts } from '../figure/rig.js';
 import { MotionState } from './motion.js';
 import { stance, easeAngle, STANCE } from './stance.js';
 
@@ -104,6 +104,15 @@ export class Character {
     } else this.legYaw = null;
     Object.assign(this.pose, { x: feet[0], y: feet[1], z: feet[2], rotY: -legYaw }, m, { phase, twist,
       aim: this.aim?.k || 0, aimPitch: this.aim?.pitch || 0, aimSprint: this.aim?.sprint || 0, aimReady: this.aim?.ready ?? 1 });
+    // the manga look: still for a few seconds (and not holding a gun), strike a pose (rig.js STAND_POSES)
+    if (PROPORTION.pose) {
+      this.stillT = speed < 0.15 && !this.aim ? (this.stillT || 0) + dt : 0;
+      if (this.stillT === 0 && this.posed) { this.posed = false; this.poseN = (this.poseN || 0) + 1; }
+      const want = this.stillT > 2.5 ? 1 : 0;
+      this.poseK = (this.poseK || 0) + (want - (this.poseK || 0)) * Math.min(1, dt * (want ? 5 : 9));
+      if (this.poseK > 0.01) { this.posed = true; Object.assign(this.pose, { mode: MODE.IDLE, idle: IDLE.POSE, idleK: this.poseK, poseKind: this.poseN || 0 }); }
+      else if (this.pose.idle === IDLE.POSE) this.pose.idle = 0;
+    }
     this.crowd.begin();
     this.crowd.add(this.variant, this.pose);
     this.crowd.end();

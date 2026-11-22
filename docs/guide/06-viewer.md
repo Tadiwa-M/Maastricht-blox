@@ -975,3 +975,19 @@ per block, a worker for the walkers' simulation.
   (`mangaSky`, three weighted octaves: big smooth puffs), the side facing the sun cream-gold (the
   sun's direction from `scene.js` via `post.setSun`), violet undersides, a soft ink edge; the haze
   colour stays a plain mix of the palette. Mockup (a paint-over) first, as agreed.
+
+## Our characters in that world: proportions and poses (2026-11-22)
+
+Owner: make our own characters look like they come from the bizarre-adventure world (not its
+characters); research first, mockup first (a concept image from our own screenshot, used as a
+mood board only). Research notes: fashion-plate posing (models, Rodin, kabuki stock poses: the
+whole skeleton in the pose), high fashion, heroic proportions (Part 3) turning slimmer later,
+colour used relationally, stands as the soul made visible (often echoing the user; armour,
+machine and organic mixed).
+- `figure/rig.js` `PROPORTION` (set by the manga look in `render/figuresurface.js`): shoulders
+  x1.3, chest x1.24, waist x0.86, legs x1.12 (the feet stay on the ground; seats and saddles keep
+  plain legs), head x0.86, arms x1.07, for every figure.
+- `STAND_POSES` (`IDLE.POSE`): three original sculptural poses (an arm across the face and a hand
+  on the hip; pointing ahead with the other arm folded; a hand at the temple, chin up, back
+  arched). The player strikes one after 2.5 s standing still (not while holding a gun), easing in,
+  a different one each time; the ゴゴゴ lettering rises at the same moment (render/mangafx.js).

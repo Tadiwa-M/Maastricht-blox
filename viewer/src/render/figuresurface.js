@@ -11,11 +11,14 @@
 //          stitching, worn knees, a twill grain
 //   shoe   sole band with a welt line, laces, a toe cap
 // Accessories keep the toy material.
-import { PAINTED_LOOK } from './verse.js';
+import { PAINTED_LOOK, LOOK } from './verse.js';
+import { setProportions } from '../figure/rig.js';
 import { addPartVaryings } from './pools.js';
 
 // every look gets the printed detail; the painted looks also the film materials (matte cloth, skin sheen)
 export const FIGURE_LOOK = typeof location !== 'undefined';
+// the manga look: the heroic build of that world (figure/rig.js PROPORTION)
+if (LOOK === 'manga') setProportions({ shoulder: 1.3, chest: 1.24, waist: 0.86, leg: 1.12, head: 0.86, arm: 1.07, pose: true });
 const FILM = PAINTED_LOOK;
 
 /** Material kind of a figure part key ('head', 'hair:short', 'top:shirt', 'lo:thigh', ...). */
