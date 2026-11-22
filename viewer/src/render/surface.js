@@ -17,8 +17,10 @@
 import * as THREE from 'three';
 import { POOL_GLSL, poolUniforms } from './pools.js';
 import { seasonUniforms } from './season.js';
+import { LOOK } from './verse.js';
 
-export const SURFACE = { brick: 0.06, stain: 0.18, streak: 0.09, cell: [0.8, 0.48, 0.8] };
+// the manga look keeps the material textures but only a trace of the weathering (stains turned to blotches)
+export const SURFACE = LOOK === 'manga' ? { brick: 0.04, stain: 0.05, streak: 0.03, cell: [0.8, 0.48, 0.8] } : { brick: 0.06, stain: 0.18, streak: 0.09, cell: [0.8, 0.48, 0.8] };
 export const KINDS = { brick: 1, stone: 2, plaster: 3, setts: 4, asphalt: 5, roof: 6, foliage: 7, bark: 8, grass: 9, soil: 10, copper: 11 };
 // palette names -> kind (names, not colours: the palette's colours may be tuned)
 export const KIND_OF = {

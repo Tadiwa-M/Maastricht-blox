@@ -953,3 +953,10 @@ per block, a worker for the walkers' simulation.
   or wave throws it to pink and purple); ink speed lines at the screen edges when sprinting; sound
   words in katakana (バシッ, ドン!, ドドド, バーン, ゴン, ドサッ).
 - Manga colour, second pass: the lit tone is the colour at full strength (+50 % saturation), not blended toward white; greys take a little of the scene's colour; shadows deep and saturated, terminator at 24 % luma (more contrast); solid ink below ~8 %; distance fades into the sky's colour.
+- (Owner: the style of the anime's backgrounds, not its characters.) Manga, third pass, toward the
+  illustrated backgrounds of Parts 3-5: light and shadow as two clear masses with a painted edge,
+  gradients inside each; warm highlights (amber) and cool shadows (blue-violet, the scene's shade
+  colour); greys as warm cream stone; a brush grain of long soft strokes; deep colour (+35 %
+  saturation); material textures back with only a trace of weathering; lines with intent (a dark
+  shade of the local colour on the city, heavier near, light at creases; the characters' ink line
+  2 px); a strong sun and deep shade (sun x1.35, fill x0.6).

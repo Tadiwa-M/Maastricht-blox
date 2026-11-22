@@ -146,8 +146,9 @@ export class Stage {
     this.hours = hours;
     this.sun.intensity *= this.weatherSun ?? 1; // an overcast or wet sky (render/weatherfx.js)
     this.renderer.toneMappingExposure = L.exposure;
-    if (this.post?.verse) { // comic test look: a film's lighting, a stronger key against a coloured fill
-      this.sun.intensity *= 1.15; this.hemi.intensity *= 0.78;
+    if (this.post?.verse) { // the painted looks: a film's lighting, a stronger key against a coloured fill
+      const manga = this.post.look === 'manga'; // (an anime background: a strong sun, deep shadow)
+      this.sun.intensity *= manga ? 1.35 : 1.15; this.hemi.intensity *= manga ? 0.6 : 0.78;
     }
     if (this.box) this.fitShadow();
     this.night = n;

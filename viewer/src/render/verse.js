@@ -41,7 +41,7 @@ export function switchLook(id) {
 /** Painted looks: textured materials, figures and vehicles finished as film props. */
 export const PAINTED_LOOK = LOOK === 'verse' || LOOK === 'manga';
 /** Material textures and weathering: the comic film only (cel shading wants flat surfaces). */
-export const TEXTURED_LOOK = LOOK === 'verse';
+export const TEXTURED_LOOK = LOOK === 'verse' || LOOK === 'manga'; // (manga: illustrated, with lighter weathering)
 
 /** The animation-on-twos tick for a time in seconds (a new pose only when it changes). */
 export const twosTick = (t, hz = VERSE.twosHz) => Math.floor(t * hz);
@@ -130,42 +130,44 @@ const shader = {
       return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
     }
     vec3 manga(vec3 base, float z, float sky, float dEdge, float nEdge, float nearK, vec2 f, vec3 nrmM) {
-      // anime cel shading (owner's JoJo stills): two flat tones with a crisp edge between them, the
-      // lit tone a clean bright version of the surface's colour, the shadow turned violet; solid
-      // ink only in the deepest dark; a few hatch lines along the shadow's edge; bold outlines
+      // an illustrated anime background (Parts 3-5): light and shadow as two clear masses, but
+      // painted: gradients inside each, warm highlights and cool shadows, a brush grain; deep
+      // saturated colour; lines with intent (dark shades of the local colour on the city, black
+      // round the characters: render/outline.js); the scene's palette from render/mangafx.js
       float L = luma(base);
       L = mix(L, pow(L, 0.6), night * 0.8);
       float mx = max(max(base.r, base.g), base.b);
-      vec3 pure = base / max(mx, 0.03); // the colour at full value
+      vec3 pure = base / max(mx, 0.03);
       float sat = 1.0 - min(min(pure.r, pure.g), pure.b);
-      // the colour itself, clean and bright; greys (stone, paving) stay grey, not a pale blue
-      // anime colour is deep, not pastel: the lit tone is the colour at full strength (barely toward
-      // white), greys take a little of the scene's colour; the shadow is deep and saturated
-      vec3 deep = mix(vec3(dot(pure, vec3(0.333))), pure, 1.5); // more saturated than life
-      vec3 grey = mix(vec3(0.7), mSkyB, 0.22) * (0.85 + 0.25 * L);
-      vec3 lit = mix(grey, clamp(deep, 0.0, 1.0) * (0.78 + 0.2 * smoothstep(0.25, 0.7, L)), smoothstep(0.1, 0.3, sat));
-      vec3 shadow = mix(hue(clamp(deep, 0.0, 1.0), 0.3) * 0.36, mShade * 0.8, 0.4); // deep, leaning into the scene's shade colour (render/mangafx.js)
-      float w = fwidth(L) * 1.5 + 0.004;
-      float litK = smoothstep(0.24 - w, 0.24 + w, L); // one crisp terminator (more of the frame in shadow: contrast)
-      vec3 c = mix(shadow, lit, litK);
-      c = mix(c, vec3(0.04, 0.02, 0.07), 1.0 - smoothstep(0.075 - w, 0.09 + w, L)); // the deep darks are solid ink
-      // the sky: flat and graphic
-      vec3 skyc = mix(mSkyB, mSkyA, vUv.y) * mix(1.0, 0.45, night); // the scene's unreal sky (render/mangafx.js)
+      vec3 deep = clamp(mix(vec3(dot(pure, vec3(0.333))), pure, 1.35), 0.0, 1.0);
+      float litK = smoothstep(0.19, 0.26, L); // a clear but painted terminator
+      float grad = smoothstep(0.26, 0.85, L); // the gradient inside the light
+      vec3 warm = vec3(1.0, 0.86, 0.62), cool = mix(vec3(0.24, 0.3, 0.55), mShade, 0.5);
+      vec3 stone = vec3(0.86, 0.8, 0.7) * (0.78 + 0.26 * grad); // greys: warm cream stone, not blue
+      vec3 litC = mix(stone, deep * (0.72 + 0.28 * grad), smoothstep(0.1, 0.3, sat));
+      litC = mix(litC, litC * warm * 1.12, grad * 0.55); // highlights warm
+      vec3 shC = mix(deep * 0.45, cool, 0.42) * (0.72 + 0.5 * smoothstep(0.05, 0.2, L)); // shadows cool, with depth in them
+      vec3 c = mix(shC, litC, litK);
+      // a brush grain: long soft strokes, not noise
+      float brush = hNoise(vec2(f.x * 0.045 + f.y * 0.015, f.y * 0.3)) * 0.6 + hNoise(vec2(f.x * 0.11, f.y * 0.7 + f.x * 0.03)) * 0.4;
+      c *= 0.93 + 0.14 * brush * (1.0 - sky);
+      c = mix(c, vec3(0.06, 0.035, 0.1), 1.0 - smoothstep(0.045, 0.07, L)); // the deepest dark: ink
+      vec3 skyc = mix(mSkyB, mSkyA, vUv.y) * mix(1.0, 0.45, night);
       c = mix(c, skyc, sky);
-      c = mix(c, mix(c, mSkyB, 0.3), smoothstep(500.0, 1800.0, z) * (1.0 - sky)); // distance: into the sky's colour, not white
-      // hatching: thin, only in the shadow near its edge, near the camera
-      float hs = (1.0 - litK) * smoothstep(0.12, 0.23, L) * 0.4;
+      c = mix(c, mix(c, skyc, 0.35), smoothstep(450.0, 1700.0, z) * (1.0 - sky)); // aerial: into the sky's colour
+      float hs = (1.0 - litK) * smoothstep(0.12, 0.2, L) * 0.3;
       float hk = inkHatch(f, nrmM, hs, 4.0) * nearK;
-      c = mix(c, vec3(0.06, 0.03, 0.1), hk * 0.7 * (1.0 - sky));
-      float ink = max(dEdge, nEdge * 0.6) * mix(0.55, 1.0, nearK) * (1.0 - sky);
-      // speed lines at the edges while sprinting
+      c = mix(c, c * 0.35, hk * 0.8 * (1.0 - sky));
+      // lines: a dark shade of the local colour, full at silhouettes, light at creases, thinner far off
+      float ink = max(dEdge * mix(0.45, 0.95, nearK), nEdge * 0.35 * nearK) * (1.0 - sky);
+      vec3 lineC = c * 0.22 + vec3(0.02, 0.01, 0.035);
       if (uSpeedK > 0.01) {
         vec2 d = (vUv - 0.5) * vec2(res.x / res.y, 1.0);
         float a = atan(d.y, d.x), r = length(d);
         float ln = step(0.8, hHash(vec2(floor(a * 110.0), floor(uTime * 14.0)))) * smoothstep(0.42, 0.75, r);
-        ink = max(ink, ln * uSpeedK * 0.85);
+        c = mix(c, vec3(0.03, 0.02, 0.05), ln * uSpeedK * 0.85);
       }
-      return mix(clamp(c, 0.0, 1.0), vec3(0.03, 0.02, 0.05), ink);
+      return mix(clamp(c, 0.0, 1.0), lineC, ink);
     }
     #endif
     void main() {

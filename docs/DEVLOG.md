@@ -1952,3 +1952,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Manga crisper: cel shading, flat surfaces, no phantom hatch lines; dynamic resolution no longer halves pixels on a capped display (remote desktop).
 - Manga look: ink outlines on characters (inverted hull), menacing ゴ lettering, palette swings, speed lines, katakana sound words (guide 06).
 - Manga colours deep, not pastel (owner: washed out): the lit tone at full colour strength (+50 % saturation), greys tinted by the scene, deep saturated shadows over a larger share of the frame, solid ink below 8 % luma, distance fading into the sky colour (guide 06).
+- Manga: illustrated anime-background style (painted gradients, warm light / cool shade, brush grain, coloured lines, textures back, strong sun) (guide 06).

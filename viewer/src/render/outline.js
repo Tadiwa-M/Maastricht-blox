@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { LOOK } from './verse.js';
 
 /** Outline width in CSS pixels by look (0: none). */
-export const OUTLINE_PX = { manga: 2.6 };
+export const OUTLINE_PX = { manga: 2.0 }; // the characters' line: firm, not heavy
 export const OUTLINE_ON = !!OUTLINE_PX[LOOK];
 export const outlineUniforms = { uOutlinePx: { value: OUTLINE_PX[LOOK] || 0 }, uScreenH: { value: 800 } };
 
