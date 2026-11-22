@@ -1953,3 +1953,14 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Manga look: ink outlines on characters (inverted hull), menacing ゴ lettering, palette swings, speed lines, katakana sound words (guide 06).
 - Manga colours deep, not pastel (owner: washed out): the lit tone at full colour strength (+50 % saturation), greys tinted by the scene, deep saturated shadows over a larger share of the frame, solid ink below 8 % luma, distance fading into the sky colour (guide 06).
 - Manga: illustrated anime-background style (painted gradients, warm light / cool shade, brush grain, coloured lines, textures back, strong sun) (guide 06).
+
+## 2026-11-22: Manga environment refinement
+
+- Refined the Manga colour pass to preserve local material hues and values, with restrained warm
+  highlights, blue-violet material shadows and warm neutral stone.
+- Added subtle pigment variation and softened the brush treatment; distant architecture now eases
+  toward the Manga sky with lower contrast and chroma.
+- Kept the existing Manga surface textures and trace weathering. Classic and Spider-Verse paths
+  remain unchanged.
+- Validation: source and documentation reviewed; `scripts/check.sh` still needs to be run in a
+  project environment with the repository dependencies installed.
