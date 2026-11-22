@@ -202,6 +202,10 @@ real city); a light story in chapters through the NPCs. First step done: the sol
 capture the flag with bots (guide 18). Next (owner, play-test): raiders as monsters or animals
 from the caves, not people (and no smiling faces), raider kinds, cave entrances, co-op raids online.
 
+**Manga look, later (owner, 2026-11-22):** after the look is right: anime-style characters (faces,
+proportions, outfits, dramatic poses) and a stand system (a figure beside you, auras, summoning,
+impact effects). Look first; one big job at a time.
+
 **Next world rebuild backlog (owner, 2026-11-15)**: items that need the pipeline and a full world
 rebuild on the workstation, batched for the next one:
 - Facade detail: window sills, cornices, shop signs and awnings (`pipeline/.../facade/`).
