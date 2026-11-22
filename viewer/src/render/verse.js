@@ -41,7 +41,7 @@ export function switchLook(id) {
 /** Painted looks: textured materials, figures and vehicles finished as film props. */
 export const PAINTED_LOOK = LOOK === 'verse' || LOOK === 'manga';
 /** Material textures and weathering: the comic film only (cel shading wants flat surfaces). */
-export const TEXTURED_LOOK = LOOK === 'verse'; // Manga uses clean cel surfaces; the comic look keeps the painted material textures.
+export const TEXTURED_LOOK = LOOK === 'verse' || LOOK === 'manga'; // both painted looks keep material texture; Manga uses only trace weathering.
 
 /** The animation-on-twos tick for a time in seconds (a new pose only when it changes). */
 export const twosTick = (t, hz = VERSE.twosHz) => Math.floor(t * hz);
@@ -156,7 +156,6 @@ const shader = {
       float brush = hNoise(vec2(f.x * 0.045 + f.y * 0.015, f.y * 0.3)) * 0.6 + hNoise(vec2(f.x * 0.11, f.y * 0.7 + f.x * 0.03)) * 0.4;
       float pigment = hNoise(f * 0.19 + vec2(4.1, 8.7));
       c *= (0.97 + 0.06 * brush) * (0.985 + 0.03 * pigment) * (1.0 - sky);
-      c += sky * vec3(0.0); // keep the sky clean of surface pigment
       c = mix(c, vec3(0.06, 0.035, 0.1), 1.0 - smoothstep(0.045, 0.07, L)); // the deepest dark: ink
       vec3 skyc = mix(mSkyB, mSkyA, vUv.y) * mix(1.0, 0.45, night);
       c = mix(c, skyc, sky);
