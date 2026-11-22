@@ -952,3 +952,4 @@ per block, a worker for the walkers' simulation.
   and violet, lime and gold, pink and purple, orange and teal; 75 s each, 6 s crossfade; a knock-out
   or wave throws it to pink and purple); ink speed lines at the screen edges when sprinting; sound
   words in katakana (バシッ, ドン!, ドドド, バーン, ゴン, ドサッ).
+- Manga colour, second pass: the lit tone is the colour at full strength (+50 % saturation), not blended toward white; greys take a little of the scene's colour; shadows deep and saturated, terminator at 24 % luma (more contrast); solid ink below ~8 %; distance fades into the sky's colour.

@@ -139,18 +139,22 @@ const shader = {
       vec3 pure = base / max(mx, 0.03); // the colour at full value
       float sat = 1.0 - min(min(pure.r, pure.g), pure.b);
       // the colour itself, clean and bright; greys (stone, paving) stay grey, not a pale blue
-      vec3 lit = mix(vec3(min(0.97, 0.5 + L * 1.1)), mix(vec3(1.0), pure, 0.8) * 0.95, smoothstep(0.12, 0.35, sat));
-      vec3 shadow = mix(hue(pure, 0.28) * 0.5, mShade, 0.42); // its own colour, darker, leaning into the scene's shade colour (render/mangafx.js)
+      // anime colour is deep, not pastel: the lit tone is the colour at full strength (barely toward
+      // white), greys take a little of the scene's colour; the shadow is deep and saturated
+      vec3 deep = mix(vec3(dot(pure, vec3(0.333))), pure, 1.5); // more saturated than life
+      vec3 grey = mix(vec3(0.7), mSkyB, 0.22) * (0.85 + 0.25 * L);
+      vec3 lit = mix(grey, clamp(deep, 0.0, 1.0) * (0.78 + 0.2 * smoothstep(0.25, 0.7, L)), smoothstep(0.1, 0.3, sat));
+      vec3 shadow = mix(hue(clamp(deep, 0.0, 1.0), 0.3) * 0.36, mShade * 0.8, 0.4); // deep, leaning into the scene's shade colour (render/mangafx.js)
       float w = fwidth(L) * 1.5 + 0.004;
-      float litK = smoothstep(0.19 - w, 0.19 + w, L); // one crisp terminator
+      float litK = smoothstep(0.24 - w, 0.24 + w, L); // one crisp terminator (more of the frame in shadow: contrast)
       vec3 c = mix(shadow, lit, litK);
-      c = mix(c, vec3(0.05, 0.03, 0.09), 1.0 - smoothstep(0.035 - w, 0.045 + w, L)); // the deepest dark is ink
+      c = mix(c, vec3(0.04, 0.02, 0.07), 1.0 - smoothstep(0.075 - w, 0.09 + w, L)); // the deep darks are solid ink
       // the sky: flat and graphic
       vec3 skyc = mix(mSkyB, mSkyA, vUv.y) * mix(1.0, 0.45, night); // the scene's unreal sky (render/mangafx.js)
       c = mix(c, skyc, sky);
-      c = mix(c, mix(c, vec3(0.86, 0.82, 0.92), 0.35), smoothstep(400.0, 1600.0, z) * (1.0 - sky)); // distance: paler
+      c = mix(c, mix(c, mSkyB, 0.3), smoothstep(500.0, 1800.0, z) * (1.0 - sky)); // distance: into the sky's colour, not white
       // hatching: thin, only in the shadow near its edge, near the camera
-      float hs = (1.0 - litK) * smoothstep(0.1, 0.18, L) * 0.4;
+      float hs = (1.0 - litK) * smoothstep(0.12, 0.23, L) * 0.4;
       float hk = inkHatch(f, nrmM, hs, 4.0) * nearK;
       c = mix(c, vec3(0.06, 0.03, 0.1), hk * 0.7 * (1.0 - sky));
       float ink = max(dEdge, nEdge * 0.6) * mix(0.55, 1.0, nearK) * (1.0 - sky);
