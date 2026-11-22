@@ -151,11 +151,15 @@ const shader = {
       // Shadow colour is the material darkened and nudged toward blue-violet, not replaced by a flat tint.
       vec3 shC = base * vec3(0.44, 0.46, 0.63);
       shC = mix(shC, cool * (0.58 + 0.22 * L), 0.22 + (1.0 - materialColour) * 0.10);
+      // (combined) lift the shadow toward its lit colour so the shade stays readable (figures at dusk),
+      // then the anime's richer colour on top
+      shC = mix(shC, litC * 0.62, 0.32);
       vec3 c = mix(shC, litC, litK);
+      c = mix(vec3(luma(c)), c, 1.32);
       // Fine pigment variation plus long, soft brush strokes; both stay subtle to avoid screen-door noise.
       float brush = hNoise(vec2(f.x * 0.045 + f.y * 0.015, f.y * 0.3)) * 0.6 + hNoise(vec2(f.x * 0.11, f.y * 0.7 + f.x * 0.03)) * 0.4;
       float pigment = hNoise(f * 0.19 + vec2(4.1, 8.7));
-      c *= (0.97 + 0.06 * brush) * (0.985 + 0.03 * pigment) * (1.0 - sky);
+      c *= mix(1.0, (0.97 + 0.06 * brush) * (0.985 + 0.03 * pigment), 1.0 - sky); // (the grain off the sky, not the colour)
       c = mix(c, vec3(0.06, 0.035, 0.1), 1.0 - smoothstep(0.045, 0.07, L)); // the deepest dark: ink
       vec3 skyc = mix(mSkyB, mSkyA, vUv.y) * mix(1.0, 0.45, night);
       c = mix(c, skyc, sky);
