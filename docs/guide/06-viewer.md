@@ -1185,7 +1185,7 @@ depth pass and ink outlines draw figures and vehicles again). Per figure: Classi
 - Vrijthof market (`life/xmas.js`), from the owner's photos: Sint-Servaas is on the west side and
   Sint Jan to the south-west; from the café side (east) the wheel stands face-on right of the
   Servaas towers, from the north-east corner right of Sint Jan's tower: the wheel is in the north half
-  facing east, out in the square ~40 m from the Servaas front (owner: not that close to the church) (at [15, 33], yaw pi/2), the gift box by the east fence (at [40, -2]); the gift box is a
-  see-through wire cage (line segments) with red ribbon strips on its faces, as in the photos.
+  facing east, out in the square ~40 m from the Servaas front (owner: not that close to the church) (at [15, 33], yaw pi/2), the gift box by the east fence (at [40, -2]); the gift box is an
+  open frame (its edges only; owner: no wire cage) with red ribbon strips on its faces and a bow.
 - Posing shots: each of `STAND_POSES` has a `cam` (yaw from straight in front, pitch, distance, fov
   added, focus height) that player/camera.js uses for the manga posing shot, with a slow drift.

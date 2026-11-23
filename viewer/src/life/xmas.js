@@ -39,12 +39,12 @@ export function chaletLayout(keep = () => true) {
   return out;
 }
 
-/** The gift's wire cage: its edges and a lattice over the sides and the top (line segments, origin on the ground). */
-function giftCage([w, h, d], step = 0.55) {
-  const p = [], seg = (a, b) => p.push(...a, ...b);
-  for (let x = -w / 2; x <= w / 2 + 1e-6; x += w / Math.round(w / step)) { seg([x, 0, -d / 2], [x, h, -d / 2]); seg([x, 0, d / 2], [x, h, d / 2]); seg([x, h, -d / 2], [x, h, d / 2]); }
-  for (let z = -d / 2; z <= d / 2 + 1e-6; z += d / Math.round(d / step)) { seg([-w / 2, 0, z], [-w / 2, h, z]); seg([w / 2, 0, z], [w / 2, h, z]); seg([-w / 2, h, z], [w / 2, h, z]); }
-  for (let y = 0; y <= h + 1e-6; y += h / Math.round(h / step)) { seg([-w / 2, y, -d / 2], [w / 2, y, -d / 2]); seg([-w / 2, y, d / 2], [w / 2, y, d / 2]); seg([-w / 2, y, -d / 2], [-w / 2, y, d / 2]); seg([w / 2, y, -d / 2], [w / 2, y, d / 2]); }
+/** The gift's open frame: just the twelve edges of the box (line segments, origin on the ground). */
+function giftFrame([w, h, d]) {
+  const p = [], X = [-w / 2, w / 2], Z = [-d / 2, d / 2];
+  for (const x of X) for (const z of Z) p.push(x, 0, z, x, h, z); // the four uprights
+  for (const y of [0, h]) for (const x of X) p.push(x, y, -d / 2, x, y, d / 2);
+  for (const y of [0, h]) for (const z of Z) p.push(-w / 2, y, z, w / 2, y, z);
   return new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
 }
 
@@ -161,9 +161,9 @@ export class XmasMarket {
     this.eaveBulbs = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.07), glow(), spots.length * 10);
     const G = XMAS.gift;
     this.gift = new THREE.Group();
-    const giftMat = new THREE.MeshBasicMaterial({ color: '#c8202a', toneMapped: false }), band = new THREE.LineBasicMaterial({ color: '#ffffff', toneMapped: false }); // the cage's wire and light strings
-    // (owner's photos: a see-through cage of wire and light strings, the ribbon bands solid red)
-    this.gift.add(new THREE.LineSegments(giftCage(G.size), band));
+    const giftMat = new THREE.MeshBasicMaterial({ color: '#c8202a', toneMapped: false }), band = new THREE.LineBasicMaterial({ color: '#ffffff', toneMapped: false }); // the frame's edges
+    // (owner's photos: an open frame you see straight through, the ribbon bands solid red; no lattice)
+    this.gift.add(new THREE.LineSegments(giftFrame(G.size), band));
     { // the ribbon: 0.8 m strips round the outside of the cage (down each side, over the top), not slabs through it
       const [w, h, d] = G.size, t = 0.12, R = 0.8, strips = [];
       for (const sz of [-1, 1]) strips.push(new THREE.BoxGeometry(R, h, t).translate(0, h / 2, sz * d / 2));
