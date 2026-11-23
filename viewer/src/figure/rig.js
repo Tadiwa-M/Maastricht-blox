@@ -186,15 +186,19 @@ function relaxed(out, seed, t) {
   out.pelvisYaw = (out.pelvisYaw || 0) + 0.3 * side; out.chestYaw = (out.chestYaw || 0) - 0.12 * side;
   out.legAbd[st] = 0.06; out.legAbd[free] = 0.26; out.legYaw[st] = 0.3; out.legYaw[free] = 0.45;
   out.knee[st] = -0.02; out.hip[st] = -0.04; out.knee[free] = -0.32; out.hip[free] = 0.18;
-  const hand = Math.sin(seed * 3.1) > -0.2 ? free : -1; // most raise a hand to the brow
+  // nonchalant, as far as the manga allows: most stand with their hands in their pockets (both, or
+  // one with the other hanging loose); now and then one raises a hand to the brow
+  const h = Math.sin(seed * 12.9898) * 43758.5453, pick = h - Math.floor(h), brow = pick > 0.86, both = pick < 0.5; // (even spread: about one in seven raises a hand)
   for (let q = 0; q < 2; q++) {
-    if (q === hand) { out.sh[q] = 1.85; out.abd[q] = 0.42; out.elbow[q] = 2.15; out.wrist[q] = 0.55; out.shY[q] = 0.025; }
-    else if (hand < 0 && q === free) { out.sh[q] = -0.12; out.abd[q] = 0.3; out.elbow[q] = 0.8; } // a hand in the pocket
-    else { out.sh[q] = 0.1; out.abd[q] = 0.32; out.elbow[q] = 0.55; out.wrist[q] = -0.3; } // hanging, a loose fist, the elbow out
+    const pocket = both || q === st; // (the standing side's hand goes in first)
+    if (brow && q === free) { out.sh[q] = 1.85; out.abd[q] = 0.42; out.elbow[q] = 2.15; out.wrist[q] = 0.55; out.shY[q] = 0.025; }
+    else if (pocket) { out.sh[q] = 0.12; out.abd[q] = 0.3; out.elbow[q] = 0.9; out.armTwist[q] = 0.75; out.wrist[q] = 0.3; } // a hand in the front pocket, the elbow out
+    else { out.sh[q] = 0.1; out.abd[q] = 0.3; out.elbow[q] = 0.5; out.wrist[q] = -0.3; } // hanging, a loose fist
   }
+  out.spineLean -= 0.06; // the chest out
   out.shY[st] -= 0.015; out.spineRoll += sgS * 0.12; out.spineLean -= 0.1; // the S continues up through the trunk, the chest lifted
   out.tailFlare = 0.1; out.tailSide = sgS * 0.22; // the coat swept out to one side
-  out.headRoll += sgS * 0.18; out.headYaw += 0.3 * side; out.headPitch += -0.14 + b; out.lean -= 0.07;
+  out.headRoll += sgS * 0.14; out.headYaw += 0.35 * side; out.headPitch += (brow ? -0.14 : 0.1) + b; out.lean -= 0.07; // chin up, looking down the nose
   ground(out, 1);
 }
 

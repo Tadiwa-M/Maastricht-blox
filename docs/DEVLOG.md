@@ -1985,3 +1985,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Character creator: Manga print and chain choices. Fixed the look and the saved figure overwriting each other's storage (guide 06).
 - Spider-Verse figure: own face, bending spine, street stance, arm twist joint; coat tails and skirts swing in both painted looks; the manga posing camera (guide 06).
 - Each look's own vehicles: retro cars, a road bike, a two-tone coach and a yacht in Manga; street cars, a BMX, a tagged bus and a neon ferry in Spider-Verse; Classic unchanged (guide 06).
+- Manga default stance: nonchalant, hands in pockets; the hand to the brow only now and then (guide 06).

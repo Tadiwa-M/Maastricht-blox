@@ -1141,3 +1141,7 @@ places, pivots and colour slots, so traffic, riders, bus flow, liveries and boar
   rounded cabins, a chrome rail and a mast / a squat teal ferry with a neon stripe and roof edge,
   tagged by the graffiti.
 Open: per-look trains; cyclists' riders ride the new bikes with the same hold.
+- (Owner: the default stance doesn't always have an arm up; it's a nonchalant aura, as nonchalant
+  as the manga allows.) The manga default stance now mostly keeps the hands in the pockets (both,
+  or one with the other hanging in a loose fist), chest out, chin up, looking down the nose; about
+  one in seven raises a hand to the brow. Still the S-curve, the wide turned-out stance.
