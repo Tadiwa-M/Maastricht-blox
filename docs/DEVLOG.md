@@ -1995,3 +1995,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Stand designer (parts, colours, name, ability; the three Stands are presets), Stand abilities on X (Guard via the relay, Encore, Short Circuit), the Spider-Verse comic panel border (guide 06). Relay redeploy needed for Guard online.
 - Controller: Share takes photos and postcards, Y/RB the Stand's rush and ability, R3 a pose, L3 the character, d-pad journal, trip planner and songs; Start pauses (guide 09).
 - Spider-Verse panel: thin by default, the full frame only on comic beats (owner: too big) (guide 06).
+- Posing: the camera can be orbited during the posing shot; people nearby pose with you (guide 06).

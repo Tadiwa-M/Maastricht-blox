@@ -207,3 +207,15 @@ test('the manga posing shot: drama swings the camera to the front three-quarter,
   assert.ok(r.position[1] < r.focus[1], 'below the focus, looking up');
   assert.ok(r.fov > 55, 'a little wider');
 });
+
+test('the posing shot can be orbited: look input moves round it, and is forgotten when the pose ends', () => {
+  const city = { isSolid: () => false, floorY: 0 };
+  const cam = new FollowCamera(); cam.aimYaw = 0; cam.snap();
+  cam.drama = 1; cam.dramaYaw = Math.PI;
+  const a = cam.update(city, [0, 0, 0], 1).position;
+  cam.input([0.8, 0], 0);
+  const b = cam.update(city, [0, 0, 0], 1).position;
+  assert.ok(Math.hypot(a[0] - b[0], a[2] - b[2]) > 1, 'the camera moved round the figure');
+  cam.drama = 0; cam.update(city, [0, 0, 0], 1);
+  assert.equal(cam.dramaOff, null);
+});

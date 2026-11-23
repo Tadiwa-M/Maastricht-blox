@@ -192,7 +192,7 @@ export function initPlayer(ctx) {
   // the cursor stays free: drag to look, every button clickable without Esc first
   input.mayLock = () => !!settings.captureMouse || !!window.__bloxMp?.combat?.active;
   hud.captures = input.mayLock;
-  let lastMayLock = input.mayLock();
+  let lastMayLock = input.mayLock(), wasPosing = false;
   canvas.addEventListener('pointermove', (e) => { hover = [e.clientX, e.clientY]; });
   canvas.addEventListener('dblclick', (e) => { if (mode === 'map' && !tween && !riding()) enterAt(screenRay(e.clientX, e.clientY)); });
   // walk mode: a click on the world captures the mouse (open-world look)
@@ -448,6 +448,8 @@ export function initPlayer(ctx) {
       follow.aspect = camera.aspect; // portrait phones: wider view, less shoulder offset
       // the manga look: a pose gets the manga's shot (camera.js drama): front three-quarter, low, looking up
       const wantDrama = !!PROPORTION.style?.poses && (character.poseK || 0) > 0.6 && !character.aim ? 1 : 0;
+      if (wantDrama && !wasPosing) window.__bloxLife?.walkers?.poseWithMe?.(ctrl.pos[0], -ctrl.pos[2]); // people nearby pose with you
+      wasPosing = !!wantDrama;
       follow.drama = (follow.drama || 0) + (wantDrama - (follow.drama || 0)) * Math.min(1, dt * (wantDrama ? 1.6 : 6));
       // the shot of the pose being struck (lookstyle.js STAND_POSES cam: yaw from straight in front of
       // the figure); a slow drift round it keeps the frame alive

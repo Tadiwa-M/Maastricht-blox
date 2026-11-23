@@ -1231,3 +1231,8 @@ headless (software rendering at ~1 fps does not advance CSS transitions), check 
   gutter widens and the border is redrawn, like a cut to a new panel.
 Needs the relay redeployed for Guard in online matches (bots and solo use the same rules locally).
 - (Owner: the panel frame was too big, it took you out of the game.) The panel is now a thin inked line with a 3 px paper sliver while you play; the full panel (14 px gutter, heavier ink) cuts in only for a beat: a caption, a knock-out, a hard landing, a raid wave, then goes back.
+- (Owner: move the camera freely while posing; "some people do poses with me".) The posing shot can
+  be orbited: look input during a pose turns round the shot (`camera.js dramaOff`, yaw and pitch,
+  forgotten when the pose ends) instead of being overridden by it. Pose with me: when the player
+  strikes a pose, about half the people within 18 m (hands free) stop for 6 s and strike one of
+  their own (`walkers.js poseWithMe`). Checked in the city: 9 people posed with the player.

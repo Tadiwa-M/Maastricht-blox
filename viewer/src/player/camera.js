@@ -103,6 +103,8 @@ export class FollowCamera {
 
   /** look: [dx, dy] radians (right / down positive as from a mouse), zoom: metres (+ = out). */
   input(look, zoom) {
+    // in the posing shot the look input orbits round the shot instead of being overridden by it
+    if ((this.drama || 0) > 0.3) { this.dramaOff = this.dramaOff || { yaw: 0, pitch: 0 }; this.dramaOff.yaw += look[0]; this.dramaOff.pitch = clamp(this.dramaOff.pitch + look[1], -0.5, 0.9); }
     ({ yaw: this.aimYaw, pitch: this.aimPitch } = applyLook({ yaw: this.aimYaw, pitch: this.aimPitch }, look, this.lim));
     this.aimDist = clamp(this.aimDist + zoom, this.o.minDist, this.o.maxDist);
   }
@@ -132,8 +134,10 @@ export class FollowCamera {
     // looking up, closer and wider, the way the manga frames a pose; each pose has its own shot
     // (dramaShot: pitch, dist, fov added, focus height: figure/lookstyle.js STAND_POSES cam)
     const dr = this.drama || 0, shot = { ...DRAMA_SHOT, ...this.dramaShot };
-    const yawU = dr ? this._yaw + wrapAngle(this.dramaYaw - this._yaw) * dr : this._yaw;
-    const pitchU = this._pitch + (shot.pitch - this._pitch) * dr, wantU = this._want + (shot.dist - this._want) * dr;
+    if (dr <= 0.01) this.dramaOff = null; // the pose is over: the next one starts from its own shot
+    const off = this.dramaOff || { yaw: 0, pitch: 0 };
+    const yawU = dr ? this._yaw + wrapAngle(this.dramaYaw + off.yaw - this._yaw) * dr : this._yaw;
+    const pitchU = this._pitch + (shot.pitch + off.pitch - this._pitch) * dr, wantU = this._want + (shot.dist - this._want) * dr;
     this.fov += shot.fov * dr;
     const head = [this.trail[0], this.trail[1] + o.focusY + shot.y * dr, this.trail[2]];
     // over the right shoulder, unless a wall is there

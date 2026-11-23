@@ -335,6 +335,27 @@ export class Pedestrians {
    * landings, step aside from a runner, scatter after a knock-down. Cheap: only groups within
    * reach, through squared distances.
    */
+  /**
+   * The player strikes a pose (the manga look; owner: "some people do poses with me"): people
+   * nearby stop and strike one with them, each their own, for a few seconds (about half of those
+   * close enough who have their hands free). (x, z) Unity metres.
+   */
+  poseWithMe(x, z, { reach = 18, share = 0.6, holdS = 6 } = {}) {
+    const poses = PROPORTION.style?.poses;
+    if (!poses) return 0;
+    let n = 0;
+    for (let q = 0; q < (this.active ?? 0); q++) {
+      const g = this.groups[q], k = g.walker, d2 = (k.x - x) ** 2 + (k.z - z) ** 2;
+      if (d2 > reach * reach || g.flee > 0 || ((g.members[0].u ?? 0.5) * 7.31 + performance.now() / 9973) % 1 > share) continue;
+      g.pause = Math.max(g.pause, holdS); g.look = null;
+      for (const m of g.members) {
+        if (m.v.acc === 'umbrella' || m.v.acc === 'bag' || m.v.kind === 'kid') continue;
+        m.act = IDLE.POSE; m.poseKind = Math.floor(Math.random() * poses.length); n++;
+      }
+    }
+    return n;
+  }
+
   react(seen, dt) {
     this.player = seen ? [seen.x, seen.z] : null; // heads turn to the player passing (draw)
     if (!seen) return;
