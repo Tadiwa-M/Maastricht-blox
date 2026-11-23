@@ -15,7 +15,7 @@ export const XMAS = {
   extent: [62, 78], // the square: half-widths east-west, north-south searched for open ground (m)
   gift: { at: [40, -2], size: [8, 5.5, 7] }, // the giant lit gift box, by the east fence (the café side)
   maxTrees: 48,
-  wheel: { at: [-15, 15], r: 15, axle: 17, gondolas: 24, yaw: Math.PI / 2, turn: 0.035 }, // offsets east/north of the centre (m); yaw pi/2: facing east
+  wheel: { at: [15, 33], r: 15, axle: 17, gondolas: 24, yaw: Math.PI / 2, turn: 0.035 }, // offsets east/north of the centre (m); yaw pi/2: facing east
   carousel: { at: [-30, -14], r: 6 },
   chalet: { w: 3.2, d: 2.4, h: 2.3 },
 };
