@@ -7,7 +7,7 @@
 //   wheel   rubber tyres with tread across the face and a sidewall ring; metal rims with spokes
 //   frame   (bike) enamelled steel; grips and saddle matte
 // Pools of light at night (render/pools.js) light them like everything else.
-import { PAINTED_LOOK } from './verse.js';
+import { PAINTED_LOOK, LOOK } from './verse.js';
 import { addPartVaryings } from './pools.js';
 
 // every look: tread, rims, paint vs trim; the painted looks: deeper clear coat and road dirt
@@ -25,9 +25,23 @@ export function vehicleKindOf(key) {
 
 const paintMask = 'float paint = step(0.97, min(vLocC.r, min(vLocC.g, vLocC.b)));';
 
+// the Spider-Verse look: graffiti on the paint of every car and bus side, below the windows: neon
+// tags in blobby spray shapes with a dark outline, a different colour per panel
+const GRAFFITI = `
+      float gside = step(0.75, abs(normalize(vLocN).x)) * step(0.3, p.y) * step(p.y, 1.05);
+      float gseed = floor(p.z * 0.45);
+      float gn = fNoise(vec3(p.z * 1.8, p.y * 3.2, gseed * 5.3)) * 0.75 + fNoise(vec3(p.z * 6.0, p.y * 8.0, gseed)) * 0.25;
+      float gon = step(0.25, fract(gseed * 0.618 + 0.3)); // most panels are tagged
+      vec3 gcol = fract(gseed * 0.37) < 0.33 ? vec3(1.0, 0.22, 0.62) : fract(gseed * 0.37) < 0.66 ? vec3(0.2, 0.9, 1.0) : vec3(1.0, 0.85, 0.15);
+      float gfill = smoothstep(0.5, 0.52, gn), gline = smoothstep(0.45, 0.47, gn) - gfill;
+      c = mix(c, gcol, gfill * gside * gon * paint); c = mix(c, vec3(0.04), gline * gside * gon * paint);`;
+
 const KIND = {
   body: { params: { clearcoat: 1, clearcoatRoughness: 0.05, roughness: 0.34, metalness: 0.12, envMapIntensity: 1.3 },
     color: `${paintMask}
+      float decal = step(1.99, vLocC.r); // an absolute colour (stickers, neon trim: figure/lookrides.js)
+      c = mix(c, vLocC - 2.0, decal); paint *= 1.0 - decal;
+      ${LOOK === 'verse' ? GRAFFITI : ''}
       float low = 1.0 - smoothstep(0.18, 0.55, p.y);
       float dirt = low * (0.55 + 0.45 * fNoise(p * vec3(6.0, 14.0, 6.0))) * paint;
       c = mix(c, c * vec3(0.55, 0.5, 0.45), dirt * ${FILM ? '0.45' : '0.0'});
@@ -48,7 +62,7 @@ const KIND = {
     rough: 'roughnessFactor = mix(roughnessFactor, 0.22, step(0.5, vLocC.r));',
     metal: 'metalnessFactor = mix(metalnessFactor, 0.9, step(0.5, vLocC.r));', coat: '' },
   frame: { params: { clearcoat: 0.8, clearcoatRoughness: 0.12, roughness: 0.4, metalness: 0.2 },
-    color: '', rough: `${paintMask} roughnessFactor = mix(0.8, roughnessFactor, paint);`, coat: `${paintMask} material.clearcoat *= paint;` },
+    color: `float decal = step(1.99, vLocC.r); c = mix(c, vLocC - 2.0, decal);`, rough: `${paintMask} roughnessFactor = mix(0.8, roughnessFactor, paint);`, coat: `${paintMask} material.clearcoat *= paint;` },
 };
 
 /** A clone of the vehicle material for a mesh kind (see KIND), or the material itself. */

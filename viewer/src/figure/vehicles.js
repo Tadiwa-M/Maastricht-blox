@@ -10,6 +10,8 @@ import { rbox, sphere, cyl, torus, tube as tubeN, place, merge, tint } from './g
 import { figureMaterial } from './parts.js';
 import { VEHICLE_LOOK, vehicleKindOf, vehicleMaterialFor } from '../render/vehiclesurface.js';
 import { OUTLINE_ON, outlineFor } from '../render/outline.js';
+import { LOOK } from '../render/verse.js';
+import { lookRides } from './lookrides.js';
 
 export const BIKE = { wheelR: 0.34, rear: 0.25, front: -0.84, bb: -0.17 };
 const HUB_Y = BIKE.wheelR;
@@ -149,6 +151,7 @@ export function VEHICLE_GEOS() {
   if (geoCache) return geoCache;
   geoCache = { bikeFrame: bikeFrame(), bikeWheel: bikeWheel(), carWheel: carWheel(), beacon: rbox(0.42, 0.11, 0.26, 0.04, 1), carLights: carLights() };
   for (const [k, t] of Object.entries(CAR_TYPES)) { geoCache[`body:${k}`] = carBody(t); geoCache[`glass:${k}`] = carGlass(t); }
+  Object.assign(geoCache, lookRides(LOOK, CAR_TYPES, BIKE) || {}); // each painted look's own cars and bikes (lookrides.js)
   return geoCache;
 }
 

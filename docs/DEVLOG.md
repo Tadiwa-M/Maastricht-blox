@@ -1984,3 +1984,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Manga: the torso in two with a bending spine, pelvis tip and thrust, pointed toes, forearm twist; new reach and backbend stances (guide 06).
 - Character creator: Manga print and chain choices. Fixed the look and the saved figure overwriting each other's storage (guide 06).
 - Spider-Verse figure: own face, bending spine, street stance, arm twist joint; coat tails and skirts swing in both painted looks; the manga posing camera (guide 06).
+- Each look's own vehicles: retro cars, a road bike, a two-tone coach and a yacht in Manga; street cars, a BMX, a tagged bus and a neon ferry in Spider-Verse; Classic unchanged (guide 06).

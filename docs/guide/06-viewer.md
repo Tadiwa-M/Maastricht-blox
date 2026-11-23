@@ -1119,3 +1119,25 @@ Owner: the brick Classic look is the only stiff one; carry on with the rest.
   thrown out in a pose.
 - The manga posing shot (`camera.js` `drama`): when the player strikes a pose the camera swings to
   the front three-quarter, drops low and looks up, closer and a little wider; moving eases it back.
+
+## Each look's own vehicles (2026-11-23)
+
+Owner: as with the figures, each look adopts its own vehicles. Classic keeps the toy cars and the
+brick buses and boats; the painted looks get their own builds on the same keys, sizes, wheel
+places, pivots and colour slots, so traffic, riders, bus flow, liveries and boarding are unchanged.
+- `figure/lookrides.js` `lookRides(look)` (picked in `VEHICLE_GEOS`): Manga: rounded retro European
+  cars (a rounded tub, swelling fenders, a set-back cabin with a cream roof, chrome bumpers, strip
+  and grille, round lamps, little fins, whitewall tyres with chrome hubcaps) and a drop-bar road
+  bike. Spider-Verse: chunky street cars (boxy, high on fat six-spoke wheels, wide dark arches, a
+  spoiler or a bull bar or a roof rack, stickers) and a BMX (thick tubes, high-rise bars, pegs, a
+  hot-pink saddle, fat tyres with mag spokes).
+- Vertex colours >= 2 are absolute decal colours (colour - 2) that `vehiclesurface.js` paints over
+  the body and bike frame (chrome, cream roofs, stickers, neon); the Spider-Verse body shader adds
+  graffiti (neon tags with a dark outline) to the sides of cars and buses.
+- `life/lookmodels.js`: the bus (`lookBusPrims`, used by `InstancedModel` instead of the bricks;
+  wheel hinges and the livery slot 38 kept, ink outline in manga): a rounded two-tone retro coach /
+  a chunky city bus with a dark skirt, roof units and a neon line. The river boat (`lookBoat`, used
+  by `Boats` instead of `buildModel`): a white yacht with a navy stripe, a teak deck, two decks of
+  rounded cabins, a chrome rail and a mast / a squat teal ferry with a neon stripe and roof edge,
+  tagged by the graffiti.
+Open: per-look trains; cyclists' riders ride the new bikes with the same hold.
