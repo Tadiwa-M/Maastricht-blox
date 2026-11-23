@@ -12,6 +12,8 @@ export const HAIR_COLOURS = [...HAIR, ...GREY_HAIR];
 export const HEADWEAR = new Set(['cap', 'beanie', 'hat']);
 /** The manga top prints, in the order the shader knows them (0 auto: picked from the colour). */
 export const PRINTS = ['auto', 'plain', 'stripes', 'zigzag', 'hearts', 'checks', 'panel'];
+/** The Stands (player/standdesigns.js): IRON HYMN, VELVET ENCORE, LIVE WIRE. */
+export const STANDS = ['iron', 'velvet', 'wire'];
 
 /** Every choice: key, label, its options (values; colours are hex strings) and when(values) it applies. */
 export const CHOICES = [
@@ -30,6 +32,7 @@ export const CHOICES = [
   // the manga look's fashion (render/figuresurface.js MANGA_FASHION): the top's print and the gold chain
   { key: 'print', label: 'Print (Manga)', values: PRINTS },
   { key: 'chain', label: 'Chain (Manga)', values: ['on', 'off'] },
+  { key: 'stand', label: 'Stand (Manga)', values: STANDS },
 ];
 const BY_KEY = Object.fromEntries(CHOICES.map((c) => [c.key, c]));
 
@@ -54,7 +57,7 @@ export function defaultChoices(seed = 52) {
     hair: idx('hair', v.hair), hairCol: idx('hairCol', v.colours.hair), hatCol: idx('hatCol', v.colours.hat),
     top: idx('top', v.top), topCol: idx('topCol', v.colours.top), bottomCol: idx('bottomCol', v.colours.bottom),
     shoeCol: idx('shoeCol', v.colours.shoe), acc: idx('acc', v.acc === 'umbrella' ? 'none' : v.acc), accCol: idx('accCol', v.colours.acc),
-    print: 0, chain: 0,
+    print: 0, chain: 0, stand: 0,
   };
 }
 
@@ -71,6 +74,7 @@ export function customVariant(ch) {
     },
   };
   if (HEADWEAR.has(hair)) v.colours.hairTint = v.colours.hat;
+  v.stand = val('stand');
   v.fashion = clampIdx('print', ch.print) + (val('chain') === 'off' ? 8 : 0); // (one number for the shader: print + 8 without the chain)
   return v;
 }

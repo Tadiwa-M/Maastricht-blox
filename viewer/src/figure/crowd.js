@@ -128,7 +128,8 @@ export class FigureCrowd {
   }
 
   /** Add one figure. pose: { x, y, z (three.js metres, feet), rotY, mode, phase, speed, t, look }. */
-  add(v, pose) {
+  /** J: joint angles to use instead of the pose's own (rig.js jointAngles, adjusted: the Stand). */
+  add(v, pose, J = null) {
     if (this.hold) return true;
     if (this.count >= this.cap) return false;
     const e0 = this.eye;
@@ -142,7 +143,7 @@ export class FigureCrowd {
       lo = d2 > this.hiDist2 || this.hi >= this.hiCap;
       if (!lo) this.hi++;
     }
-    poseFigure(v, pose, this._emit, jointAngles(v, pose, this._J), lo);
+    poseFigure(v, pose, this._emit, J || jointAngles(v, pose, this._J), lo);
     if (pose.mode !== MODE.SIT && pose.mode !== MODE.CYCLE) { // (riders and sitters are off their feet)
       this._cm.makeScale(CONTACT.r, 1, CONTACT.r).setPosition(pose.x, pose.y + 0.015, pose.z);
       this.contact.setMatrixAt(this.nContact++, this._cm);

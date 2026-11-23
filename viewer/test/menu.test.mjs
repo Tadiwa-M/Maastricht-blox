@@ -178,3 +178,13 @@ test('the tour: six steps, touch or mouse wording, the first moves on once the p
   assert.equal(t[0].done({ mode: 'walk' }), true); assert.equal(t[0].done({ mode: 'map' }), false);
   assert.match(t[3].text, /Spider-Verse/);
 });
+
+test('Spider-Verse captions: the first place is the universe, then the narrator; one every 25 s at most', async () => {
+  const { captionFor, Captions, CAPTION } = await import('../src/render/captions.js');
+  assert.deepEqual(captionFor('Vrijthof', 0), { title: 'VRIJTHOF.', sub: 'SOME OTHER UNIVERSE.' });
+  assert.equal(captionFor('Markt', 1).sub, 'MEANWHILE...');
+  assert.equal(captionFor('', 0).title, 'MAASTRICHT.');
+  const off = new Captions({ look: 'manga' });
+  off.place('Markt'); assert.equal(off.n, 0, 'other looks show none');
+  assert.ok(CAPTION.gapS >= 10);
+});

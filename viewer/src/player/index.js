@@ -37,6 +37,8 @@ import { Scatter } from './scatter.js';
 import { defaultChoices, loadChoices } from '../figure/custom.js';
 import { PROPORTION } from '../figure/rig.js';
 import { Stand } from './stand.js';
+import { Captions } from '../render/captions.js';
+import { comicFx } from '../render/comicfx.js';
 
 const DEG = Math.PI / 180;
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
@@ -54,10 +56,12 @@ export function initPlayer(ctx) {
   const character = new Character(ctx.models, world, { look });
   character.group.visible = false;
   stage.scene.add(character.group);
-  // the manga look: the player's Stand (player/stand.js), in the user's own colours
+  // the manga look: the player's Stand (player/stand.js), the design picked in the creator
   let stand = null;
+  const captions = new Captions();
+  window.__bloxCaptions = captions; // (tests)
   if (PROPORTION.style?.poses) {
-    stand = new Stand(stage.scene, { top: character.variant.colours.top, bottom: character.variant.colours.bottom });
+    stand = new Stand(stage.scene, character.variant.stand);
     window.__bloxStand = stand;
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyE' && mode === 'walk' && !window.__bloxMp?.combat?.active && !e.repeat) stand.rush(); });
   }
@@ -100,7 +104,10 @@ export function initPlayer(ctx) {
   let creatorCam = null;
   const creator = new Creator(look || defaultChoices(), {
     store,
-    onChange: (v, ch) => { look = ch; character.setVariant(v); },
+    onChange: (v, ch) => {
+      look = ch; character.setVariant(v);
+      if (stand && v.stand && v.stand !== stand.design) { stand.dispose(); stand = new Stand(stage.scene, v.stand); window.__bloxStand = stand; } // a new Stand picked
+    },
     onDone: () => closeCreator(),
   });
   function openCreator() {
@@ -362,6 +369,7 @@ export function initPlayer(ctx) {
         // a big fall: more than ~3.4 m (landing faster than 11 m/s)
         if (!ctrl.grounded) airMinVy = Math.min(airMinVy, ctrl.vel[1]);
         if (!scatter && ctrl.grounded && !wasGrounded && airMinVy < -14) knockDown([0, 2, 0]);
+        else if (ctrl.grounded && !wasGrounded && airMinVy < -7) comicFx('thud', [ctrl.pos[0], ctrl.visualY, ctrl.pos[2]]); // the comic looks letter a hard landing
         if (ctrl.grounded) airMinVy = 0;
       }
       wasGrounded = ctrl.grounded;
@@ -374,7 +382,7 @@ export function initPlayer(ctx) {
           { angVel: L.angVel, accel: L.accel, steer: L.steer, grounded: ctrl.grounded, vy: ctrl.vel[1] });
       }
       // the Stand shows while posing or aiming (and during a rush); each punch goes to the match, if any
-      if (stand) stand.setPose((character.poseK || 0) > 0.5 ? (character.poseN || 0) % 5 : -1);
+      if (stand) stand.setPose((character.poseK || 0) > 0.5 ? (character.poseN || 0) : -1);
       if (stand) stand.update(dt, drawFeet, character.aim?.yaw ?? ctrl.yaw, (character.poseK || 0) > 0.5 || (window.__bloxMp?.combat?.aim || 0) > 0.5,
         (at) => window.__bloxMp?.combat?.standPunch?.(at));
       // smooth the followed height (step-ups and landings), keep x/z exact
@@ -406,7 +414,8 @@ export function initPlayer(ctx) {
       character.group.visible = follow.dist > 0.9 || !!tween;
       if ((streetT -= dt) <= 0) {
         streetT = 0.5;
-        hud.setStreet(findStreet(Math.floor(ctrl.pos[0] / S), Math.floor(-ctrl.pos[2] / S)));
+        const street = findStreet(Math.floor(ctrl.pos[0] / S), Math.floor(-ctrl.pos[2] / S));
+        hud.setStreet(street); captions.place(street); // (the Spider-Verse look narrates it in a caption box)
       }
     }
     if (tween) stepTween(dt);

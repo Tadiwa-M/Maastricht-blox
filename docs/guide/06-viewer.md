@@ -1189,3 +1189,23 @@ depth pass and ink outlines draw figures and vehicles again). Per figure: Classi
   open frame (its edges only; owner: no wire cage) with red ribbon strips on its faces and a bow.
 - Posing shots: each of `STAND_POSES` has a `cam` (yaw from straight in front, pitch, distance, fov
   added, focus height) that player/camera.js uses for the manga posing shot, with a slow drift.
+
+## The Stands, for real; more comic book in the Spider-Verse look (2026-11-23)
+
+- Stands (owner: the concept mockup approved; "make basic ones good"; designing your own Stand is a
+  later feature): `player/standdesigns.js` holds three original designs (IRON HYMN, VELVET ENCORE,
+  LIVE WIRE): a painted skin from GLSL over the part's own coordinates, a head and armour fixed to
+  the figure's parts, an aura colour, accent and sparks. `player/stand.js` is now a body: the anime
+  figure on the rig (one FigureCrowd, joints adjusted: arms crossed and looming, its own pose
+  answering the user's, a blur of punches in a rush), the armour moved onto the parts every frame
+  (`captureParts`), a flame aura sprite, sparks, fading fist afterimages. Picked in the creator
+  (`figure/custom.js` choice `stand`; changing it swaps the Stand). `FigureCrowd.add(v, pose, J)`
+  takes adjusted joint angles.
+- Spider-Verse (owner: more of the panel mockup): caption boxes narrate the city
+  (`render/captions.js`: "VRIJTHOF. SOME OTHER UNIVERSE.", then "MEANWHILE...", at most one per
+  25 s, when you walk into a new place); a pink and cyan rim light on every figure
+  (`figuresurface.js VERSE_RIM`, emissive, from the camera's right); a hard landing is lettered
+  (`comicfx.js thud`: BOEF! PLOF! DOEF!, in katakana in the manga look).
+Open: Stand abilities beyond the rush (Guard, Encore, Short Circuit) and a Stand designer; paint
+splatter and panel borders in the Spider-Verse look; the caption's slide-in could not be watched
+headless (software rendering at ~1 fps does not advance CSS transitions), check it on a PC.

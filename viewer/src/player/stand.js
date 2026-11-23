@@ -1,75 +1,92 @@
-// The player's Stand (the manga look; owner: our characters in that world, "with some stands"). An
-// original design, not one from the series: a tall spirit of translucent armoured blocks in the
-// player's own outfit colours, gold trim, a glowing visor and a soft aura, floating behind the
-// player's right shoulder. It fades in when the player strikes a pose, aims, or presses E, and
-// in a match E (or the gamepad's Y) throws a rush: a burst of punches with afterimages in front
-// of the player that hits whoever is within reach (each punch a 'stand' shot through the room's
-// rules, like the knife). Built from boxes in one group; a few draw calls.
+// The player's Stand (the manga look; owner: our characters in that world, "with some stands").
+// One of three original designs (player/standdesigns.js: IRON HYMN, VELVET ENCORE, LIVE WIRE),
+// picked in the character creator. It is a body like the player's (the anime figure on the same
+// rig), larger, floating behind the right shoulder in a soft flame aura: it crosses its arms and
+// looms; when the player strikes a pose it strikes its own (figure/lookstyle.js STAND_POSES); E
+// (or the gamepad's Y in a match) throws a rush: it steps in front and fires a blur of punches with
+// afterimage fists, each punch a 'stand' shot through the room's rules, like the knife.
 import * as THREE from 'three';
-import { outlineMaterial, OUTLINE_ON } from '../render/outline.js';
+import { FigureCrowd } from '../figure/crowd.js';
+import { makeVariant } from '../figure/variants.js';
+import { MODE, IDLE, jointAngles, captureParts } from '../figure/rig.js';
+import { STAND_DESIGNS, auraTexture } from './standdesigns.js';
 
-export const STAND = { height: 2.9, behind: -0.35, side: 0.95, rise: 0.25, // beside the right shoulder, a little ahead (the camera is behind)
+export const STAND = { behind: -0.45, side: 0.95, rise: 0.4, // beside the right shoulder, a little behind and above
   rushS: 1.1, punchEvery: 0.07, reachM: 3.2, fadeIn: 5, fadeOut: 2.5 };
-
-function armourMat(colour, glow = 0) {
-  return new THREE.MeshStandardMaterial({ color: colour, roughness: 0.3, metalness: 0.5, transparent: true, opacity: 0.95,
-    emissive: colour, emissiveIntensity: glow, depthWrite: false });
-}
+const PART = { top: 'top:shirt' }; // design names for figure part keys
 
 export class Stand {
-  /** colours: { top, bottom } (hex): the Stand wears the user's colours. */
-  constructor(scene, colours = { top: '#5a3d8c', bottom: '#2b2f4a' }) {
+  /** id: a STAND_DESIGNS key (figure/custom.js STANDS). */
+  constructor(scene, id = 'iron') {
+    this.design = STAND_DESIGNS[id] ? id : 'iron';
+    const D = STAND_DESIGNS[this.design];
     this.group = new THREE.Group(); this.group.name = 'stand'; this.group.visible = false;
-    const main = armourMat(colours.top, 0.25), dark = armourMat(colours.bottom, 0.15), gold = armourMat('#f2c14e', 0.5);
-    const visor = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 2.2, 2.0), toneMapped: false, transparent: true });
-    const box = (w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); return b; };
-    const H = STAND.height;
-    this.body = new THREE.Group();
-    // a V-shaped torso of plates, a waist band, a helmet with a visor slit and a crest
-    this.body.add(box(0.95, 0.55, 0.45, main, 0, H * 0.72, 0), box(0.62, 0.35, 0.38, dark, 0, H * 0.55, 0), box(0.7, 0.08, 0.42, gold, 0, H * 0.47, 0));
-    this.body.add(box(0.42, 0.4, 0.42, main, 0, H * 0.92, 0), box(0.34, 0.06, 0.02, visor, 0, H * 0.93, -0.215), box(0.05, 0.22, 0.3, gold, 0, H * 1.03, 0.02));
-    for (const s of [-1, 1]) {
-      this.body.add(box(0.36, 0.2, 0.46, gold, s * 0.6, H * 0.84, 0)); // shoulder plates
-      for (let k = 0; k < 3; k++) { // spikes rising off each shoulder
-        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.32 - k * 0.06, 4), gold);
-        sp.position.set(s * (0.52 + k * 0.1), H * 0.84 + 0.2, 0.05 - k * 0.08); sp.rotation.z = -s * (0.35 + k * 0.2); this.body.add(sp);
-      }
-    }
-    for (let k = 0; k < 5; k++) { // a mane of plates down the back of the helmet
-      const m = box(0.36 - k * 0.04, 0.12, 0.08, dark, 0, H * 0.98 - k * 0.09, 0.22 + k * 0.03); m.rotation.x = 0.4 + k * 0.12; this.body.add(m);
-    }
-    // the legs fade into a trail of plates (a Stand floats)
-    for (let k = 0; k < 4; k++) this.body.add(box(0.5 - k * 0.1, 0.2, 0.32 - k * 0.05, dark, 0, H * 0.4 - k * 0.22, 0));
-    // arms: shoulder pivots, so the rush can punch
-    this.arms = [-1, 1].map((s) => {
-      const pivot = new THREE.Group(); pivot.position.set(s * 0.62, H * 0.8, 0);
-      pivot.add(box(0.26, 0.5, 0.26, main, 0, -0.25, 0), box(0.3, 0.42, 0.3, dark, 0, -0.66, 0), box(0.34, 0.24, 0.34, gold, 0, -0.95, 0));
-      this.body.add(pivot); return pivot;
+    // the body: one anime figure in the design's painted skin (no hair; Velvet Encore has no shins)
+    this.crowd = new FigureCrowd(1, { lod: false, twos: false, shadows: false });
+    this.crowd.contact.visible = false; // (it floats)
+    this.group.add(this.crowd.group);
+    const v = makeVariant(77, { kind: 'adult' });
+    Object.assign(v, { hair: 'short', top: 'shirt', acc: 'none', scale: D.scale, width: D.width, stoop: 0 });
+    v.colours = Object.fromEntries(Object.keys(v.colours).map((k) => [k, '#ffffff'])); delete v._c;
+    this.v = v;
+    this.skin = D.skin();
+    this.hidden = new RegExp(D.ribbons ? '^(hair:|shin$|shoe$)' : '^hair:');
+    for (const { mesh } of this.crowd.meshes.values()) mesh.material = this.skin;
+    // the head and armour, fixed to the body's parts each frame
+    this.holders = [];
+    D.build((key, n, obj) => {
+      const holder = new THREE.Group(); holder.matrixAutoUpdate = false; holder.add(obj);
+      this.group.add(holder); this.holders.push({ key: PART[key] || key, n, holder });
     });
-    // the aura: a soft glowing shell
-    this.aura = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), new THREE.MeshBasicMaterial({ color: colours.top, transparent: true, opacity: 0.12, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
-    this.aura.scale.set(0.8, H * 0.55, 0.6); this.aura.position.y = H * 0.65;
-    this.body.add(this.aura);
-    // afterimage fists for the rush
-    this.fists = Array.from({ length: 10 }, () => { const f = box(0.32, 0.26, 0.3, gold, 0, 0, 0); f.visible = false; this.group.add(f); return { m: f, t: 0 }; });
-    this.group.add(this.body);
-    this.group.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
-    // an ink line round the armour, as round every figure in this look (render/outline.js)
-    if (OUTLINE_ON) {
-      const plates = [];
-      this.body.traverse((o) => { if (o.isMesh && o !== this.aura && o.material !== visor) plates.push(o); });
-      for (const o of plates) { const l = new THREE.Mesh(o.geometry, outlineMaterial()); l.frustumCulled = false; o.add(l); this.lines = (this.lines || []).concat(l); }
-    }
+    // the aura: a flickering flame behind it; Live Wire throws sparks
+    this.aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: auraTexture(D.aura), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    this.group.add(this.aura);
+    this.sparks = D.sparks ? Array.from({ length: 6 }, () => {
+      const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 5 }, () => new THREE.Vector3())),
+        new THREE.LineBasicMaterial({ color: new THREE.Color(D.sparks).multiplyScalar(3), toneMapped: false, transparent: true }));
+      this.group.add(l); return l;
+    }) : [];
+    // afterimage fists for the rush, in the design's accent
+    const fistGeo = new THREE.BoxGeometry(0.13, 0.11, 0.17); // a fist, knuckles forward; each afterimage fades on its own
+    this.fists = Array.from({ length: 10 }, () => {
+      const m = new THREE.Mesh(fistGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(D.accent).multiplyScalar(1.6), transparent: true, depthWrite: false, toneMapped: false }));
+      m.visible = false; this.group.add(m); return { m, t: 0 };
+    });
+    this.mats = [];
+    this.group.traverse((o) => {
+      if (!(o.isMesh || o.isLine || o.isSprite)) return;
+      o.frustumCulled = false; o.castShadow = false;
+      if (!o.material.isShaderMaterial && !this.mats.includes(o.material)) this.mats.push(o.material); // (not the shared ink outline)
+    });
     scene.add(this.group);
-    this.k = 0; this.t = 0; this.rushT = 0; this.punchT = 0; this.pose = -1; this.mats = [main, dark, gold, visor];
+    this.fistMats = new Set(this.fists.map((f) => f.m.material));
+    this.pos = new THREE.Vector3(); this.placed = false;
+    this.k = 0; this.t = 0; this.rushT = 0; this.punchT = 0; this.sparkT = 0; this.pose = -1;
   }
 
-  /** The pose the Stand strikes beside a posing user (0..4, follows the user's), or -1. */
+  /** The pose the user strikes (STAND_POSES index), or -1: the Stand strikes one of its own. */
   setPose(k) { this.pose = k; }
 
   /** Throw a rush (if out of one). -> true when it started. */
   rush() { if (this.rushT > 0) return false; this.rushT = STAND.rushS; this.punchT = 0; return true; }
   get rushing() { return this.rushT > 0; }
+
+  /** The joints for this frame: arms crossed and looming, its own pose, or a blur of punches. */
+  joints(pose) {
+    const J = jointAngles(this.v, pose);
+    if (this.rushT > 0) {
+      for (let q = 0; q < 2; q++) {
+        const ext = 0.5 + 0.5 * Math.sin(this.t * 38 + q * Math.PI);
+        J.sh[q] = 1.45; J.abd[q] = 0.12; J.elbow[q] = 1.7 * (1 - ext) + 0.05; J.armTwist[q] = 0.3;
+      }
+      J.lean += 0.25; J.headPitch -= 0.1;
+    } else if (this.pose < 0) {
+      for (let q = 0; q < 2; q++) { J.sh[q] = 0.32; J.abd[q] = 0.12; J.armTwist[q] = 1.25; J.elbow[q] = 1.75; }
+      J.sh[0] = 0.4; J.elbow[0] = 1.85; J.headPitch -= 0.12; J.lean -= 0.08; // arms crossed, looking down at you
+      for (let q = 0; q < 2; q++) { J.hip[q] = 0.12; J.knee[q] = -0.3; J.ankle[q] = 0.5; } // legs trailing (it floats)
+    }
+    return J;
+  }
 
   /**
    * Per frame: dt, feet (three.js), yaw (compass, facing), want (should it show), onPunch(pos) for
@@ -80,32 +97,46 @@ export class Stand {
     const show = want || this.rushT > 0;
     this.k += ((show ? 1 : 0) - this.k) * Math.min(1, dt * (show ? STAND.fadeIn : STAND.fadeOut));
     this.group.visible = this.k > 0.02;
-    if (!this.group.visible) return;
+    if (!this.group.visible) { this.placed = false; return; }
     const fx = Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = Math.sin(yaw);
     const rushing = this.rushT > 0;
-    // behind the right shoulder; forward in front of the player during a rush
+    // behind the right shoulder; in front of the player during a rush
     const back = rushing ? -1.3 : STAND.behind, side = rushing ? 0 : STAND.side;
     const bob = Math.sin(this.t * 1.6) * 0.06;
     const tx = feet[0] - fx * back + rx * side, tz = feet[2] - fz * back + rz * side, ty = feet[1] + STAND.rise * this.k + bob - (1 - this.k) * 0.6;
-    const p = this.body.position;
-    p.x += (tx - p.x) * Math.min(1, dt * 10); p.y += (ty - p.y) * Math.min(1, dt * 10); p.z += (tz - p.z) * Math.min(1, dt * 10);
-    this.body.rotation.y = -yaw;
+    if (!this.placed) { this.pos.set(tx, ty, tz); this.placed = true; }
+    const e = Math.min(1, dt * 10);
+    this.pos.x += (tx - this.pos.x) * e; this.pos.y += (ty - this.pos.y) * e; this.pos.z += (tz - this.pos.z) * e;
+    // the body: posed like a figure (its own pose answers the user's)
+    const pose = { x: this.pos.x, y: this.pos.y, z: this.pos.z, rotY: -yaw, mode: MODE.IDLE, t: this.t,
+      ...(this.pose >= 0 && !rushing ? { idle: IDLE.POSE, idleK: 1, poseKind: this.pose + 3 } : {}) };
+    const J = this.joints(pose);
+    this.crowd.begin(); this.crowd.add(this.v, pose, J); this.crowd.end();
     const solid = this.k > 0.97;
-    for (const m of this.mats) { m.opacity = this.k; if (m.transparent === solid) { m.transparent = !solid; m.depthWrite = solid; m.needsUpdate = true; } }
-    for (const l of this.lines || []) l.visible = solid;
+    for (const [key, { mesh, outline }] of this.crowd.meshes) {
+      if (this.hidden.test(key)) { mesh.count = 0; if (outline) outline.count = 0; }
+      if (outline) outline.visible = solid && mesh.count > 0;
+    }
+    const parts = captureParts(this.v, pose, J), seen = {};
+    for (const p of parts) { const n = seen[p.key] = (seen[p.key] ?? -1) + 1; p.n = n; }
+    for (const h of this.holders) {
+      const p = parts.find((q) => q.key === h.key && q.n === h.n);
+      if (p) { h.holder.matrix.fromArray(p.mat); h.holder.matrixWorldNeedsUpdate = true; }
+    }
+    for (const m of this.mats) if (!this.fistMats.has(m)) m.opacity = this.k;
     // the aura flickers like a flame and pulses
-    this.aura.material.opacity = (0.16 + 0.08 * Math.sin(this.t * 7) + 0.05 * Math.sin(this.t * 23)) * this.k;
-    this.aura.scale.set(0.95 + 0.08 * Math.sin(this.t * 9), STAND.height * 0.6 + 0.1 * Math.sin(this.t * 6), 0.7);
-    // arms: at rest folded, in a rush a blur of punches
-    // arms: in a rush a blur of punches; posing, a dramatic stance of its own; else arms crossed, menacing
-    const P = [[[-2.6, 0.5], [-0.4, -0.9]], [[-1.6, 0.2], [-1.6, -0.2]], [[-0.4, 1.2], [-0.4, -1.2]], [[-2.9, 0.1], [-0.2, -0.3]], [[-1.2, 0.9], [-2.4, -0.4]]];
-    this.arms.forEach((a, i) => {
-      let rx = -0.9, rz = (i ? -1 : 1) * 0.9; // crossed
-      if (rushing) { rx = -1.4 + Math.sin(this.t * 38 + i * Math.PI) * 0.5; rz = (i ? -1 : 1) * 0.1; }
-      else if (this.pose >= 0) { const q = P[this.pose % P.length][i]; rx = q[0]; rz = q[1]; }
-      a.rotation.x += (rx - a.rotation.x) * Math.min(1, dt * 10); a.rotation.z += (rz - a.rotation.z) * Math.min(1, dt * 10);
-    });
-    this.body.rotation.z = this.pose >= 0 && !rushing ? Math.sin(this.pose * 1.7) * 0.18 : 0; // leaning into the pose
+    const D = STAND_DESIGNS[this.design];
+    this.aura.position.set(this.pos.x, this.pos.y + 1.45 * D.scale, this.pos.z);
+    this.aura.scale.set((2.4 + 0.12 * Math.sin(this.t * 9)) * D.scale / 1.4, (3.8 + 0.15 * Math.sin(this.t * 6)) * D.scale / 1.4, 1);
+    this.aura.material.opacity = (0.75 + 0.15 * Math.sin(this.t * 7) + 0.1 * Math.sin(this.t * 23)) * this.k;
+    if (this.sparks.length && (this.sparkT -= dt) <= 0) { // new sparks jump off it
+      this.sparkT = 0.09;
+      for (const l of this.sparks) {
+        const a = l.geometry.attributes.position; let x = this.pos.x + (Math.random() - 0.5) * 1.0, y = this.pos.y + 0.6 + Math.random() * 1.8, z = this.pos.z + (Math.random() - 0.5) * 0.5;
+        for (let i = 0; i < a.count; i++) { a.setXYZ(i, x, y, z); x += (Math.random() - 0.5) * 0.18; y += (Math.random() - 0.5) * 0.18; z += (Math.random() - 0.5) * 0.1; }
+        a.needsUpdate = true; l.visible = Math.random() < 0.6;
+      }
+    }
     if (rushing) {
       this.rushT -= dt; this.punchT -= dt;
       if (this.punchT <= 0) {
@@ -113,12 +144,16 @@ export class Stand {
         const f = this.fists.find((q) => q.t <= 0) || this.fists[0];
         const spread = (Math.random() - 0.5) * 0.9, up = 1.2 + Math.random() * 0.8, out = 1.6 + Math.random() * 0.8;
         f.m.position.set(feet[0] + fx * out + rx * spread, feet[1] + up, feet[2] + fz * out + rz * spread);
-        f.m.rotation.y = -yaw; f.t = 0.16; f.m.visible = true;
+        f.t = 0.16; f.m.visible = true; f.m.rotation.y = -yaw;
         onPunch?.([feet[0] + fx * 2.2, feet[1] + 1.2, feet[2] + fz * 2.2]);
       }
     }
-    for (const f of this.fists) if (f.t > 0) { f.t -= dt; f.m.scale.setScalar(1 + (0.16 - f.t) * 3); f.m.visible = f.t > 0; }
+    for (const f of this.fists) if (f.t > 0) { f.t -= dt; f.m.scale.set(1, 1, 1 + (0.16 - f.t) * 10); f.m.material.opacity = Math.max(0, f.t / 0.16) * 0.8 * this.k; f.m.visible = f.t > 0; } // stretched along the punch, fading
   }
 
-  dispose() { this.group.removeFromParent(); this.group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } }); }
+  dispose() {
+    this.group.removeFromParent();
+    this.group.traverse((o) => { if ((o.isMesh || o.isLine) && !o.isInstancedMesh) o.geometry.dispose(); });
+    for (const m of this.mats) { m.map?.dispose?.(); m.dispose(); }
+  }
 }

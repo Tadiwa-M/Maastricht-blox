@@ -8,7 +8,8 @@
 //   hurt    I am hit: the plates jump, a red flash
 //   down    I am knocked out: a long red-violet flash and tilt
 //   knock   I ran someone over: a dot burst, a few short lines, a jolt of the plates, a small word
-//   land    a hard landing: the plates jolt
+//   land    a landing: the plates jolt
+//   thud    a hard landing: the plates jolt and a small sound word (BOEF! PLOF!)
 //   shove   I brushed someone aside: a slight jolt
 //   shot    I fired: the plates twitch (the shotgun more)
 //   wave    a raid wave comes: the palette swings to deep red-violet and settles
@@ -19,7 +20,7 @@ import * as THREE from 'three';
 import { LOOK } from './verse.js';
 
 // the manga look letters its sound words in katakana
-const KANA = { 'PATS!': 'バシッ', 'KNAL!': 'ドン!', 'BOEM!': 'ドドド', 'KRAK!': 'バーン', 'BONK!': 'ゴン', 'OEPS!': 'ドサッ' };
+const KANA = { 'BOEF!': 'ドスッ', 'PLOF!': 'ドサッ', 'DOEF!': 'ドンッ', 'PATS!': 'バシッ', 'KNAL!': 'ドン!', 'BOEM!': 'ドドド', 'KRAK!': 'バーン', 'BONK!': 'ゴン', 'OEPS!': 'ドサッ' };
 
 export const FX = {
   hit: { impact: 0.55, split: 0.5 },
@@ -29,6 +30,7 @@ export const FX = {
   down: { split: 1, duo: 0.6, duoCol: 'red', roll: -0.05, hold: 90, decay: 0.8 },
   knock: { impact: 0.5, split: 0.6, lines: 0.5, word: ['PATS!', 'BONK!', 'OEPS!'], wordSize: 0.55 },
   land: { split: 0.35 },
+  thud: { split: 0.45, lines: 0.3, word: ['BOEF!', 'PLOF!', 'DOEF!'], wordSize: 0.5 }, // a hard landing from a jump or a fall
   shove: { split: 0.18 },
   shot: { split: 0.12 },
   shotgun: { split: 0.35 },

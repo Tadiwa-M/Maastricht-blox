@@ -194,6 +194,13 @@ const VERSE_FACE = `
     float lip = step(p.y, mY - 0.002) * step(mY - 0.012, p.y) * step(abs(p.x - 0.002), 0.016 - (mY - p.y) * 0.5);
     c = mix(c, c * vec3(0.72, 0.5, 0.52), lip * vf);`;
 
+// the Spider-Verse look's rim light on people (owner: like the comic mockup): a hot pink edge on
+// one side of every figure and a cyan edge on the other, as the film lights its heroes
+const VERSE_RIM = `{ vec3 V = normalize(cameraPosition - vWP), N = normalize(vWN);
+        vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+        float rim = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 3.6);
+        totalEmissiveRadiance += mix(vec3(0.15, 0.85, 1.0), vec3(1.0, 0.2, 0.6), step(0.0, dot(N, right))) * rim * 0.7; }`;
+
 const MANGA_FASHION = {
   top: `
     float pick = fHash(vec3(floor(diffuseColor.r * 9.0), floor(diffuseColor.g * 9.0), floor(diffuseColor.b * 9.0))); // per outfit colour: the same print on a whole top
@@ -310,6 +317,8 @@ export function figureMaterialFor(base, kind) {
       { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} ${LOOK === 'manga' ? MANGA_FASHION[kind] || '' : LOOK === 'verse' && kind === 'face' ? VERSE_FACE : ''}
       ${LOOK === 'manga' ? MANGA_PALETTE : FILM ? FILM_PALETTE : ''}
       diffuseColor.rgb = max(c, 0.0); }`); // (new lines: a // comment at the end of a block must not swallow the rest)
+    if (LOOK === 'verse') sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      ${VERSE_RIM}`);
   };
   m.customProgramCacheKey = () => `figure:${kind}:${FILM ? 'film' : 'toy'}:${LOOK || ''}`;
   return m;
