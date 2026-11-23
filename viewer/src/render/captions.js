@@ -42,6 +42,7 @@ export class Captions {
     this.el.innerHTML = '';
     this.el.append(title, Object.assign(document.createElement('small'), { textContent: sub }));
     this.el.classList.add('on');
+    window.dispatchEvent(new CustomEvent('blox:fx', { detail: { kind: 'caption' } })); // the comic panel cuts in with it (render/panels.js)
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.el.classList.remove('on'), CAPTION.showS * 1000);
   }

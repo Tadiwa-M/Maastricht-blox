@@ -1230,3 +1230,4 @@ headless (software rendering at ~1 fps does not advance CSS transitions), check 
   border, slightly uneven; a big moment (a knock-out, a hard landing, a raid wave) jolts it: the
   gutter widens and the border is redrawn, like a cut to a new panel.
 Needs the relay redeployed for Guard in online matches (bots and solo use the same rules locally).
+- (Owner: the panel frame was too big, it took you out of the game.) The panel is now a thin inked line with a 3 px paper sliver while you play; the full panel (14 px gutter, heavier ink) cuts in only for a beat: a caption, a knock-out, a hard landing, a raid wave, then goes back.

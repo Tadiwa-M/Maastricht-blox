@@ -1,10 +1,11 @@
 // The Spider-Verse look's comic panel (owner: panel borders, "that's comic coded"): the screen is
-// one panel of a comic page: a paper gutter round the edge and a hand-inked border, a little
-// uneven, as if drawn. A big moment (a knock-out, a hard landing, a raid wave) jolts the panel:
-// the gutter widens and the border kicks, like a cut to a new panel. Only in the Spider-Verse look.
+// one panel of a comic page: a hand-inked border, a little uneven, as if drawn. (Owner: the full
+// frame all the time took you out of the game.) While you play it is a thin line with a sliver of
+// paper; a big moment (a knock-out, a hard landing, a raid wave, a caption) brings the full panel in
+// for a beat: the gutter widens and the border kicks, like a cut to a new panel.
 import { LOOK } from './verse.js';
 
-export const PANEL = { gutterPx: 9, inkPx: 4, jolt: { kill: 1, down: 1, thud: 0.6, wave: 0.8, capture: 0.5 } };
+export const PANEL = { gutterPx: 3, inkPx: 2, beatGutterPx: 14, beatInkPx: 4, jolt: { kill: 1, down: 1, thud: 0.6, wave: 0.8, capture: 0.5, caption: 0.7 } };
 
 /** The border's path: a rectangle with slightly wobbly corners (pure; 0..100 units, seed: which wobble). */
 export function panelPath(seed = 1, wobble = 0.35) {
@@ -17,9 +18,10 @@ const CSS = `
 #cmx-panel { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
 #cmx-panel .gutter { position: absolute; inset: 0; border: ${PANEL.gutterPx}px solid #f4efe2; transition: border-width .12s; }
 #cmx-panel svg { position: absolute; inset: ${PANEL.gutterPx}px; width: calc(100% - ${PANEL.gutterPx * 2}px); height: calc(100% - ${PANEL.gutterPx * 2}px); overflow: visible; transition: inset .12s, width .12s, height .12s; }
-#cmx-panel path { fill: none; stroke: #0b0b10; stroke-width: ${PANEL.inkPx}px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
-#cmx-panel.jolt .gutter { border-width: ${PANEL.gutterPx * 2.4}px; }
-#cmx-panel.jolt svg { inset: ${PANEL.gutterPx * 2.4}px; width: calc(100% - ${PANEL.gutterPx * 4.8}px); height: calc(100% - ${PANEL.gutterPx * 4.8}px); }
+#cmx-panel path { fill: none; stroke: #0b0b10; stroke-width: ${PANEL.inkPx}px; vector-effect: non-scaling-stroke; stroke-linejoin: round; transition: stroke-width .12s; }
+#cmx-panel.jolt .gutter { border-width: ${PANEL.beatGutterPx}px; }
+#cmx-panel.jolt path { stroke-width: ${PANEL.beatInkPx}px; }
+#cmx-panel.jolt svg { inset: ${PANEL.beatGutterPx}px; width: calc(100% - ${PANEL.beatGutterPx * 2}px); height: calc(100% - ${PANEL.beatGutterPx * 2}px); }
 body.title #cmx-panel, body.shot #cmx-panel { display: none; }
 `;
 
@@ -42,7 +44,7 @@ export class ComicPanel {
     this.el.querySelector('path').setAttribute('d', panelPath(++this.seed, 0.35 + 0.5 * k));
     this.el.classList.add('jolt');
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.el.classList.remove('jolt'), 140 + 160 * k);
+    this.timer = setTimeout(() => this.el.classList.remove('jolt'), 350 + 450 * k); // a beat, then back to the thin line
   }
 
   dispose() { if (this.on) { window.removeEventListener('blox:fx', this.onFx); this.el.remove(); } }

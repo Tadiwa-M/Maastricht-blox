@@ -1994,3 +1994,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Backlog (owner): the next world from an artist friend's designs; a stop-motion world (working title "Fantastic Mr Blox"), noted in PLAN.md, not started.
 - Stand designer (parts, colours, name, ability; the three Stands are presets), Stand abilities on X (Guard via the relay, Encore, Short Circuit), the Spider-Verse comic panel border (guide 06). Relay redeploy needed for Guard online.
 - Controller: Share takes photos and postcards, Y/RB the Stand's rush and ability, R3 a pose, L3 the character, d-pad journal, trip planner and songs; Start pauses (guide 09).
+- Spider-Verse panel: thin by default, the full frame only on comic beats (owner: too big) (guide 06).
