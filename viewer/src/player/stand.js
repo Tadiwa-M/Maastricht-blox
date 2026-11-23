@@ -9,17 +9,32 @@ import * as THREE from 'three';
 import { FigureCrowd } from '../figure/crowd.js';
 import { makeVariant } from '../figure/variants.js';
 import { MODE, IDLE, jointAngles, captureParts } from '../figure/rig.js';
-import { STAND_DESIGNS, auraTexture } from './standdesigns.js';
+import { resolveStand, auraTexture } from './standdesigns.js';
 
 export const STAND = { behind: -0.45, side: 0.95, rise: 0.4, // beside the right shoulder, a little behind and above
   rushS: 1.1, punchEvery: 0.07, reachM: 3.2, fadeIn: 5, fadeOut: 2.5 };
 const PART = { top: 'top:shirt' }; // design names for figure part keys
 
+// the Stand's name when it is summoned: 「NAME」 in its aura colour, as the manga letters it
+let card = null, cardTimer = 0;
+function nameCard(name, colour) {
+  if (typeof document === 'undefined' || document.body.classList.contains('shot')) return;
+  if (!card) {
+    document.head.append(Object.assign(document.createElement('style'), { textContent: `#stand-name { position: fixed; right: 7%; top: 30%; z-index: 5; pointer-events: none;
+      font: 400 46px/1 'Anton', Impact, sans-serif; letter-spacing: .03em; -webkit-text-stroke: 2px #0a0410; text-shadow: 4px 4px 0 #0a0410;
+      transform: skewX(-8deg) translateX(30px); opacity: 0; transition: opacity .25s, transform .35s cubic-bezier(.2,1.4,.4,1); }
+      #stand-name.on { opacity: 1; transform: skewX(-8deg); } body.title #stand-name, body.bx-paused #stand-name { display: none; }` }));
+    card = Object.assign(document.createElement('div'), { id: 'stand-name' }); document.body.append(card);
+  }
+  card.textContent = `「${name}」`; card.style.color = colour; card.classList.add('on');
+  clearTimeout(cardTimer); cardTimer = setTimeout(() => card.classList.remove('on'), 2200);
+}
+
 export class Stand {
-  /** id: a STAND_DESIGNS key (figure/custom.js STANDS). */
-  constructor(scene, id = 'iron') {
-    this.design = STAND_DESIGNS[id] ? id : 'iron';
-    const D = STAND_DESIGNS[this.design];
+  /** spec: a preset id (figure/custom.js STANDS) or a designer spec (customVariant v.standSpec). */
+  constructor(scene, spec = 'iron') {
+    const D = this.D = resolveStand(spec);
+    this.key = D.key; this.name = D.name; this.ability = D.ability;
     this.group = new THREE.Group(); this.group.name = 'stand'; this.group.visible = false;
     // the body: one anime figure in the design's painted skin (no hair; Velvet Encore has no shins)
     this.crowd = new FigureCrowd(1, { lod: false, twos: false, shadows: false });
@@ -61,7 +76,7 @@ export class Stand {
     scene.add(this.group);
     this.fistMats = new Set(this.fists.map((f) => f.m.material));
     this.pos = new THREE.Vector3(); this.placed = false;
-    this.k = 0; this.t = 0; this.rushT = 0; this.punchT = 0; this.sparkT = 0; this.pose = -1;
+    this.k = 0; this.t = 0; this.rushT = 0; this.punchT = 0; this.sparkT = 0; this.pose = -1; this.guardT = 0;
   }
 
   /** The pose the user strikes (STAND_POSES index), or -1: the Stand strikes one of its own. */
@@ -70,6 +85,11 @@ export class Stand {
   /** Throw a rush (if out of one). -> true when it started. */
   rush() { if (this.rushT > 0) return false; this.rushT = STAND.rushS; this.punchT = 0; return true; }
   get rushing() { return this.rushT > 0; }
+
+  /** Guard (IRON HYMN's ability): for s seconds it stands in front with its arms crossed and its aura flares. */
+  guard(s = 2) { this.guardT = s; }
+  /** A flash of the aura (an ability used). */
+  flare() { this.flareT = 0.6; }
 
   /** The joints for this frame: arms crossed and looming, its own pose, or a blur of punches. */
   joints(pose) {
@@ -94,14 +114,17 @@ export class Stand {
    */
   update(dt, feet, yaw, want, onPunch) {
     this.t += dt;
-    const show = want || this.rushT > 0;
+    const show = want || this.rushT > 0 || this.guardT > 0 || (this.flareT || 0) > 0;
+    if (show && this.k < 0.05) nameCard(this.name, this.D.aura); // summoned: its name, as the manga letters it
     this.k += ((show ? 1 : 0) - this.k) * Math.min(1, dt * (show ? STAND.fadeIn : STAND.fadeOut));
     this.group.visible = this.k > 0.02;
     if (!this.group.visible) { this.placed = false; return; }
     const fx = Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = Math.sin(yaw);
     const rushing = this.rushT > 0;
     // behind the right shoulder; in front of the player during a rush
-    const back = rushing ? -1.3 : STAND.behind, side = rushing ? 0 : STAND.side;
+    const guarding = this.guardT > 0 && !rushing;
+    if (this.guardT > 0) this.guardT -= dt; if (this.flareT > 0) this.flareT -= dt;
+    const back = rushing ? -1.3 : guarding ? -0.9 : STAND.behind, side = rushing || guarding ? 0 : STAND.side;
     const bob = Math.sin(this.t * 1.6) * 0.06;
     const tx = feet[0] - fx * back + rx * side, tz = feet[2] - fz * back + rz * side, ty = feet[1] + STAND.rise * this.k + bob - (1 - this.k) * 0.6;
     if (!this.placed) { this.pos.set(tx, ty, tz); this.placed = true; }
@@ -109,8 +132,10 @@ export class Stand {
     this.pos.x += (tx - this.pos.x) * e; this.pos.y += (ty - this.pos.y) * e; this.pos.z += (tz - this.pos.z) * e;
     // the body: posed like a figure (its own pose answers the user's)
     const pose = { x: this.pos.x, y: this.pos.y, z: this.pos.z, rotY: -yaw, mode: MODE.IDLE, t: this.t,
-      ...(this.pose >= 0 && !rushing ? { idle: IDLE.POSE, idleK: 1, poseKind: this.pose + 3 } : {}) };
+      ...(this.pose >= 0 && !rushing && !guarding ? { idle: IDLE.POSE, idleK: 1, poseKind: this.pose + 3 } : {}) };
+    const posing = this.pose; if (guarding) this.pose = -1; // guarding: arms crossed in front
     const J = this.joints(pose);
+    this.pose = posing;
     this.crowd.begin(); this.crowd.add(this.v, pose, J); this.crowd.end();
     const solid = this.k > 0.97;
     for (const [key, { mesh, outline }] of this.crowd.meshes) {
@@ -125,10 +150,12 @@ export class Stand {
     }
     for (const m of this.mats) if (!this.fistMats.has(m)) m.opacity = this.k;
     // the aura flickers like a flame and pulses
-    const D = STAND_DESIGNS[this.design];
+    const D = this.D;
     this.aura.position.set(this.pos.x, this.pos.y + 1.45 * D.scale, this.pos.z);
     this.aura.scale.set((2.4 + 0.12 * Math.sin(this.t * 9)) * D.scale / 1.4, (3.8 + 0.15 * Math.sin(this.t * 6)) * D.scale / 1.4, 1);
-    this.aura.material.opacity = (0.75 + 0.15 * Math.sin(this.t * 7) + 0.1 * Math.sin(this.t * 23)) * this.k;
+    const flare = guarding || this.flareT > 0 ? 1.6 : 1;
+    this.aura.scale.multiplyScalar(flare > 1 ? 1.25 : 1);
+    this.aura.material.opacity = Math.min(1, (0.75 + 0.15 * Math.sin(this.t * 7) + 0.1 * Math.sin(this.t * 23)) * this.k * flare);
     if (this.sparks.length && (this.sparkT -= dt) <= 0) { // new sparks jump off it
       this.sparkT = 0.09;
       for (const l of this.sparks) {

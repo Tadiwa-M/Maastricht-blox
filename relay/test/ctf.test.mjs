@@ -303,3 +303,19 @@ test('spawn shield: no hits for 3 s after the start and after coming back, unles
   assert.ok(shoot(g, 1, at(317900, 317930, 2), back + 1000).events.some((e) => e.k === 'hit'), 'no hiding behind it while shooting');
   void r;
 });
+
+test("a Stand's Guard: no hit lands for 2 s, then hits count again; once per cooldown; firing ends it", async () => {
+  const { shoot, guard } = await import('../src/ctf.js');
+  const g = newGame('GARD', 0);
+  join(g, { pid: 'aaaaaaaa1', name: 'A' }, 0); join(g, { pid: 'bbbbbbbb2', name: 'B' }, 0);
+  start(g, 1, 0);
+  const a = g.players[1], b = g.players[2];
+  a.safe = b.safe = 0;
+  move(g, 1, { p: [176300, 50, 317900] }, 1000); move(g, 2, { p: [176300, 50, 317930] }, 1000);
+  const shot = { w: 'rifle', o: [176300, 51.5, 317900], e: [176300, 51, 317930], hit: 2, head: false };
+  assert.deepEqual(kinds(guard(g, 2, 1000)), ['guard']);
+  assert.ok(!shoot(g, 1, shot, 1500).events.some((e) => e.k === 'hit'), 'guarded');
+  assert.deepEqual(kinds(guard(g, 2, 1600)), [], 'not again so soon');
+  move(g, 1, { p: [176300, 50, 317900] }, 3100); move(g, 2, { p: [176300, 50, 317930] }, 3100);
+  assert.ok(shoot(g, 1, shot, 3200).events.some((e) => e.k === 'hit'), 'over after 2 s');
+});

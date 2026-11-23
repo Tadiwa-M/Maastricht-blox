@@ -1209,3 +1209,24 @@ depth pass and ink outlines draw figures and vehicles again). Per figure: Classi
 Open: Stand abilities beyond the rush (Guard, Encore, Short Circuit) and a Stand designer; paint
 splatter and panel borders in the Spider-Verse look; the caption's slide-in could not be watched
 headless (software rendering at ~1 fps does not advance CSS transitions), check it on a PC.
+
+## The Stand designer, Stand abilities, the comic panel (2026-11-23)
+
+- Stand designer (owner): `player/standdesigns.js` now builds a Stand from parts: skin pattern
+  (circuit, harlequin, zigzag, scales, stripes), colours (main, second, trim, glow and aura), head
+  (helm, mask, speed), crown (none, blades, jester, bolt), shoulders (none, gears, ruff, bolts), arms
+  (none, vambraces, claws, fins), legs (full, spiked, ribbons), chest (none, keyhole, star), build
+  (broad, slender, athletic), a song-style name and an ability. The three concept Stands are
+  `PRESETS` of it; `resolveStand(id | spec)` makes either. Creator: "Stand (Manga)" = a preset or
+  `custom`, which shows the designer rows (`figure/custom.js STAND_PARTS`, kept equal to the module's
+  `PART_NAMES` by a test). The Stand stays out while the creator is open, so you see it change; it
+  letters its name 「NAME」 when summoned.
+- Abilities on X (`ABILITIES`, with cooldowns): Guard (relay `ctf.js guard`: the spawn-shield rule
+  for 2 s, once per 7.5 s, firing ends it; the Stand stands in front, arms crossed, aura flaring);
+  Encore (back to where you stood 3 s ago, client side; no rewinding across a fast travel); Short
+  Circuit (`controller.dash`: an 18 m/s burst for 0.22 s that walls still stop, then a Stand hit at
+  the end of it).
+- Spider-Verse comic panel (`render/panels.js`, owner: panel borders): a paper gutter and a hand-inked
+  border, slightly uneven; a big moment (a knock-out, a hard landing, a raid wave) jolts it: the
+  gutter widens and the border is redrawn, like a cut to a new panel.
+Needs the relay redeployed for Guard in online matches (bots and solo use the same rules locally).

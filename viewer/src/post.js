@@ -19,6 +19,7 @@ import { LOOK, makeVersePass, updateVerse } from './render/verse.js';
 import { PoolLights } from './render/pools.js';
 import { DepthRenderPass } from './render/depthpass.js';
 import { ComicFx } from './render/comicfx.js';
+import { ComicPanel } from './render/panels.js';
 import { MangaFx } from './render/mangafx.js';
 import { outlineUniforms } from './render/outline.js';
 import { HorizontalTiltShiftShader } from 'three/examples/jsm/shaders/HorizontalTiltShiftShader.js';
@@ -60,6 +61,7 @@ export class Post {
       gtao.blendIntensity = 1.2;
       this.fx = new ComicFx(); // the look reacting to hits, knock-outs, waves (render/comicfx.js)
       if (this.look === 'manga') this.mfx = new MangaFx(); // menace lettering, palette swings, speed lines
+      if (this.look === 'verse') this.panel = new ComicPanel(); // the screen as a comic panel (render/panels.js)
     }
     this.composer = c;
     this.pools = new PoolLights(); // lamps and shop windows light their surroundings at night (every look)

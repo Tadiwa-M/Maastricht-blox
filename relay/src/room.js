@@ -14,7 +14,7 @@
 // { t: 'leave' }; the text 'ping' is answered 'pong' without waking the object.
 // Room -> client: { t: 'welcome', you, rejoin, config, ...state }, { t: 'state', ... },
 // { t: 'p', i: id, p, r, s }, { t: 'ev', k, ... }, { t: 'error', error }.
-import { CTF, newGame, join, disconnect, remove, start, move, shoot, take, tick, nextDeadline, expired, publicState,
+import { CTF, newGame, join, disconnect, remove, start, move, shoot, take, guard, tick, nextDeadline, expired, publicState,
   arenaConfig, isEmpty, playerByPid } from './ctf.js';
 
 const MAX_MSG = 2000;
@@ -138,6 +138,8 @@ export class BloxRoom {
       res = shoot(g, id, msg, now);
     } else if (msg.t === 'take') {
       res = take(g, id, msg, now);
+    } else if (msg.t === 'guard') {
+      res = guard(g, id, now);
     } else if (msg.t === 'start') {
       res = start(g, id, now);
       if (!res.ok) this.send(ws, { t: 'error', error: res.error });

@@ -149,6 +149,9 @@ export class CharacterController {
    * letting go early makes a lower hop) }. camYaw: compass radians the camera
    * looks to. Returns { speed (m/s horizontal), travelled (m) }.
    */
+  /** A burst of speed (m/s east, north in three.js x, z) for s seconds on top of walking; walls still stop it. */
+  dash(vx, vz, s) { this.boost = [vx, vz]; this.boostT = s; }
+
   update(dt, { move = [0, 0], speed = 0, jump = false, jumpHeld = true } = {}, camYaw = 0) {
     const o = this.o;
     const [x0, y0, z0] = this.pos;
@@ -166,6 +169,7 @@ export class CharacterController {
     this.yaw = loco.heading;
     this.vel[0] = loco.vx;
     this.vel[2] = loco.vz;
+    if (this.boostT > 0) { this.boostT -= dt; this.vel[0] += this.boost[0]; this.vel[2] += this.boost[1]; } // a dash (dash())
 
     // jump: forgiving on both sides. Pressed a moment before landing it is remembered (buffer);
     // pressed a moment after walking off an edge it still counts (coyote time).

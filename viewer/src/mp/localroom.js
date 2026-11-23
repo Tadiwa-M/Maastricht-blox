@@ -142,6 +142,7 @@ export class LocalRoom {
       return r;
     }
     if (m.t === 'take') return take(this.g, id, m, now);
+    if (m.t === 'guard') return guard(this.g, id, now);
     return { events: [], changed: false };
   }
 

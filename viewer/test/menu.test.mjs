@@ -188,3 +188,11 @@ test('Spider-Verse captions: the first place is the universe, then the narrator;
   off.place('Markt'); assert.equal(off.n, 0, 'other looks show none');
   assert.ok(CAPTION.gapS >= 10);
 });
+
+test('the Spider-Verse comic panel: a closed, slightly uneven border; other looks show none', async () => {
+  const { panelPath, ComicPanel } = await import('../src/render/panels.js');
+  const p = panelPath(3);
+  assert.match(p, /^M[-\d. ]+( L[-\d. ]+){3} Z$/);
+  assert.notEqual(panelPath(3), panelPath(4), 'each panel drawn a little differently');
+  assert.equal(new ComicPanel({ look: 'manga' }).on, false);
+});

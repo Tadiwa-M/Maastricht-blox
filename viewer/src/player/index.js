@@ -37,6 +37,7 @@ import { Scatter } from './scatter.js';
 import { defaultChoices, loadChoices } from '../figure/custom.js';
 import { PROPORTION } from '../figure/rig.js';
 import { Stand } from './stand.js';
+import { resolveStand, ABILITIES } from './standdesigns.js';
 import { Captions } from '../render/captions.js';
 import { comicFx } from '../render/comicfx.js';
 
@@ -61,9 +62,33 @@ export function initPlayer(ctx) {
   const captions = new Captions();
   window.__bloxCaptions = captions; // (tests)
   if (PROPORTION.style?.poses) {
-    stand = new Stand(stage.scene, character.variant.stand);
+    stand = new Stand(stage.scene, character.variant.standSpec || character.variant.stand);
     window.__bloxStand = stand;
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyE' && mode === 'walk' && !window.__bloxMp?.combat?.active && !e.repeat) stand.rush(); });
+    window.addEventListener('keydown', (e) => { if (e.code === 'KeyX' && !e.repeat && !/INPUT|TEXTAREA|SELECT/.test(e.target?.tagName || '')) standAbility(); });
+  }
+  // the Stand's ability (X): Guard, Encore or Short Circuit (player/standdesigns.js ABILITIES)
+  let abilityReady = 0;
+  const trail = []; // where the player was, for Encore: [{ t, pos }], the last few seconds
+  function standAbility() {
+    if (!stand || mode !== 'walk' || tween || riding()) return;
+    const now = performance.now(), A = ABILITIES[stand.ability];
+    if (now < abilityReady) { hud.toast(`${A.name}: ready in ${Math.ceil((abilityReady - now) / 1000)} s`, 1200); return; }
+    abilityReady = now + A.coolS * 1000;
+    const combat = window.__bloxMp?.combat;
+    if (stand.ability === 'guard') { stand.guard(2); combat?.guard?.(); }
+    else if (stand.ability === 'encore') { // back to where you were 3 s ago
+      const then = trail.find((p) => now - p.t <= 3000) || trail[0];
+      if (then) { ctrl.pos[0] = then.pos[0]; ctrl.pos[1] = then.pos[1]; ctrl.pos[2] = then.pos[2]; ctrl.vel[1] = 0; ctrl.visualY = then.pos[1]; }
+      stand.flare(); comicFx('land', null);
+    } else { // Short Circuit: a lightning dash forward that hits whoever is at the end of it
+      const fx = Math.sin(ctrl.yaw), fz = -Math.cos(ctrl.yaw);
+      ctrl.dash(fx * 18, fz * 18, 0.22); stand.flare();
+      setTimeout(() => combat?.standPunch?.([ctrl.pos[0] + fx * 0.8, ctrl.pos[1] + 1.2, ctrl.pos[2] + fz * 0.8]), 230);
+    }
+    hud.toast(`「${stand.name}」 ${A.name}!`, 1200);
+  }
+  {
   }
   const findStreet = world?.features ? streetFinder(world.features.values()) : () => '';
   const S = world?.studM || 0.5;
@@ -106,7 +131,8 @@ export function initPlayer(ctx) {
     store,
     onChange: (v, ch) => {
       look = ch; character.setVariant(v);
-      if (stand && v.stand && v.stand !== stand.design) { stand.dispose(); stand = new Stand(stage.scene, v.stand); window.__bloxStand = stand; } // a new Stand picked
+      const spec = v.standSpec || v.stand; // a new Stand picked or designed: build it again
+      if (stand && spec && resolveStand(spec).key !== stand.key) { stand.dispose(); stand = new Stand(stage.scene, spec); window.__bloxStand = stand; }
     },
     onDone: () => closeCreator(),
   });
@@ -383,7 +409,11 @@ export function initPlayer(ctx) {
       }
       // the Stand shows while posing or aiming (and during a rush); each punch goes to the match, if any
       if (stand) stand.setPose((character.poseK || 0) > 0.5 ? (character.poseN || 0) : -1);
-      if (stand) stand.update(dt, drawFeet, character.aim?.yaw ?? ctrl.yaw, (character.poseK || 0) > 0.5 || (window.__bloxMp?.combat?.aim || 0) > 0.5,
+      // Encore's trail: where the player stood, the last 3.5 s
+      { const now = performance.now(), last = trail[trail.length - 1];
+        if (last && Math.hypot(ctrl.pos[0] - last.pos[0], ctrl.pos[2] - last.pos[2]) > 20) trail.length = 0; // a fast travel or a walk-in: no rewinding across town
+        trail.push({ t: now, pos: [ctrl.pos[0], ctrl.pos[1], ctrl.pos[2]] }); while (trail.length && now - trail[0].t > 3500) trail.shift(); }
+      if (stand) stand.update(dt, drawFeet, character.aim?.yaw ?? ctrl.yaw, (character.poseK || 0) > 0.5 || (window.__bloxMp?.combat?.aim || 0) > 0.5 || creator.open, // (designing it: it stays out)
         (at) => window.__bloxMp?.combat?.standPunch?.(at));
       // smooth the followed height (step-ups and landings), keep x/z exact
       smoothFeet[0] = ctrl.pos[0]; smoothFeet[2] = ctrl.pos[2];

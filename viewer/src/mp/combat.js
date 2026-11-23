@@ -591,6 +591,13 @@ export class Combat {
   }
 
   /** One punch of the Stand's rush (player/stand.js): at = where it lands (three.js); the room judges. */
+  /** The Stand's Guard: the room makes me untouchable for a moment (relay ctf.js guard); the shield ring shows it. */
+  guard() {
+    if (!this.active || this.down > 0) return;
+    this.send({ t: 'guard' });
+    this.safeT = Math.max(this.safeT || 0, 2);
+  }
+
   standPunch(at) {
     if (!this.active || this.down > 0) return;
     const rd = (p) => [Math.round((this.origin[0] + p[0]) * 100) / 100, Math.round(p[1] * 100) / 100, Math.round((this.origin[1] - p[2]) * 100) / 100];

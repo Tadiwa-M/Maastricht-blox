@@ -12,8 +12,20 @@ export const HAIR_COLOURS = [...HAIR, ...GREY_HAIR];
 export const HEADWEAR = new Set(['cap', 'beanie', 'hat']);
 /** The manga top prints, in the order the shader knows them (0 auto: picked from the colour). */
 export const PRINTS = ['auto', 'plain', 'stripes', 'zigzag', 'hearts', 'checks', 'panel'];
-/** The Stands (player/standdesigns.js): IRON HYMN, VELVET ENCORE, LIVE WIRE. */
-export const STANDS = ['iron', 'velvet', 'wire'];
+/** The Stands (player/standdesigns.js): the presets IRON HYMN, VELVET ENCORE, LIVE WIRE, or your own. */
+export const STANDS = ['iron', 'velvet', 'wire', 'custom'];
+/** The Stand designer's parts per slot (the same names as player/standdesigns.js PART_NAMES). */
+export const STAND_PARTS = {
+  skin: ['circuit', 'harlequin', 'zigzag', 'scales', 'stripes'], head: ['helm', 'mask', 'speed'],
+  crown: ['none', 'blades', 'jester', 'bolt'], shoulders: ['none', 'gears', 'ruff', 'bolts'],
+  arms: ['none', 'vambraces', 'claws', 'fins'], legs: ['full', 'spiked', 'ribbons'], chest: ['none', 'keyhole', 'star'],
+};
+export const STAND_COLOURS = ['#eee6d1', '#1a1f24', '#e01f80', '#120812', '#ffcc1a', '#0c0c10', '#3b2a7a', '#14311f', '#c8202a', '#1f5fd1', '#f6f0ea', '#e8b84a', '#7a7f88', '#2bb39a'];
+export const STAND_GLOWS = ['#27f2e0', '#ffe14a', '#4dd2ff', '#ff3fa8', '#9dff4a', '#ff7a1a', '#b56bff', '#ffffff'];
+// song-style names, as that world names its Stands (our own)
+export const STAND_NAMES = ['NEON SERENADE', 'MIDNIGHT ARCADE', 'GLASS HEART', 'MAAS BLUES', 'PAPER THUNDER', 'SILVER STATIC', 'CRIMSON TIDE BELL', 'VELVET SIREN', 'BRICK & MORTAR', 'GOLDEN HOUR', 'SECOND ENCORE', 'STEREO GHOST'];
+export const STAND_ABILITIES = ['guard', 'encore', 'dash'];
+const designing = (c) => c.stand === 'custom';
 
 /** Every choice: key, label, its options (values; colours are hex strings) and when(values) it applies. */
 export const CHOICES = [
@@ -33,6 +45,21 @@ export const CHOICES = [
   { key: 'print', label: 'Print (Manga)', values: PRINTS },
   { key: 'chain', label: 'Chain (Manga)', values: ['on', 'off'] },
   { key: 'stand', label: 'Stand (Manga)', values: STANDS },
+  // the Stand designer (stand: custom)
+  { key: 'standName', label: 'Stand name', values: STAND_NAMES, when: designing },
+  { key: 'standSkin', label: 'Stand pattern', values: STAND_PARTS.skin, when: designing },
+  { key: 'standA', label: 'Stand colour', values: STAND_COLOURS, colour: true, when: designing },
+  { key: 'standB', label: 'Stand second colour', values: STAND_COLOURS, colour: true, when: designing },
+  { key: 'standTrim', label: 'Stand trim', values: STAND_COLOURS, colour: true, when: designing },
+  { key: 'standGlow', label: 'Stand glow and aura', values: STAND_GLOWS, colour: true, when: designing },
+  { key: 'standHead', label: 'Stand head', values: STAND_PARTS.head, when: designing },
+  { key: 'standCrown', label: 'Stand crown', values: STAND_PARTS.crown, when: designing },
+  { key: 'standShoulders', label: 'Stand shoulders', values: STAND_PARTS.shoulders, when: designing },
+  { key: 'standArms', label: 'Stand arms', values: STAND_PARTS.arms, when: designing },
+  { key: 'standLegs', label: 'Stand legs', values: STAND_PARTS.legs, when: designing },
+  { key: 'standChest', label: 'Stand chest', values: STAND_PARTS.chest, when: designing },
+  { key: 'standBuild', label: 'Stand build', values: ['broad', 'slender', 'athletic'], when: designing },
+  { key: 'standAbility', label: 'Stand ability (X)', values: STAND_ABILITIES, when: designing },
 ];
 const BY_KEY = Object.fromEntries(CHOICES.map((c) => [c.key, c]));
 
@@ -58,6 +85,7 @@ export function defaultChoices(seed = 52) {
     top: idx('top', v.top), topCol: idx('topCol', v.colours.top), bottomCol: idx('bottomCol', v.colours.bottom),
     shoeCol: idx('shoeCol', v.colours.shoe), acc: idx('acc', v.acc === 'umbrella' ? 'none' : v.acc), accCol: idx('accCol', v.colours.acc),
     print: 0, chain: 0, stand: 0,
+    ...Object.fromEntries(CHOICES.filter((c) => c.key.startsWith('stand') && c.key !== 'stand').map((c) => [c.key, 0])), // the designer starts from its first options
   };
 }
 
@@ -75,6 +103,11 @@ export function customVariant(ch) {
   };
   if (HEADWEAR.has(hair)) v.colours.hairTint = v.colours.hat;
   v.stand = val('stand');
+  if (v.stand === 'custom') {
+    v.standSpec = { name: val('standName'), skin: val('standSkin'), a: val('standA'), b: val('standB'), trim: val('standTrim'),
+      glow: val('standGlow'), aura: val('standGlow'), head: val('standHead'), crown: val('standCrown'), shoulders: val('standShoulders'),
+      arms: val('standArms'), legs: val('standLegs'), chest: val('standChest'), build: val('standBuild'), ability: val('standAbility') };
+  }
   v.fashion = clampIdx('print', ch.print) + (val('chain') === 'off' ? 8 : 0); // (one number for the shader: print + 8 without the chain)
   return v;
 }

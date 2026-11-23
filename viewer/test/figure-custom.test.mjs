@@ -78,3 +78,20 @@ test('codes saved before the manga print and chain choices still load (the new o
   const v = customVariant({ ...ch, print: 2, chain: 1 });
   assert.equal(v.fashion, 2 + 8, 'stripes, no chain');
 });
+
+test('the Stand designer: custom unlocks its rows; the parts match the Stand module; presets resolve', async () => {
+  const { STAND_PARTS, visibleChoices: vis } = await import('../src/figure/custom.js');
+  const { PART_NAMES, resolveStand, PRESETS } = await import('../src/player/standdesigns.js');
+  assert.deepEqual(STAND_PARTS, PART_NAMES);
+  const ch = defaultChoices();
+  const rows = (c) => vis(c).filter((x) => x.key.startsWith('stand') && x.key !== 'stand').length;
+  assert.equal(rows(ch), 0, 'a preset: no designer rows');
+  const custom = { ...ch, stand: CHOICES.find((c) => c.key === 'stand').values.indexOf('custom') };
+  assert.ok(rows(custom) >= 10);
+  const v = customVariant({ ...custom, standHead: 1, standLegs: 2 });
+  assert.equal(v.standSpec.head, 'mask'); assert.equal(v.standSpec.legs, 'ribbons');
+  const D = resolveStand(v.standSpec);
+  assert.ok(D.ribbons && D.name && D.key);
+  for (const id of Object.keys(PRESETS)) assert.equal(resolveStand(id).name, PRESETS[id].name);
+  assert.equal(resolveStand({ head: 'nonsense' }).key, resolveStand({ head: 'helm' }).key, 'unknown parts fall back');
+});

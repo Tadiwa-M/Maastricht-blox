@@ -31,6 +31,7 @@ export const CTF = {
   hp: 100,
   respawnS: 4, // knocked out this long, then back at the base
   spawnSafeS: 3, // just back (or just started): shots do not count on you this long, unless you shoot first
+  guard: { ms: 2000, coolMs: 7500 }, // a Stand's Guard (the manga look): untouchable this long, this often
   shotRangeM: 170,
   shotSlackM: 2.5, // a claimed hit must pass this close to where the room last saw the target
   pickupBackS: 20, // a taken weapon lies there again after this
@@ -273,6 +274,17 @@ export function take(g, id, msg, now) {
   const ev = { k: 'take', i, id, w: spot.w, s: CTF.pickupBackS };
   if (spot.w === 'med') { regen(p, now); p.hp = Math.min(CTF.hp, (p.hp ?? CTF.hp) + CTF.medHp); ev.hp = p.hp; }
   return result([ev], false);
+}
+
+/**
+ * A Stand's Guard (the manga look): for CTF.guard.ms no hit lands on p (the spawn shield's rule),
+ * at most once per CTF.guard.coolMs; firing ends it, as it ends the spawn shield.
+ */
+export function guard(g, id, now) {
+  const p = g.players[id];
+  if (!p || g.phase !== 'play' || p.down > now || now - (p.guardAt || -1e12) < CTF.guard.coolMs) return result();
+  p.guardAt = now; p.safe = Math.max(p.safe || 0, now + CTF.guard.ms);
+  return result([{ k: 'guard', id, s: CTF.guard.ms / 1000 }], false);
 }
 
 /** Health back since the last hit (CTF.regen): applied lazily when it matters (a hit, a medkit). */
