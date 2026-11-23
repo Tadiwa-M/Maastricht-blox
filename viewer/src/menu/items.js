@@ -7,19 +7,20 @@
  */
 export function menuItems({ has = {}, goalsOff = false, touch = false, match = false, look = 'Classic' } = {}) {
   const all = [
+    // (owner: people could not find these: what makes it yours and what there is to do come first)
     { id: 'resume', label: 'Resume', key: 'Esc' },
     { id: 'map', label: 'Map & fast travel', key: '', sub: match ? 'Map only during a match' : '' },
-    { id: 'character', label: 'Character', key: 'C', need: 'player' },
-    { id: 'journal', label: 'Journal', key: 'J', need: 'explore' },
-    { id: 'photo', label: 'Photo mode', key: 'P', need: 'explore' },
-    { id: 'trip', label: 'Plan a trip', key: '', need: 'trip' },
-    { id: 'goals', label: goalsOff ? 'Goals: off' : 'Goals: on', key: 'O', need: 'goals' },
+    { id: 'character', label: 'Character', key: 'C', sub: 'Hair, outfit, colours', need: 'player' },
     { id: 'look', label: `Look: ${look}`, key: '', sub: 'Classic, Spider-Verse or Manga' },
+    { id: 'trip', label: 'Plan a trip', key: '', sub: 'Real buses and trains, live times', need: 'trip' },
     { id: 'music', label: 'Music', key: '', sub: 'Play your Spotify while you play', need: 'music' },
+    { id: 'mp', label: 'Play', key: '', sub: 'Defend Maastricht, capture the flag', need: 'mp' },
+    { id: 'photo', label: 'Photo mode', key: 'P', need: 'explore' },
+    { id: 'journal', label: 'Journal', key: 'J', need: 'explore' },
+    { id: 'goals', label: goalsOff ? 'Goals: off' : 'Goals: on', key: 'O', need: 'goals' },
     { id: 'settings', label: 'Settings', key: '', sub: 'Sun, quality, sound' },
     { id: 'help', label: 'Controls & help', key: 'H', need: 'player' },
     { id: 'tour', label: 'Tour', key: '', sub: 'What there is to do, again', need: 'tour' },
-    { id: 'mp', label: 'Multiplayer', key: '', need: 'mp' },
   ];
   return all.filter((it) => !it.need || has[it.need]).map(({ need, ...it }) => ({ ...it, key: touch ? '' : it.key, sub: it.sub || '' }));
 }

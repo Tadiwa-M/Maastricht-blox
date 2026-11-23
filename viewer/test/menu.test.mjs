@@ -101,7 +101,7 @@ test('marker pick by screen distance; labels by zoom; heading from a camera', ()
 
 test('menu items follow the modules that are there; key hints only without touch', () => {
   const all = menuItems({ has: { player: true, explore: true, trip: true, goals: true, mp: true, music: true, tour: true } });
-  assert.deepEqual(all.map((i) => i.id), ['resume', 'map', 'character', 'journal', 'photo', 'trip', 'goals', 'look', 'music', 'settings', 'help', 'tour', 'mp']);
+  assert.deepEqual(all.map((i) => i.id), ['resume', 'map', 'character', 'look', 'trip', 'music', 'mp', 'photo', 'journal', 'goals', 'settings', 'help', 'tour']);
   assert.equal(all.find((i) => i.id === 'journal').key, 'J');
   const bare = menuItems({ has: {}, touch: true, goalsOff: true });
   assert.deepEqual(bare.map((i) => i.id), ['resume', 'map', 'look', 'settings']);
@@ -168,11 +168,13 @@ test('travel: gives up after the timeout', () => {
   assert.equal(log.at(-1)[1], 'gave-up');
 });
 
-test('the tour: four steps, touch or mouse wording, the first moves on once the player walks', async () => {
+test('the tour: six steps, touch or mouse wording, the first moves on once the player walks', async () => {
   const { tourSteps } = await import('../src/menu/tour.js');
   const t = tourSteps(true), m = tourSteps(false);
-  assert.deepEqual(t.map((s) => s.id), ['drop', 'walk', 'look', 'play']);
+  assert.deepEqual(t.map((s) => s.id), ['drop', 'walk', 'you', 'look', 'more', 'play']);
+  assert.match(m[2].text, /press C/); assert.equal(t[2].menu, 'character');
+  assert.match(t[4].text, /Spotify/); assert.match(t[4].text, /trip/);
   assert.match(t[0].text, /double-tap/); assert.match(m[0].text, /double-click/);
   assert.equal(t[0].done({ mode: 'walk' }), true); assert.equal(t[0].done({ mode: 'map' }), false);
-  assert.match(t[2].text, /Spider-Verse/);
+  assert.match(t[3].text, /Spider-Verse/);
 });

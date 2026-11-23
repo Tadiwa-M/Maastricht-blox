@@ -138,7 +138,9 @@ const optionalModules = {
 
 async function bundle(out) {
   const common = { bundle: true, target: 'es2022', minify: true, sourcemap: false, logLevel: 'warning' };
-  await build({ ...common, entryPoints: [join(here, 'src', 'main.js')], format: 'esm', outfile: join(out, 'viewer.js'), plugins: [optionalModules] });
+  // iife: index.html loads viewer.js as a classic script, so the bundle keeps its own scope (as ESM
+  // output its top-level names became page globals: an unminified build clashed with window.top)
+  await build({ ...common, entryPoints: [join(here, 'src', 'main.js')], format: 'iife', outfile: join(out, 'viewer.js'), plugins: [optionalModules] });
   await build({ ...common, entryPoints: [join(here, 'src', 'stream-worker.js')], format: 'iife', outfile: join(out, 'stream-worker.js') });
   await copyFile(join(here, 'src', 'index.html'), join(out, 'index.html'));
   // the phone trip planner (plan.html): its own small bundle, no 3D city

@@ -201,7 +201,6 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const mats = new MaterialSet();
   const box = cityBox(index);
   const approxGround = groundGrid(farIndex, index);
-  const centre = box.getCenter(new THREE.Vector3());
   const cityRadius = Math.hypot(box.max.x - box.min.x, box.max.z - box.min.z) / 2;
   // the baseplate lies just under the lowest brick (river bed), so it never covers a street
   stage.setBounds(box, index.studM, { groundSize: 40000, groundY: box.min.y - 0.3 });
@@ -330,7 +329,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
   const frustum = new THREE.Frustum(), pv = new THREE.Matrix4(), tmpBox = new THREE.Box3();
   const inView = (b) => frustum.intersectsBox(tmpBox.set(b.min, b.max));
   const shadowBox = new THREE.Box3();
-  let frames = 0, lastStats = 0, firstFrame = null, readyAt = null, settleFrames = 0;
+  let lastStats = 0, firstFrame = null, readyAt = null, settleFrames = 0;
   const hooks = [];
   document.addEventListener('visibilitychange', () => { meter.last = null; governor.reset(); });
   const times = { start: t0 };

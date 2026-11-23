@@ -56,7 +56,7 @@ export function initPlayer(ctx) {
   stage.scene.add(character.group);
   // the manga look: the player's Stand (player/stand.js), in the user's own colours
   let stand = null;
-  if (PROPORTION.pose) {
+  if (PROPORTION.style?.poses) {
     stand = new Stand(stage.scene, { top: character.variant.colours.top, bottom: character.variant.colours.bottom });
     window.__bloxStand = stand;
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyE' && mode === 'walk' && !window.__bloxMp?.combat?.active && !e.repeat) stand.rush(); });
@@ -138,6 +138,11 @@ export function initPlayer(ctx) {
       hud.setMode(mode, padCount > 0);
     },
   });
+  // the mouse is held only to aim in a match, or when the player asked for it (Settings); otherwise
+  // the cursor stays free: drag to look, every button clickable without Esc first
+  input.mayLock = () => !!settings.captureMouse || !!window.__bloxMp?.combat?.active;
+  hud.captures = input.mayLock;
+  let lastMayLock = input.mayLock();
   canvas.addEventListener('pointermove', (e) => { hover = [e.clientX, e.clientY]; });
   canvas.addEventListener('dblclick', (e) => { if (mode === 'map' && !tween && !riding()) enterAt(screenRay(e.clientX, e.clientY)); });
   // walk mode: a click on the world captures the mouse (open-world look)
@@ -380,9 +385,13 @@ export function initPlayer(ctx) {
       // but never falls far behind a long drop
       smoothFeet[1] += (ctrl.pos[1] - smoothFeet[1]) * (1 - Math.exp(-dt * (ctrl.grounded ? 11 : 4.5)));
       smoothFeet[1] = Math.max(ctrl.pos[1] - 1.1, Math.min(ctrl.pos[1] + 1.1, smoothFeet[1]));
+      // the mouse is held only while that is allowed (a match ended, the setting switched off: let go)
+      const may = input.mayLock();
+      if (input.locked && !may) input.releaseLock();
+      if (may !== lastMayLock) { lastMayLock = may; hud.refreshHint(); }
       follow.aspect = camera.aspect; // portrait phones: wider view, less shoulder offset
       // the manga look: a pose gets the manga's shot (camera.js drama): front three-quarter, low, looking up
-      const wantDrama = PROPORTION.pose && (character.poseK || 0) > 0.6 && !character.aim ? 1 : 0;
+      const wantDrama = !!PROPORTION.style?.poses && (character.poseK || 0) > 0.6 && !character.aim ? 1 : 0;
       follow.drama = (follow.drama || 0) + (wantDrama - (follow.drama || 0)) * Math.min(1, dt * (wantDrama ? 1.6 : 6));
       follow.dramaYaw = ctrl.yaw + Math.PI + 0.55;
       if (!tween) {

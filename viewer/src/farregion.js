@@ -42,7 +42,6 @@ const ORDER = (() => {
  * per owner }, position: [x, y, z], scale: [sx, sy, sz], triangles }. palette: Map idx -> entry.
  */
 export function regionArrays({ header: h, owners, quads }, palette, studM = 0.5, plateM = 0.2) {
-  const fams = new Map();
   const famOf = new Uint8Array(256), names = [];
   const style = new Map();
   for (const [idx, entry] of palette) {

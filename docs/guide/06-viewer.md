@@ -1145,3 +1145,34 @@ Open: per-look trains; cyclists' riders ride the new bikes with the same hold.
   as the manga allows.) The manga default stance now mostly keeps the hands in the pockets (both,
   or one with the other hanging in a loose fist), chest out, chin up, looking down the nose; about
   one in seven raises a hand to the brow. Still the S-curve, the wide turned-out stance.
+
+## Code health pass (2026-11-23)
+
+Owner: improve and maintain, no new features. Each refactor below was checked by rendering the
+figure and vehicle sheets before and after: **0 pixels differ** (the renders are deterministic).
+- `figure/lookstyle.js`: how each painted look's people stand, walk and pose (proportions, walk,
+  default stance, stand-your-ground poses), moved out of `rig.js` (the skeleton and its mechanics)
+  and out of `render/figuresurface.js` (which set body proportions from a shader module).
+  `PROPORTION.style` replaces the `pose` / `swag` flags; callers ask `PROPORTION.style?.poses`.
+- `rig.js`: every joint and its rest value in one table (`PAIR_REST`, `SCALAR_REST`), used to reset,
+  blend and pose; before, each new joint had to be added in three lists (and two comments had
+  been run together into one line).
+- Torso cut heights are `BODY.spineAt` / `BODY.hemAt` (parts.js), used by the rig and both builds
+  (before: three copies, one a bare 0.27); `geom.js splitTop / splitTops` replaces the split loop
+  both builds repeated.
+- `geom.js decal / CHROME / CREAM / box`: the absolute vertex colour convention, shared by the
+  vehicle builds (were duplicated); `lookmodels.js` makes a painted boat material through
+  `vehicleMaterialFor` instead of cloning one and copying its shader hook by hand.
+- Triangles: the Spider-Verse car wheel was 3,688 triangles (twelve rounded tread blocks; the
+  classic wheel is 128): plain boxes, 232. A Spider-Verse car 21.7k -> 7.8k triangles; the shoe's
+  lace bars likewise (figure 6.1k -> 5.6k).
+- A one-off ESLint run over `viewer/src` (no-undef, no-unused-vars, no-dupe-keys, ...): 10 unused
+  variables, now removed; no undefined names.
+- `build.mjs`: the game bundle is `iife` (index.html loads it as a classic script; as ESM output its
+  top-level names were page globals, and an unminified build failed on `function top` vs `window.top`).
+
+Measured, hardware-independent (headless, software GPU, so no FPS): a street at Low/Classic draws
+175 calls and 3.0 M triangles, 2.1 M of them distant city (the baked far silhouettes and mid LOD)
+mostly hidden behind the street at walking height. Medium/Manga: 508 calls, 9.9 M triangles (the
+depth pass and ink outlines draw figures and vehicles again). Per figure: Classic 4.7k, Manga
+7.5k, Spider-Verse 5.6k triangles. Real frame times need the owner's hardware.

@@ -7,12 +7,9 @@
 //          pale roof, chrome bumpers and trim, round lamps, whitewall tyres); a drop-bar road bike
 //   verse: chunky street cars (boxy, wide dark arches, big wheels, a spoiler, a roof rack or bull
 //          bar, stickers); a BMX (thick tubes, high-rise bars, pegs, fat knobbly tyres)
-import * as THREE from 'three';
-import { rbox, sphere, cyl, torus, tube as tubeN, place, merge, tint } from './geom.js';
+import { rbox, box, sphere, cyl, torus, tube as tubeN, place, merge, decal, CHROME, CREAM } from './geom.js';
 
 const WHEEL_R = 0.32, Y0 = 0.22, DARK = 0.16;
-const decal = (r, g, b) => [r + 2, g + 2, b + 2];
-const CHROME = decal(0.86, 0.88, 0.92), PALE = decal(0.95, 0.92, 0.84); // fixed colours: chrome, a cream roof
 const lowOf = (t) => (t.van ? 0.85 : t.tall ? 0.74 : 0.6);
 
 // ---- manga: retro European ---------------------------------------------------------------
@@ -22,7 +19,7 @@ function mangaBody(t) {
   const parts = [
     place(rbox(W * 0.94, low, L, 0.3, 1, 3), { at: [0, Y0 + low / 2, 0] }), // a rounded tub
     place(rbox(W * 0.62, 0.1, L * 0.36, 0.05, 1, 2), { at: [0, Y0 + low + 0.02, -L / 2 + L * 0.2] }), // the bonnet's centre crease
-    place(rbox(cw * 0.96, ch, cl * 0.92, Math.min(0.32, ch * 0.45), PALE, 3), { at: [0, Y0 + low + ch / 2 - 0.08, cz + 0.08] }), // a pale roof
+    place(rbox(cw * 0.96, ch, cl * 0.92, Math.min(0.32, ch * 0.45), CREAM, 3), { at: [0, Y0 + low + ch / 2 - 0.08, cz + 0.08] }), // a pale roof
   ];
   for (const sx of [-1, 1]) {
     for (const az of [-1, 1]) parts.push(place(sphere(0.5, 1, 14, 10), { at: [sx * (W / 2 - 0.2), WHEEL_R + 0.1, az * (L / 2 - 0.85)], scale: [0.52, 0.62, 1.05] })); // swelling fenders
@@ -110,7 +107,7 @@ function verseGlass(t) {
 }
 const verseWheel = () => { const parts = [place(cyl(WHEEL_R, WHEEL_R, 0.28, 0.1, 16), { rot: [0, 0, Math.PI / 2] }),
   place(cyl(WHEEL_R * 0.62, WHEEL_R * 0.62, 0.285, 0.8, 6), { rot: [0, 0, Math.PI / 2] })]; // fat tyres, six-spoke rims
-  for (let q = 0; q < 12; q++) { const a = (q / 12) * Math.PI * 2; parts.push(place(rbox(0.29, 0.05, 0.05, 0.01, 0.1), { at: [0, Math.cos(a) * WHEEL_R, Math.sin(a) * WHEEL_R], rot: [a, 0, 0] })); } // tread blocks
+  for (let q = 0; q < 12; q++) { const a = (q / 12) * Math.PI * 2; parts.push(place(box(0.29, 0.05, 0.05, 0.1), { at: [0, Math.cos(a) * WHEEL_R, Math.sin(a) * WHEEL_R], rot: [a, 0, 0] })); } // tread blocks (plain boxes: 12 a wheel, 4 wheels a car)
   return merge(parts); };
 
 // a BMX (riders' hands and saddle stay put: rig.js)

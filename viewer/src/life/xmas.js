@@ -138,7 +138,7 @@ export class XmasMarket {
     // the lights of the night photos: colour chasing along the wheel's spokes, strings along every
     // chalet's eaves, the giant gift box, and the square's trees wound with lights
     const glow = () => new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false });
-    const SP = 32, PER = 9, cols = [new THREE.Color(1, 0.18, 0.25), new THREE.Color(0.25, 0.45, 1), new THREE.Color(1, 1, 1)];
+    const SP = 32, cols = [new THREE.Color(1, 0.18, 0.25), new THREE.Color(0.25, 0.45, 1), new THREE.Color(1, 1, 1)];
     // each spoke a glowing bar (they read from across the square, as in the night photos)
     this.spokeBulbs = new THREE.InstancedMesh(new THREE.BoxGeometry(W.r * 0.9, 0.14, 0.14).translate(W.r * 0.5, 0, 0), glow(), SP * 2);
     for (let k = 0; k < SP * 2; k++) {

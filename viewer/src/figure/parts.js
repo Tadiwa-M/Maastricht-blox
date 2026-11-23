@@ -17,6 +17,9 @@ export const BODY = {
   upperArm: 0.27, foreArm: 0.24,
   neckY: 0.55, // neck base above the pelvis
   headTop: 0.3, // head top above the neck base (without hair)
+  // the painted looks' bendy torso (rig.js PROPORTION.spine): where the chest bends over the belly,
+  // and where a long top's hem (coat tails, a skirt) hangs from; heights in the torso's own frame
+  spineAt: 0.27, hemAt: 0.03,
 };
 const DARK = 0.07; // eyes
 

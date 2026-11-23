@@ -19,10 +19,10 @@ export class Scatter {
     this.o = { ...SCATTER, ...o };
     this.ground = ground;
     this.t = 0;
-    let cx = 0, cy = 0, cz = 0;
-    for (const p of parts) { cx += p.mat[12]; cy += p.mat[13]; cz += p.mat[14]; }
+    let cx = 0, cz = 0; // the pieces fly out from the body's centre on the ground
+    for (const p of parts) { cx += p.mat[12]; cz += p.mat[14]; }
     const n = Math.max(1, parts.length);
-    cx /= n; cy /= n; cz /= n;
+    cx /= n; cz /= n;
     this.bits = parts.map((p) => {
       _m.fromArray(p.mat).decompose(_p, _q, _s);
       const out = new THREE.Vector3(_p.x - cx, 0, _p.z - cz);

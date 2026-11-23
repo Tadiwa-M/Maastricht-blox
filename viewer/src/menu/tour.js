@@ -2,10 +2,14 @@
 // and double-tap to get into the street, nor that the look can change). A card at the bottom,
 // one step at a time, on the first visit (saved: localStorage blox.tour); Skip ends it; pause menu
 // > Tour plays it again. Steps move on by themselves when the player does the thing.
-//   1 the city from above: zoom in and double-tap a street, or "Drop me on the Markt"
+//   1 the city from above: zoom in and double-tap a street, Walk here, or "Drop me on the Markt"
 //   2 in the street: how to move; what there is to do (tourists ask for help, bikes, the ducks)
-//   3 the looks: Jump into the Spider-Verse (opens the look picker)
-//   4 games: Defend Maastricht at night, capture the flag (opens the Play panel)
+//   3 make it yours: hair, outfit, colours (opens the character creator)
+//   4 the looks: Classic, Spider-Verse, Manga (opens the look picker)
+//   5 more in the menu: trips on the real buses and trains, your Spotify, photo mode, fast travel
+//   6 games: Defend Maastricht at night, capture the flag (opens the Play panel)
+// (owner: people missed the character creator, the music and the trip planner: steps 3 and 5)
+// Buttons go through the pause menu's own actions (menu/index.js choose), so there is one way to open each thing.
 export const TOUR_KEY = 'blox.tour';
 export const MARKT_RD = [176380, 317990];
 
@@ -15,17 +19,25 @@ const touch = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: c
 export function tourSteps(isTouch) {
   return [
     { id: 'drop', title: 'Welcome to Maastricht, in bricks',
-      text: isTouch ? 'This is the real city. Pinch to zoom in close to a street, then double-tap it to jump in.' : 'This is the real city. Scroll to zoom in close to a street, then double-click it to jump in.',
+      text: isTouch ? 'This is the real city. Pinch to zoom in close to a street, then double-tap it to jump in.'
+        : 'This is the real city. Scroll to zoom in close to a street, then double-click it (or press Walk here, bottom right) to jump in.',
       action: 'Drop me on the Markt', done: (p) => p?.mode === 'walk' },
     { id: 'walk', title: 'You are in the street',
       text: isTouch ? 'Joystick to walk, drag the right side to look. Tourists with a ! need help, bikes stand ready at the racks, and the ducks on the Maas are hungry.' : 'WASD to walk, the mouse to look, Space to jump. Tourists with a ! need help, bikes stand ready at the racks, and the ducks on the Maas are hungry.',
       action: 'Got it', minS: 6 },
+    { id: 'you', title: 'Make it yours',
+      text: isTouch ? 'Your hair, outfit and colours: menu (top right), Character. It is saved in this browser and others see it in games.'
+        : 'Your hair, outfit and colours: press C, or the menu (Esc), Character. It is saved in this browser and others see it in games.',
+      action: 'Change my look', menu: 'character' },
     { id: 'look', title: 'Change how the city looks',
-      text: 'Jump into the Spider-Verse: a comic-book film with ink outlines, halftone dots and colours that flash when the action hits. Any time from the pause menu, Look.',
-      action: 'Show me the looks' },
+      text: 'Three worlds, three casts: the Classic brick toy, the Spider-Verse comic film, or Manga, with its own poses and Stands. Any time from the menu, Look.',
+      action: 'Show me the looks', menu: 'look' },
+    { id: 'more', title: 'More in the menu',
+      text: (isTouch ? 'In the menu (top right): ' : 'In the menu (Esc): ') + 'plan a trip on the real buses and trains, play your own Spotify while you walk, photo mode, and fast travel on the map.',
+      action: 'Got it' },
     { id: 'play', title: 'Something to play',
       text: 'Defend Maastricht: raiders come out of the caves at night, keep them off the banner on the Markt. Or capture the flag, with friends or bots. The PLAY button on the right.',
-      action: 'Open Play' },
+      action: 'Open Play', menu: 'mp' },
   ];
 }
 
@@ -39,6 +51,7 @@ const CSS = `
 #tour .dots { color: #8d91ad; font-size: 11px; letter-spacing: .3em; }
 #tour button { border: 0; border-radius: 999px; padding: 8px 14px; font: 800 12px system-ui, sans-serif; cursor: pointer; }
 #tour .go { background: #F2A900; color: #10153a; }
+#tour .go kbd { font: 700 10px system-ui, sans-serif; opacity: .6; margin-left: 4px; }
 #tour .skip { background: none; color: #8d91ad; text-decoration: underline; padding: 8px 4px; }
 body.title #tour, body.shot #tour { display: none; }
 `;
@@ -59,25 +72,33 @@ export function initTour({ store = safe(), origin = () => window.BLOX_SITE?.orig
     shownAt = performance.now();
     el.innerHTML = `<b>${s.title}</b><div>${s.text}</div>
       <div class="row"><span class="dots">${steps.map((_, q) => (q === i ? '●' : '○')).join('')}</span>
-      <span><button class="skip">Skip tour</button> <button class="go">${s.action}</button></span></div>`;
+      <span><button class="skip">Skip tour</button> <button class="go">${s.action}${touch() ? '' : ' <kbd>Enter</kbd>'}</button></span></div>`;
     el.hidden = false;
+    // (found by playing it: in the street the mouse is held for looking around, so the card's buttons
+    // could not be clicked; free it, as every other panel does; Enter works either way)
+    player()?.input?.releaseLock?.();
   }
   function next() { show(i + 1); }
   function end() {
     el.hidden = true; i = -1; clearInterval(timer); window.__bloxTourOn = false;
     try { store?.setItem(TOUR_KEY, 'done'); } catch { /* blocked */ }
   }
+  function act() {
+    const s = steps[i];
+    if (!s) return;
+    if (s.id === 'drop') dropOnMarkt();
+    if (s.menu) window.__bloxMenu?.choose(s.menu); // the menu's own way to open it
+    if (i === steps.length - 1) end(); else next();
+  }
   el.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
-    if (b.classList.contains('skip')) { end(); return; }
-    const s = steps[i];
-    if (s.id === 'drop') {
-      dropOnMarkt();
-      next();
-    } else if (s.id === 'look') { document.querySelector('#look-panel') ? (window.__bloxLooks?.open(), next()) : next(); }
-    else if (s.id === 'play') { const btn = document.getElementById('mp-open'); if (btn && document.getElementById('mp-panel')?.hidden !== false) btn.click(); end(); }
-    else next();
+    if (b.classList.contains('skip')) end(); else act();
+  });
+  // Enter presses the card's button, also while the mouse is held for looking around
+  document.addEventListener('keydown', (e) => {
+    if (el.hidden || e.key !== 'Enter' || e.repeat || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '')) return;
+    e.preventDefault(); act();
   });
 
   /** Into the street on the Markt: fly the map there first if that part of town isn't loaded yet. */

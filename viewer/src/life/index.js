@@ -201,7 +201,7 @@ export async function initLife(ctx) {
 
   const data = await loadLifeData(ctx);
   state.source = data ? 'export' : 'world';
-  const { clock, fixed, anchor } = initialClock();
+  const { clock, anchor } = initialClock();
   state.clock = clock;
   const tier = () => (typeof ctx.quality === 'function' ? ctx.quality() : 'medium');
   const hideDemo = (name) => { for (const a of ctx.demo?.actors || []) if (a.obj.userData.model?.name === name || a.obj.name === `model:${name}`) a.obj.visible = false; };

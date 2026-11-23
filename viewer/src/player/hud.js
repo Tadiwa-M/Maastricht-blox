@@ -47,8 +47,8 @@ body.shot #pl-bar, body.shot #pl-back, body.shot #pl-toast, body.shot #pl-help, 
 `;
 
 export const CONTROLS = [
-  ['Look (walk)', 'Click to capture the mouse, then move it · Q E', 'Right stick', 'Right half: drag'],
-  ['Free the mouse', 'Esc', '', ''],
+  ['Look (walk)', 'Drag on the city · Q E (to hold the mouse instead: Settings)', 'Right stick', 'Right half: drag'],
+  ['Free the mouse', 'Esc (when it is held: in a match, or by the setting)', '', ''],
   ['Move', 'W A S D / arrows (where the camera looks)', 'Left stick', 'Left half: joystick'],
   ['Run', 'Shift', 'Push stick fully / LB', 'Push joystick fully'],
   ['Jump', 'Space', 'A', 'Jump button'],
@@ -69,6 +69,7 @@ const TOGGLES = [
   ['invertY', 'Invert Y (mouse / touch)'],
   ['padInvertY', 'Invert Y (controller)'],
   ['recenter', 'Camera eases behind you while walking'],
+  ['captureMouse', 'Hold the mouse for looking (Esc frees it; matches always do)'],
 ];
 
 const el = (tag, attrs = {}, html = '') => Object.assign(document.createElement(tag), attrs, html ? { innerHTML: html } : {});
@@ -142,12 +143,12 @@ export class TouchControls {
 }
 
 /** Hint line for the bottom bar (pure, tested). */
-export function hintFor(mode, { touch = false, pad = false, locked = false } = {}) {
+export function hintFor(mode, { touch = false, pad = false, locked = false, capture = true } = {}) {
   if (mode === 'walk') {
     if (touch) return 'Joystick to move · drag the right side to look · pinch out for the map';
     if (pad) return 'Left stick move · right stick look · A jump · B map · Start menu';
-    return locked ? 'Mouse look · WASD move · Space jump · M or scroll out: map · Esc frees the mouse'
-      : 'Click to look around · WASD move · Space jump · M or scroll out: map · Esc menu';
+    if (locked) return 'Mouse look · WASD move · Space jump · M or scroll out: map · Esc frees the mouse';
+    return `${capture ? 'Click to look around' : 'Drag to look around'} · WASD move · Space jump · C character · M or scroll out: map · Esc menu`;
   }
   if (touch) return 'Double-tap the ground to walk there';
   if (pad) return 'A: walk at the centre · left stick pan · right stick orbit · LT/RT zoom';
@@ -227,7 +228,7 @@ export class Hud {
 
   setLocked(locked) { this.state.locked = locked; this.refreshHint(); }
 
-  refreshHint() { this.hint.textContent = hintFor(this.mode, { touch: isTouchDevice(), ...this.state }); }
+  refreshHint() { this.hint.textContent = hintFor(this.mode, { touch: isTouchDevice(), capture: this.captures?.() ?? true, ...this.state }); }
 
   setStreet(name) { if (this.street.textContent !== name) this.street.textContent = name; }
 

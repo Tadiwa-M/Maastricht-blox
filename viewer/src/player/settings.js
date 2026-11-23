@@ -10,6 +10,9 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   padSens: 1, // x base stick turn rate (look.js StickLook)
   padInvertY: false,
   recenter: true, // ease the camera behind the player after ~2 s without look input
+  // (owner: the held mouse made every button need Esc first) exploring looks by dragging with a
+  // free cursor; true holds the mouse for looking all the time. Matches always hold it (aiming).
+  captureMouse: false,
 });
 
 export const SETTINGS_RANGE = { mouseSens: [0.2, 3], padSens: [0.3, 2.5] };
@@ -22,7 +25,7 @@ export function sanitizeSettings(raw) {
     const v = Number(raw[k]);
     if (raw[k] != null && Number.isFinite(v)) s[k] = Math.min(hi, Math.max(lo, v));
   }
-  for (const k of ['invertY', 'padInvertY', 'recenter']) if (typeof raw[k] === 'boolean') s[k] = raw[k];
+  for (const k of ['invertY', 'padInvertY', 'recenter', 'captureMouse']) if (typeof raw[k] === 'boolean') s[k] = raw[k];
   return s;
 }
 

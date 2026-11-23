@@ -12,14 +12,10 @@
 //   shoe   sole band with a welt line, laces, a toe cap
 // Accessories keep the toy material.
 import { PAINTED_LOOK, LOOK } from './verse.js';
-import { setProportions } from '../figure/rig.js';
 import { addPartVaryings } from './pools.js';
 
 // every look gets the printed detail; the painted looks also the film materials (matte cloth, skin sheen)
 export const FIGURE_LOOK = typeof location !== 'undefined';
-// the manga look: the heroic build of that world (figure/rig.js PROPORTION)
-if (LOOK === 'verse') setProportions({ shoulder: 1.06, chest: 1.0, waist: 0.9, leg: 1.16, head: 0.98, arm: 1.1, swag: true, spine: true }); // lanky, swaggering
-if (LOOK === 'manga') setProportions({ shoulder: 1.12, chest: 1.06, waist: 0.92, leg: 1.17, head: 0.9, arm: 1.05, pose: true, spine: true }); // (the anime figure carries most of the build itself)
 const FILM = PAINTED_LOOK;
 
 /**

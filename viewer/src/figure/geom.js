@@ -18,6 +18,13 @@ export function tint(geo, c = 1) {
   return g;
 }
 
+/**
+ * An absolute vertex colour: components >= 2 mean "this colour (minus 2), whatever the part is
+ * painted" (render/vehiclesurface.js paints it over the body: chrome, a cream roof, stickers).
+ */
+export const decal = (r, g, b) => [r + 2, g + 2, b + 2];
+export const CHROME = decal(0.86, 0.88, 0.92), CREAM = decal(0.95, 0.92, 0.84);
+
 /** Translate/rotate/scale helper: geo -> geo (in place). */
 export function place(geo, { at = [0, 0, 0], rot = [0, 0, 0], scale = null } = {}) {
   if (scale) geo.scale(...(Array.isArray(scale) ? scale : [scale, scale, scale]));
@@ -29,6 +36,8 @@ export function place(geo, { at = [0, 0, 0], rot = [0, 0, 0], scale = null } = {
 }
 
 export const rbox = (w, h, d, r, c = 1, seg = 2) => tint(new RoundedBoxGeometry(w, h, d, seg, Math.min(r, w / 2, h / 2, d / 2) * 0.999), c);
+/** A plain box (12 triangles): for small details where rounded edges cannot be seen but cost hundreds of triangles. */
+export const box = (w, h, d, c = 1) => tint(new THREE.BoxGeometry(w, h, d), c);
 export const sphere = (r, c = 1, ws = 9, hs = 6) => tint(new THREE.SphereGeometry(r, ws, hs), c);
 export const capsule = (r, len, c = 1, seg = 2, rad = 8) => tint(new THREE.CapsuleGeometry(r, len, seg, rad), c);
 export const cyl = (rt, rb, h, c = 1, seg = 12) => tint(new THREE.CylinderGeometry(rt, rb, h, seg), c);
@@ -89,8 +98,25 @@ export function splitTorso(geo, y, filler) {
   return { upper: merge([build(parts[0])]), belly: merge([build(parts[1]), filler]) };
 }
 
-/** The hem of a long top (a coat's tails, a skirt) cut off below y, to swing on its own: { body, tail }. */
-export function splitHem(geo, y, filler) {
-  const { upper, belly } = splitTorso(geo, y, filler);
-  return { body: upper, tail: belly };
+/**
+ * A top for a bendy figure: the chest (top), the belly it bends over, and for a long top (a coat,
+ * a dress) the hem that swings on its own (tail). Cut at `spineAt` and `hemAt` (parts.js BODY);
+ * each filler (e.g. a squashed sphere at the cut) hides the gap when that joint bends.
+ */
+export function splitTop(geo, { spineAt, hemAt, waist, hem = null }) {
+  const { upper, belly } = splitTorso(geo, spineAt, waist);
+  if (!hem) return { top: upper, belly };
+  const h = splitTorso(belly, hemAt, hem);
+  return { top: upper, belly: h.upper, tail: h.belly };
+}
+
+/** Split every top style of a figure (top(style) -> geometry) into parts.top/belly/tail. */
+export function splitTops(styles, top, fillers) {
+  const out = { top: {}, belly: {}, tail: {} };
+  for (const st of styles) {
+    const p = splitTop(top(st), fillers(st));
+    out.top[st] = p.top; out.belly[st] = p.belly;
+    if (p.tail) out.tail[st] = p.tail;
+  }
+  return out;
 }

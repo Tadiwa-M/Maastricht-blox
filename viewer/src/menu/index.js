@@ -392,7 +392,7 @@ export async function initMenu(ctx) {
   const api = {
     get isOpen() { return isOpen; },
     get page() { return page; },
-    open, close, toggle, travel: (x, z, name = '') => go({ x, z, name }), map,
+    open, close, toggle, choose, travel: (x, z, name = '') => go({ x, z, name }), map,
     get travelling() { return travel.busy; },
     update(dt) {
       if (explore()?.state?.().photo) photoSeenAt = performance.now();

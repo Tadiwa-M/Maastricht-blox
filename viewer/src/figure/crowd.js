@@ -11,6 +11,7 @@ import { FIGURE_LOOK, figureKindOf, figureMaterialFor, mangaShape } from '../ren
 import { OUTLINE_ON, outlineFor } from '../render/outline.js';
 import { ANIME_PARTS } from './animeparts.js';
 import { VERSE_PARTS } from './verseparts.js';
+import './lookstyle.js'; // the look's proportions, walk, stance and poses (before any figure is posed)
 import { LOOK } from '../render/verse.js';
 
 const LIMBS = { hips: 1, upperArm: 2, foreArm: 2, hand: 2, thigh: 2, shin: 2, shoe: 2, head: 1, 'lo:upperArm': 2, 'lo:foreArm': 2, 'lo:thigh': 2, 'lo:shin': 2 };

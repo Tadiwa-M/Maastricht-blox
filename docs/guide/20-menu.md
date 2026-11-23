@@ -30,8 +30,10 @@ modules). Tests: `viewer/test/menu.test.mjs`.
 
 ## Entries
 
-Resume · Map & fast travel · Character (C) · Journal (J) · Photo mode (P) · Plan a trip ·
-Goals on/off (O) · Settings · Controls & help (H) · Multiplayer. An entry shows only when its
+Resume · Map & fast travel · Character (C) · Look · Plan a trip · Music · Play · Photo mode (P) ·
+Journal (J) · Goals on/off (O) · Settings · Controls & help (H) · Tour. What makes it yours and what
+there is to do come first, each with a line saying what it is (2026-11-23, owner: people could not
+find the character creator, the music or the trip planner). An entry shows only when its
 module is there. Character and photo mode walk in at the map's centre first when you are on the
 map. Settings moves the `#hud` panel (sun, tilt-shift, AO, animation, quality, clock speed,
 sound volume and mute) into the menu while the page is up and puts it back after. **On phones
@@ -40,7 +42,8 @@ sound volume and mute) into the menu while the page is up and puts it back after
 APIs used: `__bloxPlayer.openCreator / closeCreator / creatorOpen / toggleHelp / busy`,
 `__bloxExplore.journal / photo / landmarks() / journalOpen`, `__bloxTrip.open`,
 `__bloxGoals.setOff / flow.off`, the multiplayer button `#mp-open`. The menu itself is
-`window.__bloxMenu { isOpen, page, open(page), close(), toggle(), travel(x, z, name), travelling }`.
+`window.__bloxMenu { isOpen, page, open(page), close(), toggle(), choose(id), travel(x, z, name), travelling }`;
+`choose(id)` runs an entry as if picked (the tour uses it, so there is one way to open each thing).
 
 ## The map (`map.js`, `view.js`, `mapdata.js`)
 
@@ -92,3 +95,11 @@ there if it isn't loaded, then enters walk mode); (2) moving, and what to do (to
 bikes, ducks); (3) "Jump into the Spider-Verse" (opens the look picker); (4) Defend Maastricht and
 capture the flag (opens Play). Steps move on by themselves when the player does the thing; Skip
 ends it; pause menu > Tour plays it again. The goals card's own welcome waits while the tour runs.
+
+- (2026-11-23) Six steps: (1) into the street (mentions the Walk here button), (2) moving and what to
+  do, (3) **Make it yours** (opens the character creator), (4) the looks: three worlds, three casts,
+  (5) **More in the menu**: trips on the real buses and trains, your Spotify, photo mode, fast
+  travel, (6) Play. Buttons run the menu's own entries (`__bloxMenu.choose`). Found by playing the
+  tour: in the street the mouse was held for looking around, so the card's buttons could not be
+  clicked; the card now frees the mouse when it shows, and **Enter** presses its button. (Since then
+  the mouse is free while exploring anyway: guide 09.)

@@ -144,6 +144,7 @@ test('map drags: Ctrl/Alt + left orbits, middle tilts, plain left/right stay wit
 
 test('HUD hint follows the mode, the mouse lock and the device', () => {
   assert.match(hintFor('walk', { locked: false }), /Click to look around.*M or scroll out: map.*Esc menu/);
+  assert.match(hintFor('walk', { locked: false, capture: false }), /Drag to look around.*C character.*Esc menu/);
   assert.match(hintFor('walk', { locked: true }), /Mouse look.*M or scroll out: map.*Esc frees the mouse/);
   assert.match(hintFor('walk', { pad: true }), /right stick look/);
   assert.match(hintFor('walk', { touch: true }), /drag.*pinch out for the map/);

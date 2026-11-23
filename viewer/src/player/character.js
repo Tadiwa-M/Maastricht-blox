@@ -104,8 +104,8 @@ export class Character {
     } else this.legYaw = null;
     Object.assign(this.pose, { x: feet[0], y: feet[1], z: feet[2], rotY: -legYaw }, m, { phase, twist,
       aim: this.aim?.k || 0, aimPitch: this.aim?.pitch || 0, aimSprint: this.aim?.sprint || 0, aimReady: this.aim?.ready ?? 1 });
-    // the manga look: still for a few seconds (and not holding a gun), strike a pose (rig.js STAND_POSES)
-    if (PROPORTION.pose) {
+    // the manga look: still for a few seconds (and not holding a gun), strike a pose (figure/lookstyle.js STAND_POSES)
+    if (PROPORTION.style?.poses) {
       this.stillT = speed < 0.15 && !this.aim ? (this.stillT || 0) + dt : 0;
       if (this.stillT === 0 && this.posed) { this.posed = false; this.poseN = (this.poseN || 0) + 1; }
       const want = this.stillT > 2.5 ? 1 : 0;

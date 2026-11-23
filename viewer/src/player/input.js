@@ -5,9 +5,10 @@
 // helpers (deadzone, readKeys, readPad, lockDelta, combine, frameSpeed) are tested without a
 // browser; the Input class only collects DOM/Gamepad state and calls them once per frame.
 //
-// Mouse look (walk mode): click the canvas to capture the mouse (Pointer Lock API); while
-// locked, every pointermove's movementX/Y turns the camera, no button held. Without the lock
-// (declined, or before the first click) dragging still turns it. Only one path feeds a given
+// Mouse look (walk mode): drag on the canvas to turn the camera, the cursor stays free for the
+// HUD. Where the lock is allowed (mayLock: in a match, for aiming, or the captureMouse setting) a
+// click captures the mouse (Pointer Lock API); while locked, every pointermove's movementX/Y turns
+// the camera, no button held. Only one path feeds a given
 // event, so deltas are never applied twice. Esc releases the lock (the browser does that
 // itself); the Escape key press that released it is swallowed so it does not also open the menu.
 //
@@ -172,6 +173,7 @@ export class Input {
     this.touchLook = [0, 0]; // look drag (px) not yet applied (smoothTouchLook)
     this.lookActive = false; // mouse look (walk mode only)
     this.locked = false; this.lockedAt = 0; this.unlockedAt = -1e9;
+    this.mayLock = () => true; // the one rule for capturing the mouse (player/index.js sets it)
     this.padNames = new Map();
     const typing = (e) => /^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName || '') && !/^(checkbox|range)$/.test(e.target.type);
     window.addEventListener('keydown', (e) => {
@@ -213,7 +215,7 @@ export class Input {
   /** Capture the mouse (needs a user gesture: a click or key press shortly before). */
   requestLock() {
     const t = this.target;
-    if (this.locked || !t.requestPointerLock) return;
+    if (this.locked || !t.requestPointerLock || !this.mayLock()) return;
     const plain = () => { try { t.requestPointerLock()?.catch?.(() => {}); } catch { /* not allowed now */ } };
     try {
       // raw mouse input (no OS acceleration) where supported, like a desktop game

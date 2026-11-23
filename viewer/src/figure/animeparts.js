@@ -9,7 +9,7 @@
 // down -y from their joint. Vertex colours < 1 mark fixed dark details, as in parts.js.
 import * as THREE from 'three';
 import { BODY, FIGURE_PARTS } from './parts.js';
-import { place, sphere, cyl, torus, lathe, merge, tint, rbox, splitTorso, splitHem } from './geom.js';
+import { place, sphere, cyl, torus, lathe, merge, tint, rbox, splitTops } from './geom.js';
 
 /** A limb from [radius, y] points (y going down from the joint), slightly oval front to back. */
 const limb = (pts, depth = 0.92, seg = 14) => lathe(pts.map(([r, y]) => [r, y]).reverse(), { depth, seg });
@@ -141,17 +141,16 @@ const shoe = () => merge([ // a pointed dress shoe (origin: the ankle)
   place(tint(new THREE.ConeGeometry(0.042, 0.1, 6), 1), { at: [0, -0.05, -0.15], rot: [-Math.PI / 2, 0, 0], scale: [1, 1, 0.6] }),
   place(rbox(0.086, 0.016, 0.26, 0.007, 0.35, 1), { at: [0, -0.072, -0.06] })]);
 
-// the torso in two (owner: the poses need to bend through the trunk): the abdomen (with the coat or
-// skirt below it) and the chest, split at SPLIT; a small triangle across the cut goes in both, and a
-// waist filler hides the gap when the spine bends. Both stay in the torso's own coordinates (the
-// chest bends about the cut), so prints and the inked muscles stay put.
-export const SPLIT = 0.27;
-function splitTop(geo, style) {
+// the torso in two (owner: the poses need to bend through the trunk) and long hems that swing
+// (geom.js splitTop): both parts stay in the torso's own coordinates, so prints and the inked
+// muscles stay put; fillers sized to each style hide the gaps when the joints bend
+const fillers = (style) => {
   const wide = style === 'coat' ? 1.1 : style === 'jacket' ? 1.07 : 1.0, deep = style === 'coat' ? D + 0.14 : style === 'jacket' ? D + 0.06 : D;
-  return splitTorso(geo, SPLIT, place(sphere(0.152, 1, 16, 8), { at: [0, SPLIT, 0], scale: [wide, 0.55, deep] }));
-}
+  return { spineAt: BODY.spineAt, hemAt: BODY.hemAt,
+    waist: place(sphere(0.152, 1, 16, 8), { at: [0, BODY.spineAt, 0], scale: [wide, 0.55, deep] }),
+    hem: style === 'coat' || style === 'dress' ? place(sphere(0.15, 1, 14, 6), { at: [0, BODY.hemAt, 0], scale: [1.08, 0.3, D + 0.1] }) : null };
+};
 
-const HEM_AT = 0.03; // where a coat's tails or a skirt hang from (rig.js HEM_AT)
 let cache = null;
 /** The manga figure's part geometries, keyed exactly as FIGURE_PARTS (far LOD and accessories shared). */
 export function ANIME_PARTS() {
@@ -159,9 +158,6 @@ export function ANIME_PARTS() {
   const P = FIGURE_PARTS();
   cache = { ...P, head: head(), hips: hips(), upperArm: upperArm(), foreArm: foreArm(), hand: hand(), thigh: thigh(), shin: shin(), shoe: shoe(),
     hair: Object.fromEntries(Object.keys(P.hair).map((s) => [s, hair(s)])),
-    top: {}, belly: {} };
-  for (const st of Object.keys(P.top)) { const { upper, belly } = splitTop(top(st), st); cache.top[st] = upper;
-    if (st === 'coat' || st === 'dress') { const h = splitHem(belly, HEM_AT, place(sphere(0.15, 1, 14, 6), { at: [0, HEM_AT, 0], scale: [1.08, 0.3, D + 0.1] })); cache.belly[st] = h.body; (cache.tail ||= {})[st] = h.tail; } // the hem swings on its own
-    else cache.belly[st] = belly; }
+    ...splitTops(Object.keys(P.top), top, fillers) };
   return cache;
 }

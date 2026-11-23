@@ -5,15 +5,21 @@ with keyboard + mouse, a gamepad or touch. Phase 2 track P (see `PLAN.md`).
 
 ## How to use
 
-Walk mode plays like an open-world third-person game: **click the world to capture the mouse**
-(Pointer Lock), then just move the mouse to look around, no button held. Esc frees the mouse
-(the browser's rule), Esc again opens the menu, M goes back to the map.
+Walk mode plays like an open-world third-person game. **Drag on the world to look around**; the
+cursor stays free, so every button on screen (Map, Play, the tour card, the menu) can be clicked
+straight away and Esc opens the menu. The mouse is held (Pointer Lock: just move it to look, no
+button) only in a match, where aiming needs it, or when the player turns on Settings > "Hold the
+mouse for looking"; then Esc frees it (the browser's rule) and Esc again opens the menu. M goes
+back to the map. (2026-11-23, owner: with the mouse always held, every button needed an Esc first,
+so people were stuck in an Esc, click, re-held, Esc loop.) The one rule is `input.mayLock`
+(player/index.js); every request for the lock goes through it, and a lock that is no longer
+allowed (a match ended, the setting switched off) is let go on the next frame.
 
 | Action | Keyboard + mouse | Gamepad (standard mapping) | Touch |
 |---|---|---|---|
 | Walk here (from the map) | F (point under the cursor) / double-click / "Walk here" button (screen centre) | A (screen centre) | double-tap |
-| Look (walk) | click once to capture the mouse, then move it; Q E turn | right stick (curve + turn boost) | drag on the right half |
-| Free the mouse | Esc | | |
+| Look (walk) | drag on the world (or, when the mouse is held, just move it); Q E turn | right stick (curve + turn boost) | drag on the right half |
+| Free the mouse | Esc (when it is held: in a match, or by the setting) | | |
 | Move (camera-relative) | W A S D / arrows | left stick | joystick (left half) |
 | Run | Shift | push the stick fully / LB | push the joystick fully |
 | Jump | Space | A | JUMP button |
