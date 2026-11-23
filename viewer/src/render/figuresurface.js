@@ -71,6 +71,8 @@ export function figureKindOf(key) {
 
 // painted looks: the figures' toy colours pulled a little toward the city's palette (less saturated,
 // a touch darker), so people belong to the scene instead of sitting on top of it
+// the manga look: louder than life (bold, saturated clothes and hair; skin warm)
+const MANGA_PALETTE = 'c = max(mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, 1.55), 0.0) * 1.04;';
 const FILM_PALETTE = 'c = mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, 0.8) * 0.94;';
 
 const CLOTH = `float fold = fNoise(vec3(p.x * 9.0, p.y * 3.5, p.z * 9.0));
@@ -215,7 +217,7 @@ export function figureMaterialFor(base, kind) {
     addPartVaryings(sh);
     sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} ${LOOK === 'manga' ? MANGA_FASHION[kind] || '' : ''}
-      ${FILM ? FILM_PALETTE : ''}
+      ${LOOK === 'manga' ? MANGA_PALETTE : FILM ? FILM_PALETTE : ''}
       diffuseColor.rgb = max(c, 0.0); }`); // (new lines: a // comment at the end of a block must not swallow the rest)
   };
   m.customProgramCacheKey = () => `figure:${kind}:${FILM ? 'film' : 'toy'}:${LOOK || ''}`;

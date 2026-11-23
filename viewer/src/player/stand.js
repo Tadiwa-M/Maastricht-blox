@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { outlineMaterial, OUTLINE_ON } from '../render/outline.js';
 
-export const STAND = { height: 2.4, behind: -0.35, side: 0.95, rise: 0.25, // beside the right shoulder, a little ahead (the camera is behind)
+export const STAND = { height: 2.9, behind: -0.35, side: 0.95, rise: 0.25, // beside the right shoulder, a little ahead (the camera is behind)
   rushS: 1.1, punchEvery: 0.07, reachM: 3.2, fadeIn: 5, fadeOut: 2.5 };
 
 function armourMat(colour, glow = 0) {
@@ -28,7 +28,16 @@ export class Stand {
     // a V-shaped torso of plates, a waist band, a helmet with a visor slit and a crest
     this.body.add(box(0.95, 0.55, 0.45, main, 0, H * 0.72, 0), box(0.62, 0.35, 0.38, dark, 0, H * 0.55, 0), box(0.7, 0.08, 0.42, gold, 0, H * 0.47, 0));
     this.body.add(box(0.42, 0.4, 0.42, main, 0, H * 0.92, 0), box(0.34, 0.06, 0.02, visor, 0, H * 0.93, -0.215), box(0.05, 0.22, 0.3, gold, 0, H * 1.03, 0.02));
-    for (const s of [-1, 1]) this.body.add(box(0.36, 0.2, 0.46, gold, s * 0.6, H * 0.84, 0)); // shoulder plates
+    for (const s of [-1, 1]) {
+      this.body.add(box(0.36, 0.2, 0.46, gold, s * 0.6, H * 0.84, 0)); // shoulder plates
+      for (let k = 0; k < 3; k++) { // spikes rising off each shoulder
+        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.32 - k * 0.06, 4), gold);
+        sp.position.set(s * (0.52 + k * 0.1), H * 0.84 + 0.2, 0.05 - k * 0.08); sp.rotation.z = -s * (0.35 + k * 0.2); this.body.add(sp);
+      }
+    }
+    for (let k = 0; k < 5; k++) { // a mane of plates down the back of the helmet
+      const m = box(0.36 - k * 0.04, 0.12, 0.08, dark, 0, H * 0.98 - k * 0.09, 0.22 + k * 0.03); m.rotation.x = 0.4 + k * 0.12; this.body.add(m);
+    }
     // the legs fade into a trail of plates (a Stand floats)
     for (let k = 0; k < 4; k++) this.body.add(box(0.5 - k * 0.1, 0.2, 0.32 - k * 0.05, dark, 0, H * 0.4 - k * 0.22, 0));
     // arms: shoulder pivots, so the rush can punch
@@ -52,8 +61,11 @@ export class Stand {
       for (const o of plates) { const l = new THREE.Mesh(o.geometry, outlineMaterial()); l.frustumCulled = false; o.add(l); this.lines = (this.lines || []).concat(l); }
     }
     scene.add(this.group);
-    this.k = 0; this.t = 0; this.rushT = 0; this.punchT = 0; this.mats = [main, dark, gold, visor];
+    this.k = 0; this.t = 0; this.rushT = 0; this.punchT = 0; this.pose = -1; this.mats = [main, dark, gold, visor];
   }
+
+  /** The pose the Stand strikes beside a posing user (0..4, follows the user's), or -1. */
+  setPose(k) { this.pose = k; }
 
   /** Throw a rush (if out of one). -> true when it started. */
   rush() { if (this.rushT > 0) return false; this.rushT = STAND.rushS; this.punchT = 0; return true; }
@@ -81,9 +93,19 @@ export class Stand {
     const solid = this.k > 0.97;
     for (const m of this.mats) { m.opacity = this.k; if (m.transparent === solid) { m.transparent = !solid; m.depthWrite = solid; m.needsUpdate = true; } }
     for (const l of this.lines || []) l.visible = solid;
-    this.aura.material.opacity = (0.1 + 0.05 * Math.sin(this.t * 5)) * this.k;
+    // the aura flickers like a flame and pulses
+    this.aura.material.opacity = (0.16 + 0.08 * Math.sin(this.t * 7) + 0.05 * Math.sin(this.t * 23)) * this.k;
+    this.aura.scale.set(0.95 + 0.08 * Math.sin(this.t * 9), STAND.height * 0.6 + 0.1 * Math.sin(this.t * 6), 0.7);
     // arms: at rest folded, in a rush a blur of punches
-    this.arms.forEach((a, i) => { a.rotation.x = rushing ? -1.4 + Math.sin(this.t * 38 + i * Math.PI) * 0.5 : -0.3; a.rotation.z = (i ? -1 : 1) * (rushing ? 0.1 : 0.35); });
+    // arms: in a rush a blur of punches; posing, a dramatic stance of its own; else arms crossed, menacing
+    const P = [[[-2.6, 0.5], [-0.4, -0.9]], [[-1.6, 0.2], [-1.6, -0.2]], [[-0.4, 1.2], [-0.4, -1.2]], [[-2.9, 0.1], [-0.2, -0.3]], [[-1.2, 0.9], [-2.4, -0.4]]];
+    this.arms.forEach((a, i) => {
+      let rx = -0.9, rz = (i ? -1 : 1) * 0.9; // crossed
+      if (rushing) { rx = -1.4 + Math.sin(this.t * 38 + i * Math.PI) * 0.5; rz = (i ? -1 : 1) * 0.1; }
+      else if (this.pose >= 0) { const q = P[this.pose % P.length][i]; rx = q[0]; rz = q[1]; }
+      a.rotation.x += (rx - a.rotation.x) * Math.min(1, dt * 10); a.rotation.z += (rz - a.rotation.z) * Math.min(1, dt * 10);
+    });
+    this.body.rotation.z = this.pose >= 0 && !rushing ? Math.sin(this.pose * 1.7) * 0.18 : 0; // leaning into the pose
     if (rushing) {
       this.rushT -= dt; this.punchT -= dt;
       if (this.punchT <= 0) {

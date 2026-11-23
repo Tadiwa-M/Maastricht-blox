@@ -29,12 +29,16 @@ export function setProportions(p) { Object.assign(PROPORTION, p); }
  * temple. The whole skeleton takes part.
  */
 export const STAND_POSES = [
-  { pelvisYaw: 0.35, chestYaw: -0.55, lean: -0.1, roll: 0.09, headYaw: 0.5, headPitch: 0.12, hip: [0.12, -0.18], knee: [-0.05, -0.35],
-    sh: [-0.3, 2.35], abd: [0.85, 0.55], elbow: [1.9, 2.1] }, // an arm across the face, the other hand on the hip
-  { pelvisYaw: -0.25, chestYaw: 0.45, lean: -0.05, roll: -0.07, headYaw: -0.35, headPitch: 0.05, hip: [0.3, -0.12], knee: [-0.4, -0.05],
-    sh: [0.25, 1.6], abd: [0.1, -0.15], elbow: [1.5, 0.05] }, // pointing out ahead, the other arm folded
-  { pelvisYaw: 0.15, chestYaw: -0.3, lean: -0.18, roll: 0.12, headYaw: 0.2, headPitch: 0.3, hip: [-0.05, 0.2], knee: [-0.15, -0.3],
-    sh: [2.6, -0.2], abd: [0.35, 0.7], elbow: [2.4, 1.6] }, // a hand at the temple, chin up, arched back
+  { pelvisYaw: 0.6, chestYaw: -0.9, lean: -0.32, roll: 0.16, headYaw: 0.7, headPitch: 0.3, hip: [0.25, -0.35], knee: [-0.1, -0.7],
+    sh: [-0.5, 2.9], abd: [1.1, 0.75], elbow: [2.2, 2.4] }, // arched back, an arm over the face, the other on the hip
+  { pelvisYaw: -0.5, chestYaw: 0.8, lean: -0.15, roll: -0.14, headYaw: -0.6, headPitch: 0.15, hip: [0.6, -0.3], knee: [-0.75, -0.1],
+    sh: [0.3, 1.9], abd: [0.2, -0.45], elbow: [1.7, 0.0] }, // a lunge, pointing far ahead
+  { pelvisYaw: 0.3, chestYaw: -0.55, lean: -0.38, roll: 0.2, headYaw: 0.35, headPitch: 0.5, hip: [-0.15, 0.35], knee: [-0.3, -0.55],
+    sh: [3.0, -0.3], abd: [0.6, 1.0], elbow: [2.6, 1.9] }, // a hand behind the head, chin up, leaning back
+  { pelvisYaw: -0.7, chestYaw: 1.0, lean: 0.25, roll: -0.18, headYaw: -0.9, headPitch: -0.15, hip: [0.4, 0.1], knee: [-0.9, -0.4],
+    sh: [1.4, 1.4], abd: [1.3, 1.3], elbow: [0.3, 0.3] }, // crouched and twisted, both arms flung wide
+  { pelvisYaw: 0.45, chestYaw: -0.7, lean: -0.2, roll: 0.22, headYaw: 0.8, headPitch: -0.1, hip: [0.1, -0.45], knee: [-0.2, -0.45],
+    sh: [2.4, 0.6], abd: [-0.2, 1.2], elbow: [2.5, 1.6] }, // fingers splayed across the face, the other arm crooked out
 ];
 export const SEAT_H = 0.46; // chair seat height (m)
 export const SADDLE = { h: 0.93, back: 0.17, bbH: 0.3, crank: 0.17 }; // bike: saddle height, saddle behind the bottom bracket
@@ -76,7 +80,7 @@ export function jointAngles(v, pose, out = {}) {
     }
     if (v.acc === 'bag') { out.sh[1] *= 0.3; out.elbow[1] = 0.1; } // the hand with the bag hangs
     if (PROPORTION.pose) { // the manga look: a looser, swaggering walk
-      out.chestYaw *= 1.9; out.pelvisYaw = (out.pelvisYaw || 0) * 1.6; out.pelvisRoll *= 1.5;
+      out.chestYaw *= 2.4; out.pelvisYaw = (out.pelvisYaw || 0) * 2.0; out.pelvisRoll *= 2.0; out.lean -= 0.06;
       for (let q = 0; q < 2; q++) { out.sh[q] *= 1.25; out.elbow[q] += 0.3; out.abd[q] += 0.06; }
       out.headYaw -= out.chestYaw * 0.4;
     }
@@ -150,7 +154,7 @@ const mix = (a, b, k) => a + (b - a) * k;
 /** Standing at ease (the manga look): weight on one hip, the free knee bent, a hand in a pocket, the chest turned against the hips, the head tilted. */
 function relaxed(out, seed, t) {
   const side = Math.sin(seed * 7.3) > 0 ? 1 : -1, b = 0.015 * Math.sin(t * 1.3 + seed);
-  out.pelvisRoll += 0.09 * side; out.pelvisYaw = (out.pelvisYaw || 0) + 0.18 * side; out.chestYaw = (out.chestYaw || 0) - 0.3 * side;
+  out.pelvisRoll += 0.13 * side; out.pelvisYaw = (out.pelvisYaw || 0) + 0.28 * side; out.chestYaw = (out.chestYaw || 0) - 0.45 * side;
   const free = side > 0 ? 0 : 1, pocket = side > 0 ? 1 : 0;
   out.knee[free] -= 0.32; out.hip[free] += 0.14; out.ankle[free] += 0.12;
   out.sh[pocket] = -0.12; out.abd[pocket] = 0.24; out.elbow[pocket] = 0.75; // a hand in the pocket

@@ -369,6 +369,7 @@ export function initPlayer(ctx) {
           { angVel: L.angVel, accel: L.accel, steer: L.steer, grounded: ctrl.grounded, vy: ctrl.vel[1] });
       }
       // the Stand shows while posing or aiming (and during a rush); each punch goes to the match, if any
+      if (stand) stand.setPose((character.poseK || 0) > 0.5 ? (character.poseN || 0) % 5 : -1);
       if (stand) stand.update(dt, drawFeet, character.aim?.yaw ?? ctrl.yaw, (character.poseK || 0) > 0.5 || (window.__bloxMp?.combat?.aim || 0) > 0.5,
         (at) => window.__bloxMp?.combat?.standPunch?.(at));
       // smooth the followed height (step-ups and landings), keep x/z exact

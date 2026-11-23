@@ -1027,3 +1027,10 @@ Found on the way: an injected shader block ending in a // comment swallowed the 
 the manga faces and the trouser prints had been failing to compile (fixed; blocks end with a new
 line). Checked in a standalone figure preview (front, three-quarter, close-up) and in the city.
 Open: still rigid segments (no bend through the spine), coat tails that swing, expressions.
+- (Owner: closer, but colouring off and poses and Stands not crazy enough.) Manga figures now get
+  louder colour (`MANGA_PALETTE`: +55 % saturation; the film's desaturation was making them pastel);
+  five far more extreme `STAND_POSES` (arched back with an arm over the face, a pointing lunge, a
+  hand behind the head leaning back, a crouched twist with arms flung wide, splayed fingers across
+  the face); crowd members strike them too (30 % of stops); a bigger walk swagger and stance. The
+  Stand: 2.9 m, spikes off the shoulders, a mane of plates, a flickering, pulsing aura, arms crossed
+  when idle and its own pose (and lean) matching the user's.
