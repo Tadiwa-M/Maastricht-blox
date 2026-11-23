@@ -15,7 +15,7 @@ export const XMAS = {
   extent: [62, 78], // the square: half-widths east-west, north-south searched for open ground (m)
   gift: { at: [40, -2], size: [8, 5.5, 7] }, // the giant lit gift box, by the east fence (the café side)
   maxTrees: 48,
-  wheel: { at: [-4, 20], r: 15, axle: 17, gondolas: 24, yaw: Math.PI / 2, turn: 0.035 }, // offsets east/north of the centre (m); yaw pi/2: facing east
+  wheel: { at: [-15, 15], r: 15, axle: 17, gondolas: 24, yaw: Math.PI / 2, turn: 0.035 }, // offsets east/north of the centre (m); yaw pi/2: facing east
   carousel: { at: [-30, -14], r: 6 },
   chalet: { w: 3.2, d: 2.4, h: 2.3 },
 };
@@ -37,6 +37,15 @@ export function chaletLayout(keep = () => true) {
     }
   }
   return out;
+}
+
+/** The gift's wire cage: its edges and a lattice over the sides and the top (line segments, origin on the ground). */
+function giftCage([w, h, d], step = 0.55) {
+  const p = [], seg = (a, b) => p.push(...a, ...b);
+  for (let x = -w / 2; x <= w / 2 + 1e-6; x += w / Math.round(w / step)) { seg([x, 0, -d / 2], [x, h, -d / 2]); seg([x, 0, d / 2], [x, h, d / 2]); seg([x, h, -d / 2], [x, h, d / 2]); }
+  for (let z = -d / 2; z <= d / 2 + 1e-6; z += d / Math.round(d / step)) { seg([-w / 2, 0, z], [-w / 2, h, z]); seg([w / 2, 0, z], [w / 2, h, z]); seg([-w / 2, h, z], [w / 2, h, z]); }
+  for (let y = 0; y <= h + 1e-6; y += h / Math.round(h / step)) { seg([-w / 2, y, -d / 2], [w / 2, y, -d / 2]); seg([-w / 2, y, d / 2], [w / 2, y, d / 2]); seg([-w / 2, y, -d / 2], [-w / 2, y, d / 2]); seg([w / 2, y, -d / 2], [w / 2, y, d / 2]); }
+  return new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
 }
 
 function wheelFrame(o) {
@@ -152,10 +161,16 @@ export class XmasMarket {
     this.eaveBulbs = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.07), glow(), spots.length * 10);
     const G = XMAS.gift;
     this.gift = new THREE.Group();
-    const giftMat = new THREE.MeshBasicMaterial({ color: '#c8202a', toneMapped: false }), band = new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false });
-    this.gift.add(new THREE.Mesh(new THREE.BoxGeometry(...G.size).translate(0, G.size[1] / 2, 0), giftMat));
-    this.gift.add(new THREE.Mesh(new THREE.BoxGeometry(G.size[0] + 0.1, G.size[1] + 0.1, 0.8).translate(0, G.size[1] / 2, 0), band));
-    this.gift.add(new THREE.Mesh(new THREE.BoxGeometry(0.8, G.size[1] + 0.1, G.size[2] + 0.1).translate(0, G.size[1] / 2, 0), band));
+    const giftMat = new THREE.MeshBasicMaterial({ color: '#c8202a', toneMapped: false }), band = new THREE.LineBasicMaterial({ color: '#ffffff', toneMapped: false }); // the cage's wire and light strings
+    // (owner's photos: a see-through cage of wire and light strings, the ribbon bands solid red)
+    this.gift.add(new THREE.LineSegments(giftCage(G.size), band));
+    { // the ribbon: 0.8 m strips round the outside of the cage (down each side, over the top), not slabs through it
+      const [w, h, d] = G.size, t = 0.12, R = 0.8, strips = [];
+      for (const sz of [-1, 1]) strips.push(new THREE.BoxGeometry(R, h, t).translate(0, h / 2, sz * d / 2));
+      for (const sx of [-1, 1]) strips.push(new THREE.BoxGeometry(t, h, R).translate(sx * w / 2, h / 2, 0));
+      strips.push(new THREE.BoxGeometry(R, t, d).translate(0, h, 0), new THREE.BoxGeometry(w, t, R).translate(0, h, 0));
+      this.gift.add(new THREE.Mesh(mergeGeometries(strips), giftMat));
+    }
     for (const s of [-1, 1]) this.gift.add(new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.18, 8, 24).rotateY(Math.PI / 2).translate(0, G.size[1] + 0.9, s * 1.0), giftMat));
     this.giftMats = [giftMat, band];
     this.treeBulbs = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.08), glow(), XMAS.maxTrees * 70);
