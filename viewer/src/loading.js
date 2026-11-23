@@ -44,10 +44,16 @@ export function loadState(s) {
 /**
  * Full screen on every device: hides the browser's address bar, tabs and the system navigation;
  * phones turn to landscape while full screen.
+ * On a desktop the Escape key is locked to the game while full screen (Keyboard Lock: Esc opens the
+ * menu, holding Esc leaves full screen); elsewhere Esc leaves full screen as usual.
  * Browsers only allow it from a tap or key press (the title screen's start). iPhones' Safari has
  * no full screen for pages; there, "Add to Home Screen" opens the game full screen
  * (game.webmanifest, apple-mobile-web-app-capable).
  */
+let escLocked = false;
+/** True while the game holds the Escape key (full screen, Keyboard Lock): an Esc press is the game's, not the browser's. */
+export const escapeIsOurs = () => escLocked;
+
 export function goFullscreen(doc = typeof document !== 'undefined' ? document : null) {
   const root = doc?.documentElement;
   if (!root?.requestFullscreen || doc.fullscreenElement) return;
@@ -55,6 +61,14 @@ export function goFullscreen(doc = typeof document !== 'undefined' ? document : 
     // phones play full screen in landscape (portrait stays for the normal browser view); only
     // allowed while full screen, released again when you leave it (back swipe, Esc)
     const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    // (owner: full screen and Esc fought) in full screen the browser keeps Esc to leave it, so Esc
+    // could not open the menu; with the Escape key locked (Chrome, Edge) a press goes to the game
+    // and holding Esc leaves full screen (the browser says so). Released with full screen.
+    if (!touch) navigator.keyboard?.lock?.(['Escape']).then(() => { escLocked = true; }, () => {});
+    doc.addEventListener('fullscreenchange', function freed() { // (the browser drops the key lock with full screen)
+      if (doc.fullscreenElement) return;
+      doc.removeEventListener('fullscreenchange', freed); escLocked = false;
+    });
     if (!touch || !screen.orientation?.lock) return;
     screen.orientation.lock('landscape').catch(() => {});
     doc.addEventListener('fullscreenchange', function off() {

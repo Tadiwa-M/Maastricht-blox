@@ -13,7 +13,11 @@ mouse for looking"; then Esc frees it (the browser's rule) and Esc again opens t
 back to the map. (2026-11-23, owner: with the mouse always held, every button needed an Esc first,
 so people were stuck in an Esc, click, re-held, Esc loop.) The one rule is `input.mayLock`
 (player/index.js); every request for the lock goes through it, and a lock that is no longer
-allowed (a match ended, the setting switched off) is let go on the next frame.
+allowed (a match ended, the setting switched off) is let go on the next frame. Full screen (Start, loading.js) on a desktop also
+locks the Escape key for the game (Keyboard Lock, Chrome and Edge): without it the browser keeps Esc
+to leave full screen, so Esc could never open the menu; now a press opens the menu and holding Esc
+leaves full screen (the browser shows that). While the key is locked a press with the mouse held
+frees the mouse itself (`escapeIsOurs`, input.js) and opens the menu.
 
 | Action | Keyboard + mouse | Gamepad (standard mapping) | Touch |
 |---|---|---|---|

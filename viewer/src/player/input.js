@@ -17,6 +17,7 @@
 // held: Set, pressed: Set (this frame) }.
 import { StickLook, mouseLook } from './look.js';
 import { SETTINGS_DEFAULTS } from './settings.js';
+import { escapeIsOurs } from '../loading.js';
 
 export const BINDINGS = {
   keys: {
@@ -178,8 +179,13 @@ export class Input {
     const typing = (e) => /^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName || '') && !/^(checkbox|range)$/.test(e.target.type);
     window.addEventListener('keydown', (e) => {
       if (typing(e)) return;
-      // the Esc that released the pointer lock is the browser's, not a menu press
-      if (e.code === 'Escape' && (this.locked || performance.now() - this.unlockedAt < 300)) return;
+      if (e.code === 'Escape') {
+        // full screen with the Escape key held for the game (loading.js): the browser did not free the
+        // mouse, so this is a menu press: free it here and let it through
+        if (this.locked && escapeIsOurs()) this.releaseLock();
+        // otherwise the Esc that released the pointer lock is the browser's, not a menu press
+        else if (this.locked || performance.now() - this.unlockedAt < 300) return;
+      }
       this.codes.add(e.code);
       if (!e.repeat) this.taps.add(e.code); // a tap shorter than a frame still counts once
       if (this.lookActive && /^(Space|Arrow)/.test(e.code)) e.preventDefault();
