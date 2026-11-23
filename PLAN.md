@@ -217,6 +217,16 @@ rebuild on the workstation, batched for the next one:
 Shared by all looks: window glazing bars, lamps and shop windows as real night lights, printed
 figure detail, tyre/rim/paint detail. Painted looks only: material textures, film materials.
 
+### Next worlds (backlog, owner 2026-11-23; not started)
+
+- **A world drawn by the owner's friend** (an artist): wait for the designs, then build the look,
+  its figures, vehicles and motion from them (the each-look-owns-its-people rule; mockup first).
+- **Stop-motion world** ("Fantastic Mr Blox", working title; owner: a stop-motion feel like that
+  film): animation stepped at ~12 fps with slight per-frame jitter, felt, fur and fabric surfaces
+  instead of plastic, miniature-set lighting (warm key, shallow depth of field, tilt-shift),
+  handmade figures with visible seams; its own cast and vehicles. The title riffs on a film's name:
+  fine as a working title, pick an original name before release.
+
 ## 4. Process (how we work)
 
 1. **Outline → tools → plan → phases**: this file.
