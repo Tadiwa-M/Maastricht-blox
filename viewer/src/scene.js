@@ -148,7 +148,13 @@ export class Stage {
     this.renderer.toneMappingExposure = L.exposure;
     if (this.post?.verse) { // the painted looks: a film's lighting, a stronger key against a coloured fill
       const manga = this.post.look === 'manga'; // (an anime background: a strong sun, deep shadow)
-      this.sun.intensity *= manga ? 1.35 : 1.15; this.hemi.intensity *= manga ? 0.6 : 0.78;
+      this.sun.intensity *= manga ? 1.35 : 1.15; this.hemi.intensity *= manga ? 0.88 : 0.78;
+      if (manga) { // (owner: grey roofs and the street went navy in shade: the blue sky fill was all that
+        // lit them, and the comic pass then read that tint as colour; the fill goes near neutral and
+        // the shader's own gentle violet sets the shade's tone)
+        this.hemi.color.lerp(new THREE.Color(0.86, 0.84, 0.82), 0.7 * (1 - n));
+        this.scene.environmentIntensity *= 0.7;
+      }
     }
     if (this.box) this.fitShadow();
     this.night = n;

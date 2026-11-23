@@ -169,11 +169,44 @@ const MANGA_FASHION = {
     // a gold chain across the chest and a pin
     float chain = fLine(p.y - 0.4 + p.x * 0.6, 0.008) * step(0.0, -p.z) * step(-0.14, p.x) * step(p.x, 0.14);
     c = mix(c, vec3(1.0, 0.78, 0.2) * (0.8 + 0.4 * step(0.5, fract(p.x * 90.0))), chain);
-    float pin = 1.0 - smoothstep(0.012, 0.016, length(vec2(p.x + 0.1, p.y - 0.46))); c = mix(c, vec3(0.95, 0.85, 0.3), pin * step(0.0, -p.z));`,
+    float pin = 1.0 - smoothstep(0.012, 0.016, length(vec2(p.x + 0.1, p.y - 0.46))); c = mix(c, vec3(0.95, 0.85, 0.3), pin * step(0.0, -p.z));
+    // muscles drawn through the cloth, as the manga inks them: the pecs' lower arcs, the sternum,
+    // a six-pack of short hatches, the obliques; on the back the shoulder blades
+    float mf = step(p.z, -0.02), mb = step(0.02, p.z);
+    vec2 pq = vec2(abs(p.x) - 0.062, p.y - 0.415);
+    float pec = fLine(pq.y + 0.035 - pq.x * pq.x * 7.0 - pq.x * 0.12, 0.0035) * step(-0.052, pq.x) * step(pq.x, 0.07) * mf; // a heavy line under each pec, rising to the armpit
+    float pecS = smoothstep(0.03, -0.02, pq.y + 0.045) * smoothstep(-0.075, -0.03, pq.y) * step(abs(p.x), 0.13) * mf; // the shadow under the pecs
+    float stern = fLine(p.x, 0.0025) * step(0.13, p.y) * step(p.y, 0.4) * mf;
+    float abY = fract((p.y - 0.13) / 0.062);
+    float abs6 = fLine(abY - 0.5, 0.05) * step(0.13, p.y) * step(p.y, 0.32) * step(0.008, abs(p.x)) * step(abs(p.x), 0.045) * mf;
+    float obl = fLine(abs(p.x) - 0.07 - (p.y - 0.12) * 0.25, 0.003) * step(0.1, p.y) * step(p.y, 0.3) * mf;
+    vec2 sb = vec2(abs(p.x) - 0.07, p.y - 0.38);
+    float blade = fLine(length(sb * vec2(1.4, 1.0)) - 0.055, 0.0035) * step(sb.x, 0.0) * mb;
+    c *= 1.0 - (pec * 0.55 + pecS * 0.22 + stern * 0.4 + abs6 * 0.4 + obl * 0.35 + blade * 0.4);`,
+  sleeve: `
+    // the deltoid's cut and the biceps' groove, inked; a highlight down the swell
+    float sf = step(p.z, 0.0);
+    float delt = fLine(p.y + 0.075 + p.x * p.x * 9.0 - p.z * 0.3, 0.0035) * step(-0.12, p.y);
+    float bic = fLine(p.x - 0.014 * sin(p.y * 22.0), 0.003) * step(-0.2, p.y) * step(p.y, -0.06) * sf;
+    float swell = exp(-pow((p.y + 0.11) / 0.05, 2.0)) * smoothstep(0.0, -0.04, p.z);
+    c *= 1.0 - delt * 0.45 - bic * 0.35 + swell * 0.12;`,
   legs: `
     float pick = fHash(vec3(floor(diffuseColor.r * 9.0), floor(diffuseColor.g * 9.0) + 3.0, floor(diffuseColor.b * 9.0)));
     if (pick < 0.3) c = mix(c, c * 0.35, fLine(abs(p.x) - 0.05, 0.012));                                // a racing stripe
-    else if (pick < 0.45) c = mix(c, mix(c, vec3(1.0), 0.5), step(0.5, fract((p.x + p.y) * 12.0)));     // diagonal print`,
+    else if (pick < 0.45) c = mix(c, mix(c, vec3(1.0), 0.5), step(0.5, fract((p.x + p.y) * 12.0)));     // diagonal print
+    // the quads' teardrop above the knee and the calf's curve behind
+    float quad = fLine(length(vec2(p.x + 0.025, (p.y + 0.33) * 0.55)) - 0.035, 0.003) * step(p.z, -0.01) * step(-0.38, p.y) * step(p.y, -0.24);
+    float calf = fLine(abs(p.x) - 0.02 - 0.02 * sin((p.y + 0.05) * 9.0), 0.003) * step(0.01, p.z) * step(-0.25, p.y) * step(p.y, -0.04);
+    c *= 1.0 - quad * 0.4 - calf * 0.3;`,
+  hair: `
+    // anime hair: two hard cel bands, inked strand cuts, and the bright highlight band around the crown
+    float ha = atan(p.x, p.z);
+    float band = 0.255 + 0.012 * cos(ha * 5.0);
+    c *= mix(0.6, 1.1, step(band - 0.02, p.y));                                       // shade below, lit crown above
+    float cut = fLine(fract(ha * 2.6 + p.y * 3.0) - 0.5, 0.03) * step(band, p.y);
+    c *= 1.0 - cut * 0.4;
+    float ring = (1.0 - smoothstep(0.008, 0.013, abs(p.y - band - 0.022))) * step(0.35, fract(ha * 2.4 + 0.2));
+    c = mix(c, mix(c, vec3(1.0), 0.7), ring);                                         // the highlight band, broken into dashes`,
   face: `
     // anime eyes: an almond of white, a dark iris with a highlight, a heavy upper lid line with a
     // flick at the outer corner, a thin lower line; the nose's shadow line; the jaw's shadow
@@ -185,11 +218,24 @@ const MANGA_FASHION = {
       float iris = 1.0 - smoothstep(0.0105, 0.0125, length(e - vec2(-float(s) * 0.003, 0.0)));
       c = mix(c, vec3(0.12, 0.08, 0.16), iris * (1.0 - smoothstep(0.9, 1.0, alm)) * front);
       c = mix(c, vec3(1.0), (1.0 - smoothstep(0.002, 0.003, length(e - vec2(-float(s) * 0.006, 0.004)))) * front);
-      float lid = (1.0 - smoothstep(0.0, 0.0042, abs(e.y - 0.014 * (1.0 - (e.x / 0.03) * (e.x / 0.03)) + 0.001))) * step(abs(e.x), 0.033 + 0.008 * step(0.0, e.x * float(s)));
+      float lid = (1.0 - smoothstep(0.0, 0.0058, abs(e.y - 0.014 * (1.0 - (e.x / 0.03) * (e.x / 0.03)) + 0.001))) * step(abs(e.x), 0.033 + 0.008 * step(0.0, e.x * float(s)));
       c = mix(c, vec3(0.05, 0.03, 0.07), lid * front);
       float low = (1.0 - smoothstep(0.0, 0.0016, abs(e.y + 0.013 * (1.0 - (e.x / 0.03) * (e.x / 0.03))))) * step(abs(e.x), 0.026);
       c = mix(c, c * 0.45, low * front);
+      float lash = fLine(e.y - 0.012 - (e.x * float(s) - 0.03) * 0.9, 0.0025) * step(0.028, e.x * float(s)) * step(e.x * float(s), 0.04);
+      c = mix(c, vec3(0.05, 0.03, 0.07), lash * front);                                 // the flick of the lashes
+      float bag = fLine(e.y + 0.02 + e.x * e.x * 8.0, 0.0014) * step(-0.018, e.x * float(s)) * step(e.x * float(s), 0.022);
+      c = mix(c, c * 0.6, bag * front);                                                 // the line under the eye
+      vec2 ck = vec2(e.x * float(s) - 0.012, e.y + 0.045);
+      float hatch = fLine(fract((ck.x - ck.y * 0.8) * 160.0) - 0.5, 0.18) * step(abs(ck.x), 0.016) * step(abs(ck.y), 0.008);
+      c = mix(c, c * vec3(0.62, 0.5, 0.66), hatch * front * 0.8);                       // cheekbone hatching
     }
+    float bridge = (1.0 - smoothstep(0.003, 0.007, abs(p.x + 0.013))) * step(0.16, p.y) * step(p.y, 0.205) * step(p.z, -0.05);
+    c = mix(c, c * vec3(0.7, 0.6, 0.75), bridge * 0.6);                                  // the nose bridge's shaded side
+    float under = (1.0 - smoothstep(0.0, 0.004, abs(p.y - 0.137 + abs(p.x) * 0.3))) * step(abs(p.x), 0.014) * step(p.z, -0.05);
+    c = mix(c, c * 0.5, under);                                                          // under the nose
+    float chin = fLine(p.y - 0.082 - p.x * p.x * 12.0, 0.002) * step(abs(p.x), 0.018) * step(p.z, -0.04);
+    c = mix(c, c * 0.62, chin);                                                          // the chin's crease
     float noseL = (1.0 - smoothstep(0.0, 0.003, abs(p.x - 0.008))) * step(0.135, p.y) * step(p.y, 0.175) * step(p.z, -0.05);
     c = mix(c, c * 0.6, noseL);
     float jaw = smoothstep(0.13, 0.08, p.y) * smoothstep(0.03, 0.08, abs(p.x)) * step(p.z, 0.02);

@@ -48,23 +48,35 @@ const spike = (at, dir, len = 0.11, r = 0.03, c = 1) => {
   g.translate(...at);
   return g;
 };
+// layers of locks at the back and sides of the head, so every style reads as sculpted, cut hair
+const nape = (n = 5, y = 0.2, len = 0.1) => Array.from({ length: n }, (_, k) => {
+  const a = (k / (n - 1) - 0.5) * 2.2; // spread around the back
+  return spike([Math.sin(a) * 0.085, y, Math.cos(a) * 0.085], [Math.sin(a) * 0.6, -1, Math.cos(a) * 0.7], len, 0.03);
+});
+const sideburns = () => [-1, 1].map((s) => spike([s * 0.098, 0.2, -0.03], [s * 0.15, -1, -0.2], 0.07, 0.018));
 function hair(style) {
   switch (style) {
-    case 'short': return merge([crown(), back(), // a swept-up pompadour: a big forward-curling volume
+    case 'short': return merge([crown(), back(), ...nape(5, 0.2, 0.09), ...sideburns(), // a swept-up pompadour: a big forward-curling volume
+      spike([-0.07, 0.3, -0.02], [-0.5, 0.6, 0.8], 0.1, 0.03), spike([0.07, 0.3, -0.02], [0.5, 0.6, 0.8], 0.1, 0.03),
+      spike([0, 0.38, -0.1], [0, 0.5, -1], 0.08, 0.035),
       place(sphere(0.07, 1, 14, 10), { at: [0, 0.32, -0.07], scale: [1.25, 0.85, 1.35], rot: [0.5, 0, 0] }),
       place(sphere(0.055, 1, 12, 8), { at: [0, 0.35, -0.12], scale: [1.15, 0.7, 1.1], rot: [0.9, 0, 0] })]);
-    case 'curly': return merge([crown(0.7), back(0.18), // a crown of spikes
+    case 'curly': return merge([crown(0.7), back(0.18), ...nape(6, 0.19, 0.1), // a crown of spikes
+      ...[[-0.03, 0.33, -0.08, -0.2, 0.8, -1], [0.03, 0.33, -0.08, 0.2, 0.8, -1], [0, 0.34, 0.0, 0, 1, 0]]
+        .map(([x, y, z, a, b, c]) => spike([x, y, z], [a, b, c], 0.1, 0.028)),
       ...[[0, 0.32, -0.04, 0, 1, -0.6], [-0.06, 0.31, -0.02, -0.5, 1, -0.4], [0.06, 0.31, -0.02, 0.5, 1, -0.4], [-0.09, 0.27, 0.03, -1, 0.6, 0.1],
         [0.09, 0.27, 0.03, 1, 0.6, 0.1], [0, 0.31, 0.05, 0, 1, 0.5], [-0.05, 0.3, 0.07, -0.5, 0.8, 0.7], [0.05, 0.3, 0.07, 0.5, 0.8, 0.7]]
         .map(([x, y, z, a, b, c]) => spike([x, y, z], [a, b, c], 0.12, 0.034))]);
-    case 'fringe': return merge([crown(), back(), // a long angular fringe swept across one eye
+    case 'fringe': return merge([crown(), back(), ...nape(5, 0.19, 0.11), ...sideburns(), // a long angular fringe swept across one eye
+      spike([-0.05, 0.28, -0.085], [-0.2, -1, -0.3], 0.09, 0.03), spike([0.0, 0.33, -0.05], [0.3, 0.9, -0.6], 0.08, 0.03),
       spike([0.04, 0.29, -0.09], [-0.6, -1, -0.3], 0.17, 0.045), spike([-0.01, 0.29, -0.095], [-0.4, -1, -0.25], 0.14, 0.04),
       spike([0.07, 0.27, -0.08], [-0.3, -1, -0.2], 0.11, 0.035)]);
-    case 'bob': return merge([crown(), // a sharp bob, spikes framing the face
+    case 'bob': return merge([crown(), ...nape(6, 0.15, 0.09), // a sharp bob, spikes framing the face
       place(rbox(0.232, 0.2, 0.17, 0.05, 1, 2), { at: [0, 0.2, 0.036] }),
       spike([-0.095, 0.22, -0.06], [-0.2, -1, -0.15], 0.11, 0.03), spike([0.095, 0.22, -0.06], [0.2, -1, -0.15], 0.11, 0.03),
       spike([0, 0.3, -0.1], [0, -0.6, -1], 0.08, 0.04)]);
-    case 'long': return merge([crown(), // long hair down the back, in locks
+    case 'long': return merge([crown(), ...nape(5, 0.08, 0.14), ...sideburns(), // long hair down the back, in locks
+      spike([-0.09, 0.18, -0.04], [-0.1, -1, -0.1], 0.16, 0.028), spike([0.09, 0.18, -0.04], [0.1, -1, -0.1], 0.16, 0.028),
       place(rbox(0.23, 0.38, 0.08, 0.035, 1, 2), { at: [0, 0.12, 0.078] }),
       spike([-0.07, 0.0, 0.08], [-0.15, -1, 0.2], 0.12, 0.035), spike([0.07, 0.0, 0.08], [0.15, -1, 0.2], 0.12, 0.035),
       spike([0, 0.29, -0.095], [0.3, -1, -0.3], 0.12, 0.035)]);
@@ -91,11 +103,13 @@ const D = 0.6;
 function top(style) {
   // a stand-up collar framing the neck, open at the front so the chin shows
   const collar = (h = 0.05, r = 0.07) => place(tint(new THREE.CylinderGeometry(r + 0.012, r, h, 16, 1, true, Math.PI * 0.25, Math.PI * 1.5), 1), { at: [0, 0.545 + h / 2, 0.012] });
+  // the pecs: two flattened swells on the chest, so the chest reads broad and heavy in profile
+  const pecs = (z) => [-1, 1].map((s) => place(sphere(0.066, 1, 12, 8), { at: [s * 0.058, 0.41, -z + 0.03], scale: [1.05, 0.72, 0.5], rot: [0.15, s * 0.25, 0] }));
   const lapel = (s) => place(rbox(0.05, 0.22, 0.02, 0.008, 0.82, 1), { at: [s * 0.06, 0.4, -0.1], rot: [0.1, 0, s * 0.35] });
   switch (style) {
-    case 'shirt': return merge([lathe(TORSO, { depth: D }), collar(0.035, 0.055),
+    case 'shirt': return merge([lathe(TORSO, { depth: D }), collar(0.035, 0.055), ...pecs(0.098),
       place(rbox(0.03, 0.2, 0.012, 0.005, 0.85, 1), { at: [0, 0.42, -0.097] })]); // an open V at the neck
-    case 'jacket': return merge([lathe([[0, -0.08], [0.15, -0.08], ...TORSO.slice(2)], { depth: D + 0.05, width: 1.06 }), collar(0.05, 0.068), lapel(-1), lapel(1),
+    case 'jacket': return merge([lathe([[0, -0.08], [0.15, -0.08], ...TORSO.slice(2)], { depth: D + 0.05, width: 1.06 }), collar(0.05, 0.068), lapel(-1), lapel(1), ...pecs(0.104),
       ...[0.28, 0.18, 0.08].map((y) => place(sphere(0.012, [1.3, 1.0, 0.3], 5, 4), { at: [-0.05, y, -0.11] }))]); // gold buttons
     case 'coat': return merge([ // a long open coat with a tall collar, flaring to the knee
       lathe([[0, -0.52], [0.22, -0.52], [0.19, -0.3], [0.16, -0.05], [0.14, 0.12], ...TORSO.slice(3)], { depth: D + 0.16, width: 1.08 }),
@@ -111,7 +125,8 @@ const hips = () => merge([lathe([[0, -0.12], [0.11, -0.13], [0.14, -0.05], [0.13
 // limbs: a shoulder ball, a deltoid and biceps swelling, a forearm muscle tapering to the wrist,
 // a thigh tapering to the knee, a calf to a slim ankle
 const upperArm = () => merge([limb([[0.055, 0.02], [0.062, -0.02], [0.056, -0.09], [0.05, -0.15], [0.04, -0.24], [0.036, -BODY.upperArm]]),
-  place(sphere(0.06, 1, 10, 7), { at: [0, -0.005, 0] })]);
+  place(sphere(0.066, 1, 12, 8), { at: [0, -0.01, 0] }), // the shoulder ball and a heavy deltoid cap over it
+  place(sphere(0.064, 1, 12, 8), { at: [0, -0.05, 0], scale: [1.08, 1.25, 1.02] })]);
 const foreArm = () => limb([[0.038, 0.02], [0.046, -0.05], [0.04, -0.13], [0.03, -0.21], [0.027, -BODY.foreArm]]);
 const hand = () => { // a palm and four slightly curled fingers and a thumb
   const parts = [place(rbox(0.06, 0.07, 0.03, 0.012, 1, 2), { at: [0, -0.04, 0] })];

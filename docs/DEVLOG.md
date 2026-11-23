@@ -1973,3 +1973,7 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Manga characters less stiff: shaped limbs and V torso in the geometry, relaxed contrapposto stance for everyone, looser walk, fuller hair (guide 06).
 - The manga look's own figure: an original anime build on the same joints (head, hair, anatomy, tailored clothes, hands), face drawn by shader; fixed a shader comment bug that broke manga faces and trouser prints (guide 06).
 - Manga: bolder figure colour, five extreme poses (crowd too), a bigger spiky Stand that poses with you (guide 06).
+
+## 2026-11-23
+- Manga figures: layered, sculpted hair with a cel underside and highlight band; more face detail (lashes, under-eye lines, cheekbone hatching, nose bridge, chin); muscles in the geometry (pecs, deltoids) and inked through the clothes (guide 06).
+- Manga shade no longer navy: a neutral sky fill in the manga look, a lighter, less blue shadow tint, saturation pushed only where a surface has colour (guide 06). Shadows stay dark.

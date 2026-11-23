@@ -1034,3 +1034,22 @@ Open: still rigid segments (no bend through the spine), coat tails that swing, e
   the face); crowd members strike them too (30 % of stops); a bigger walk swagger and stance. The
   Stand: 2.9 m, spikes off the shoulders, a mane of plates, a flickering, pulsing aura, arms crossed
   when idle and its own pose (and lean) matching the user's.
+- (Owner: their hair, faces and muscles too.) Hair: locks layered round the nape and sideburns on
+  every style, extra spikes on the pompadour and crown; the hair shader paints a shaded underside,
+  a lit crown, inked strand cuts and a broken white highlight band. Faces: thicker lids, a lash
+  flick, a line under each eye, cheekbone hatching, a shaded nose bridge, a shadow under the nose,
+  a chin crease. Muscles: pec swells and a heavier deltoid cap in the geometry; inked through the
+  clothes (`MANGA_FASHION` top, sleeve, legs) the line under each pec, the sternum, a six-pack, the
+  obliques, shoulder blades on the back, the deltoid cut and biceps groove, the quads' teardrop
+  and the calf.
+
+## Manga shade: dark, not navy (2026-11-23)
+
+Owner: everything a tad too dark and blue, roofs and the ground most. Cause: in shade only the
+sky fill lights a surface, and the fill was blue (hemisphere light and the sky environment), so
+grey stone arrived blue; the comic pass then read that tint as material colour and pushed it
+(saturation x1.6 and a blue split tone). Now, in the manga look only: the hemisphere fill is lerped
+70 % toward a warm neutral by day and is a little stronger, the environment 30 % weaker
+(`scene.js` setTime); in `manga()` the shadow is the material x (0.7, 0.68, 0.76), the saturation
+push scales with the surface's own chroma (x1.12 on grey, x1.55 on colour), the shade's blue tone
+is smaller and the solid ink starts darker. The shadows stay dark; grey reads grey-violet.
