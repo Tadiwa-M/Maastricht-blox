@@ -393,7 +393,11 @@ export function initPlayer(ctx) {
       // the manga look: a pose gets the manga's shot (camera.js drama): front three-quarter, low, looking up
       const wantDrama = !!PROPORTION.style?.poses && (character.poseK || 0) > 0.6 && !character.aim ? 1 : 0;
       follow.drama = (follow.drama || 0) + (wantDrama - (follow.drama || 0)) * Math.min(1, dt * (wantDrama ? 1.6 : 6));
-      follow.dramaYaw = ctrl.yaw + Math.PI + 0.55;
+      // the shot of the pose being struck (lookstyle.js STAND_POSES cam: yaw from straight in front of
+      // the figure); a slow drift round it keeps the frame alive
+      const poses = PROPORTION.style?.poses, cam = poses?.[(character.poseN || 0) % poses.length]?.cam || {};
+      follow.dramaYaw = ctrl.yaw + Math.PI + (cam.yaw ?? 0.55) + 0.06 * Math.sin(performance.now() / 3000);
+      follow.dramaShot = cam;
       if (!tween) {
         const { focus, position, fov } = follow.update(city, smoothFeet, dt, res.speed);
         setCamera(position, focus, fov);

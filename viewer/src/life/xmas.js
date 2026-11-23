@@ -1,5 +1,7 @@
-// The Christmas market on the Vrijthof (Magisch Maastricht; owner's photos of 21 November): a
-// white Ferris wheel on the south side in front of the Generaalshuis, rows of wooden chalets with
+// The Christmas market on the Vrijthof (Magisch Maastricht; owner's photos of 21 and 23 November): a
+// white Ferris wheel in the north half of the square, its face to the east (seen face-on from the
+// café side, right of the Sint-Servaas towers; right of Sint Jan's tower from the north-east corner),
+// the giant lit gift box by the east fence in line with Sint-Servaas, rows of wooden chalets with
 // red and brown roofs, a carousel with a striped tent roof, and while it is being built a fence of
 // printed banner panels round it all. Up the week before it opens (render/season.js market:
 // 'building' fenced off, 'open' lit at night, the wheel turning) until a few days after.
@@ -11,9 +13,9 @@ import { poolSources } from '../render/pools.js';
 export const XMAS = {
   centre: [176185, 317717], // Vrijthof, RD metres
   extent: [62, 78], // the square: half-widths east-west, north-south searched for open ground (m)
-  gift: { at: [-32, -26], size: [7, 5, 6] }, // the giant lit gift box beside the wheel
+  gift: { at: [40, -2], size: [8, 5.5, 7] }, // the giant lit gift box, by the east fence (the café side)
   maxTrees: 48,
-  wheel: { at: [-6, -38], r: 15, axle: 17, gondolas: 24, yaw: 0.6, turn: 0.035 }, // offsets east/north of the centre (m)
+  wheel: { at: [-4, 20], r: 15, axle: 17, gondolas: 24, yaw: Math.PI / 2, turn: 0.035 }, // offsets east/north of the centre (m); yaw pi/2: facing east
   carousel: { at: [-30, -14], r: 6 },
   chalet: { w: 3.2, d: 2.4, h: 2.3 },
 };
@@ -27,7 +29,7 @@ export function chaletLayout(keep = () => true) {
   const out = [], C = XMAS.chalet, [ex, ez] = XMAS.extent;
   const clear = (x, z) => Math.hypot(x - XMAS.wheel.at[0], z - XMAS.wheel.at[1]) > 14
     && Math.hypot(x - XMAS.carousel.at[0], z - XMAS.carousel.at[1]) > XMAS.carousel.r + 4
-    && Math.hypot(x - XMAS.gift.at[0], z - XMAS.gift.at[1]) > 7;
+    && Math.hypot(x - XMAS.gift.at[0], z - XMAS.gift.at[1]) > 8;
   for (let x = -ex + 4, k = 0; x <= ex - 4; x += C.d * 2 + 4.6, k++) {
     for (const side of [-1, 1]) {
       const cx = x + side * C.d / 2, yaw = side < 0 ? -Math.PI / 2 : Math.PI / 2; // backs together, counters to the aisles

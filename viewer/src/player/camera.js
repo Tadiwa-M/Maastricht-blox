@@ -40,6 +40,9 @@ export function fitFov(vfov, aspect, { minHfov = 62, maxVfov = 78 } = {}) {
 export function shoulderScale(aspect) { return Math.min(1, Math.max(0.35, aspect / 1.3)); }
 
 /** Unit vector from the focus to the camera (three.js axes) for a look yaw/pitch. */
+/** The posing shot when a pose names none: low (pitch rad), close (m), wider (fov deg added), the focus lowered (m). */
+export const DRAMA_SHOT = { pitch: -0.26, dist: 3.1, fov: 8, y: -0.4 };
+
 export function backDir(yaw, pitch) {
   const c = Math.cos(pitch);
   return [-Math.sin(yaw) * c, Math.sin(pitch), Math.cos(yaw) * c];
@@ -125,13 +128,14 @@ export class FollowCamera {
     this.trail[1] = feet[1];
     this.sprint += (Math.min(1, Math.max(0, (speed - o.sprintFrom) / 2)) - this.sprint) * Math.min(1, dt * 3);
     this.fov = fitFov(o.fov + o.sprintFov * this.sprint, this.aspect);
-    // the manga look's posing shot (drama 0..1, set by index.js): swung round to the front three-quarter
-    // (dramaYaw), low and looking up, closer and a little wider, the way the manga frames a pose
-    const dr = this.drama || 0;
+    // the manga look's posing shot (drama 0..1, set by index.js): swung round to dramaYaw, low and
+    // looking up, closer and wider, the way the manga frames a pose; each pose has its own shot
+    // (dramaShot: pitch, dist, fov added, focus height: figure/lookstyle.js STAND_POSES cam)
+    const dr = this.drama || 0, shot = { ...DRAMA_SHOT, ...this.dramaShot };
     const yawU = dr ? this._yaw + wrapAngle(this.dramaYaw - this._yaw) * dr : this._yaw;
-    const pitchU = this._pitch + (-0.26 - this._pitch) * dr, wantU = this._want + (3.1 - this._want) * dr;
-    this.fov += 8 * dr;
-    const head = [this.trail[0], this.trail[1] + o.focusY - 0.4 * dr, this.trail[2]];
+    const pitchU = this._pitch + (shot.pitch - this._pitch) * dr, wantU = this._want + (shot.dist - this._want) * dr;
+    this.fov += shot.fov * dr;
+    const head = [this.trail[0], this.trail[1] + o.focusY + shot.y * dr, this.trail[2]];
     // over the right shoulder, unless a wall is there
     const right = [Math.cos(yawU), 0, Math.sin(yawU)];
     const sh = o.shoulder * shoulderScale(this.aspect);

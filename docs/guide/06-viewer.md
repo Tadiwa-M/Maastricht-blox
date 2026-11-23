@@ -1176,3 +1176,15 @@ Measured, hardware-independent (headless, software GPU, so no FPS): a street at 
 mostly hidden behind the street at walking height. Medium/Manga: 508 calls, 9.9 M triangles (the
 depth pass and ink outlines draw figures and vehicles again). Per figure: Classic 4.7k, Manga
 7.5k, Spider-Verse 5.6k triangles. Real frame times need the owner's hardware.
+
+## Spider-Verse run, the Vrijthof, posing shots (2026-11-23, later)
+
+- Spider-Verse walk (`lookstyle.js verseWalk`): the swagger (dip, lean back, rolling shoulders, loose
+  arms, knees out) is weighted by walking pace and gone by 3.2 m/s; a run leans forward 0.16 rad with
+  the elbows bent (+0.55) instead (owner: the run looked goofy: lean back, straight arms, bow legs).
+- Vrijthof market (`life/xmas.js`), from the owner's photos: Sint-Servaas is on the west side and
+  Sint Jan to the south-west; from the café side (east) the wheel stands face-on right of the
+  Servaas towers, from the north-east corner right of Sint Jan's tower: the wheel is in the north half
+  facing east (at [-4, 20], yaw pi/2), the gift box by the east fence (at [40, -2]).
+- Posing shots: each of `STAND_POSES` has a `cam` (yaw from straight in front, pitch, distance, fov
+  added, focus height) that player/camera.js uses for the manga posing shot, with a slow drift.
