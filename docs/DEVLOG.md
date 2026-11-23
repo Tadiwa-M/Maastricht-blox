@@ -1977,3 +1977,5 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 ## 2026-11-23
 - Manga figures: layered, sculpted hair with a cel underside and highlight band; more face detail (lashes, under-eye lines, cheekbone hatching, nose bridge, chin); muscles in the geometry (pecs, deltoids) and inked through the clothes (guide 06).
 - Manga shade no longer navy: a neutral sky fill in the manga look, a lighter, less blue shadow tint, saturation pushed only where a surface has colour (guide 06). Shadows stay dark.
+- Manga poses rebuilt around the legs: leg spread/cross and twist joints, the pelvis sinks so feet stay planted; five new stances (guide 06).
+- The Spider-Verse look gets its own figure (`figure/verseparts.js`, streetwear builds from the owner-approved mockup) and a bouncing street swagger walk (guide 06).

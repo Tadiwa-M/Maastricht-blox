@@ -10,6 +10,7 @@ import { poseFigure, jointAngles, MODE } from './rig.js';
 import { FIGURE_LOOK, figureKindOf, figureMaterialFor, mangaShape } from '../render/figuresurface.js';
 import { OUTLINE_ON, outlineFor } from '../render/outline.js';
 import { ANIME_PARTS } from './animeparts.js';
+import { VERSE_PARTS } from './verseparts.js';
 import { LOOK } from '../render/verse.js';
 
 const LIMBS = { hips: 1, upperArm: 2, foreArm: 2, hand: 2, thigh: 2, shin: 2, shoe: 2, head: 1, 'lo:upperArm': 2, 'lo:foreArm': 2, 'lo:thigh': 2, 'lo:shin': 2 };
@@ -46,7 +47,7 @@ export class FigureCrowd {
     this.material = material || figureMaterial({ clippingPlanes });
     this.group = new THREE.Group();
     this.group.name = 'figures';
-    const P = LOOK === 'manga' ? ANIME_PARTS() : FIGURE_PARTS(); // the manga look's own figure (figure/animeparts.js)
+    const P = LOOK === 'manga' ? ANIME_PARTS() : LOOK === 'verse' ? VERSE_PARTS() : FIGURE_PARTS(); // each painted look's own figure (animeparts.js, verseparts.js)
     const geos = { ...Object.fromEntries(Object.keys(LIMBS).map((k) => [k, P[k]])) };
     for (const s of HAIR_STYLES) geos[`hair:${s}`] = P.hair[s];
     for (const s of TOP_STYLES) geos[`top:${s}`] = P.top[s];

@@ -18,6 +18,7 @@ import { addPartVaryings } from './pools.js';
 // every look gets the printed detail; the painted looks also the film materials (matte cloth, skin sheen)
 export const FIGURE_LOOK = typeof location !== 'undefined';
 // the manga look: the heroic build of that world (figure/rig.js PROPORTION)
+if (LOOK === 'verse') setProportions({ shoulder: 1.06, chest: 1.0, waist: 0.9, leg: 1.16, head: 0.98, arm: 1.1, swag: true }); // lanky, swaggering
 if (LOOK === 'manga') setProportions({ shoulder: 1.12, chest: 1.06, waist: 0.95, leg: 1.1, head: 0.9, arm: 1.05, pose: true }); // (the anime figure carries most of the build itself)
 const FILM = PAINTED_LOOK;
 
@@ -157,6 +158,7 @@ const KIND = {
 // trousers gets a bold printed pattern picked from where the figure stands (stripes, zigzags,
 // hearts, checks, a solid with a contrast panel), tops a gold chain across the chest and a pin;
 // faces heavy brows and a dark ink shadow under them, coloured lips. In the part's own space.
+// (the Spider-Verse figure borrows the drawn face: its graphic head needs real eyes, brows and a mouth)
 const MANGA_FASHION = {
   top: `
     float pick = fHash(vec3(floor(diffuseColor.r * 9.0), floor(diffuseColor.g * 9.0), floor(diffuseColor.b * 9.0))); // per outfit colour: the same print on a whole top
@@ -262,7 +264,7 @@ export function figureMaterialFor(base, kind) {
   m.onBeforeCompile = (sh) => {
     addPartVaryings(sh);
     sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-      { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} ${LOOK === 'manga' ? MANGA_FASHION[kind] || '' : ''}
+      { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} ${LOOK === 'manga' ? MANGA_FASHION[kind] || '' : LOOK === 'verse' && kind === 'face' ? MANGA_FASHION.face : ''}
       ${LOOK === 'manga' ? MANGA_PALETTE : FILM ? FILM_PALETTE : ''}
       diffuseColor.rgb = max(c, 0.0); }`); // (new lines: a // comment at the end of a block must not swallow the rest)
   };

@@ -19,7 +19,7 @@ export const IDLE = { NONE: 0, PHONE: 1, TALK: 2, LOOK: 3, HIPS: 4, POSE: 5 };
  * smaller head. Shared by every figure; standing and walking only (seats and saddles keep the
  * plain legs so feet stay on pedals and floors).
  */
-export const PROPORTION = { shoulder: 1, chest: 1, waist: 1, leg: 1, head: 1, arm: 1, pose: false }; // pose: the player strikes a stand-your-ground pose when still
+export const PROPORTION = { shoulder: 1, chest: 1, waist: 1, leg: 1, head: 1, arm: 1, pose: false, swag: false }; // swag: the Spider-Verse look's bouncing street swagger // pose: the player strikes a stand-your-ground pose when still
 export function setProportions(p) { Object.assign(PROPORTION, p); }
 
 /**
@@ -28,17 +28,20 @@ export function setProportions(p) { Object.assign(PROPORTION, p); }
  * twisted against the hips, the neck bent, an arm across the face, a pointing hand, a hand at the
  * temple. The whole skeleton takes part.
  */
+// legs (owner: the poses must be dramatic in the legs too): legAbd spreads a leg out (+) or pinches
+// the knee in across the body (-), legYaw turns the knee out (+) or in (-); the pelvis sinks so the
+// lowest foot stays on the ground however deep the knees bend
 export const STAND_POSES = [
-  { pelvisYaw: 0.6, chestYaw: -0.9, lean: -0.32, roll: 0.16, headYaw: 0.7, headPitch: 0.3, hip: [0.25, -0.35], knee: [-0.1, -0.7],
-    sh: [-0.5, 2.9], abd: [1.1, 0.75], elbow: [2.2, 2.4] }, // arched back, an arm over the face, the other on the hip
-  { pelvisYaw: -0.5, chestYaw: 0.8, lean: -0.15, roll: -0.14, headYaw: -0.6, headPitch: 0.15, hip: [0.6, -0.3], knee: [-0.75, -0.1],
-    sh: [0.3, 1.9], abd: [0.2, -0.45], elbow: [1.7, 0.0] }, // a lunge, pointing far ahead
-  { pelvisYaw: 0.3, chestYaw: -0.55, lean: -0.38, roll: 0.2, headYaw: 0.35, headPitch: 0.5, hip: [-0.15, 0.35], knee: [-0.3, -0.55],
-    sh: [3.0, -0.3], abd: [0.6, 1.0], elbow: [2.6, 1.9] }, // a hand behind the head, chin up, leaning back
-  { pelvisYaw: -0.7, chestYaw: 1.0, lean: 0.25, roll: -0.18, headYaw: -0.9, headPitch: -0.15, hip: [0.4, 0.1], knee: [-0.9, -0.4],
-    sh: [1.4, 1.4], abd: [1.3, 1.3], elbow: [0.3, 0.3] }, // crouched and twisted, both arms flung wide
-  { pelvisYaw: 0.45, chestYaw: -0.7, lean: -0.2, roll: 0.22, headYaw: 0.8, headPitch: -0.1, hip: [0.1, -0.45], knee: [-0.2, -0.45],
-    sh: [2.4, 0.6], abd: [-0.2, 1.2], elbow: [2.5, 1.6] }, // fingers splayed across the face, the other arm crooked out
+  { pelvisYaw: -0.55, chestYaw: 0.75, lean: -0.22, roll: -0.3, headYaw: -0.55, headPitch: 0.1, hip: [-0.3, 0.75], knee: [-0.15, -1.15],
+    legAbd: [0.28, -0.22], legYaw: [0.35, -0.4], sh: [0.1, 1.55], abd: [0.35, 0.05], elbow: [0.3, 0.05] }, // the accusation: weight thrown back on a straight leg, the front knee driving across, an arm aimed straight out
+  { pelvisYaw: 0.7, chestYaw: -1.05, lean: -0.18, roll: 0.13, headYaw: 0.75, headPitch: -0.35, hip: [0.55, -0.1], knee: [-1.0, -0.2],
+    legAbd: [-0.3, 0.12], legYaw: [-0.45, 0.2], sh: [3.05, 0.9], abd: [0.25, -0.5], elbow: [2.0, 2.3] }, // the twist: an arm thrown over the head, hips cocked hard, knees pinched in
+  { pelvisYaw: -0.4, chestYaw: 0.9, lean: 0.18, roll: -0.12, headYaw: -0.7, headPitch: 0.2, hip: [1.05, -0.55], knee: [-1.45, -0.25],
+    legAbd: [0.4, 0.35], legYaw: [0.4, 0.5], sh: [0.4, 2.2], abd: [0.3, -0.3], elbow: [1.6, 0.1] }, // the deep lunge, wide, pointing up and ahead
+  { pelvisYaw: 0.35, chestYaw: -0.8, lean: -0.48, roll: 0.24, headYaw: 0.6, headPitch: 0.55, hip: [0.2, -0.12], knee: [-0.35, -0.1],
+    legAbd: [-0.32, -0.26], legYaw: [-0.2, 0.3], sh: [-0.4, 2.7], abd: [1.1, 0.6], elbow: [2.1, 2.5] }, // legs crossed at the shin, arched back, a hand splayed across the face
+  { pelvisYaw: -0.8, chestYaw: 1.1, lean: 0.35, roll: -0.2, headYaw: -0.95, headPitch: -0.2, hip: [1.3, 0.35], knee: [-2.0, -1.0],
+    legAbd: [0.5, 0.3], legYaw: [0.6, 0.2], sh: [1.5, 1.3], abd: [1.4, 1.3], elbow: [0.4, 0.4] }, // a crouch on one heel, twisted, both arms flung wide
 ];
 export const SEAT_H = 0.46; // chair seat height (m)
 export const SADDLE = { h: 0.93, back: 0.17, bbH: 0.3, crank: 0.17 }; // bike: saddle height, saddle behind the bottom bracket
@@ -66,7 +69,7 @@ export function jointAngles(v, pose, out = {}) {
   const mode = pose.mode ?? MODE.WALK;
   out.pelvisY = BODY.pelvisY; out.bob = 0; out.lean = v.stoop; out.headPitch = v.stoop * 0.7; out.headYaw = pose.look || 0; // positive pitch = chin up
   set2(out, 'hip', 0, 0); set2(out, 'knee', -0.04, -0.04); set2(out, 'ankle', 0.04, 0.04);
-  set2(out, 'sh', 0, 0); set2(out, 'abd', 0.07, 0.07); set2(out, 'elbow', 0.12, 0.12);
+  set2(out, 'sh', 0, 0); set2(out, 'abd', 0.07, 0.07); set2(out, 'elbow', 0.12, 0.12); set2(out, 'legAbd', 0, 0); set2(out, 'legYaw', 0, 0);
   out.pelvisYaw = 0; out.chestYaw = 0; out.pelvisRoll = 0;
   if (mode === MODE.WALK) { // motion-captured gait (gait.js), blended walk -> run by speed
     const speed = (pose.speed ?? 1.2) * (v.kind === 'older' ? 0.8 : 1);
@@ -83,6 +86,14 @@ export function jointAngles(v, pose, out = {}) {
       out.chestYaw *= 2.4; out.pelvisYaw = (out.pelvisYaw || 0) * 2.0; out.pelvisRoll *= 2.0; out.lean -= 0.06;
       for (let q = 0; q < 2; q++) { out.sh[q] *= 1.25; out.elbow[q] += 0.3; out.abd[q] += 0.06; }
       out.headYaw -= out.chestYaw * 0.4;
+    }
+    if (PROPORTION.swag) { // the Spider-Verse look: a bouncing street swagger: a deep dip on every step,
+      // shoulders rolling, leaning back, loose arms hanging wide, the head nodding to the beat, a wide step
+      const ph = pose.phase || 0, step = Math.sin(ph * 2);
+      out.bob = out.bob * 1.8 - 0.035 * Math.max(0, -step); out.lean -= 0.17;
+      out.chestYaw *= 3.0; out.pelvisRoll = out.pelvisRoll * 2.6 + 0.06 * Math.sin(ph); out.pelvisYaw = (out.pelvisYaw || 0) * 2.2;
+      for (let q = 0; q < 2; q++) { out.sh[q] *= 0.8; out.elbow[q] = 0.5 + 0.3 * Math.max(0, out.sh[q]); out.abd[q] += 0.2 + 0.1 * Math.sin(ph + q * Math.PI); out.legAbd[q] = 0.09; out.legYaw[q] = 0.25; out.knee[q] -= 0.22; out.hip[q] += 0.08; }
+      out.headPitch += 0.09 * Math.max(0, step) - 0.05; out.headYaw -= out.chestYaw * 0.5;
     }
   } else if (mode === MODE.IDLE || mode === MODE.BROWSE) {
     // standing: breathing, the weight shifting slowly from one leg to the other, the head wandering
@@ -185,7 +196,14 @@ function idleAct(kind, k, t, out) {
     out.pelvisYaw = mix(out.pelvisYaw, P.pelvisYaw, k); out.chestYaw = mix(out.chestYaw, P.chestYaw, k);
     out.lean = mix(out.lean, P.lean + b, k); out.pelvisRoll = mix(out.pelvisRoll, P.roll, k);
     out.headYaw = mix(out.headYaw, P.headYaw, k); out.headPitch = mix(out.headPitch, P.headPitch, k);
-    for (const key of ['hip', 'knee', 'sh', 'abd', 'elbow']) for (let q = 0; q < 2; q++) out[key][q] = mix(out[key][q], P[key][q], k);
+    for (const key of ['hip', 'knee', 'sh', 'abd', 'elbow', 'legAbd', 'legYaw']) for (let q = 0; q < 2; q++) out[key][q] = mix(out[key][q], (P[key] || [0, 0])[q], k);
+    // sink the pelvis so the lowest foot stays planted; feet flat on the ground
+    let reach = 0;
+    for (let q = 0; q < 2; q++) {
+      reach = Math.max(reach, (BODY.thigh * Math.cos(out.hip[q]) + BODY.shin * Math.cos(out.hip[q] + out.knee[q])) * Math.cos(out.legAbd[q]));
+      out.ankle[q] = mix(out.ankle[q], -(out.hip[q] + out.knee[q]), k);
+    }
+    out.pelvisY -= (BODY.thigh + BODY.shin - reach) * k;
   } else if (kind === IDLE.HIPS) { // hands on the hips, waiting
     for (let q = 0; q < 2; q++) { out.sh[q] = mix(out.sh[q], -0.25, k); out.abd[q] = mix(out.abd[q], 0.55, k); out.elbow[q] = mix(out.elbow[q], 1.45, k); }
     out.headYaw *= 1 + 0.6 * k;
@@ -193,7 +211,7 @@ function idleAct(kind, k, t, out) {
 }
 
 const IDLE_J = {};
-const PAIRS = ['hip', 'knee', 'ankle', 'sh', 'abd', 'elbow'];
+const PAIRS = ['hip', 'knee', 'ankle', 'sh', 'abd', 'elbow', 'legAbd', 'legYaw'];
 
 /**
  * Optional motion layer (the player; crowds leave these unset): pose.blend 0..1 mixes the idle
@@ -317,7 +335,8 @@ export function poseFigure(v, pose, emit, J = jointAngles(v, pose), lo = false) 
       // umbrellas show at any distance (rain is visible from afar), bags only near
       emit(K.acc, root(M[9], hand[12], hand[13], hand[14], pose.rotY || 0, s), 'acc');
     }
-    const thigh = rx(tr(copy(M[6], pelvis), sg * BODY.hipX * w * PR.waist, 0, 0), J.hip[q]);
+    const la = J.legAbd ? J.legAbd[q] : 0, ly = J.legYaw ? J.legYaw[q] : 0; // spread / cross, knee out / in
+    const thigh = rx(rz(ry(tr(copy(M[6], pelvis), sg * BODY.hipX * w * PR.waist, 0, 0), -sg * ly), sg * la), J.hip[q]);
     emit(lo ? 'lo:thigh' : 'thigh', leg === 1 ? thigh : sc(copy(T1, thigh), 1, leg, 1), 'bottom');
     const shin = rx(tr(copy(M[7], thigh), 0, -BODY.thigh * leg, 0), J.knee[q]);
     emit(lo ? 'lo:shin' : 'shin', leg === 1 ? shin : sc(copy(T1, shin), 1, leg, 1), 'bottom');

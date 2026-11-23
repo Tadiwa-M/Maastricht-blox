@@ -1053,3 +1053,24 @@ grey stone arrived blue; the comic pass then read that tint as material colour a
 (`scene.js` setTime); in `manga()` the shadow is the material x (0.7, 0.68, 0.76), the saturation
 push scales with the surface's own chroma (x1.12 on grey, x1.55 on colour), the shade's blue tone
 is smaller and the solid ink starts darker. The shadows stay dark; grey reads grey-violet.
+
+## Dramatic legs, and the Spider-Verse look's own figure (2026-11-23)
+
+Owner: the manga poses were still not dramatic enough, "look at the legs" (pose references: a
+pointing stance with the weight thrown back and the front knee driving across; an arm thrown
+over the head with the hips cocked and the knees pinched); each look's people should belong to
+it; the Spider-Verse builds from the mockup were liked; their walk wants an exaggerated teenage
+street swagger.
+- Legs: the skeleton gains `legAbd` (a leg spread out, or the knee pinched in across the body)
+  and `legYaw` (the knee turned out or in), blended like the other joints. In a stand-your-ground
+  pose the pelvis sinks so the lowest foot stays planted and the feet are flat, so deep knee bends
+  read as stances instead of floating. Five new `STAND_POSES` built around the legs: the
+  accusation, the twist, the deep lunge, crossed shins with an arched back, the crouch on one heel.
+- `figure/verseparts.js` `VERSE_PARTS()`: the Spider-Verse look's figure on the same joints and
+  keys (crowd.js picks it as it picks the anime one for manga): faceted graphic heads with a
+  square jaw, streetwear (an oversized hoodie with headphones, a quilted puffer, a parka with a fur
+  hood, a cropped track jacket over a pleated skirt), baggy sleeves and cargos bunched at wrist
+  and ankle, chunky high-tops, big mitt hands, its own hair styles. It borrows the drawn face.
+- `PROPORTION.swag` (verse): lanky proportions and a bouncing swagger walk: a dip on every step,
+  leaning back, shoulders rolling, loose wide arms, the head nodding on the beat, a wide step.
+Open: the verse figure's own face design; a stepped (on-twos) animation for the verse look.
