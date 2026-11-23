@@ -19,7 +19,7 @@ import { addPartVaryings } from './pools.js';
 export const FIGURE_LOOK = typeof location !== 'undefined';
 // the manga look: the heroic build of that world (figure/rig.js PROPORTION)
 if (LOOK === 'verse') setProportions({ shoulder: 1.06, chest: 1.0, waist: 0.9, leg: 1.16, head: 0.98, arm: 1.1, swag: true }); // lanky, swaggering
-if (LOOK === 'manga') setProportions({ shoulder: 1.12, chest: 1.06, waist: 0.95, leg: 1.1, head: 0.9, arm: 1.05, pose: true }); // (the anime figure carries most of the build itself)
+if (LOOK === 'manga') setProportions({ shoulder: 1.12, chest: 1.06, waist: 0.92, leg: 1.17, head: 0.9, arm: 1.05, pose: true }); // (the anime figure carries most of the build itself)
 const FILM = PAINTED_LOOK;
 
 /**

@@ -1074,3 +1074,14 @@ street swagger.
 - `PROPORTION.swag` (verse): lanky proportions and a bouncing swagger walk: a dip on every step,
   leaning back, shoulders rolling, loose wide arms, the head nodding on the beat, a wide step.
 Open: the verse figure's own face design; a stepped (on-twos) animation for the verse look.
+- (Owner, with a standing-pose reference: even standing still the manga stance is dramatic; it is
+  the flexibility.) New bend points in the skeleton: `hipShift` (the pelvis pushed sideways),
+  `waistRoll` (a side bend at the waist, so hips and shoulders tilt opposite ways), `shY` (each
+  shoulder raised or dropped), `headRoll` (the neck tilted), `wrist`; the shoe undoes the leg
+  spread so soles stay flat; `ground()` sinks the pelvis so the lowest foot is planted (spread
+  legs, deep knees, a tilted pelvis). The manga default stance (`relaxed`) is now an S through the
+  whole body: a wide stance with the feet turned out, the weight on one straight leg with that hip
+  pushed out and up, the shoulders counter-tilted, chin down, head tilted, one hand up at the brow
+  (or in a pocket), the other hanging in a loose fist; longer legs (leg 1.17).
+  Open: a real S through the trunk needs the torso split in two (abdomen and chest); coat tails
+  that flare.

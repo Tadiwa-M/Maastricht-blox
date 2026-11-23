@@ -69,7 +69,8 @@ export function jointAngles(v, pose, out = {}) {
   const mode = pose.mode ?? MODE.WALK;
   out.pelvisY = BODY.pelvisY; out.bob = 0; out.lean = v.stoop; out.headPitch = v.stoop * 0.7; out.headYaw = pose.look || 0; // positive pitch = chin up
   set2(out, 'hip', 0, 0); set2(out, 'knee', -0.04, -0.04); set2(out, 'ankle', 0.04, 0.04);
-  set2(out, 'sh', 0, 0); set2(out, 'abd', 0.07, 0.07); set2(out, 'elbow', 0.12, 0.12); set2(out, 'legAbd', 0, 0); set2(out, 'legYaw', 0, 0);
+  set2(out, 'sh', 0, 0); set2(out, 'abd', 0.07, 0.07); set2(out, 'elbow', 0.12, 0.12); set2(out, 'legAbd', 0, 0); set2(out, 'legYaw', 0, 0); set2(out, 'shY', 0, 0); set2(out, 'wrist', 0, 0);
+  out.hipShift = 0; out.waistRoll = 0; out.headRoll = 0; // the S-curve: hips pushed sideways, a side bend at the waist, the neck tilted
   out.pelvisYaw = 0; out.chestYaw = 0; out.pelvisRoll = 0;
   if (mode === MODE.WALK) { // motion-captured gait (gait.js), blended walk -> run by speed
     const speed = (pose.speed ?? 1.2) * (v.kind === 'older' ? 0.8 : 1);
@@ -163,14 +164,38 @@ export function holdGun(k, pitch, out, { sprint = 0, ready = 1, phase = 0, speed
 const mix = (a, b, k) => a + (b - a) * k;
 
 /** Standing at ease (the manga look): weight on one hip, the free knee bent, a hand in a pocket, the chest turned against the hips, the head tilted. */
+// the manga look's default stance (owner: in the manga even just standing is dramatic): a wide
+// stance with the feet turned out, the weight on one straight leg and that hip pushed out and up,
+// the shoulders tilted the other way (an S through the whole body), the chin down and the head
+// tilted; one hand up at the brow or in a pocket, the other hanging in a loose fist
 function relaxed(out, seed, t) {
   const side = Math.sin(seed * 7.3) > 0 ? 1 : -1, b = 0.015 * Math.sin(t * 1.3 + seed);
-  out.pelvisRoll += 0.13 * side; out.pelvisYaw = (out.pelvisYaw || 0) + 0.28 * side; out.chestYaw = (out.chestYaw || 0) - 0.45 * side;
-  const free = side > 0 ? 0 : 1, pocket = side > 0 ? 1 : 0;
-  out.knee[free] -= 0.32; out.hip[free] += 0.14; out.ankle[free] += 0.12;
-  out.sh[pocket] = -0.12; out.abd[pocket] = 0.24; out.elbow[pocket] = 0.75; // a hand in the pocket
-  out.sh[1 - pocket] += 0.1; out.elbow[1 - pocket] += 0.35; out.abd[1 - pocket] += 0.05;
-  out.headYaw += 0.25 * side; out.headPitch += 0.06 + b; out.lean -= 0.05;
+  const st = side > 0 ? 1 : 0, free = 1 - st, sgS = st === 1 ? 1 : -1; // the standing leg and its side (+x = 1)
+  out.hipShift += sgS * 0.075; out.pelvisRoll += sgS * 0.17; out.waistRoll -= sgS * 0.3;
+  out.pelvisYaw = (out.pelvisYaw || 0) + 0.3 * side; out.chestYaw = (out.chestYaw || 0) - 0.12 * side;
+  out.legAbd[st] = 0.06; out.legAbd[free] = 0.26; out.legYaw[st] = 0.3; out.legYaw[free] = 0.45;
+  out.knee[st] = -0.02; out.hip[st] = -0.04; out.knee[free] = -0.32; out.hip[free] = 0.18;
+  const hand = Math.sin(seed * 3.1) > -0.2 ? free : -1; // most raise a hand to the brow
+  for (let q = 0; q < 2; q++) {
+    if (q === hand) { out.sh[q] = 1.85; out.abd[q] = 0.42; out.elbow[q] = 2.15; out.wrist[q] = 0.55; out.shY[q] = 0.025; }
+    else if (hand < 0 && q === free) { out.sh[q] = -0.12; out.abd[q] = 0.3; out.elbow[q] = 0.8; } // a hand in the pocket
+    else { out.sh[q] = 0.1; out.abd[q] = 0.32; out.elbow[q] = 0.55; out.wrist[q] = -0.3; } // hanging, a loose fist, the elbow out
+  }
+  out.shY[st] -= 0.015;
+  out.headRoll += sgS * 0.18; out.headYaw += 0.3 * side; out.headPitch += -0.14 + b; out.lean -= 0.07;
+  ground(out, 1);
+}
+
+/** Sink the pelvis so the lowest foot stays planted (deep knees, spread legs, a tilted pelvis); feet flat. */
+function ground(out, k) {
+  let reach = -Infinity;
+  for (let q = 0; q < 2; q++) {
+    const sg = q === 0 ? -1 : 1;
+    const r = (BODY.thigh * Math.cos(out.hip[q]) + BODY.shin * Math.cos(out.hip[q] + out.knee[q])) * Math.cos(out.legAbd[q]) - sg * BODY.hipX * Math.sin(out.pelvisRoll || 0);
+    reach = Math.max(reach, r);
+    out.ankle[q] = mix(out.ankle[q], -(out.hip[q] + out.knee[q]), k);
+  }
+  out.pelvisY -= (BODY.thigh + BODY.shin - reach) * k;
 }
 
 /** Standing activities (IDLE): k 0..1 eases the pose in over the plain idle; t: the person's own clock. */
@@ -197,13 +222,8 @@ function idleAct(kind, k, t, out) {
     out.lean = mix(out.lean, P.lean + b, k); out.pelvisRoll = mix(out.pelvisRoll, P.roll, k);
     out.headYaw = mix(out.headYaw, P.headYaw, k); out.headPitch = mix(out.headPitch, P.headPitch, k);
     for (const key of ['hip', 'knee', 'sh', 'abd', 'elbow', 'legAbd', 'legYaw']) for (let q = 0; q < 2; q++) out[key][q] = mix(out[key][q], (P[key] || [0, 0])[q], k);
-    // sink the pelvis so the lowest foot stays planted; feet flat on the ground
-    let reach = 0;
-    for (let q = 0; q < 2; q++) {
-      reach = Math.max(reach, (BODY.thigh * Math.cos(out.hip[q]) + BODY.shin * Math.cos(out.hip[q] + out.knee[q])) * Math.cos(out.legAbd[q]));
-      out.ankle[q] = mix(out.ankle[q], -(out.hip[q] + out.knee[q]), k);
-    }
-    out.pelvisY -= (BODY.thigh + BODY.shin - reach) * k;
+    for (const key of ['hipShift', 'waistRoll', 'headRoll']) out[key] = mix(out[key], P[key] ?? out[key], k);
+    out.pelvisY = BODY.pelvisY; ground(out, k); // (re-grounded from scratch: the stance's own drop is replaced)
   } else if (kind === IDLE.HIPS) { // hands on the hips, waiting
     for (let q = 0; q < 2; q++) { out.sh[q] = mix(out.sh[q], -0.25, k); out.abd[q] = mix(out.abd[q], 0.55, k); out.elbow[q] = mix(out.elbow[q], 1.45, k); }
     out.headYaw *= 1 + 0.6 * k;
@@ -211,7 +231,7 @@ function idleAct(kind, k, t, out) {
 }
 
 const IDLE_J = {};
-const PAIRS = ['hip', 'knee', 'ankle', 'sh', 'abd', 'elbow', 'legAbd', 'legYaw'];
+const PAIRS = ['hip', 'knee', 'ankle', 'sh', 'abd', 'elbow', 'legAbd', 'legYaw', 'shY', 'wrist'];
 
 /**
  * Optional motion layer (the player; crowds leave these unset): pose.blend 0..1 mixes the idle
@@ -225,7 +245,7 @@ function motion(v, pose, out) {
     const idle = jointAngles(v, { ...pose, mode: MODE.IDLE, blend: undefined, air: 0, dip: 0, lean: 0 }, IDLE_J);
     const b = Math.max(0, pose.blend);
     for (const k of PAIRS) for (let q = 0; q < 2; q++) out[k][q] = idle[k][q] + (out[k][q] - idle[k][q]) * b;
-    for (const k of ['bob', 'lean', 'headPitch', 'headYaw', 'pelvisYaw', 'chestYaw', 'pelvisRoll']) out[k] = idle[k] + (out[k] - idle[k]) * b;
+    for (const k of ['bob', 'lean', 'headPitch', 'headYaw', 'pelvisYaw', 'chestYaw', 'pelvisRoll', 'hipShift', 'waistRoll', 'headRoll', 'pelvisY']) out[k] = idle[k] + (out[k] - idle[k]) * b;
   }
   if (pose.lean) out.lean += pose.lean;
   const a = Math.min(1, Math.max(0, pose.air || 0));
@@ -308,27 +328,27 @@ export function poseFigure(v, pose, emit, J = jointAngles(v, pose), lo = false) 
   const seated = mode === MODE.SIT || mode === MODE.CYCLE, PR = PROPORTION, leg = seated ? 1 : PR.leg;
   const base = root(M[0], pose.x, pose.y, pose.z, pose.rotY || 0, s);
   if (pose.bank) rz(base, pose.bank); // roll about the feet: lean into a turn
-  const pelvis = rz(ry(tr(copy(M[1], base), 0, (J.pelvisY + J.bob) * (seated ? 1 : 1 + (leg - 1) * 0.92), 0), J.pelvisYaw || 0), J.pelvisRoll || 0);
+  const pelvis = rz(ry(tr(copy(M[1], base), J.hipShift || 0, (J.pelvisY + J.bob) * (seated ? 1 : 1 + (leg - 1) * 0.92), 0), J.pelvisYaw || 0), J.pelvisRoll || 0);
   emit(lo ? 'lo:hips' : 'hips', sc(copy(M[2], pelvis), w * PR.waist, 1, w * PR.waist), 'bottom');
   // the trunk counter-tilts against the hip drop (people stay upright; only TRUNK_ROLL of it shows)
-  const chest = rx(ry(rz(copy(M[3], pelvis), -(J.pelvisRoll || 0) * (1 - TRUNK_ROLL)), (J.chestYaw || 0) - (J.pelvisYaw || 0)), -J.lean);
+  const chest = rx(ry(rz(copy(M[3], pelvis), -(J.pelvisRoll || 0) * (1 - TRUNK_ROLL) + (J.waistRoll || 0)), (J.chestYaw || 0) - (J.pelvisYaw || 0)), -J.lean);
   const torso = sc(copy(M[4], chest), w * PR.chest, 1, w * (0.5 + 0.5 * PR.chest));
   const longTop = v.top === 'dress' || v.top === 'coat';
   emit(lo ? (seated ? 'lo:top:short' : K.loTop) : longTop && seated ? K.shirt : K.top, torso, 'top');
   if (v.acc === 'backpack') emit(lo ? 'lo:backpack' : K.acc, torso, 'acc');
   const hs = v.headScale * PR.head;
-  const head = sc(ry(rx(tr(copy(M[5], chest), 0, BODY.neckY, 0), J.headPitch), J.headYaw), hs, hs, hs);
+  const head = sc(rz(ry(rx(tr(copy(M[5], chest), 0, BODY.neckY, 0), J.headPitch), J.headYaw), J.headRoll || 0), hs, hs, hs);
   emit(lo ? 'lo:head' : 'head', head, 'skin');
   emit(lo ? K.loHair : K.hair, head, K.hairCol);
   for (let q = 0; q < 2; q++) {
     const sg = q === 0 ? -1 : 1; // 0 = left (-x), 1 = right (+x)
     let sh = J.sh[q], el = J.elbow[q];
     if (q === 1 && v.acc === 'umbrella' && mode !== MODE.CYCLE) { sh = 0.7; el = 1.5; }
-    const arm = rz(rx(tr(copy(M[6], chest), sg * BODY.shoulderX * w * PR.shoulder, BODY.shoulderY, 0), sh), sg * J.abd[q]);
+    const arm = rz(rx(tr(copy(M[6], chest), sg * BODY.shoulderX * w * PR.shoulder, BODY.shoulderY + (J.shY ? J.shY[q] : 0), 0), sh), sg * J.abd[q]);
     emit(lo ? 'lo:upperArm' : 'upperArm', PR.arm === 1 ? arm : sc(copy(T1, arm), 1, PR.arm, 1), 'top');
     const fore = rx(tr(copy(M[7], arm), 0, -BODY.upperArm * PR.arm, 0), el);
     emit(lo ? 'lo:foreArm' : 'foreArm', PR.arm === 1 ? fore : sc(copy(T1, fore), 1, PR.arm, 1), 'top');
-    const hand = tr(copy(M[8], fore), 0, -BODY.foreArm * PR.arm, 0);
+    const hand = rx(tr(copy(M[8], fore), 0, -BODY.foreArm * PR.arm, 0), J.wrist ? J.wrist[q] : 0);
     if (!lo) emit('hand', hand, 'skin');
     if (q === 1 && ((v.acc === 'bag' && !lo) || v.acc === 'umbrella') && !seated) {
       // hangs straight down (bag) / stands straight up (umbrella) from the hand, turned like the body;
@@ -340,7 +360,7 @@ export function poseFigure(v, pose, emit, J = jointAngles(v, pose), lo = false) 
     emit(lo ? 'lo:thigh' : 'thigh', leg === 1 ? thigh : sc(copy(T1, thigh), 1, leg, 1), 'bottom');
     const shin = rx(tr(copy(M[7], thigh), 0, -BODY.thigh * leg, 0), J.knee[q]);
     emit(lo ? 'lo:shin' : 'shin', leg === 1 ? shin : sc(copy(T1, shin), 1, leg, 1), 'bottom');
-    if (!lo) emit('shoe', rx(tr(copy(M[8], shin), 0, -BODY.shin * leg, 0), J.ankle[q]), 'shoe');
+    if (!lo) emit('shoe', rx(rz(tr(copy(M[8], shin), 0, -BODY.shin * leg, 0), -sg * la), J.ankle[q]), 'shoe'); // (the spread undone at the ankle: soles flat)
   }
 }
 
