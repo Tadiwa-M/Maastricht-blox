@@ -1979,3 +1979,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Manga shade no longer navy: a neutral sky fill in the manga look, a lighter, less blue shadow tint, saturation pushed only where a surface has colour (guide 06). Shadows stay dark.
 - Manga poses rebuilt around the legs: leg spread/cross and twist joints, the pelvis sinks so feet stay planted; five new stances (guide 06).
 - The Spider-Verse look gets its own figure (`figure/verseparts.js`, streetwear builds from the owner-approved mockup) and a bouncing street swagger walk (guide 06).
+- Rule (owner): each look adopts its own figures (build, face, proportions, motion) for immersion; added to CLAUDE.md.
