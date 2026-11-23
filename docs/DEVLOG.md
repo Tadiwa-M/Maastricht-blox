@@ -1993,3 +1993,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Three original Stands in the game (Iron Hymn, Velvet Encore, Live Wire), built on the figure rig, picked in the creator; Spider-Verse caption boxes, pink/cyan rim light on figures, lettered hard landings (guide 06).
 - Backlog (owner): the next world from an artist friend's designs; a stop-motion world (working title "Fantastic Mr Blox"), noted in PLAN.md, not started.
 - Stand designer (parts, colours, name, ability; the three Stands are presets), Stand abilities on X (Guard via the relay, Encore, Short Circuit), the Spider-Verse comic panel border (guide 06). Relay redeploy needed for Guard online.
+- Controller: Share takes photos and postcards, Y/RB the Stand's rush and ability, R3 a pose, L3 the character, d-pad journal, trip planner and songs; Start pauses (guide 09).

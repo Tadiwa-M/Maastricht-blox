@@ -166,3 +166,14 @@ test('zooming out past the farthest walk camera leads back to the map', async ()
   z.update(0.9, true, 0.016);
   assert.equal(z.update(0.9, true, 0.016), true); // two quick notches past the max: leave
 });
+
+test("the controller's other buttons: each button one action, Start pauses, Share takes photos", async () => {
+  const { BINDINGS, readPad } = await import('../src/player/input.js');
+  const B = BINDINGS.pad.buttons;
+  assert.equal(B.menu, 9); assert.equal(B.photo, 8); assert.equal(B.photoPad, 17);
+  for (const k of ['rush', 'ability', 'pose', 'creator', 'journal', 'trip', 'songPrev', 'songNext']) assert.ok(Number.isInteger(B[k]), k);
+  const uses = Object.entries(B).filter(([k]) => k !== 'enter').map(([, i]) => i); // (enter shares A with jump on purpose)
+  assert.equal(new Set(uses).size, uses.length, 'no button does two things');
+  const buttons = Array.from({ length: 18 }, (_, i) => ({ pressed: i === 8, value: i === 8 ? 1 : 0 }));
+  assert.ok(readPad({ axes: [0, 0, 0, 0], buttons }).held.has('photo'));
+});

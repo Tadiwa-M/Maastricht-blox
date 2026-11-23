@@ -38,7 +38,7 @@ test('gamepad standard mapping: sticks (y up), buttons, triggers, stick drift ig
   assert.ok(p.zoom < 0); // RT zooms in
   assert.ok(readPad(pad([0, 0, 0, 0], [1])).held.has('map'));
   assert.ok(readPad(pad([0, 0, 0, 0], [9])).held.has('menu'));
-  assert.ok(readPad(pad([0, 0, 0, 0], [8])).held.has('help'));
+  assert.ok(readPad(pad([0, 0, 0, 0], [8])).held.has('photo')); // Share: photo mode (help is in the pause menu)
   assert.deepEqual(readPad(pad([0.12, -0.1, 0, 0])).move.map(Math.abs), [0, 0]);
 });
 

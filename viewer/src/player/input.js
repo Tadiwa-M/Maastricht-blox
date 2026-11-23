@@ -30,7 +30,12 @@ export const BINDINGS = {
   // standard gamepad mapping (https://w3c.github.io/gamepad/#remapping)
   pad: {
     axes: { moveX: 0, moveY: 1, lookX: 2, lookY: 3 },
-    buttons: { jump: 0, enter: 0, map: 1, run: 4, zoomOut: 6, zoomIn: 7, help: 8, menu: 9 },
+    // (owner: make the other buttons useful) Share (8, and the PlayStation touchpad, 17): photo mode,
+    // again for the postcard; Y: the Stand's rush; RB: its ability; R3: strike a pose; L3: your
+    // character; d-pad up: journal, down: plan a trip, left/right: previous/next song. In a match
+    // X, Y and R3 belong to the weapons (mp/combat.js pollPad). Help is in the pause menu.
+    buttons: { jump: 0, enter: 0, map: 1, run: 4, zoomOut: 6, zoomIn: 7, menu: 9,
+      photo: 8, photoPad: 17, rush: 3, ability: 5, pose: 11, creator: 10, journal: 12, trip: 13, songPrev: 14, songNext: 15 },
     deadzone: 0.18,
     triggerDeadzone: 0.08,
   },

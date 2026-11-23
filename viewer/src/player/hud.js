@@ -58,7 +58,13 @@ export const CONTROLS = [
   ['Rotate map', 'Right drag / Ctrl or Alt + drag / Q E', 'Right stick', 'Two-finger drag'],
   ['Tilt map', 'Middle drag / right drag up-down', 'Right stick up-down', 'Two-finger drag up-down'],
   ['Face north', 'Click the compass', '', 'Tap the compass'],
-  ['Menu (this panel)', 'H / Esc (mouse free)', 'Start / Select', ''],
+  ['Menu (this panel)', 'H / Esc (mouse free)', 'Start', ''],
+  ['Photo mode, postcard', 'P, then Space', 'Share (again: the postcard)', ''],
+  ['Your character', 'C', 'L3 (left stick click)', ''],
+  ['Strike a pose (Manga)', 'stand still', 'R3 (right stick click)', ''],
+  ['Stand rush, ability (Manga)', 'E, X', 'Y, RB', ''],
+  ['Journal, plan a trip', 'J, menu', 'D-pad up, down', ''],
+  ['Previous / next song', '', 'D-pad left / right', ''],
 ];
 
 const SLIDERS = [
@@ -146,7 +152,7 @@ export class TouchControls {
 export function hintFor(mode, { touch = false, pad = false, locked = false, capture = true } = {}) {
   if (mode === 'walk') {
     if (touch) return 'Joystick to move · drag the right side to look · pinch out for the map';
-    if (pad) return 'Left stick move · right stick look · A jump · B map · Start menu';
+    if (pad) return 'Left stick move · right stick look · A jump · B map · Share photo · L3 character · Start menu';
     if (locked) return 'Mouse look · WASD move · Space jump · M or scroll out: map · Esc frees the mouse';
     return `${capture ? 'Click to look around' : 'Drag to look around'} · WASD move · Space jump · C character · M or scroll out: map · Esc menu`;
   }

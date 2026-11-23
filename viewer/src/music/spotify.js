@@ -251,5 +251,6 @@ export function initMusic({ clientId = window.BLOX_SITE?.spotifyClientId || '', 
     } catch (e) { st.msg = e.message; open(); }
   })();
   draw();
-  return { open, get state() { return st; } };
+  // (the controller's d-pad: previous / next song; without the Spotify app, next plays or pauses)
+  return { open, toggle, next: () => (usingSdk() ? st.sdk.nextTrack() : toggle()), prev: () => usingSdk() && st.sdk.previousTrack(), get state() { return st; } };
 }

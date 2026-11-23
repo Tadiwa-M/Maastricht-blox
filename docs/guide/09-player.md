@@ -29,7 +29,7 @@ frees the mouse itself (`escapeIsOurs`, input.js) and opens the menu.
 | Jump | Space | A | JUMP button |
 | Zoom | wheel / + - | LT (out) / RT (in) | pinch |
 | Back to the map | M / "Map" button | B | "Map" button |
-| Menu: controls + camera settings | H, or Esc while the mouse is free | Start / Select | |
+| Menu: controls + camera settings | H, or Esc while the mouse is free | Start | |
 | Rotate the map | right drag / Ctrl or Alt + left drag / Q E (hold) | right stick | two-finger drag |
 | Tilt the map | middle drag / right drag up-down | right stick up-down | two-finger drag up-down |
 | Face north | click the compass (bottom right) | | tap the compass |
@@ -419,3 +419,23 @@ blend poses a figure twice only during the half second of a start or stop.
 - Other players use the same holds (at the hip unless they just fired, sprint carry by speed).
 - Tests: `test/stance.test.mjs` (including that the chest really faces the aim when the legs turn).
 
+
+## The controller's other buttons (2026-11-23)
+
+Owner: make the other buttons useful (pause to pause, share to share). `input.js BINDINGS.pad.buttons`
+(standard mapping), handled in one place (`player/index.js padButtons`):
+
+| Button | Action |
+|---|---|
+| Start | pause menu |
+| Share / Back (8), PlayStation touchpad (17) | photo mode; press again for the postcard (shared or saved); B leaves photo mode |
+| Y | the Stand's rush (manga look; in a match Y swaps weapons) |
+| RB | the Stand's ability (Guard, Encore, Short Circuit) |
+| R3 | strike a pose now (manga look; in a match R3 stabs) |
+| L3 | your character (creator) |
+| D-pad up / down | journal / plan a trip |
+| D-pad left / right | previous / next song (without the Spotify app: next plays or pauses) |
+
+Help moved off Share: it is in the pause menu (Controls & help). The help panel's table and the
+bottom hint list the new buttons. A test keeps one action per button (A's walk-here shares jump on
+purpose).

@@ -67,6 +67,23 @@ export function initPlayer(ctx) {
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyE' && mode === 'walk' && !window.__bloxMp?.combat?.active && !e.repeat) stand.rush(); });
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyX' && !e.repeat && !/INPUT|TEXTAREA|SELECT/.test(e.target?.tagName || '')) standAbility(); });
   }
+  // the controller's other buttons (input.js BINDINGS.pad.buttons): photos and postcards, the Stand,
+  // a pose, your character, the journal, a trip, the music
+  const explore = () => window.__bloxExplore;
+  function padButtons(p) {
+    if (!p.size || window.__bloxMenu?.isOpen) return;
+    const match = !!window.__bloxMp?.combat?.active, walk = mode === 'walk' && !tween;
+    if (p.has('photo') || p.has('photoPad')) { const ex = explore(); if (ex?.state?.().photo) ex.shoot?.(); else ex?.photo?.(true); }
+    if (p.has('journal')) explore()?.journal?.(!explore()?.journalOpen);
+    if (p.has('trip')) window.__bloxTrip?.open?.(true);
+    if (p.has('songNext')) window.__bloxMusic?.next?.();
+    if (p.has('songPrev')) window.__bloxMusic?.prev?.();
+    if (!walk) return;
+    if (p.has('creator')) { if (creator.open) closeCreator(); else openCreator(); }
+    if (p.has('ability')) standAbility();
+    if (!match && p.has('rush')) stand?.rush(); // (in a match Y swaps weapons, R3 stabs: mp/combat.js)
+    if (!match && p.has('pose')) character.poseNow = true;
+  }
   // the Stand's ability (X): Guard, Encore or Short Circuit (player/standdesigns.js ABILITIES)
   let abilityReady = 0;
   const trail = []; // where the player was, for Encore: [{ t, pos }], the last few seconds
@@ -358,8 +375,9 @@ export function initPlayer(ctx) {
     } else {
       // Esc with a free mouse (the locked one only frees it) / Start: menu; M / B: map
       if (frame.pressed.has('menu')) menuKey();
-      if (frame.pressed.has('map')) { hud.toggleHelp(false); exitWalk(); }
+      if (frame.pressed.has('map')) { if (explore()?.state?.().photo) explore().photo(false); else { hud.toggleHelp(false); exitWalk(); } } // (B leaves photo mode first)
     }
+    padButtons(frame.pressed);
     if (mode === 'walk' && !tween) { // scroll / pinch / LT past the farthest camera: back to the map
       const leave = zoomExit.update(frame.zoom, follow.aimDist >= follow.o.maxDist - 1e-3, dt);
       if (zoomExit.progress() > 0.3) hud.toast('Keep zooming out for the map');
