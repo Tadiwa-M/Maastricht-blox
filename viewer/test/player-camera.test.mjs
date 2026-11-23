@@ -193,3 +193,17 @@ test('FollowCamera: a lamp post between player and camera is looked past; a wall
   assert.ok(Math.abs(cam2.dist - 5) < 0.05, `back out: ${cam2.dist}`);
   assert.ok(maxStep < 0.12, `eased, no pop: ${maxStep}`);
 });
+
+test('the manga posing shot: drama swings the camera to the front three-quarter, low, looking up', () => {
+  const city = { isSolid: () => false, floorY: 0 };
+  const cam = new FollowCamera();
+  const feet = [0, 0, 0];
+  cam.aimYaw = 0; cam.snap();
+  let r = cam.update(city, feet, 1);
+  assert.ok(r.position[2] > 1, 'behind: south of a player looking north');
+  cam.drama = 1; cam.dramaYaw = Math.PI + 0.55; // the player faces north (yaw 0): its front is to the north
+  r = cam.update(city, feet, 1);
+  assert.ok(r.position[2] < -1, `in front: ${r.position[2]}`);
+  assert.ok(r.position[1] < r.focus[1], 'below the focus, looking up');
+  assert.ok(r.fov > 55, 'a little wider');
+});

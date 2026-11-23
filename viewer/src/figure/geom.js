@@ -63,3 +63,34 @@ export function merge(list) {
   g.computeBoundingSphere();
   return g;
 }
+
+/**
+ * A torso in two for a bending spine (the painted looks' figures): { upper, belly } split at
+ * height y. A small triangle across the cut goes in both; a long piece across it (a coat's
+ * front) goes whole to the side of its middle; the filler (e.g. a squashed sphere at the cut)
+ * joins the belly and hides the gap when the chest bends. Both keep the torso's coordinates.
+ */
+export function splitTorso(geo, y, filler) {
+  const pos = geo.attributes.position, nor = geo.attributes.normal, col = geo.attributes.color, idx = geo.index;
+  const tri = idx ? idx.count / 3 : pos.count / 3, at = (k) => (idx ? idx.getX(k) : k);
+  const parts = [[], []];
+  for (let t = 0; t < tri; t++) {
+    const v = [at(3 * t), at(3 * t + 1), at(3 * t + 2)], ys = v.map((i) => pos.getY(i));
+    const lo = Math.min(...ys), hi = Math.max(...ys), mid = (ys[0] + ys[1] + ys[2]) / 3;
+    if (hi - lo > 0.12) parts[mid > y ? 0 : 1].push(...v);
+    else { if (hi > y - 0.01) parts[0].push(...v); if (lo < y + 0.01) parts[1].push(...v); }
+  }
+  const build = (list) => {
+    const g = new THREE.BufferGeometry(), P = new Float32Array(list.length * 3), N = new Float32Array(list.length * 3), C = new Float32Array(list.length * 3);
+    list.forEach((i, k) => { P.set([pos.getX(i), pos.getY(i), pos.getZ(i)], 3 * k); N.set([nor.getX(i), nor.getY(i), nor.getZ(i)], 3 * k); C.set([col.getX(i), col.getY(i), col.getZ(i)], 3 * k); });
+    g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3));
+    return g;
+  };
+  return { upper: merge([build(parts[0])]), belly: merge([build(parts[1]), filler]) };
+}
+
+/** The hem of a long top (a coat's tails, a skirt) cut off below y, to swing on its own: { body, tail }. */
+export function splitHem(geo, y, filler) {
+  const { upper, belly } = splitTorso(geo, y, filler);
+  return { body: upper, tail: belly };
+}

@@ -18,7 +18,7 @@ import { addPartVaryings } from './pools.js';
 // every look gets the printed detail; the painted looks also the film materials (matte cloth, skin sheen)
 export const FIGURE_LOOK = typeof location !== 'undefined';
 // the manga look: the heroic build of that world (figure/rig.js PROPORTION)
-if (LOOK === 'verse') setProportions({ shoulder: 1.06, chest: 1.0, waist: 0.9, leg: 1.16, head: 0.98, arm: 1.1, swag: true }); // lanky, swaggering
+if (LOOK === 'verse') setProportions({ shoulder: 1.06, chest: 1.0, waist: 0.9, leg: 1.16, head: 0.98, arm: 1.1, swag: true, spine: true }); // lanky, swaggering
 if (LOOK === 'manga') setProportions({ shoulder: 1.12, chest: 1.06, waist: 0.92, leg: 1.17, head: 0.9, arm: 1.05, pose: true, spine: true }); // (the anime figure carries most of the build itself)
 const FILM = PAINTED_LOOK;
 
@@ -62,7 +62,7 @@ export function figureKindOf(key) {
   if (k === 'head') return 'face';
   if (k === 'hand') return 'hand';
   if (k.startsWith('hair:')) return 'hair';
-  if (k.startsWith('top:') || k.startsWith('belly:')) return 'top';
+  if (k.startsWith('top:') || k.startsWith('belly:') || k.startsWith('tail:')) return 'top';
   if (k === 'upperArm' || k === 'foreArm') return 'sleeve';
   if (k === 'hips') return 'hips';
   if (k === 'thigh' || k === 'shin') return 'legs';
@@ -158,7 +158,46 @@ const KIND = {
 // trousers gets a bold printed pattern picked from where the figure stands (stripes, zigzags,
 // hearts, checks, a solid with a contrast panel), tops a gold chain across the chest and a pin;
 // faces heavy brows and a dark ink shadow under them, coloured lips. In the part's own space.
-// (the Spider-Verse figure borrows the drawn face: its graphic head needs real eyes, brows and a mouth)
+// the Spider-Verse figure's own face (owner: each look's people belong to it): drawn like the film,
+// in bold graphic shapes: big round eyes with a thick lid band and two catch-lights, blocky brows,
+// the nose as one flat shadow shape and nostril dots, a lopsided smirk with a darker lower lip,
+// smile lines, and a halftone blush on the cheeks
+const VERSE_FACE = `
+    float vf = step(p.z, -0.045);
+    for (int s = -1; s <= 1; s += 2) {
+      float fs = float(s);
+      vec2 e = vec2(p.x - fs * 0.04, p.y - 0.188);
+      float eye = 1.0 - smoothstep(0.9, 1.0, length(e / vec2(0.028, 0.019)));
+      c = mix(c, vec3(0.98, 0.97, 0.94), eye * vf);
+      vec2 ir = e - vec2(-fs * 0.004, -0.002);
+      c = mix(c, vec3(0.22, 0.12, 0.07), (1.0 - smoothstep(0.0125, 0.014, length(ir))) * eye * vf);
+      c = mix(c, vec3(0.03), (1.0 - smoothstep(0.0055, 0.0065, length(ir))) * eye * vf);
+      c = mix(c, vec3(1.0), (1.0 - smoothstep(0.0028, 0.0036, length(ir - vec2(0.004, 0.005)))) * vf);
+      c = mix(c, vec3(1.0), (1.0 - smoothstep(0.0012, 0.002, length(ir - vec2(-0.004, -0.004)))) * vf);
+      float lidY = 0.017 * sqrt(max(0.0, 1.0 - pow(e.x / 0.03, 2.0)));
+      float lid = (1.0 - smoothstep(0.0, 0.0065, abs(e.y - lidY))) * step(abs(e.x), 0.032 + 0.006 * step(0.0, e.x * fs));
+      c = mix(c, vec3(0.04, 0.03, 0.05), lid * vf);
+      float low = (1.0 - smoothstep(0.0, 0.0018, abs(e.y + lidY * 0.95))) * step(0.008, e.x * fs) * step(e.x * fs, 0.028);
+      c = mix(c, c * 0.4, low * vf);
+      vec2 bw = vec2(p.x - fs * 0.042, p.y - 0.222 - (e.x * fs) * 0.12);
+      float brow = step(abs(bw.x), 0.028) * step(abs(bw.y + abs(bw.x) * 0.15), 0.0065);
+      c = mix(c, vec3(0.08, 0.05, 0.04), brow * vf);
+      float smile = fLine(length(vec2(p.x - fs * 0.04, (p.y - 0.14) * 0.8)) - 0.032, 0.0018) * step(p.y, 0.14) * step(0.11, p.y) * step(0.025, abs(p.x));
+      c = mix(c, c * 0.6, smile * vf);
+      vec2 ck = vec2(p.x - fs * 0.058, p.y - 0.15);
+      vec2 cell = fract(p.xy * 260.0) - 0.5;
+      float dots = step(length(cell), 0.32) * (1.0 - smoothstep(0.012, 0.022, length(ck)));
+      c = mix(c, c * vec3(1.0, 0.62, 0.58), dots * vf * 0.8);
+    }
+    float noseSh = step(-0.022, p.x) * step(p.x, -0.002) * step(0.138, p.y) * step(p.y, 0.19 + p.x * 1.2);
+    c = mix(c, c * vec3(0.72, 0.6, 0.62), noseSh * vf);
+    for (int s = -1; s <= 1; s += 2) c = mix(c, c * 0.45, (1.0 - smoothstep(0.0025, 0.0035, length(vec2(p.x - float(s) * 0.01, p.y - 0.141)))) * vf);
+    float mY = 0.113 + p.x * 0.18 + max(0.0, p.x) * p.x * 3.0; // a lopsided smirk, one corner up
+    float mouth = (1.0 - smoothstep(0.0012, 0.0028, abs(p.y - mY))) * step(abs(p.x - 0.003), 0.024);
+    c = mix(c, vec3(0.2, 0.07, 0.08), mouth * vf);
+    float lip = step(p.y, mY - 0.002) * step(mY - 0.012, p.y) * step(abs(p.x - 0.002), 0.016 - (mY - p.y) * 0.5);
+    c = mix(c, c * vec3(0.72, 0.5, 0.52), lip * vf);`;
+
 const MANGA_FASHION = {
   top: `
     float pick = fHash(vec3(floor(diffuseColor.r * 9.0), floor(diffuseColor.g * 9.0), floor(diffuseColor.b * 9.0))); // per outfit colour: the same print on a whole top
@@ -272,7 +311,7 @@ export function figureMaterialFor(base, kind) {
       sh.fragmentShader = 'varying float vFash;\n' + sh.fragmentShader;
     }
     sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-      { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} ${LOOK === 'manga' ? MANGA_FASHION[kind] || '' : LOOK === 'verse' && kind === 'face' ? MANGA_FASHION.face : ''}
+      { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} ${LOOK === 'manga' ? MANGA_FASHION[kind] || '' : LOOK === 'verse' && kind === 'face' ? VERSE_FACE : ''}
       ${LOOK === 'manga' ? MANGA_PALETTE : FILM ? FILM_PALETTE : ''}
       diffuseColor.rgb = max(c, 0.0); }`); // (new lines: a // comment at the end of a block must not swallow the rest)
   };

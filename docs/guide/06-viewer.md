@@ -1103,3 +1103,19 @@ Open: the verse figure's own face design; a stepped (on-twos) animation for the 
 - Fixed: the Look menu and the saved figure shared the storage key `blox.look`, so saving a
   figure reset the look to Classic and switching look erased the figure. The look is now
   `blox.style` (an old saved look still counts).
+
+## Only Classic stays stiff (2026-11-23)
+
+Owner: the brick Classic look is the only stiff one; carry on with the rest.
+- Spider-Verse figure: its own face (`VERSE_FACE`: big round eyes with a thick lid band and two
+  catch-lights, blocky brows, the nose as one flat shadow shape, a lopsided smirk, smile lines, a
+  halftone blush); the bending spine (`geom.js` `splitTorso`, shared with the manga figure); a loose
+  street stance (`street()`: the weight dropped on one leg, chest sunk, shoulders round, head
+  tilted and nodding; hands in the front pocket, arms crossed leaning back, or one hand in a
+  pocket). New joint `armTwist` (the upper arm turned in, so a forearm can fold across the body).
+- Coat tails and skirts swing (both painted looks): the hem below `HEM_AT` is its own part
+  (`tail:<style>`, `geom.js` `splitHem`), hung from the hips: it lifts behind with speed and sways
+  with each step (`tailFlare`, `tailSide`), sweeps out to one side in the manga stance and is
+  thrown out in a pose.
+- The manga posing shot (`camera.js` `drama`): when the player strikes a pose the camera swings to
+  the front three-quarter, drops low and looks up, closer and a little wider; moving eases it back.

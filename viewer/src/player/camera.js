@@ -125,15 +125,21 @@ export class FollowCamera {
     this.trail[1] = feet[1];
     this.sprint += (Math.min(1, Math.max(0, (speed - o.sprintFrom) / 2)) - this.sprint) * Math.min(1, dt * 3);
     this.fov = fitFov(o.fov + o.sprintFov * this.sprint, this.aspect);
-    const head = [this.trail[0], this.trail[1] + o.focusY, this.trail[2]];
+    // the manga look's posing shot (drama 0..1, set by index.js): swung round to the front three-quarter
+    // (dramaYaw), low and looking up, closer and a little wider, the way the manga frames a pose
+    const dr = this.drama || 0;
+    const yawU = dr ? this._yaw + wrapAngle(this.dramaYaw - this._yaw) * dr : this._yaw;
+    const pitchU = this._pitch + (-0.26 - this._pitch) * dr, wantU = this._want + (3.1 - this._want) * dr;
+    this.fov += 8 * dr;
+    const head = [this.trail[0], this.trail[1] + o.focusY - 0.4 * dr, this.trail[2]];
     // over the right shoulder, unless a wall is there
-    const right = [Math.cos(this._yaw), 0, Math.sin(this._yaw)];
+    const right = [Math.cos(yawU), 0, Math.sin(yawU)];
     const sh = o.shoulder * shoulderScale(this.aspect);
     const side = sh > 0 ? Math.min(sh, pullIn(city, head, right, sh, { margin: 0.25, spread: 0.1 })) : 0;
     this.side += (side - this.side) * (side < this.side ? 1 : Math.min(1, dt * 4));
     const focus = [head[0] + right[0] * this.side, head[1], head[2] + right[2] * this.side];
-    const dir = backDir(this._yaw, this._pitch);
-    const free = pullIn(city, focus, dir, this._want + o.sprintBack * this.sprint, { thin: o.thin });
+    const dir = backDir(yawU, pitchU);
+    const free = pullIn(city, focus, dir, wantU + o.sprintBack * this.sprint, { thin: o.thin });
     if (free < this.dist - 1e-3) { // blocked: in quickly (eased over a few frames, not a jump cut)
       this.dist += (free - this.dist) * (dt >= 0.5 ? 1 : approach(o.pullRate, dt));
       this.held = 0; this.vdist = 0;

@@ -1983,3 +1983,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Manga stance: new bend points (hip shift, waist side bend, shoulder raise, head tilt, wrists, flat feet on spread legs); the default stance is a dramatic S-curve (guide 06). Next (owner): finish the Spider-Verse and manga figures, then per-look vehicles (buses, boats, cyclists).
 - Manga: the torso in two with a bending spine, pelvis tip and thrust, pointed toes, forearm twist; new reach and backbend stances (guide 06).
 - Character creator: Manga print and chain choices. Fixed the look and the saved figure overwriting each other's storage (guide 06).
+- Spider-Verse figure: own face, bending spine, street stance, arm twist joint; coat tails and skirts swing in both painted looks; the manga posing camera (guide 06).

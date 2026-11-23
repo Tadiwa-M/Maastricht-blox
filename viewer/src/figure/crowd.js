@@ -51,7 +51,8 @@ export class FigureCrowd {
     const geos = { ...Object.fromEntries(Object.keys(LIMBS).map((k) => [k, P[k]])) };
     for (const s of HAIR_STYLES) geos[`hair:${s}`] = P.hair[s];
     for (const s of TOP_STYLES) geos[`top:${s}`] = P.top[s];
-    if (P.belly) for (const s of TOP_STYLES) geos[`belly:${s}`] = P.belly[s]; // the manga figure's torso is in two (a bending spine)
+    if (P.belly) for (const s of TOP_STYLES) geos[`belly:${s}`] = P.belly[s]; // the painted figures' torso is in two (a bending spine)
+    if (P.tail) for (const [s, g] of Object.entries(P.tail)) geos[`tail:${s}`] = g; // and long hems swing
     for (const a of ACCESSORIES) if (a !== 'none') geos[`acc:${a}`] = P.acc[a];
     if (lod) {
       for (const k of ['head', 'hips', 'upperArm', 'foreArm', 'thigh', 'shin', 'backpack']) geos[`lo:${k}`] = P.lo[k];
@@ -61,7 +62,7 @@ export class FigureCrowd {
     this.meshes = new Map();
     for (const [key, geo] of Object.entries(geos)) {
       const n = (key.startsWith('lo:') || key === 'acc:umbrella' || !lod ? cap : Math.min(cap, hiCap)) * (LIMBS[key] || 1);
-      const fash = LOOK === 'manga' && (key.startsWith('top:') || key.startsWith('belly:')); // the manga top's fashion per figure (print, chain): figure/custom.js
+      const fash = LOOK === 'manga' && (key.startsWith('top:') || key.startsWith('belly:') || key.startsWith('tail:')); // the manga top's fashion per figure (print, chain): figure/custom.js
       const mesh = new THREE.InstancedMesh(fash ? mangaShape(key, geo).clone() : mangaShape(key, geo), this.materialFor(key), n); // (own copy: each crowd its own fashion data)
       let f = null;
       if (fash) { f = new THREE.InstancedBufferAttribute(new Float32Array(n), 1); f.setUsage(THREE.DynamicDrawUsage); mesh.geometry.setAttribute('aFash', f); }

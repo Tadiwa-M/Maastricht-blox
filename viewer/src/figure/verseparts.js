@@ -7,7 +7,7 @@
 // locs, space buns, a high pony, a backwards cap, a slouchy beanie, a bucket hat).
 import * as THREE from 'three';
 import { BODY, FIGURE_PARTS } from './parts.js';
-import { place, sphere, cyl, torus, lathe, merge, tint, rbox } from './geom.js';
+import { place, sphere, cyl, torus, lathe, merge, tint, rbox, splitTorso, splitHem } from './geom.js';
 
 const facet = (g) => { const n = g.toNonIndexed(); n.computeVertexNormals(); return n; }; // flat planes: a graphic look
 const fin = (at, h, len, lean, c = 1) => place(tint(facet(new THREE.ConeGeometry(0.02, h, 4)), c), { at, rot: [lean, 0, 0], scale: [0.45, 1, len] });
@@ -96,12 +96,19 @@ const shoe = () => merge([ // a chunky high-top: big upper, ankle collar, a thic
   place(rbox(0.13, 0.035, 0.27, 0.015, 1.7, 2), { at: [0, -0.085, -0.045] }),
   ...[0, 1, 2].map((k) => place(rbox(0.07, 0.008, 0.012, 0.003, 0.3, 1), { at: [0, 0.015 - k * 0.022, -0.07 - k * 0.03], rot: [0.5, 0, 0] }))]);
 
+const HEM_AT = 0.03; // where a coat's tails or a skirt hang from (rig.js HEM_AT)
 let cache = null;
 /** The Spider-Verse figure's part geometries, keyed exactly as FIGURE_PARTS (far LOD and accessories shared). */
 export function VERSE_PARTS() {
   if (cache) return cache;
   const P = FIGURE_PARTS();
   cache = { ...P, head: head(), hips: hips(), upperArm: upperArm(), foreArm: foreArm(), hand: hand(), thigh: thigh(), shin: shin(), shoe: shoe(),
-    hair: Object.fromEntries(Object.keys(P.hair).map((s) => [s, hair(s)])), top: Object.fromEntries(Object.keys(P.top).map((s) => [s, top(s)])) };
+    hair: Object.fromEntries(Object.keys(P.hair).map((s) => [s, hair(s)])), top: {}, belly: {} };
+  for (const st of Object.keys(P.top)) { // the torso in two: a bending spine (rig.js PROPORTION.spine)
+    const { upper, belly } = splitTorso(top(st), 0.27, place(sphere(0.17, 1, 14, 8), { at: [0, 0.27, 0], scale: [1.08, 0.5, D] }));
+    cache.top[st] = upper;
+    if (st === 'coat' || st === 'dress') { const h = splitHem(belly, HEM_AT, place(sphere(0.18, 1, 14, 6), { at: [0, HEM_AT, 0], scale: [1.1, 0.3, D] })); cache.belly[st] = h.body; (cache.tail ||= {})[st] = h.tail; } // the hem swings on its own
+    else cache.belly[st] = belly;
+  }
   return cache;
 }

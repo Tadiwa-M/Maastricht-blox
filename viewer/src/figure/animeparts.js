@@ -9,7 +9,7 @@
 // down -y from their joint. Vertex colours < 1 mark fixed dark details, as in parts.js.
 import * as THREE from 'three';
 import { BODY, FIGURE_PARTS } from './parts.js';
-import { place, sphere, cyl, torus, lathe, merge, tint, rbox } from './geom.js';
+import { place, sphere, cyl, torus, lathe, merge, tint, rbox, splitTorso, splitHem } from './geom.js';
 
 /** A limb from [radius, y] points (y going down from the joint), slightly oval front to back. */
 const limb = (pts, depth = 0.92, seg = 14) => lathe(pts.map(([r, y]) => [r, y]).reverse(), { depth, seg });
@@ -147,26 +147,11 @@ const shoe = () => merge([ // a pointed dress shoe (origin: the ankle)
 // chest bends about the cut), so prints and the inked muscles stay put.
 export const SPLIT = 0.27;
 function splitTop(geo, style) {
-  const pos = geo.attributes.position, nor = geo.attributes.normal, col = geo.attributes.color, idx = geo.index;
-  const tri = idx ? idx.count / 3 : pos.count / 3, at = (k) => (idx ? idx.getX(k) : k);
-  const parts = [[], []]; // [upper, belly]
-  for (let t = 0; t < tri; t++) {
-    const v = [at(3 * t), at(3 * t + 1), at(3 * t + 2)], ys = v.map((i) => pos.getY(i));
-    const lo = Math.min(...ys), hi = Math.max(...ys), mid = (ys[0] + ys[1] + ys[2]) / 3;
-    if (hi - lo > 0.12) parts[mid > SPLIT ? 0 : 1].push(...v); // a long piece across the cut (a coat's front) goes whole to one side
-    else { if (hi > SPLIT - 0.01) parts[0].push(...v); if (lo < SPLIT + 0.01) parts[1].push(...v); }
-  }
-  const build = (list) => {
-    const g = new THREE.BufferGeometry(), P = new Float32Array(list.length * 3), N = new Float32Array(list.length * 3), C = new Float32Array(list.length * 3);
-    list.forEach((i, k) => { P.set([pos.getX(i), pos.getY(i), pos.getZ(i)], 3 * k); N.set([nor.getX(i), nor.getY(i), nor.getZ(i)], 3 * k); C.set([col.getX(i), col.getY(i), col.getZ(i)], 3 * k); });
-    g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3));
-    return g;
-  };
   const wide = style === 'coat' ? 1.1 : style === 'jacket' ? 1.07 : 1.0, deep = style === 'coat' ? D + 0.14 : style === 'jacket' ? D + 0.06 : D;
-  const filler = place(sphere(0.152, 1, 16, 8), { at: [0, SPLIT, 0], scale: [wide, 0.55, deep] });
-  return { upper: merge([build(parts[0])]), belly: merge([build(parts[1]), filler]) };
+  return splitTorso(geo, SPLIT, place(sphere(0.152, 1, 16, 8), { at: [0, SPLIT, 0], scale: [wide, 0.55, deep] }));
 }
 
+const HEM_AT = 0.03; // where a coat's tails or a skirt hang from (rig.js HEM_AT)
 let cache = null;
 /** The manga figure's part geometries, keyed exactly as FIGURE_PARTS (far LOD and accessories shared). */
 export function ANIME_PARTS() {
@@ -175,6 +160,8 @@ export function ANIME_PARTS() {
   cache = { ...P, head: head(), hips: hips(), upperArm: upperArm(), foreArm: foreArm(), hand: hand(), thigh: thigh(), shin: shin(), shoe: shoe(),
     hair: Object.fromEntries(Object.keys(P.hair).map((s) => [s, hair(s)])),
     top: {}, belly: {} };
-  for (const st of Object.keys(P.top)) { const { upper, belly } = splitTop(top(st), st); cache.top[st] = upper; cache.belly[st] = belly; }
+  for (const st of Object.keys(P.top)) { const { upper, belly } = splitTop(top(st), st); cache.top[st] = upper;
+    if (st === 'coat' || st === 'dress') { const h = splitHem(belly, HEM_AT, place(sphere(0.15, 1, 14, 6), { at: [0, HEM_AT, 0], scale: [1.08, 0.3, D + 0.1] })); cache.belly[st] = h.body; (cache.tail ||= {})[st] = h.tail; } // the hem swings on its own
+    else cache.belly[st] = belly; }
   return cache;
 }

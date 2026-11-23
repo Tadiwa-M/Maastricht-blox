@@ -22,6 +22,7 @@ export const IDLE = { NONE: 0, PHONE: 1, TALK: 2, LOOK: 3, HIPS: 4, POSE: 5 };
 export const PROPORTION = { shoulder: 1, chest: 1, waist: 1, leg: 1, head: 1, arm: 1, pose: false, swag: false, spine: false }; // spine: the torso drawn in two (abdomen, chest) so the trunk bends (the manga figure) // swag: the Spider-Verse look's bouncing street swagger // pose: the player strikes a stand-your-ground pose when still
 export function setProportions(p) { Object.assign(PROPORTION, p); }
 const SPINE_AT = 0.27; // where the torso bends (figure/animeparts.js SPLIT)
+const HEM_AT = 0.03; // where coat tails and skirts hang from (animeparts.js, verseparts.js)
 
 /**
  * Stand-your-ground poses (pose.idle = IDLE.POSE, pose.poseKind 0..2): our own sculptural poses in
@@ -75,8 +76,8 @@ export function jointAngles(v, pose, out = {}) {
   const mode = pose.mode ?? MODE.WALK;
   out.pelvisY = BODY.pelvisY; out.bob = 0; out.lean = v.stoop; out.headPitch = v.stoop * 0.7; out.headYaw = pose.look || 0; // positive pitch = chin up
   set2(out, 'hip', 0, 0); set2(out, 'knee', -0.04, -0.04); set2(out, 'ankle', 0.04, 0.04);
-  set2(out, 'sh', 0, 0); set2(out, 'abd', 0.07, 0.07); set2(out, 'elbow', 0.12, 0.12); set2(out, 'legAbd', 0, 0); set2(out, 'legYaw', 0, 0); set2(out, 'shY', 0, 0); set2(out, 'wrist', 0, 0); set2(out, 'toe', 0, 0); set2(out, 'foreRoll', 0, 0);
-  out.spineLean = 0; out.spineRoll = 0; out.spineYaw = 0; out.pelvisPitch = 0; out.hipThrust = 0; // the mid-spine bend; the pelvis tipped and pushed forward
+  set2(out, 'sh', 0, 0); set2(out, 'abd', 0.07, 0.07); set2(out, 'elbow', 0.12, 0.12); set2(out, 'legAbd', 0, 0); set2(out, 'legYaw', 0, 0); set2(out, 'shY', 0, 0); set2(out, 'wrist', 0, 0); set2(out, 'toe', 0, 0); set2(out, 'foreRoll', 0, 0); set2(out, 'armTwist', 0, 0); // armTwist: the upper arm turned in, so the forearm folds across the body
+  out.spineLean = 0; out.spineRoll = 0; out.spineYaw = 0; out.pelvisPitch = 0; out.hipThrust = 0; out.tailFlare = 0.02; out.tailSide = 0; // the hem: flared back, swept sideways // the mid-spine bend; the pelvis tipped and pushed forward
   out.hipShift = 0; out.waistRoll = 0; out.headRoll = 0; // the S-curve: hips pushed sideways, a side bend at the waist, the neck tilted
   out.pelvisYaw = 0; out.chestYaw = 0; out.pelvisRoll = 0;
   if (mode === MODE.WALK) { // motion-captured gait (gait.js), blended walk -> run by speed
@@ -90,6 +91,8 @@ export function jointAngles(v, pose, out = {}) {
       out.bob *= g.bounce; out.chestYaw *= g.roll;
     }
     if (v.acc === 'bag') { out.sh[1] *= 0.3; out.elbow[1] = 0.1; } // the hand with the bag hangs
+    const ph0 = pose.phase || 0; // the hem lifts behind with speed and sways with each step
+    out.tailFlare = Math.min(0.6, 0.05 + speed * 0.08) + 0.05 * Math.sin(ph0 * 2); out.tailSide = 0.08 * Math.sin(ph0);
     if (PROPORTION.pose) { // the manga look: a looser, swaggering walk
       out.chestYaw *= 2.4; out.pelvisYaw = (out.pelvisYaw || 0) * 2.0; out.pelvisRoll *= 2.0; out.lean -= 0.06;
       for (let q = 0; q < 2; q++) { out.sh[q] *= 1.25; out.elbow[q] += 0.3; out.abd[q] += 0.06; }
@@ -119,6 +122,7 @@ export function jointAngles(v, pose, out = {}) {
       out.headPitch -= 0.25; out.lean += 0.06;
     } else if (pose.idle) { out.poseKind = pose.poseKind; idleAct(pose.idle, pose.idleK ?? 1, t + seed * 3, out); }
     else if (PROPORTION.pose) relaxed(out, seed, t); // the manga look: everyone stands at ease, never straight
+    else if (PROPORTION.swag) street(out, seed, t); // the Spider-Verse look: a loose street stance
   } else if (mode === MODE.SIT) {
     out.pelvisY = SEAT_H / s + 0.075;
     set2(out, 'hip', 1.5, 1.5); set2(out, 'knee', -1.48, -1.48); set2(out, 'ankle', 0, 0);
@@ -189,7 +193,29 @@ function relaxed(out, seed, t) {
     else { out.sh[q] = 0.1; out.abd[q] = 0.32; out.elbow[q] = 0.55; out.wrist[q] = -0.3; } // hanging, a loose fist, the elbow out
   }
   out.shY[st] -= 0.015; out.spineRoll += sgS * 0.12; out.spineLean -= 0.1; // the S continues up through the trunk, the chest lifted
+  out.tailFlare = 0.1; out.tailSide = sgS * 0.22; // the coat swept out to one side
   out.headRoll += sgS * 0.18; out.headYaw += 0.3 * side; out.headPitch += -0.14 + b; out.lean -= 0.07;
+  ground(out, 1);
+}
+
+// the Spider-Verse look's stance (owner: only Classic stays stiff): loose and lived-in, not posed:
+// the weight dropped on one leg with the hip out, the chest sunk and the shoulders rounded, the
+// head tilted and nodding to a beat; hands in the hoodie pocket, arms crossed leaning back, or one
+// hand in a pocket and the other hanging loose
+function street(out, seed, t) {
+  const side = Math.sin(seed * 5.7) > 0 ? 1 : -1, st = side > 0 ? 1 : 0, free = 1 - st, sgS = st === 1 ? 1 : -1;
+  const nod = Math.max(0, Math.sin(t * 4.2 + seed)) ** 2, kind = Math.floor(((Math.sin(seed * 11.3) + 1) / 2) * 2.999);
+  out.hipShift += sgS * 0.06; out.pelvisRoll += sgS * 0.12; out.waistRoll -= sgS * 0.1; out.spineRoll -= sgS * 0.06;
+  out.pelvisYaw = (out.pelvisYaw || 0) + 0.22 * side; out.chestYaw = (out.chestYaw || 0) - 0.1 * side;
+  out.spineLean += 0.14; out.lean -= 0.04; out.shY[0] += 0.012; out.shY[1] += 0.012; // a sunk chest, shoulders up and round
+  out.legAbd[st] = 0.05; out.legAbd[free] = 0.2; out.legYaw[st] = 0.25; out.legYaw[free] = 0.4;
+  out.knee[st] = -0.04; out.knee[free] = -0.38; out.hip[free] = 0.16; out.toe[free] = 0.15;
+  if (kind === 0) for (let q = 0; q < 2; q++) { out.sh[q] = 0.12; out.abd[q] = 0.1; out.armTwist[q] = 1.0; out.elbow[q] = 1.15; out.wrist[q] = 0.1; } // hands in the front pocket
+  else if (kind === 1) { // arms crossed, leaning back
+    for (let q = 0; q < 2; q++) { out.sh[q] = 0.32; out.abd[q] = 0.12; out.armTwist[q] = 1.25; out.elbow[q] = 1.75; }
+    out.sh[0] = 0.4; out.elbow[0] = 1.85; out.spineLean -= 0.3; out.lean -= 0.06;
+  } else { out.sh[st] = -0.1; out.abd[st] = 0.32; out.elbow[st] = 0.85; out.sh[free] = 0.12; out.abd[free] = 0.22; out.elbow[free] = 0.5; out.wrist[free] = -0.3; }
+  out.headRoll += sgS * 0.15; out.headYaw += 0.25 * side; out.headPitch += -0.04 + 0.07 * nod;
   ground(out, 1);
 }
 
@@ -229,8 +255,9 @@ function idleAct(kind, k, t, out) {
     out.pelvisYaw = mix(out.pelvisYaw, P.pelvisYaw, k); out.chestYaw = mix(out.chestYaw, P.chestYaw, k);
     out.lean = mix(out.lean, P.lean + b, k); out.pelvisRoll = mix(out.pelvisRoll, P.roll, k);
     out.headYaw = mix(out.headYaw, P.headYaw, k); out.headPitch = mix(out.headPitch, P.headPitch, k);
-    for (const key of ['hip', 'knee', 'sh', 'abd', 'elbow', 'legAbd', 'legYaw', 'toe', 'foreRoll', 'wrist', 'shY']) if (P[key] || ['hip', 'knee', 'sh', 'abd', 'elbow'].includes(key)) for (let q = 0; q < 2; q++) out[key][q] = mix(out[key][q], (P[key] || [0, 0])[q], k);
+    for (const key of ['hip', 'knee', 'sh', 'abd', 'elbow', 'legAbd', 'legYaw', 'toe', 'foreRoll', 'wrist', 'shY', 'armTwist']) if (P[key] || ['hip', 'knee', 'sh', 'abd', 'elbow'].includes(key)) for (let q = 0; q < 2; q++) out[key][q] = mix(out[key][q], (P[key] || [0, 0])[q], k);
     for (const key of SCALARS) out[key] = mix(out[key], P[key] ?? out[key], k);
+    out.tailFlare = mix(out.tailFlare, P.tailFlare ?? 0.3, k); out.tailSide = mix(out.tailSide, P.tailSide ?? 0.35 * Math.sign(P.roll || 1), k); // a pose throws the coat out
     out.pelvisY = BODY.pelvisY; ground(out, k); // (re-grounded from scratch: the stance's own drop is replaced)
   } else if (kind === IDLE.HIPS) { // hands on the hips, waiting
     for (let q = 0; q < 2; q++) { out.sh[q] = mix(out.sh[q], -0.25, k); out.abd[q] = mix(out.abd[q], 0.55, k); out.elbow[q] = mix(out.elbow[q], 1.45, k); }
@@ -239,8 +266,8 @@ function idleAct(kind, k, t, out) {
 }
 
 const IDLE_J = {};
-const PAIRS = ['hip', 'knee', 'ankle', 'sh', 'abd', 'elbow', 'legAbd', 'legYaw', 'shY', 'wrist', 'toe', 'foreRoll'];
-const SCALARS = ['hipShift', 'waistRoll', 'headRoll', 'spineLean', 'spineRoll', 'spineYaw', 'pelvisPitch', 'hipThrust'];
+const PAIRS = ['hip', 'knee', 'ankle', 'sh', 'abd', 'elbow', 'legAbd', 'legYaw', 'shY', 'wrist', 'toe', 'foreRoll', 'armTwist'];
+const SCALARS = ['hipShift', 'waistRoll', 'headRoll', 'spineLean', 'spineRoll', 'spineYaw', 'pelvisPitch', 'hipThrust', 'tailFlare', 'tailSide'];
 
 /**
  * Optional motion layer (the player; crowds leave these unset): pose.blend 0..1 mixes the idle
@@ -282,7 +309,7 @@ function motion(v, pose, out) {
 // translation or an axis rotation touches only a few columns: much cheaper than general
 // Matrix4 products (a crowd poses ~15 parts x 1000 figures every frame).
 const mat = () => new Float32Array(16); // same type as the instance buffers: copying is a memcpy
-const M = Array.from({ length: 12 }, mat);
+const M = Array.from({ length: 13 }, mat);
 const T1 = mat(); // a scratch matrix for stretched parts (PROPORTION)
 function copy(d, s) { d.set(s); return d; }
 function tr(m, x, y, z) { for (let r = 0; r < 3; r++) m[12 + r] += x * m[r] + y * m[4 + r] + z * m[8 + r]; return m; }
@@ -317,7 +344,7 @@ function root(m, x, y, z, rotY, s) {
 function keys(v) {
   const k = v._k;
   if (!k || k.h !== v.hair || k.t !== v.top || k.a !== v.acc) {
-    v._k = { h: v.hair, t: v.top, a: v.acc, hair: `hair:${v.hair}`, top: `top:${v.top}`, shirt: 'top:shirt', acc: `acc:${v.acc}`, belly: `belly:${v.top}`,
+    v._k = { h: v.hair, t: v.top, a: v.acc, hair: `hair:${v.hair}`, top: `top:${v.top}`, shirt: 'top:shirt', acc: `acc:${v.acc}`, belly: `belly:${v.top}`, tail: `tail:${v.top}`,
       hairCol: v.colours.hairTint ? 'hairTint' : 'hair',
       loHair: `lo:hair:${LO_HAIR[v.hair]}`, loTop: v.top === 'dress' || v.top === 'coat' ? 'lo:top:long' : 'lo:top:short' };
   }
@@ -350,7 +377,13 @@ export function poseFigure(v, pose, emit, J = jointAngles(v, pose), lo = false) 
   const split = PR.spine && !lo;
   const longTop = v.top === 'dress' || v.top === 'coat';
   emit(lo ? (seated ? 'lo:top:short' : K.loTop) : longTop && seated ? K.shirt : K.top, torso, 'top');
-  if (split) emit(longTop && seated ? 'belly:shirt' : K.belly, sc(copy(M[11], belly), tsx, 1, tsz), 'top');
+  if (split) {
+    emit(longTop && seated ? 'belly:shirt' : K.belly, sc(copy(M[11], belly), tsx, 1, tsz), 'top');
+    if (longTop && !seated) { // the hem: hung from the hips, flared back and swept sideways
+      const tm = tr(rx(rz(tr(copy(M[12], belly), 0, HEM_AT, 0), J.tailSide || 0), -(J.tailFlare || 0)), 0, -HEM_AT, 0);
+      emit(K.tail, sc(tm, tsx, 1, tsz), 'top');
+    }
+  }
   if (v.acc === 'backpack') emit(lo ? 'lo:backpack' : K.acc, torso, 'acc');
   const hs = v.headScale * PR.head;
   const head = sc(rz(ry(rx(tr(copy(M[5], chest), 0, BODY.neckY, 0), J.headPitch), J.headYaw), J.headRoll || 0), hs, hs, hs);
@@ -361,6 +394,7 @@ export function poseFigure(v, pose, emit, J = jointAngles(v, pose), lo = false) 
     let sh = J.sh[q], el = J.elbow[q];
     if (q === 1 && v.acc === 'umbrella' && mode !== MODE.CYCLE) { sh = 0.7; el = 1.5; }
     const arm = rz(rx(tr(copy(M[6], chest), sg * BODY.shoulderX * w * PR.shoulder, BODY.shoulderY + (J.shY ? J.shY[q] : 0), 0), sh), sg * J.abd[q]);
+    if (J.armTwist && J.armTwist[q]) ry(arm, sg * J.armTwist[q]);
     emit(lo ? 'lo:upperArm' : 'upperArm', PR.arm === 1 ? arm : sc(copy(T1, arm), 1, PR.arm, 1), 'top');
     const fore = ry(rx(tr(copy(M[7], arm), 0, -BODY.upperArm * PR.arm, 0), el), J.foreRoll ? sg * J.foreRoll[q] : 0);
     emit(lo ? 'lo:foreArm' : 'foreArm', PR.arm === 1 ? fore : sc(copy(T1, fore), 1, PR.arm, 1), 'top');
