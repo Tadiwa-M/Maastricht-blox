@@ -51,6 +51,7 @@ export class FigureCrowd {
     const geos = { ...Object.fromEntries(Object.keys(LIMBS).map((k) => [k, P[k]])) };
     for (const s of HAIR_STYLES) geos[`hair:${s}`] = P.hair[s];
     for (const s of TOP_STYLES) geos[`top:${s}`] = P.top[s];
+    if (P.belly) for (const s of TOP_STYLES) geos[`belly:${s}`] = P.belly[s]; // the manga figure's torso is in two (a bending spine)
     for (const a of ACCESSORIES) if (a !== 'none') geos[`acc:${a}`] = P.acc[a];
     if (lod) {
       for (const k of ['head', 'hips', 'upperArm', 'foreArm', 'thigh', 'shin', 'backpack']) geos[`lo:${k}`] = P.lo[k];
@@ -60,7 +61,10 @@ export class FigureCrowd {
     this.meshes = new Map();
     for (const [key, geo] of Object.entries(geos)) {
       const n = (key.startsWith('lo:') || key === 'acc:umbrella' || !lod ? cap : Math.min(cap, hiCap)) * (LIMBS[key] || 1);
-      const mesh = new THREE.InstancedMesh(mangaShape(key, geo), this.materialFor(key), n);
+      const fash = LOOK === 'manga' && (key.startsWith('top:') || key.startsWith('belly:')); // the manga top's fashion per figure (print, chain): figure/custom.js
+      const mesh = new THREE.InstancedMesh(fash ? mangaShape(key, geo).clone() : mangaShape(key, geo), this.materialFor(key), n); // (own copy: each crowd its own fashion data)
+      let f = null;
+      if (fash) { f = new THREE.InstancedBufferAttribute(new Float32Array(n), 1); f.setUsage(THREE.DynamicDrawUsage); mesh.geometry.setAttribute('aFash', f); }
       mesh.name = `figure:${key}`;
       mesh.count = 0;
       mesh.frustumCulled = false;
@@ -71,7 +75,7 @@ export class FigureCrowd {
       this.group.add(mesh);
       const outline = OUTLINE_ON ? outlineFor(mesh) : null; // ink line round the figure (render/outline.js)
       if (outline) this.group.add(outline);
-      this.meshes.set(key, { mesh, outline, n: 0, cap: n, m: mesh.instanceMatrix.array, c: mesh.instanceColor.array });
+      this.meshes.set(key, { mesh, outline, n: 0, cap: n, m: mesh.instanceMatrix.array, c: mesh.instanceColor.array, f });
     }
     // contact shadows: a soft darkening of the ground under each figure's feet (multiplied in), so
     // people stand on the street instead of floating over it (the AO pass is off at street level)
@@ -95,6 +99,7 @@ export class FigureCrowd {
       e.m.set(mat, i * 16);
       const c = this._cols[colourKey] || this._cols.top;
       e.c[i * 3] = c.r; e.c[i * 3 + 1] = c.g; e.c[i * 3 + 2] = c.b;
+      if (e.f) e.f.array[i] = this._fash;
     };
   }
 
@@ -127,7 +132,7 @@ export class FigureCrowd {
     const e0 = this.eye;
     if (e0 && this.cullDist2 && (pose.x - e0.x) ** 2 + (pose.y - e0.y) ** 2 + (pose.z - e0.z) ** 2 > this.cullDist2) return false; // too small to see
     this.count++;
-    this._cols = variantColours(v);
+    this._cols = variantColours(v); this._fash = v.fashion || 0;
     let lo = false;
     if (this.lod) {
       const e = this.eye;
@@ -146,7 +151,7 @@ export class FigureCrowd {
   /** Add loose parts of a figure (scattered pieces): parts = [{ key, mat: Float32Array(16), colourKey }]. */
   addParts(v, parts) {
     if (this.hold) return;
-    this._cols = variantColours(v);
+    this._cols = variantColours(v); this._fash = v.fashion || 0;
     for (const p of parts) this._emit(p.key, p.mat, p.colourKey);
   }
 
@@ -161,6 +166,7 @@ export class FigureCrowd {
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
     }
+    for (const { f } of this.meshes.values()) if (f) f.needsUpdate = true;
   }
 
   /** Meshes that draw (= draw calls of the crowd in the main pass). */

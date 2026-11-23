@@ -10,6 +10,8 @@ const CLOTHES = [44, 38, 8, 37, 41, 20, 45, 43, 4, 9, 42, 21, 17, 11, 15, 6, 16,
 const SHOE_COLS = [11, 7, 8, 10, 5, 21, 38, 44, 37];
 export const HAIR_COLOURS = [...HAIR, ...GREY_HAIR];
 export const HEADWEAR = new Set(['cap', 'beanie', 'hat']);
+/** The manga top prints, in the order the shader knows them (0 auto: picked from the colour). */
+export const PRINTS = ['auto', 'plain', 'stripes', 'zigzag', 'hearts', 'checks', 'panel'];
 
 /** Every choice: key, label, its options (values; colours are hex strings) and when(values) it applies. */
 export const CHOICES = [
@@ -25,6 +27,9 @@ export const CHOICES = [
   { key: 'shoeCol', label: 'Shoes', values: SHOE_COLS.map((i) => PALETTE_HEX[i]), colour: true },
   { key: 'acc', label: 'Carrying', values: ACCESSORIES.filter((a) => a !== 'umbrella') },
   { key: 'accCol', label: 'Bag colour', values: CLOTHES.map((i) => PALETTE_HEX[i]), colour: true, when: (c) => c.acc !== 'none' },
+  // the manga look's fashion (render/figuresurface.js MANGA_FASHION): the top's print and the gold chain
+  { key: 'print', label: 'Print (Manga)', values: PRINTS },
+  { key: 'chain', label: 'Chain (Manga)', values: ['on', 'off'] },
 ];
 const BY_KEY = Object.fromEntries(CHOICES.map((c) => [c.key, c]));
 
@@ -49,6 +54,7 @@ export function defaultChoices(seed = 52) {
     hair: idx('hair', v.hair), hairCol: idx('hairCol', v.colours.hair), hatCol: idx('hatCol', v.colours.hat),
     top: idx('top', v.top), topCol: idx('topCol', v.colours.top), bottomCol: idx('bottomCol', v.colours.bottom),
     shoeCol: idx('shoeCol', v.colours.shoe), acc: idx('acc', v.acc === 'umbrella' ? 'none' : v.acc), accCol: idx('accCol', v.colours.acc),
+    print: 0, chain: 0,
   };
 }
 
@@ -65,6 +71,7 @@ export function customVariant(ch) {
     },
   };
   if (HEADWEAR.has(hair)) v.colours.hairTint = v.colours.hat;
+  v.fashion = clampIdx('print', ch.print) + (val('chain') === 'off' ? 8 : 0); // (one number for the shader: print + 8 without the chain)
   return v;
 }
 
@@ -88,6 +95,7 @@ export function randomChoices(rand = Math.random) {
 
 // text code: one base-36 digit per choice, in CHOICES order, prefixed with a version letter
 const VERSION = 'a';
+const FIRST_CHOICES = 12; // the choices the first codes had
 
 export function encodeChoices(ch) {
   return VERSION + CHOICES.map((c) => clampIdx(c.key, ch[c.key]).toString(36)).join('');
@@ -95,9 +103,11 @@ export function encodeChoices(ch) {
 
 /** Choices from a code, or null if it isn't one (unknown version, wrong length, bad digit). */
 export function decodeChoices(code) {
-  if (typeof code !== 'string' || code[0] !== VERSION || code.length !== CHOICES.length + 1) return null;
+  // (codes saved before later choices were added are shorter: the missing ones take their first option)
+  if (typeof code !== 'string' || code[0] !== VERSION || code.length > CHOICES.length + 1 || code.length < FIRST_CHOICES + 1) return null;
   const ch = {};
   for (let q = 0; q < CHOICES.length; q++) {
+    if (q + 1 >= code.length) { ch[CHOICES[q].key] = 0; continue; }
     const i = parseInt(code[q + 1], 36);
     if (!Number.isInteger(i) || i >= CHOICES[q].values.length) return null;
     ch[CHOICES[q].key] = i;

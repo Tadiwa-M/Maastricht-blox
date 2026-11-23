@@ -1085,3 +1085,21 @@ Open: the verse figure's own face design; a stepped (on-twos) animation for the 
   (or in a pocket), the other hanging in a loose fist; longer legs (leg 1.17).
   Open: a real S through the trunk needs the torso split in two (abdomen and chest); coat tails
   that flare.
+- (Owner, with two more references: "understand the levels of these poses", the whole body is a
+  bow.) More bend points: the manga torso is now in two (`animeparts.js` `splitTop`: abdomen with
+  the coat or skirt, and chest, cut at `SPLIT` 0.27 with a waist filler; both keep the torso's own
+  coordinates so prints and inked muscles stay put; a long piece across the cut goes whole to one
+  side), drawn by `poseFigure` as `belly:<style>` + `top:<style>` when `PROPORTION.spine`; the
+  chest bends about the waist (`spineLean`, `spineRoll`, `spineYaw`); the pelvis tips
+  (`pelvisPitch`, the legs keep their angles) and thrusts forward (`hipThrust`); pointed toes
+  (`toe`, counted in `ground()`); a forearm twist (`foreRoll`). Two new stances: the reach (flung
+  low over a folded knee, the back leg out straight, a hand driving forward) and the backbend
+  (hips thrust, the chest arched back into a C, chin curled to the hand at the brow, up on one
+  toe); the default S stance continues up through the trunk.
+- Outfits: the character creator gains Print (Manga: auto, plain, stripes, zigzag, hearts, checks,
+  panel) and Chain (on/off), carried to the shader per figure (`aFash` on the manga top meshes;
+  each crowd its own geometry copy so the player's choice is not overwritten by the city's).
+  Older saved codes still load (the new choices take their first option).
+- Fixed: the Look menu and the saved figure shared the storage key `blox.look`, so saving a
+  figure reset the look to Classic and switching look erased the figure. The look is now
+  `blox.style` (an old saved look still counts).

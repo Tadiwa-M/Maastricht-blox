@@ -141,6 +141,32 @@ const shoe = () => merge([ // a pointed dress shoe (origin: the ankle)
   place(tint(new THREE.ConeGeometry(0.042, 0.1, 6), 1), { at: [0, -0.05, -0.15], rot: [-Math.PI / 2, 0, 0], scale: [1, 1, 0.6] }),
   place(rbox(0.086, 0.016, 0.26, 0.007, 0.35, 1), { at: [0, -0.072, -0.06] })]);
 
+// the torso in two (owner: the poses need to bend through the trunk): the abdomen (with the coat or
+// skirt below it) and the chest, split at SPLIT; a small triangle across the cut goes in both, and a
+// waist filler hides the gap when the spine bends. Both stay in the torso's own coordinates (the
+// chest bends about the cut), so prints and the inked muscles stay put.
+export const SPLIT = 0.27;
+function splitTop(geo, style) {
+  const pos = geo.attributes.position, nor = geo.attributes.normal, col = geo.attributes.color, idx = geo.index;
+  const tri = idx ? idx.count / 3 : pos.count / 3, at = (k) => (idx ? idx.getX(k) : k);
+  const parts = [[], []]; // [upper, belly]
+  for (let t = 0; t < tri; t++) {
+    const v = [at(3 * t), at(3 * t + 1), at(3 * t + 2)], ys = v.map((i) => pos.getY(i));
+    const lo = Math.min(...ys), hi = Math.max(...ys), mid = (ys[0] + ys[1] + ys[2]) / 3;
+    if (hi - lo > 0.12) parts[mid > SPLIT ? 0 : 1].push(...v); // a long piece across the cut (a coat's front) goes whole to one side
+    else { if (hi > SPLIT - 0.01) parts[0].push(...v); if (lo < SPLIT + 0.01) parts[1].push(...v); }
+  }
+  const build = (list) => {
+    const g = new THREE.BufferGeometry(), P = new Float32Array(list.length * 3), N = new Float32Array(list.length * 3), C = new Float32Array(list.length * 3);
+    list.forEach((i, k) => { P.set([pos.getX(i), pos.getY(i), pos.getZ(i)], 3 * k); N.set([nor.getX(i), nor.getY(i), nor.getZ(i)], 3 * k); C.set([col.getX(i), col.getY(i), col.getZ(i)], 3 * k); });
+    g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3));
+    return g;
+  };
+  const wide = style === 'coat' ? 1.1 : style === 'jacket' ? 1.07 : 1.0, deep = style === 'coat' ? D + 0.14 : style === 'jacket' ? D + 0.06 : D;
+  const filler = place(sphere(0.152, 1, 16, 8), { at: [0, SPLIT, 0], scale: [wide, 0.55, deep] });
+  return { upper: merge([build(parts[0])]), belly: merge([build(parts[1]), filler]) };
+}
+
 let cache = null;
 /** The manga figure's part geometries, keyed exactly as FIGURE_PARTS (far LOD and accessories shared). */
 export function ANIME_PARTS() {
@@ -148,6 +174,7 @@ export function ANIME_PARTS() {
   const P = FIGURE_PARTS();
   cache = { ...P, head: head(), hips: hips(), upperArm: upperArm(), foreArm: foreArm(), hand: hand(), thigh: thigh(), shin: shin(), shoe: shoe(),
     hair: Object.fromEntries(Object.keys(P.hair).map((s) => [s, hair(s)])),
-    top: Object.fromEntries(Object.keys(P.top).map((s) => [s, top(s)])) };
+    top: {}, belly: {} };
+  for (const st of Object.keys(P.top)) { const { upper, belly } = splitTop(top(st), st); cache.top[st] = upper; cache.belly[st] = belly; }
   return cache;
 }

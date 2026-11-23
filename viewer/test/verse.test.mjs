@@ -32,3 +32,10 @@ test('animation on twos: a new pose 12 times a second', () => {
   for (let t = 1 / 60; t < 1; t += 1 / 60) { const k = twosTick(t); if (k !== prev) changes++; prev = k; }
   assert.ok(changes >= VERSE.twosHz - 1 && changes <= VERSE.twosHz, `${changes} new poses in a second`);
 });
+
+test('the look and the saved figure keep separate storage: saving a figure does not reset the look', () => {
+  const data = { 'blox.style': 'manga', 'blox.look': 'a0123456789ab' }; // a figure code under the figure's key
+  const st = { getItem: (k) => data[k] ?? null };
+  assert.equal(chooseLook('', st), 'manga');
+  assert.equal(chooseLook('', { getItem: (k) => (k === 'blox.look' ? 'verse' : null) }), 'verse', 'an old save still counts');
+});

@@ -1981,3 +1981,5 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - The Spider-Verse look gets its own figure (`figure/verseparts.js`, streetwear builds from the owner-approved mockup) and a bouncing street swagger walk (guide 06).
 - Rule (owner): each look adopts its own figures (build, face, proportions, motion) for immersion; added to CLAUDE.md.
 - Manga stance: new bend points (hip shift, waist side bend, shoulder raise, head tilt, wrists, flat feet on spread legs); the default stance is a dramatic S-curve (guide 06). Next (owner): finish the Spider-Verse and manga figures, then per-look vehicles (buses, boats, cyclists).
+- Manga: the torso in two with a bending spine, pelvis tip and thrust, pointed toes, forearm twist; new reach and backbend stances (guide 06).
+- Character creator: Manga print and chain choices. Fixed the look and the saved figure overwriting each other's storage (guide 06).

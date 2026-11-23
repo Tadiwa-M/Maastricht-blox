@@ -15,7 +15,7 @@
 // do something when they stand (phone, telling a story, looking around: rig.js IDLE), keep a
 // loose formation with their friends, and turn their heads to what is going on: the player
 // passing, the friend beside them, whatever made a noise.
-import { MODE, IDLE, PROPORTION, captureParts } from '../figure/rig.js';
+import { MODE, IDLE, PROPORTION, STAND_POSES, captureParts } from '../figure/rig.js';
 import { Scatter } from '../player/scatter.js';
 import { strideAt } from '../figure/gait.js';
 import { makeVariant } from '../figure/variants.js';
@@ -428,7 +428,7 @@ export class Pedestrians {
     const u = m.u ?? 0.5, hands = m.v.acc !== 'umbrella' && m.v.acc !== 'bag' && m.v.kind !== 'kid';
     m.acts = (m.acts || 0) + 1;
     const h = (u * 97.13 + m.acts * 0.618) % 1;
-    if (PROPORTION.pose && hands && h > 0.7) { m.poseKind = Math.floor(h * 97) % 5; return IDLE.POSE; } // the manga look: some strike a pose
+    if (PROPORTION.pose && hands && h > 0.7) { m.poseKind = Math.floor(h * 97) % STAND_POSES.length; return IDLE.POSE; } // the manga look: some strike a pose
     if (g.size > 1 && g.chat && g.shelter == null) return h < 0.7 ? IDLE.TALK : hands && h < 0.85 ? IDLE.HIPS : IDLE.NONE;
     return hands && h < 0.4 ? IDLE.PHONE : h < 0.75 ? IDLE.LOOK : hands && h < 0.87 ? IDLE.HIPS : IDLE.NONE;
   }

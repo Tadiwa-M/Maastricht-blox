@@ -67,3 +67,14 @@ test('rows that apply: hat colour only with headwear, no trousers under a dress,
   const dressed = { ...base, hair: idx('hair', 'cap'), top: idx('top', 'dress'), acc: idx('acc', 'backpack') };
   assert.ok(keys(dressed).includes('hatCol') && !keys(dressed).includes('bottomCol') && keys(dressed).includes('accCol'));
 });
+
+test('codes saved before the manga print and chain choices still load (the new ones take their first option)', () => {
+  const ch = defaultChoices();
+  const old = encodeChoices(ch).slice(0, 13); // the first codes had 12 choices
+  const back = decodeChoices(old);
+  assert.equal(back.print, 0); assert.equal(back.chain, 0);
+  assert.equal(back.hair, ch.hair);
+  assert.equal(decodeChoices('a12'), null, 'too short');
+  const v = customVariant({ ...ch, print: 2, chain: 1 });
+  assert.equal(v.fashion, 2 + 8, 'stripes, no chain');
+});

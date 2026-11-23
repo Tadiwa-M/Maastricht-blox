@@ -19,7 +19,7 @@ import { addPartVaryings } from './pools.js';
 export const FIGURE_LOOK = typeof location !== 'undefined';
 // the manga look: the heroic build of that world (figure/rig.js PROPORTION)
 if (LOOK === 'verse') setProportions({ shoulder: 1.06, chest: 1.0, waist: 0.9, leg: 1.16, head: 0.98, arm: 1.1, swag: true }); // lanky, swaggering
-if (LOOK === 'manga') setProportions({ shoulder: 1.12, chest: 1.06, waist: 0.92, leg: 1.17, head: 0.9, arm: 1.05, pose: true }); // (the anime figure carries most of the build itself)
+if (LOOK === 'manga') setProportions({ shoulder: 1.12, chest: 1.06, waist: 0.92, leg: 1.17, head: 0.9, arm: 1.05, pose: true, spine: true }); // (the anime figure carries most of the build itself)
 const FILM = PAINTED_LOOK;
 
 /**
@@ -62,7 +62,7 @@ export function figureKindOf(key) {
   if (k === 'head') return 'face';
   if (k === 'hand') return 'hand';
   if (k.startsWith('hair:')) return 'hair';
-  if (k.startsWith('top:')) return 'top';
+  if (k.startsWith('top:') || k.startsWith('belly:')) return 'top';
   if (k === 'upperArm' || k === 'foreArm') return 'sleeve';
   if (k === 'hips') return 'hips';
   if (k === 'thigh' || k === 'shin') return 'legs';
@@ -162,16 +162,20 @@ const KIND = {
 const MANGA_FASHION = {
   top: `
     float pick = fHash(vec3(floor(diffuseColor.r * 9.0), floor(diffuseColor.g * 9.0), floor(diffuseColor.b * 9.0))); // per outfit colour: the same print on a whole top
+    float fc = floor(vFash + 0.5), noChain = step(7.5, fc), pc = fc - 8.0 * noChain; // a player's own choice (figure/custom.js PRINTS), 0: auto
+    if (pc > 0.5) pick = pc < 1.5 ? -1.0 : pc < 2.5 ? 0.1 : pc < 3.5 ? 0.3 : pc < 4.5 ? 0.5 : pc < 5.5 ? 0.62 : 0.8;
     vec3 ink = c * 0.28, light = mix(c, vec3(1.0), 0.55);
-    if (pick < 0.2) c = mix(c, ink, step(0.5, fract(p.y * 18.0)));                                   // bold stripes
+    if (pick < -0.5) { } // plain
+    else if (pick < 0.2) c = mix(c, ink, step(0.5, fract(p.y * 18.0)));                                   // bold stripes
     else if (pick < 0.4) c = mix(c, light, step(0.5, fract(p.x * 14.0 + abs(fract(p.y * 7.0) - 0.5) * 2.0))); // zigzag
     else if (pick < 0.55) { vec2 q = fract(vec2(p.x, p.y) * 9.0) - 0.5; q.y -= abs(q.x) * 0.5; c = mix(c, vec3(0.95, 0.2, 0.45), step(length(q), 0.24)); } // hearts
     else if (pick < 0.7) c = mix(c, ink, step(0.0, sin(p.x * 50.0) * sin(p.y * 50.0)));                // checks
     else c = mix(c, vec3(1.0) - c * 0.6, step(0.06, abs(p.x)) * step(abs(p.x), 0.11));               // a contrast panel
     // a gold chain across the chest and a pin
     float chain = fLine(p.y - 0.4 + p.x * 0.6, 0.008) * step(0.0, -p.z) * step(-0.14, p.x) * step(p.x, 0.14);
+    chain *= 1.0 - noChain;
     c = mix(c, vec3(1.0, 0.78, 0.2) * (0.8 + 0.4 * step(0.5, fract(p.x * 90.0))), chain);
-    float pin = 1.0 - smoothstep(0.012, 0.016, length(vec2(p.x + 0.1, p.y - 0.46))); c = mix(c, vec3(0.95, 0.85, 0.3), pin * step(0.0, -p.z));
+    float pin = 1.0 - smoothstep(0.012, 0.016, length(vec2(p.x + 0.1, p.y - 0.46))); c = mix(c, vec3(0.95, 0.85, 0.3), pin * step(0.0, -p.z) * (1.0 - noChain));
     // muscles drawn through the cloth, as the manga inks them: the pecs' lower arcs, the sternum,
     // a six-pack of short hatches, the obliques; on the back the shoulder blades
     float mf = step(p.z, -0.02), mb = step(0.02, p.z);
@@ -263,6 +267,10 @@ export function figureMaterialFor(base, kind) {
   }
   m.onBeforeCompile = (sh) => {
     addPartVaryings(sh);
+    if (LOOK === 'manga' && kind === 'top') { // the figure's own print and chain (crowd.js aFash)
+      sh.vertexShader = 'attribute float aFash;\nvarying float vFash;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vFash = aFash;');
+      sh.fragmentShader = 'varying float vFash;\n' + sh.fragmentShader;
+    }
     sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       { vec3 c = diffuseColor.rgb; vec3 p = vLocP; ${spec.glsl} ${LOOK === 'manga' ? MANGA_FASHION[kind] || '' : LOOK === 'verse' && kind === 'face' ? MANGA_FASHION.face : ''}
       ${LOOK === 'manga' ? MANGA_PALETTE : FILM ? FILM_PALETTE : ''}

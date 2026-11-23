@@ -11,7 +11,7 @@ export const VERSE = { twosHz: 12, maxSlip: 1.3, focusSpan: 1.0 };
 export const lookFromHash = (hash) => /(?:^|[#&])look=(verse|manga)(?:&|$)/.exec(hash || '')?.[1] || null;
 /** Looks offered in the pause menu (manga stays a test flag until it is right). */
 export const MENU_LOOKS = [{ id: null, name: 'Classic' }, { id: 'verse', name: 'Spider-Verse' }, { id: 'manga', name: 'Manga' }]; // (menu/looks.js describes them)
-const STORE_KEY = 'blox.look';
+const STORE_KEY = 'blox.style'; // (not 'blox.look': that is the player's saved figure, figure/custom.js; older saves are read once below)
 const safeStore = () => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } };
 
 /** The look for a page: the address (#look=verse|manga|classic) wins, then the saved choice. */
@@ -19,7 +19,10 @@ export function chooseLook(hash, store = safeStore()) {
   const h = lookFromHash(hash);
   if (h) return h;
   if (/(?:^|[#&])look=classic(?:&|$)/.test(hash || '')) return null;
-  try { const s = store?.getItem(STORE_KEY); return s === 'verse' || s === 'manga' ? s : null; } catch { return null; }
+  try {
+    const s = store?.getItem(STORE_KEY) ?? store?.getItem('blox.look'); // (the old shared key, if it still holds a look)
+    return s === 'verse' || s === 'manga' ? s : null;
+  } catch { return null; }
 }
 
 /** The look of this page: null (the toy look), 'verse' (comic colour) or 'manga' (ink and screentone). */
