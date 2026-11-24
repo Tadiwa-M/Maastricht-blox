@@ -8,6 +8,7 @@ import { comicFx } from '../render/comicfx.js';
 import { WEAPONS, PICKUP_R, PICKUP_BACK_S, Gun, spreadDir, hitTest, wallT, meleeTarget, pickupSpots, savedPrimary, REGEN } from './weapons.js';
 import { TEAM_HEX } from './model.js';
 import { standSpot } from '../player/spot.js';
+import { usablePads } from '../player/input.js';
 
 const HIP_DIST = 2.6, EYE_DIST = 0.05, TRACER_S = 0.09, DARK = '#4b4f5c';
 export const COMBAT_SHOULDER = 0.85; // m: the hip-fire camera over the right shoulder
@@ -505,8 +506,10 @@ export class Combat {
 
   /** Gamepad: RT fire, LT aim, X reload, Y next weapon, right stick click stab. */
   pollPad() {
-    const pad = [...(navigator.getGamepads?.() || [])].find((g) => g && g.connected);
-    const b = (i) => !!pad && (pad.buttons[i]?.pressed || pad.buttons[i]?.value > 0.4);
+    // (owner's laptop listed two gamepads: the first was not the real one and the triggers did nothing)
+    // every usable controller counts, a button pressed on any of them
+    const pads = usablePads();
+    const b = (i) => pads.some((pad) => pad.buttons[i]?.pressed || pad.buttons[i]?.value > 0.4);
     const was = this.pad || {};
     this.pad = { fire: b(7), aim: b(6), reload: b(2), swap: b(3), stab: b(11) };
     if (this.pad.fire !== !!was.fire) { this.fire = this.pad.fire; if (this.pad.fire) this.tap = true; }

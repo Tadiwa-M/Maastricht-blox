@@ -131,3 +131,12 @@ test('touch stick: dead zone, rescaled walk, run only when pushed right out; loo
   const [big] = smoothTouchLook(slow, [30, 0], 0.1); // at 10 fps nearly everything at once (no lag)
   assert.ok(big > 29);
 });
+
+test('usablePads: two listed gamepads both count when usable; an odd extra device is skipped', async () => {
+  const { usablePads } = await import('../src/player/input.js');
+  const std = (id) => ({ id, connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: [] });
+  const odd = { id: 'Keyboard-ish', connected: true, mapping: '', axes: [0], buttons: [] };
+  const nav = { getGamepads: () => [odd, std('Real pad'), null, std('Virtual pad'), { ...std('Gone'), connected: false }] };
+  assert.deepEqual(usablePads(nav).map((p) => p.id), ['Real pad', 'Virtual pad']);
+  assert.deepEqual(usablePads({}), []);
+});

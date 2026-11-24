@@ -241,3 +241,8 @@ Owner: one really good game mode; more guns, pickups and loadouts; think Call of
 - The shooting camera: from the hip over the right shoulder (0.85 m; the figure left of the
   crosshair), aiming at the eyes; the figure fades while the camera passes through it. The gun
   sits in the right hand with its barrel through the left (support) hand.
+
+- (2026-11-24, owner: R2 did not fire, L2 did not aim; `navigator.getGamepads()` listed two pads.) Combat read only the
+  first connected gamepad, movement any usable one; if the first was an extra or virtual device the sticks worked
+  and the triggers did nothing. `input.js usablePads` (connected, standard layout or >= 4 axes) is now the one
+  list; combat treats a button pressed on any of them as pressed.

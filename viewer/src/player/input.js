@@ -19,6 +19,12 @@ import { StickLook, mouseLook } from './look.js';
 import { SETTINGS_DEFAULTS } from './settings.js';
 import { escapeIsOurs } from '../loading.js';
 
+/** The controllers to read: connected, standard layout (or enough axes to be a pad), not the extra devices some laptops list. */
+export function usablePads(nav = typeof navigator !== 'undefined' ? navigator : null) {
+  const list = nav?.getGamepads ? [...nav.getGamepads()].filter((p) => p && p.connected) : [];
+  return list.filter((p) => p.mapping === 'standard' || p.axes.length >= 4);
+}
+
 export const BINDINGS = {
   keys: {
     forward: ['KeyW', 'ArrowUp'], back: ['KeyS', 'ArrowDown'],
@@ -237,10 +243,7 @@ export class Input {
 
   releaseLock() { if (this.locked && document.exitPointerLock) document.exitPointerLock(); }
 
-  pads() {
-    const list = navigator.getGamepads ? [...navigator.getGamepads()].filter((p) => p && p.connected) : [];
-    return list.filter((p) => p.mapping === 'standard' || p.axes.length >= 4);
-  }
+  pads() { return usablePads(); }
 
   /** Touch state with the look drag spread over a few frames (smoothTouchLook). */
   readTouch(dt) {

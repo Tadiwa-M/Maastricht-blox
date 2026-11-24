@@ -1996,3 +1996,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Controller: Share takes photos and postcards, Y/RB the Stand's rush and ability, R3 a pose, L3 the character, d-pad journal, trip planner and songs; Start pauses (guide 09).
 - Spider-Verse panel: thin by default, the full frame only on comic beats (owner: too big) (guide 06).
 - Posing: the camera can be orbited during the posing shot; people nearby pose with you (guide 06).
+- Controller in matches: R2/L2 now read every usable gamepad, not just the first one listed (guide 18).
