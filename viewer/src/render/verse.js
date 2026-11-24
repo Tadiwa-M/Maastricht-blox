@@ -175,21 +175,22 @@ const shader = {
       // Shadow colour is the material darkened and nudged toward blue-violet, not replaced by a flat tint.
       // (owner: the shade was a tad too dark and blue: grey roofs and paving went navy, so the shade
       // is lifted and only nudged violet; colourless stone keeps its grey instead of turning blue)
-      vec3 shC = base * vec3(0.7, 0.68, 0.76);
+      // (owner: too dark, the detail in the shade was lost: a little lighter again, still a clear mass)
+      vec3 shC = base * vec3(0.8, 0.78, 0.86);
       shC = mix(shC, cool * (0.62 + 0.22 * L), 0.14 + materialColour * 0.06);
       vec3 c = mix(shC, litC, litK);
       // vivid like the anime: far more colour, a little more contrast, and split toning: the light
       // golden, the shade blue-violet (the shadows stay as dark as they are)
       // (the saturation push only on surfaces with a colour of their own: on grey it only made the tint)
       c = mix(vec3(luma(c)), c, mix(1.12, 1.55, materialColour));
-      c = (c - 0.5) * 1.06 + 0.5;
-      c += mix(vec3(-0.015, 0.0, 0.035), vec3(0.07, 0.03, -0.06), smoothstep(0.15, 0.7, luma(c)));
+      c = (c - 0.5) * 1.03 + 0.5;
+      c += mix(vec3(-0.015, 0.0, 0.035), vec3(0.045, 0.02, -0.04), smoothstep(0.15, 0.7, luma(c)));
       c = max(c, 0.0);
       // Fine pigment variation plus long, soft brush strokes; both stay subtle to avoid screen-door noise.
       float brush = hNoise(vec2(f.x * 0.045 + f.y * 0.015, f.y * 0.3)) * 0.6 + hNoise(vec2(f.x * 0.11, f.y * 0.7 + f.x * 0.03)) * 0.4;
       float pigment = hNoise(f * 0.19 + vec2(4.1, 8.7));
       c *= mix(1.0, (0.97 + 0.06 * brush) * (0.985 + 0.03 * pigment), 1.0 - sky); // (the grain off the sky, not the colour)
-      c = mix(c, vec3(0.06, 0.035, 0.1), 1.0 - smoothstep(0.03, 0.05, L)); // the deepest dark: ink
+      c = mix(c, vec3(0.06, 0.035, 0.1), 1.0 - smoothstep(0.015, 0.03, L)); // the deepest dark: ink (only the very darkest)
       vec3 skyc = mix(mSkyB, mSkyA, 0.35) * mix(1.0, 0.45, night); // (the haze colour)
       c = mix(c, mangaSky(vUv) * mix(1.0, 0.45, night), sky);
       float haze = smoothstep(360.0, 1500.0, z) * (1.0 - sky);
@@ -198,7 +199,7 @@ const shader = {
       c = mix(c, farTone, haze);
       float hs = (1.0 - litK) * smoothstep(0.12, 0.2, L) * 0.26;
       float hk = inkHatch(f, nrmM, hs, 4.0) * nearK;
-      c = mix(c, c * 0.42, hk * 0.68 * (1.0 - sky));
+      c = mix(c, c * 0.55, hk * 0.5 * (1.0 - sky)); // (hatching lighter: it hid the detail it shades)
       // lines: a dark shade of the local colour, full at silhouettes, light at creases, thinner far off
       float ink = max(dEdge * mix(0.45, 0.95, nearK), nEdge * 0.35 * nearK) * (1.0 - sky);
       vec3 lineC = c * 0.22 + vec3(0.02, 0.01, 0.035);

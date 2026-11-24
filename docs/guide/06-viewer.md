@@ -1247,3 +1247,8 @@ downloaded or touched); a second run with no change says so. The next full `publ
 everything with a fresh single commit as usual. Tested against a local repo standing in for the site
 (the world files stayed, the viewer was replaced, an unchanged rerun did nothing); the PowerShell
 version is not run here.
+- (2026-11-24, owner: the Manga look is slightly too dark: the detail of bricks and shirts is lost in the
+  shade; people sometimes look orange.) The shade is a little lighter (material x 0.8, 0.78, 0.86), the
+  contrast boost 1.06 -> 1.03, the solid-ink floor only for the very darkest (L < 0.03), the hatching
+  lighter (x 0.55 at 50 %), the warm split tone 0.07 -> 0.045; the sun colour is pulled 45 % toward white
+  by day (the low late-November sun was orange and tinted everyone it lit).

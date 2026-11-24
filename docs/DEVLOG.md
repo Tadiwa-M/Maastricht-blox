@@ -1998,3 +1998,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Posing: the camera can be orbited during the posing shot; people nearby pose with you (guide 06).
 - Controller in matches: R2/L2 now read every usable gamepad, not just the first one listed (guide 18).
 - scripts/update-viewer.ps1|sh: publish only the game's code without a world rebuild (guide 06).
+- Manga: lighter shade, softer hatching, a less orange sun (owner: too dark, people orange) (guide 06).

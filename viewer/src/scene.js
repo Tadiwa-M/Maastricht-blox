@@ -153,6 +153,7 @@ export class Stage {
         // lit them, and the comic pass then read that tint as colour; the fill goes near neutral and
         // the shader's own gentle violet sets the shade's tone)
         this.hemi.color.lerp(new THREE.Color(0.86, 0.84, 0.82), 0.7 * (1 - n));
+        this.sun.color.lerp(new THREE.Color(1, 0.96, 0.9), 0.45 * (1 - n)); // (the low sun was orange and tinted people orange)
         this.scene.environmentIntensity *= 0.7;
       }
     }
