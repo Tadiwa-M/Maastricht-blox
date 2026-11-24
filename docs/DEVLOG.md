@@ -2001,3 +2001,5 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Manga: lighter shade, softer hatching, a less orange sun (owner: too dark, people orange) (guide 06).
 - The white flash: resolution and tier changes now happen at the start of a frame, not after the draw (guide 06).
 - Fixed: zoomed out on the map the painted looks drew the whole city as sky (guide 06).
+- Map zoom-out, second fix: anything short of the fog's far end is never painted as sky (guide 06).
+- Manga cooled (owner: too yellow): neutral sunlight tint, grey stone, no warm sky schemes (guide 06).

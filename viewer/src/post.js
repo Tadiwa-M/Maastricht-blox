@@ -147,7 +147,7 @@ export class Post {
       const p = globalThis.__bloxPlayer, cam = this.camera;
       const at = p?.mode === 'walk' && p.ctrl ? p.ctrl.pos : null;
       const focus = at ? Math.hypot(cam.position.x - at[0], cam.position.y - at[1] - 1.2, cam.position.z - at[2]) : (this.focusTarget ? cam.position.distanceTo(this.focusTarget) : 30);
-      updateVerse(this.verse, cam, focus, this.width, this.height, this.night, this.composer.renderer.getPixelRatio());
+      updateVerse(this.verse, cam, focus, this.width, this.height, this.night, this.composer.renderer.getPixelRatio(), this.scenePass.scene?.fog?.far || 0);
       if (this.fx.holding) return; // a held impact frame: the last picture stays up a moment
       const t = performance.now(), dt = Math.min(0.1, (t - (this.fxT || t)) / 1000);
       this.fxT = t;

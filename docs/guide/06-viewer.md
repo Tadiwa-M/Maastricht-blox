@@ -1265,3 +1265,11 @@ version is not run here.
   the whole city is farther than that, so it was painted over with the sky. The cutoff now rises with the camera's
   height (`skyZ` = max(2400, 4 x height + 600)). Checked in the Manga look with the camera 4.5 km out: a solid
   colour before, the city after.
+  (Later the same day, owner's screenshot: at a low, horizon-facing angle the far city still went flat sky.) The
+  cutoff now also reaches past the fog's far end (`skyZ` = max(2400, 4 x height + 600, 1.05 x fog.far), passed in
+  from post.js), so only what the fog has fully swallowed counts as sky.
+- (2026-11-24, owner: "too much yellow or whatever colour that is, colouring is off".) Manga cooled: the sunlit
+  tint all but neutral, colourless stone pale grey instead of cream, the light's split tone near zero, the cloud
+  tops off-white; the haze starts later (500 m to 2.2 km) and mixes less sky in. The sky schemes
+  (render/mangafx.js PALETTES) lost their warm ones: the peach horizon became pale lilac, lime and gold became
+  mint and sky, orange and teal became blue and aqua.

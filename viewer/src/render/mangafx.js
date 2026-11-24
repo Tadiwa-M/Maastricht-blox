@@ -2,19 +2,21 @@
 // a bizarre-adventure manga page, as our own lettering and effects.
 //   menace   stand your ground (still for a few seconds), aim, or face a raid wave, and the big
 //            menacing katakana ゴ rise in a column beside you, magenta with black ink
-//   palette  the sky and the shadow colour swing between unreal schemes (teal and violet, lime and
-//            gold, pink and purple, orange and teal), a slow crossfade every ~75 s; a knock-out or a
+//   palette  the sky and the shadow colour swing between unreal schemes (violet and lilac, teal and
+//            violet, mint and sky, pink and purple, blue and aqua), a slow crossfade every ~75 s; a knock-out or a
 //            raid wave throws it to pink and purple at once
 //   speed    ink speed lines at the edges of the screen when you sprint
 // Sound words (render/comicfx.js) are katakana in this look.
 import * as THREE from 'three';
 
 export const PALETTES = [
-  { top: [0.24, 0.14, 0.52], bottom: [0.93, 0.66, 0.62], shade: [0.3, 0.2, 0.5] }, // violet overhead, warm horizon (the default)
+  { top: [0.24, 0.2, 0.56], bottom: [0.74, 0.78, 0.92], shade: [0.3, 0.22, 0.5] }, // violet overhead, a pale lilac horizon (the default)
   { top: [0.16, 0.62, 0.66], bottom: [0.42, 0.3, 0.72], shade: [0.3, 0.2, 0.5] },
-  { top: [0.66, 0.84, 0.16], bottom: [0.93, 0.86, 0.42], shade: [0.16, 0.32, 0.24] },
+  { top: [0.24, 0.66, 0.56], bottom: [0.78, 0.92, 0.9], shade: [0.16, 0.3, 0.34] }, // mint and sky
   { top: [0.96, 0.46, 0.72], bottom: [0.55, 0.26, 0.78], shade: [0.4, 0.12, 0.44] },
-  { top: [1.0, 0.62, 0.3], bottom: [0.2, 0.56, 0.62], shade: [0.2, 0.17, 0.46] },
+  { top: [0.3, 0.52, 0.9], bottom: [0.66, 0.86, 0.9], shade: [0.2, 0.2, 0.46] }, // blue and aqua
+  // (owner: "too much yellow or whatever colour that is": the peach horizon, lime and gold, and orange
+  // schemes swapped for cool ones)
 ];
 export const MANGA_FX = { holdS: 75, fadeS: 6, stillS: 2.5, menaceEvery: 0.32 };
 

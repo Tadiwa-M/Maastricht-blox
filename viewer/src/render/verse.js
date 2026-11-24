@@ -146,7 +146,7 @@ const shader = {
       float aa = fwidth(n) * 1.2 + 1e-4;
       float cloud = smoothstep(t - aa, t + aa, n) * smoothstep(0.01, 0.12, d.y);
       float lit = step(fbm2(p + sunXZ * 0.07), n - 0.008); // the side facing the sun
-      vec3 litC = mix(vec3(1.0, 0.93, 0.74), mSkyB * 1.15 + 0.12, 0.25);
+      vec3 litC = mix(vec3(0.99, 0.97, 0.93), mSkyB * 1.15 + 0.12, 0.25);
       vec3 under = mix(mSkyA, vec3(0.78, 0.52, 0.78), 0.55);
       vec3 cc = mix(under, litC, lit);
       float edge = (1.0 - smoothstep(0.0, aa * 2.0, abs(n - t))) * smoothstep(0.03, 0.15, d.y);
@@ -166,11 +166,11 @@ const shader = {
       float materialColour = smoothstep(0.018, 0.13, chroma);
       float litK = smoothstep(0.18, 0.29, L); // two readable light masses, with a painted edge
       float grad = smoothstep(0.22, 0.88, L); // gentle value movement inside the sunlit mass
-      vec3 warm = vec3(1.055, 1.015, 0.925);
+      vec3 warm = vec3(1.025, 1.01, 0.975); // (owner: too yellow: the sunlit tint all but neutral)
       vec3 cool = mix(vec3(0.27, 0.31, 0.52), mShade, 0.32);
       // Saturated materials retain their local colour; neutral stone receives a restrained cream tint.
       vec3 litC = base * mix(vec3(1.0), warm, 0.18 + grad * 0.22);
-      vec3 warmStone = vec3(0.88, 0.81, 0.70) * (0.84 + 0.16 * grad);
+      vec3 warmStone = vec3(0.86, 0.85, 0.83) * (0.84 + 0.16 * grad); // pale stone, no cream cast
       litC = mix(warmStone, litC, materialColour);
       // Shadow colour is the material darkened and nudged toward blue-violet, not replaced by a flat tint.
       // (owner: the shade was a tad too dark and blue: grey roofs and paving went navy, so the shade
@@ -184,7 +184,7 @@ const shader = {
       // (the saturation push only on surfaces with a colour of their own: on grey it only made the tint)
       c = mix(vec3(luma(c)), c, mix(1.12, 1.55, materialColour));
       c = (c - 0.5) * 1.03 + 0.5;
-      c += mix(vec3(-0.015, 0.0, 0.035), vec3(0.045, 0.02, -0.04), smoothstep(0.15, 0.7, luma(c)));
+      c += mix(vec3(-0.015, 0.0, 0.035), vec3(0.012, 0.006, -0.008), smoothstep(0.15, 0.7, luma(c)));
       c = max(c, 0.0);
       // Fine pigment variation plus long, soft brush strokes; both stay subtle to avoid screen-door noise.
       float brush = hNoise(vec2(f.x * 0.045 + f.y * 0.015, f.y * 0.3)) * 0.6 + hNoise(vec2(f.x * 0.11, f.y * 0.7 + f.x * 0.03)) * 0.4;
@@ -193,8 +193,8 @@ const shader = {
       c = mix(c, vec3(0.06, 0.035, 0.1), 1.0 - smoothstep(0.015, 0.03, L)); // the deepest dark: ink (only the very darkest)
       vec3 skyc = mix(mSkyB, mSkyA, 0.35) * mix(1.0, 0.45, night); // (the haze colour)
       c = mix(c, mangaSky(vUv) * mix(1.0, 0.45, night), sky);
-      float haze = smoothstep(360.0, 1500.0, z) * (1.0 - sky);
-      vec3 farTone = mix(c, skyc, 0.42);
+      float haze = smoothstep(500.0, 2200.0, z) * (1.0 - sky);
+      vec3 farTone = mix(c, skyc, 0.3);
       farTone = mix(farTone, vec3(luma(farTone)), 0.08); // distant architecture loses a little chroma
       c = mix(c, farTone, haze);
       float hs = (1.0 - litK) * smoothstep(0.12, 0.2, L) * 0.26;
@@ -222,8 +222,8 @@ const shader = {
       float z = dist(vUv);
       // in front of the focus counts half (people passing close by stay readable); the sky is not printed
       float rel = (z < focus ? (focus - z) * 0.5 : z - focus) / max(focus, 0.5);
-      // cleared depth, or beyond skyZ: the sky dome (3 km round the camera) at street level; the camera's height
-      // raises it (owner: zoomed out on the map the whole city was past 2.4 km and drew as sky, a blue screen)
+      // cleared depth, or beyond skyZ: past the fog's far end (all haze there) and never nearer than 2.4 km
+      // (owner: zoomed out on the map the far city drew as flat sky; the fog reaches past the city there)
       float sky = max(step(far * 0.92, z), step(skyZ, z));
       float coc = smoothstep(${VERSE.focusSpan.toFixed(2)}, 4.0, rel);
       float bright = smoothstep(0.55, 0.8, luma(base)); // lit windows and lamps stay clean
@@ -298,13 +298,13 @@ export function makeVersePass(scenePass, look = 'verse') {
 }
 
 /** Per frame: the camera and the focus distance (m: to the player, or the orbit target). */
-export function updateVerse(pass, camera, focus, width, height, night = 0, dpr = 1) {
+export function updateVerse(pass, camera, focus, width, height, night = 0, dpr = 1, fogFar = 0) {
   const u = pass.uniforms;
   u.dpr.value = dpr;
   u.phone.value = IS_PHONE ? 1 : 0;
   u.night.value = night;
   u.near.value = camera.near; u.far.value = camera.far; u.focus.value = focus;
-  u.skyZ.value = Math.max(2400, camera.position.y * 4 + 600);
+  u.skyZ.value = Math.max(2400, camera.position.y * 4 + 600, fogFar * 1.05);
   const ty = Math.tan(THREE.MathUtils.degToRad(camera.fov || 50) / 2);
   u.fovScale.value.set(ty * (camera.aspect || 1), ty);
   u.res.value.set(width, height);
