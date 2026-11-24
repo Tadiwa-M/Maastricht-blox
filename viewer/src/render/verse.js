@@ -50,10 +50,10 @@ export const TEXTURED_LOOK = LOOK === 'verse' || LOOK === 'manga'; // both paint
 export const twosTick = (t, hz = VERSE.twosHz) => Math.floor(t * hz);
 
 const shader = {
-  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, fovScale: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, dpr: { value: 1 }, phone: { value: 0 }, fxImpact: { value: 0 }, fxAt: { value: new THREE.Vector2(0.5, 0.5) }, fxSplit: { value: 0 }, fxDuo: { value: 0 }, fxLines: { value: 1 }, fxDuoLo: { value: new THREE.Vector3() }, fxDuoHi: { value: new THREE.Vector3() }, mSkyA: { value: new THREE.Vector3(0.16, 0.62, 0.66) }, mSkyB: { value: new THREE.Vector3(0.42, 0.3, 0.72) }, mShade: { value: new THREE.Vector3(0.3, 0.2, 0.5) }, uSpeedK: { value: 0 }, uTime: { value: 0 }, camRot: { value: new THREE.Matrix3() }, sunXZ: { value: new THREE.Vector2(0.6, -0.8) }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, fovScale: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 1000 }, depthOk: { value: 1 }, night: { value: 0 }, dpr: { value: 1 }, phone: { value: 0 }, fxImpact: { value: 0 }, fxAt: { value: new THREE.Vector2(0.5, 0.5) }, fxSplit: { value: 0 }, fxDuo: { value: 0 }, fxLines: { value: 1 }, skyZ: { value: 2400 }, fxDuoLo: { value: new THREE.Vector3() }, fxDuoHi: { value: new THREE.Vector3() }, mSkyA: { value: new THREE.Vector3(0.16, 0.62, 0.66) }, mSkyB: { value: new THREE.Vector3(0.42, 0.3, 0.72) }, mShade: { value: new THREE.Vector3(0.3, 0.2, 0.5) }, uSpeedK: { value: 0 }, uTime: { value: 0 }, camRot: { value: new THREE.Matrix3() }, sunXZ: { value: new THREE.Vector2(0.6, -0.8) }, focus: { value: 10 }, res: { value: new THREE.Vector2(1, 1) } },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 fovScale; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float dpr; uniform float phone; uniform float fxImpact; uniform vec2 fxAt; uniform float fxSplit; uniform float fxDuo; uniform float fxLines; uniform vec3 fxDuoLo; uniform vec3 fxDuoHi; uniform vec3 mSkyA; uniform vec3 mSkyB; uniform vec3 mShade; uniform float uSpeedK; uniform float uTime; uniform mat3 camRot; uniform vec2 sunXZ; uniform float focus; uniform vec2 res;
+    uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 fovScale; uniform float near; uniform float far; uniform float depthOk; uniform float night; uniform float dpr; uniform float phone; uniform float fxImpact; uniform vec2 fxAt; uniform float fxSplit; uniform float fxDuo; uniform float fxLines; uniform float skyZ; uniform vec3 fxDuoLo; uniform vec3 fxDuoHi; uniform vec3 mSkyA; uniform vec3 mSkyB; uniform vec3 mShade; uniform float uSpeedK; uniform float uTime; uniform mat3 camRot; uniform vec2 sunXZ; uniform float focus; uniform vec2 res;
     varying vec2 vUv;
     float dist(vec2 uv) { float d = texture2D(tDepth, uv).x; return depthOk > 0.5 ? (near * far) / (far - d * (far - near)) : focus; } // (no depth: all in focus, no lines)
     vec3 vpos(vec2 uv) { float z = dist(uv); return vec3((uv * 2.0 - 1.0) * fovScale * z, -z); }
@@ -222,7 +222,9 @@ const shader = {
       float z = dist(vUv);
       // in front of the focus counts half (people passing close by stay readable); the sky is not printed
       float rel = (z < focus ? (focus - z) * 0.5 : z - focus) / max(focus, 0.5);
-      float sky = max(step(far * 0.92, z), step(2400.0, z)); // cleared depth, or the sky dome (3 km round the camera)
+      // cleared depth, or beyond skyZ: the sky dome (3 km round the camera) at street level; the camera's height
+      // raises it (owner: zoomed out on the map the whole city was past 2.4 km and drew as sky, a blue screen)
+      float sky = max(step(far * 0.92, z), step(skyZ, z));
       float coc = smoothstep(${VERSE.focusSpan.toFixed(2)}, 4.0, rel);
       float bright = smoothstep(0.55, 0.8, luma(base)); // lit windows and lamps stay clean
       // the print slip only on soft shapes: lights stay clean glows
@@ -302,6 +304,7 @@ export function updateVerse(pass, camera, focus, width, height, night = 0, dpr =
   u.phone.value = IS_PHONE ? 1 : 0;
   u.night.value = night;
   u.near.value = camera.near; u.far.value = camera.far; u.focus.value = focus;
+  u.skyZ.value = Math.max(2400, camera.position.y * 4 + 600);
   const ty = Math.tan(THREE.MathUtils.degToRad(camera.fov || 50) / 2);
   u.fovScale.value.set(ty * (camera.aspect || 1), ty);
   u.res.value.set(width, height);

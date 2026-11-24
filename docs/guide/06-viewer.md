@@ -1260,3 +1260,8 @@ version is not run here.
   Not reproduced headless (software rendering is too slow for the scaler to step); the next real run on a
   laptop is the test. The lag itself is the cost of the look: a Manga street draws about 3x the triangles
   of Classic (7.5k-triangle figures with an ink outline each, outlined cars), see the code health notes.
+- (2026-11-24, owner: zooming out in map view showed a blue screen, not the city.) The painted looks treated anything
+  farther than 2.4 km from the camera as sky (meant for the sky dome at street level); zoomed out on the map
+  the whole city is farther than that, so it was painted over with the sky. The cutoff now rises with the camera's
+  height (`skyZ` = max(2400, 4 x height + 600)). Checked in the Manga look with the camera 4.5 km out: a solid
+  colour before, the city after.
