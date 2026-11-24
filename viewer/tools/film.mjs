@@ -4,7 +4,8 @@
 // Also writes a still of each shot (the middle frame) as PNG: the screenshots for posts.
 //
 // Usage: node tools/film.mjs --site <site dir> [out=../build/film] [--only city,markt] [--fps 30]
-//          [--size 1920x1080] [--quick] [--headless] [--encode-only]
+//          [--size 1920x1080] [--look manga] [--quick] [--headless] [--encode-only]
+//   --look <l>    render every shot in this look (classic, verse, manga), whatever the shot says
 //   --quick       a short test cut: 0.25x duration at 10 fps
 //   --headless    no visible window (software rendering: slow, for CI/cloud tests); the default
 //                 opens a browser window so the real GPU renders the frames
@@ -12,26 +13,19 @@
 // Needs ffmpeg for the MP4 (on PATH, or `npm i --no-save ffmpeg-static` in viewer/); without it
 // the PNG frames stay in <out>/frames and the command to encode them is printed.
 import { mkdir, rm, writeFile, readdir } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { serve, siteArg } from './serve.mjs';
 
 /**
- * The shot list. kind: orbit (turn `deg` around the preset target, distance x `zoom`),
- * move (fly from preset `from` to preset `to`), with `hours` [from, to] for a sun time-lapse.
- * `hash` sets the scene: t = clock/sun hours, day = mon..sun (fri = market day on the Markt).
+ * The shot list, as data in contract/shots.json (shared with the Unity renderer later). kind: orbit
+ * (turn `deg` around the preset target, distance x `zoom`), move (fly from preset `from` to preset
+ * `to`), with `hours` [from, to] for a sun time-lapse. `hash` sets the scene: t = clock/sun hours,
+ * day = mon..sun (fri = market day on the Markt); `look` the look (classic, verse, manga).
  */
-export const SHOTS = [
-  { name: 'city', hash: 't=18&day=sat', kind: 'orbit', view: 'city', deg: 30, zoom: 1.0, seconds: 7 },
-  { name: 'dive', hash: 't=17.5&day=sat', kind: 'move', from: 'city', to: 'markt', seconds: 6 },
-  { name: 'markt', hash: 't=11.5&day=fri', kind: 'orbit', view: 'markt', deg: 45, zoom: 0.55, seconds: 8 },
-  { name: 'street', hash: 't=11.5&day=fri', kind: 'orbit', view: 'street', deg: 25, zoom: 1.0, seconds: 6 },
-  { name: 'station', hash: 't=8.5&day=tue', kind: 'orbit', view: 'station', deg: 35, zoom: 0.5, seconds: 6 },
-  { name: 'bosscherweg', hash: 't=17&day=sat', kind: 'orbit', view: 'bosscherweg', deg: 30, zoom: 0.6, seconds: 5 },
-  { name: 'enci', hash: 't=17.5&day=sat', kind: 'orbit', view: 'enci', deg: 30, zoom: 1.4, seconds: 5 },
-  { name: 'night', hash: 't=17&day=sat', kind: 'orbit', view: 'markt', deg: 30, zoom: 0.8, hours: [17, 22], seconds: 8 },
-];
+export const SHOTS = JSON.parse(readFileSync(new URL('../../contract/shots.json', import.meta.url), 'utf8')).shots;
 
 const ease = (u) => u * u * (3 - 2 * u); // smoothstep: soft start and stop
 const lerp = (a, b, u) => a.map((v, i) => v + (b[i] - v) * u);
@@ -68,9 +62,11 @@ async function main() {
   const fps = +opt('--fps', quick ? 10 : 30);
   const [W, H] = opt('--size', '1920x1080').split('x').map(Number);
   const only = opt('--only', null)?.split(',');
+  const lookAll = opt('--look', null);
   const out = resolve(argv[0] || '../build/film');
   const frames = join(out, 'frames');
-  const shots = SHOTS.filter((s) => !only || only.includes(s.name));
+  // (no --only: the look shots are extras, filmed when named; --look re-films the base shots in that look)
+  const shots = SHOTS.filter((s) => (only ? only.includes(s.name) : !s.look)).map((s) => (lookAll ? { ...s, look: lookAll } : s));
   if (!encodeOnly) {
     if (!root) throw new Error('--site <dir> is required (a scripts/site build)');
     await rm(frames, { recursive: true, force: true });
@@ -90,7 +86,7 @@ async function capture({ root, out, frames, shots, fps, W, H, quick, headless })
     for (const shot of shots) {
       const page = await browser.newPage({ viewport: { width: W, height: H } });
       page.on('pageerror', (e) => console.log(`[${shot.name}] pageerror ${e.message}`));
-      await page.goto(`${url}index.html?film=1#quality=high&view=${shot.view || shot.from}&${shot.hash}`);
+      await page.goto(`${url}index.html?film=1#quality=high&view=${shot.view || shot.from}&${shot.hash}${shot.look && shot.look !== 'classic' ? `&look=${shot.look}` : ''}`);
       await page.waitForFunction(() => window.__bloxFilm || window.__bloxError, null, { timeout: 600000 });
       const err = await page.evaluate(() => window.__bloxError);
       if (err) throw new Error(err);

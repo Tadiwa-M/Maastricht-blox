@@ -271,10 +271,12 @@ The page opens with `?film=1`: the render loop is off, and the tool drives
 Every frame advances life by exactly 1/fps and is captured only after its area has streamed in,
 so the video is smooth and free of pop-in however slow the GPU is. A browser window opens
 (the real GPU renders); `--headless` uses software rendering, which is very slow (cloud tests).
-Shots live in `SHOTS` at the top of `film.mjs`: `orbit` (turn around a preset at a zoom) or
+Shots live in `contract/shots.json` (read into `SHOTS` by `film.mjs`; shared with the Unity renderer later): `orbit` (turn around a preset at a zoom) or
 `move` (fly from one preset to another, rising in the middle), each with a scene hash (`t`, `day`)
 and an optional sun time-lapse (`hours`). Edit that list to re-cut the film. `-Quick` makes a 10 fps
-quarter-length test cut. ffmpeg comes from PATH or is installed on the spot as `ffmpeg-static`
+quarter-length test cut. A shot may name a `look` (`classic`, `verse`, `manga`; the two look shots `markt-manga` and
+`markt-verse` are filmed only when named with `--only`), and `--look manga` re-films the base shots in that look.
+ffmpeg comes from PATH or is installed on the spot as `ffmpeg-static`
 (an npm package; no admin needed).
 
 ### Reporting mistakes (`src/report/`)

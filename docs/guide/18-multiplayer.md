@@ -246,3 +246,12 @@ Owner: one really good game mode; more guns, pickups and loadouts; think Call of
   first connected gamepad, movement any usable one; if the first was an extra or virtual device the sticks worked
   and the triggers did nothing. `input.js usablePads` (connected, standard layout or >= 4 axes) is now the one
   list; combat treats a button pressed on any of them as pressed.
+
+### Hit weight (`mp/impact.js`, 2026-11-24)
+Owner: fights should feel heavier, like the video's Unity pass (hit-stop, shake, deeper sounds). `IMPACT` is a table of
+plain values per event (`hit` my shot landed, `kill`, `hurt` I was hit, `down` I went down): a camera shake (radians,
+seconds; the same shake the guns use, the heavier one wins) and a few synthesised sound layers (noise bursts and falling
+tones, no sample files; `ImpactSound` plays them at the player's volume and respects mute). `combat.js` only names the
+event (`impact(kind)`, called from `hitmark`, `hurt` and `killed`), so the numbers can be tuned in one place and the Unity
+version can read the same table. Not done: a hit-stop (a freeze of a few frames). It would have to pause the local
+simulation without desynchronising the room, so it waits for a design that does not touch the network state.

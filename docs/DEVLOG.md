@@ -2003,3 +2003,8 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Fixed: zoomed out on the map the painted looks drew the whole city as sky (guide 06).
 - Map zoom-out, second fix: anything short of the fog's far end is never painted as sky (guide 06).
 - Manga cooled (owner: too yellow): neutral sunlight tint, grey stone, no warm sky schemes (guide 06).
+- 2026-11-24 Film shots are data (`contract/shots.json`, additive, contractVersion stays 4) with a per-shot look and `--look`; two
+  look shots (Manga, Spider-Verse market). The recorder itself already existed (frame-perfect, `tools/film.mjs`), so it was not rebuilt.
+- 2026-11-24 Hit weight: `mp/impact.js` (shake and synthesised thuds for hit, kill, hurt, down), wired into combat. Hit-stop left out
+  (would need a no-desync design). Concept sheets come from an outside AI (owner), see `docs/concepts/README.md`.
+- 2026-11-24 Plan: the Unity track (two products, modular rules) added to PLAN.md and CLAUDE.md. Unity not run yet (workstation busy, credits).

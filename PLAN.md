@@ -227,6 +227,35 @@ figure detail, tyre/rim/paint detail. Painted looks only: material textures, fil
   handmade figures with visible seams; its own cast and vehicles. The title riffs on a film's name:
   fine as a working title, pick an original name before release.
 
+### The Unity track (owner 2026-11-24; planned, credit-gated, not started)
+
+**Two products, one set of specs.** The **browser game** stays the launch product (one click, phones, LinkedIn).
+The **Unity desktop build** is the polished one: real lighting, bigger crowds, native controller, cinematics.
+We expect them to be done in about a day of work once credits allow it (owner).
+
+**What Unity should improve (honest scope).**
+- *Rendering:* real-time lighting and shadows, ambient occlusion, haze, wet streets, water; the painted looks as full-screen effects.
+- *Headroom:* no tab-memory ceiling, so the whole city, farther views, thousands of people and cars.
+- *Controller:* native DualSense triggers and haptics (the browser cannot), which ends the R2/L2 trouble.
+- *Figures:* skinned rigs, IK and ragdolls allow finer hands, spines and weight shifts than our joint tables. The engine
+  does not do the posing: the dexterity of the JoJo poses comes from authoring (the pose data), so poses stay **data** shared by both.
+- *Cinematics:* camera scripts (`contract/shots.json`) rendered frame by frame in Unity for the trailer.
+- Costs: two codebases, a heavier download than a link, world data cannot ship in the repo (fetch or bundle).
+
+**Phases** (each stops if the one before shows no clear gain):
+1. *Prove it* (workstation, `scripts/unity.ps1 all`): chunks load through the contract; one screenshot per look; compare with the
+   web and with the concept sheets. Needs the workstation attached to a session (desktop app > Settings > Claude Code > Remote
+   Control > add the repo folder) and credits.
+2. *Showcase:* lighting, water, wet streets, sky; the film from `contract/shots.json`; figures in the painted looks.
+3. *Playable desktop slice:* native triggers and haptics, crowds, the shared impact table (`viewer/src/mp/impact.js`), optional AR.
+
+**Done ahead of it (cheap, browser-side):** film shots as data with a per-shot look; the combat impact pass; the concept-sheet
+brief (`docs/concepts/`, sheets from an outside AI, owner's call).
+
+**Design rules for two engines** (also in CLAUDE.md): the contract and data files are the interface; gameplay numbers, poses,
+looks and shots live in data, never in an engine's code; logic modules are pure (no engine calls) and tested; engines only
+draw and read input; one responsibility per module; a change to a shared spec updates both sides in the same change.
+
 ## 4. Process (how we work)
 
 1. **Outline → tools → plan → phases**: this file.

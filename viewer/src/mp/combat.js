@@ -4,6 +4,7 @@
 // opens with the spread, tracers, hit markers, health, and the touch buttons. The numbers and
 // the hit maths are weapons.js; the room decides the damage (relay/src/ctf.js shoot).
 import * as THREE from 'three';
+import { ImpactSound, impactShake } from './impact.js';
 import { comicFx } from '../render/comicfx.js';
 import { WEAPONS, PICKUP_R, PICKUP_BACK_S, Gun, spreadDir, hitTest, wallT, meleeTarget, pickupSpots, savedPrimary, REGEN } from './weapons.js';
 import { TEAM_HEX } from './model.js';
@@ -330,6 +331,7 @@ export class Combat {
     this.hp = 100; this.maxHp = 100; this.down = 0; this.zoom2 = false;
     this.kick = 0; this.sway = 0; this.dmg = 0; this.hitT = 0; this.prevAim = null; this.saved = null; this.active = false;
     this.sound = new ShotSound();
+    this.impactSound = new ImpactSound();
     this.touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     this.buildDom(); this.buildScene(); this.listen();
   }
@@ -414,10 +416,17 @@ export class Combat {
   /** A new round, or back at the base. */
   respawn(maxHp = 100, safeS = 0) { this.safeT = safeS; this.maxHp = this.hp = maxHp; this.down = 0; this.gun.reset(savedPrimary()); this.aiming = false; this.fire = false; this.hurtAt = 0; }
   /** from: the shooter's position (three.js [x, y, z]) or null: an arc on screen points their way for a moment. */
-  hurt(hp, from = null) { this.hp = hp; this.dmg = 1; this.hurtAt = performance.now(); haptic('hurt'); if (from) { this.hitFrom = [from[0], from[2]]; this.hitDirT = HIT_DIR_S; } }
+  hurt(hp, from = null) { this.hp = hp; this.dmg = 1; this.hurtAt = performance.now(); haptic('hurt'); this.impact('hurt'); if (from) { this.hitFrom = [from[0], from[2]]; this.hitDirT = HIT_DIR_S; } }
   /** Knocked out for `seconds`; onBack runs when it is time to stand at the base again. */
-  killed(seconds, onBack) { haptic('down'); this.down = seconds; this.onBack = onBack; this.fire = false; this.aiming = false; this.btns[1].classList.remove('on'); }
-  hitmark(kill) { haptic(kill ? 'kill' : 'hit'); this.hitT = kill ? 0.5 : 0.18; this.hitEl.className = kill ? 'on kill' : 'on'; }
+  killed(seconds, onBack) { haptic('down'); this.impact('down'); this.down = seconds; this.onBack = onBack; this.fire = false; this.aiming = false; this.btns[1].classList.remove('on'); }
+  hitmark(kill) { haptic(kill ? 'kill' : 'hit'); this.impact(kill ? 'kill' : 'hit'); this.hitT = kill ? 0.5 : 0.18; this.hitEl.className = kill ? 'on kill' : 'on'; }
+
+  /** A hit's weight (mp/impact.js): the camera shakes and the thud plays. */
+  impact(kind) {
+    const sh = impactShake(kind);
+    if (sh && sh.amp > (this.shakeT > 0 ? this.shakeA : 0)) { this.shakeT = this.shakeLen = sh.len; this.shakeA = sh.amp; }
+    this.impactSound.play(kind);
+  }
 
   /** Someone else's shot: a tracer from where it left to where it ended (three.js points). */
   tracer(from, to, kind, mine = false) {
@@ -647,7 +656,7 @@ export class Combat {
     f.aimPitch -= kp;
     f.aimYaw = wrap(f.aimYaw + (Math.random() - 0.5) * 2 * def.kick[1]);
     this.recoilDebt = (this.recoilDebt || 0) + kp * (fe.recover || 0); // part of the kick comes back down
-    this.shakeT = 0.18; this.shakeA = fe.shake || 0;
+    this.shakeT = this.shakeLen = 0.18; this.shakeA = fe.shake || 0;
     this.flash.scale.setScalar(fe.flash || 1);
     this.flashT = 0.03 + 0.015 * (fe.flash || 1);
     this.pendingTracer = { ends, kind: w };
@@ -689,7 +698,7 @@ export class Combat {
     // shot feel: the recovering part of the kick eases back, and a short shake after each shot
     if (this.recoilDebt > 0) { const r = this.recoilDebt * Math.min(1, dt * 9); f.aimPitch += r; this.recoilDebt -= r; }
     if (this.shakeT > 0) {
-      const k = this.shakeA * (this.shakeT / 0.18);
+      const k = this.shakeA * (this.shakeT / (this.shakeLen || 0.18));
       f.aimPitch += (Math.random() - 0.5) * k; f.aimYaw = wrap(f.aimYaw + (Math.random() - 0.5) * k);
       this.shakeT -= dt;
     }

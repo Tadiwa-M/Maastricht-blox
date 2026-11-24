@@ -7,6 +7,9 @@ against each other. Changing it is a breaking change: bump the version and updat
 Machine-readable parts live next to it:
 - `contract/palette.json`: colour palette (indices are stable)
 - `contract/brick_catalogue.json`: brick types (ids are stable, append-only)
+- `contract/shots.json`: camera shots (orbit/move round named presets, a look, a scene hash) for the film
+  tool now and the Unity cinematic renderer later. Additive and optional (2026-11-24): no existing reader
+  changes, so `contractVersion` stays 4.
 
 ---
 

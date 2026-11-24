@@ -32,3 +32,13 @@ test('every shot names a kind and a positive length', () => {
     assert.ok(s.seconds > 0, s.name);
   }
 });
+
+test('contract/shots.json: unique names, known looks, presets named for their kind', () => {
+  const names = new Set();
+  for (const s of SHOTS) {
+    assert.ok(!names.has(s.name), `duplicate ${s.name}`); names.add(s.name);
+    assert.ok(!s.look || ['classic', 'verse', 'manga'].includes(s.look), s.name);
+    assert.ok(s.kind === 'orbit' ? !!s.view : !!(s.from && s.to), s.name);
+    if (s.hours) assert.equal(s.hours.length, 2, s.name);
+  }
+});
