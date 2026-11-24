@@ -225,7 +225,13 @@ async function buildSite(outDir) {
     + `from ${worldDir} -> ${outDir} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 }
 
-if (site) {
+const viewerOnly = opt('--viewer-only');
+if (viewerOnly) {
+  // only the game's code and its small files (no world, no far meshes): scripts/update-viewer.* adds them to the site repo
+  await mkdir(resolve(viewerOnly), { recursive: true });
+  await bundle(resolve(viewerOnly));
+  console.log(`viewer only: ${resolve(viewerOnly)}`);
+} else if (site) {
   await buildSite(resolve(site));
 } else {
   await mkdir(dist, { recursive: true });

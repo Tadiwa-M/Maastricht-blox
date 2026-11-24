@@ -1236,3 +1236,14 @@ Needs the relay redeployed for Guard in online matches (bots and solo use the sa
   forgotten when the pose ends) instead of being overridden by it. Pose with me: when the player
   strikes a pose, about half the people within 18 m (hands free) stop for 6 s and strike one of
   their own (`walkers.js poseWithMe`). Checked in the city: 9 people posed with the player.
+
+## Updating only the game's code (2026-11-24)
+
+Owner: a code change should not need the full city rebuild and publish (30,000 world files).
+`scripts/update-viewer.ps1` / `.sh` build only the viewer (`node build.mjs --viewer-only <dir>`: the
+bundle, index.html, the trip planner, interiors, title art) and add ONE normal commit with those files
+to the site repo, from a blobless shallow clone without a checkout (the world files are never
+downloaded or touched); a second run with no change says so. The next full `publish` replaces
+everything with a fresh single commit as usual. Tested against a local repo standing in for the site
+(the world files stayed, the viewer was replaced, an unchanged rerun did nothing); the PowerShell
+version is not run here.
