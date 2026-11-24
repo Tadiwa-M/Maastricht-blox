@@ -2008,3 +2008,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - 2026-11-24 Hit weight: `mp/impact.js` (shake and synthesised thuds for hit, kill, hurt, down), wired into combat. Hit-stop left out
   (would need a no-desync design). Concept sheets come from an outside AI (owner), see `docs/concepts/README.md`.
 - 2026-11-24 Plan: the Unity track (two products, modular rules) added to PLAN.md and CLAUDE.md. Unity not run yet (workstation busy, credits).
+- 2026-11-24 The two-engine design rules are in docs/ARCHITECTURE.md (committed). Unity attach: the owner's desktop folder is listed but not offered to cloud sessions (the desktop app needs an update); Unity not run.
