@@ -245,6 +245,7 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     loader.setRadius(opts.stream ? tier.streamRadius * f : 0);
     far.setShowDist(opts.farLevel ? [[0, 0], [Infinity, 0], [Infinity, Infinity]][opts.farLevel - 1] : tier.farDist.map((d) => d * f));
   }
+  let pendingChange = null; // a resolution scale or a tier to apply at the start of the next frame
   function applyTier(name) {
     tierName = name;
     const tier = TIERS[name];
@@ -380,11 +381,15 @@ export async function cityMain(site, { initHooks = async () => [] } = {}) {
     const draw = far.silhouetteReady() && (!still || ready);
     if (draw) {
       r.info.reset();
+      // (owner: a white flash every few seconds) a resolution or tier change resizes the canvas, which
+      // wipes it: done right after a draw, the blank canvas was what the screen showed. So it waits for
+      // here, the start of the next frame, and is drawn into straight away.
+      if (pendingChange) { const run = pendingChange; pendingChange = null; run(); }
       stage.render(controls.target);
       if (firstFrame === null) { firstFrame = performance.now(); times.firstFrame = firstFrame - t0; }
       // dynamic resolution first (every mode; #drs=0 turns it off); a tier lower only when it has no pixels left to give
-      if (!still && ms > 0 && drs) { const s = drs.sample(ms); if (s !== null) stage.setResolutionScale(s); }
-      if (mode === 'auto' && !still && ms > 0 && (!drs || drs.atFloor)) { const next = governor.sample(ms); if (next) applyTier(next); }
+      if (!still && ms > 0 && drs) { const s = drs.sample(ms); if (s !== null) pendingChange = () => stage.setResolutionScale(s); }
+      if (mode === 'auto' && !still && ms > 0 && (!drs || drs.atFloor)) { const next = governor.sample(ms); if (next) { const was = pendingChange; pendingChange = () => { was?.(); applyTier(next); }; } }
     }
     if (now - lastStats > 250 || still) {
       lastStats = now;

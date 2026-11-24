@@ -1252,3 +1252,11 @@ version is not run here.
   contrast boost 1.06 -> 1.03, the solid-ink floor only for the very darkest (L < 0.03), the hatching
   lighter (x 0.55 at 50 %), the warm split tone 0.07 -> 0.045; the sun colour is pulled 45 % toward white
   by day (the low late-November sun was orange and tinted everyone it lit).
+- (2026-11-24, owner: a white flash every few seconds, laggiest in the Manga look; not a storm.) Cause found by
+  reading the frame loop: the dynamic resolution (and the quality governor) changed the canvas size right after
+  the scene was drawn, and a resize wipes the canvas, so the blank canvas was presented (the page's white
+  shows through). A laptop that is borderline in the heavy Manga look steps the resolution every few seconds.
+  Now the change waits for the start of the next frame (`citymode.js pendingChange`) and is drawn into at once.
+  Not reproduced headless (software rendering is too slow for the scaler to step); the next real run on a
+  laptop is the test. The lag itself is the cost of the look: a Manga street draws about 3x the triangles
+  of Classic (7.5k-triangle figures with an ink outline each, outlined cars), see the code health notes.

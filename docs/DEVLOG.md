@@ -1999,3 +1999,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
 - Controller in matches: R2/L2 now read every usable gamepad, not just the first one listed (guide 18).
 - scripts/update-viewer.ps1|sh: publish only the game's code without a world rebuild (guide 06).
 - Manga: lighter shade, softer hatching, a less orange sun (owner: too dark, people orange) (guide 06).
+- The white flash: resolution and tier changes now happen at the start of a frame, not after the draw (guide 06).
