@@ -39,14 +39,19 @@ function Invoke-Unity([string]$Log, [string[]]$UnityArgs) {
     if ($p.ExitCode -ne 0) { throw "Unity failed (exit $($p.ExitCode)); see $Log" }
 }
 
-function Step-Setup { Invoke-Unity "$Logs\setup.log" @('-executeMethod', 'Blox.Editor.BatchMode.SetupAndScene') }
-function Step-Test { Invoke-Unity "$Logs\editmode.log" @('-runTests', '-testPlatform', 'EditMode', '-testResults', "`"$Logs\editmode.xml`"") }
-function Step-Build { Invoke-Unity "$Logs\build.log" @('-buildTarget', 'Win64', '-executeMethod', 'Blox.Editor.BatchMode.BuildPlayer') }
-function Step-Shot {
+function Ensure-TestWorld {
     $world = Join-Path $Root 'build\testscene'
     if (-not (Test-Path "$world\manifest.json")) {
         Push-Location (Join-Path $Root 'pipeline'); uv run python -m blox_pipeline.testscene --out ..\build\testscene; Pop-Location
     }
+    return $world
+}
+
+function Step-Setup { Ensure-TestWorld | Out-Null; Invoke-Unity "$Logs\setup.log" @('-executeMethod', 'Blox.Editor.BatchMode.SetupAndScene') }
+function Step-Test { Invoke-Unity "$Logs\editmode.log" @('-runTests', '-testPlatform', 'EditMode', '-testResults', "`"$Logs\editmode.xml`"") }
+function Step-Build { Invoke-Unity "$Logs\build.log" @('-buildTarget', 'Win64', '-executeMethod', 'Blox.Editor.BatchMode.BuildPlayer') }
+function Step-Shot {
+    $world = Ensure-TestWorld
     $exe = Join-Path $Root 'unity\Builds\StandaloneWindows64\MaastrichtBlox.exe'
     if (-not (Test-Path $exe)) { throw "no player build: run '.\scripts\unity.ps1 build' first" }
     $shot = Join-Path $Root 'build\shots\unity_hero.png'
