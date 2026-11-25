@@ -5,7 +5,8 @@
 #   .\scripts\unity.ps1 shot    # run the player once, save build\shots\unity_hero.png
 #   .\scripts\unity.ps1 all     # setup, test, build, shot
 # Unity is found via $env:UNITY_EXE, else the newest 6000.* under the default Unity Hub folder.
-param([ValidateSet('setup', 'test', 'build', 'shot', 'all')][string]$Step = 'all')
+#   -World <dir>                # frame the scene on, and shoot, a real world (e.g. build\world) instead of build\testscene
+param([ValidateSet('setup', 'test', 'build', 'shot', 'all')][string]$Step = 'all', [string]$World = '')
 $ErrorActionPreference = 'Stop'
 $Root = Resolve-Path (Join-Path $PSScriptRoot '..')
 $Logs = Join-Path $Root 'build\unity'
@@ -40,6 +41,11 @@ function Invoke-Unity([string]$Log, [string[]]$UnityArgs) {
 }
 
 function Ensure-TestWorld {
+    if ($World) {
+        $w = (Resolve-Path $World).Path
+        if (-not (Test-Path "$w\manifest.json")) { throw "no manifest.json in $w" }
+        return $w
+    }
     $world = Join-Path $Root 'build\testscene'
     if (-not (Test-Path "$world\manifest.json")) {
         Push-Location (Join-Path $Root 'pipeline'); uv run python -m blox_pipeline.testscene --out ..\build\testscene; Pop-Location
@@ -47,7 +53,10 @@ function Ensure-TestWorld {
     return $world
 }
 
-function Step-Setup { Ensure-TestWorld | Out-Null; Invoke-Unity "$Logs\setup.log" @('-executeMethod', 'Blox.Editor.BatchMode.SetupAndScene') }
+function Step-Setup {
+    $w = Ensure-TestWorld
+    Invoke-Unity "$Logs\setup.log" @('-executeMethod', 'Blox.Editor.BatchMode.SetupAndScene', '-bloxWorld', "`"$w`"")
+}
 function Step-Test { Invoke-Unity "$Logs\editmode.log" @('-runTests', '-testPlatform', 'EditMode', '-testResults', "`"$Logs\editmode.xml`"") }
 function Step-Build { Invoke-Unity "$Logs\build.log" @('-buildTarget', 'Win64', '-executeMethod', 'Blox.Editor.BatchMode.BuildPlayer') }
 function Step-Shot {
