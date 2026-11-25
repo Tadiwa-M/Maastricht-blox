@@ -18,6 +18,7 @@ namespace Blox.Gameplay
             string file = Arg("-bloxShot");
             if (file == null) yield break;
             float delay = float.TryParse(Arg("-bloxShotDelay"), out var d) ? d : 10f;
+            ApplyCameraArg();
             yield return new WaitForSecondsRealtime(delay);
             yield return new WaitForEndOfFrame();
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(file)) ?? ".");
@@ -27,6 +28,24 @@ namespace Blox.Gameplay
             for (int n = 0; n < 5; n++) yield return null;  // the capture is written asynchronously
             Debug.Log($"Blox shot saved to {file}");
             Application.Quit(0);
+        }
+
+        /// <summary><c>-bloxCam x,z,distance</c> (Unity metres) re-frames the map camera before the chunks stream in.</summary>
+        private static void ApplyCameraArg()
+        {
+            var rig = UnityEngine.Object.FindFirstObjectByType<MapCameraRig>();
+            if (rig == null) return;
+            string v = Arg("-bloxCam");
+            if (v != null)
+            {
+                var p = v.Split(',');
+                var ci = System.Globalization.CultureInfo.InvariantCulture;
+                if (p.Length == 3 && float.TryParse(p[0], System.Globalization.NumberStyles.Float, ci, out float x)
+                    && float.TryParse(p[1], System.Globalization.NumberStyles.Float, ci, out float z)
+                    && float.TryParse(p[2], System.Globalization.NumberStyles.Float, ci, out float dist))
+                    rig.Focus(new Vector3(x, rig.Target.y, z), dist);
+            }
+            Debug.Log($"ShotRunner: camera target {rig.Target} distance {rig.Distance:0} tilt {rig.Tilt:0.0} yaw {rig.Yaw:0}");
         }
 
         private static void SaveCameraShot(string file)

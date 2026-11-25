@@ -19,7 +19,8 @@ namespace Blox.Editor
             m.SetFloat("_SunSizeConvergence", 6f);
             m.SetFloat("_AtmosphereThickness", 0.85f);
             m.SetColor("_SkyTint", new Color(0.52f, 0.56f, 0.62f));
-            m.SetColor("_GroundColor", new Color(0.38f, 0.36f, 0.34f));
+            // Seen when the camera looks down past the map's edge: a cool haze matching the fog, not brown.
+            m.SetColor("_GroundColor", new Color(0.60f, 0.66f, 0.74f));
             m.SetFloat("_Exposure", 1.25f);
             EditorUtility.SetDirty(m);
             return m;

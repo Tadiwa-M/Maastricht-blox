@@ -2016,4 +2016,7 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   real-world Unity build is next.
 - 2026-11-25 `unity.ps1 setup|shot -World <dir>` frames and shoots any world. First real-city run (`build/world`, 4096 chunks, 2448
   islands): streams, meshes, lights and shadows correctly in the player, no errors; the camera starts closer than a city overview.
+- 2026-11-25 Unity overview fixed: at 2500 m the street-level fog (exp², 0.0006) turned the city flat grey, so `MapCameraRig` now thins the
+  fog with distance (about 25 % haze on the scene at any zoom); the skybox ground colour (seen looking down past the map edge) is a cool
+  haze, not brown. Shot args: `unity.ps1 shot -Out x.png -ShotArgs '-bloxCam','x,z,dist','-bloxHour','13','-bloxShotDelay','20'`.
 - 2026-11-27 Title screen print layer (`titlefx.js`): halftone patches, light leak and grain in each look's inks. shaders.com's package was tried and dropped (WebGPU-only, 2.6 MB, telemetry on by default, no output in the headless check); its effect stack was ported as one WebGL shader (guide 06).

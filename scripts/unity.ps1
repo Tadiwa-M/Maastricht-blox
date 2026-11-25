@@ -5,8 +5,9 @@
 #   .\scripts\unity.ps1 shot    # run the player once, save build\shots\unity_hero.png
 #   .\scripts\unity.ps1 all     # setup, test, build, shot
 # Unity is found via $env:UNITY_EXE, else the newest 6000.* under the default Unity Hub folder.
-#   -World <dir>                # frame the scene on, and shoot, a real world (e.g. build\world) instead of build\testscene
-param([ValidateSet('setup', 'test', 'build', 'shot', 'all')][string]$Step = 'all', [string]$World = '')
+#   -Out <name.png> -ShotArgs '-bloxCam','x,z,dist','-bloxHour','14'   # shot file name and extra player args
+#   -World <dir>               # frame the scene on, and shoot, a real world (e.g. build\world) instead of build\testscene
+param([ValidateSet('setup', 'test', 'build', 'shot', 'all')][string]$Step = 'all', [string]$World = '', [string]$Out = 'unity_hero.png', [string[]]$ShotArgs = @())
 $ErrorActionPreference = 'Stop'
 $Root = Resolve-Path (Join-Path $PSScriptRoot '..')
 $Logs = Join-Path $Root 'build\unity'
@@ -63,9 +64,9 @@ function Step-Shot {
     $world = Ensure-TestWorld
     $exe = Join-Path $Root 'unity\Builds\StandaloneWindows64\MaastrichtBlox.exe'
     if (-not (Test-Path $exe)) { throw "no player build: run '.\scripts\unity.ps1 build' first" }
-    $shot = Join-Path $Root 'build\shots\unity_hero.png'
-    Start-Process -FilePath $exe -Wait -ArgumentList @('-screen-width', '1920', '-screen-height', '1080',
-        '-screen-fullscreen', '0', '-logFile', "`"$Logs\player.log`"", '-bloxWorld', "`"$world`"", '-bloxShot', "`"$shot`"")
+    $shot = Join-Path $Root "build\shots\$Out"
+    Start-Process -FilePath $exe -Wait -ArgumentList (@('-screen-width', '1920', '-screen-height', '1080',
+        '-screen-fullscreen', '0', '-logFile', "`"$Logs\player.log`"", '-bloxWorld', "`"$world`"", '-bloxShot', "`"$shot`"") + $ShotArgs)
     Write-Host "saved $shot"
 }
 
