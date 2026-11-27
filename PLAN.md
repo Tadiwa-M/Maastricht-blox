@@ -217,6 +217,15 @@ rebuild on the workstation, batched for the next one:
 Shared by all looks: window glazing bars, lamps and shop windows as real night lights, printed
 figure detail, tyre/rim/paint detail. Painted looks only: material textures, film materials.
 
+### Parked fine-tuning (owner 2026-11-27; not started)
+
+- The gun floats: it doesn't sit in the figure's hands in third person.
+- The JoJo (Manga) poses need more dexterity and drama: from pose data, ideally against the concept sheets.
+- Pose on demand: a dedicated key and a controller button (owner wants both).
+- Stand abilities on the controller: already on RB and X in code; confirm on a real DualSense.
+- The Spider-Verse figure's lower torso looked like stacked rings from behind (photo, 2026-11-27): check whether that is
+  the build or a rendering glitch.
+
 ### Next worlds (backlog, owner 2026-11-23; not started)
 
 - **A world drawn by the owner's friend** (an artist): wait for the designs, then build the look,

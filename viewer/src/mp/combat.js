@@ -5,6 +5,7 @@
 // the hit maths are weapons.js; the room decides the damage (relay/src/ctf.js shoot).
 import * as THREE from 'three';
 import { ImpactSound, impactShake } from './impact.js';
+import { ADS_DROP, figureBlocksAim } from './aimview.js';
 import { comicFx } from '../render/comicfx.js';
 import { WEAPONS, PICKUP_R, PICKUP_BACK_S, Gun, spreadDir, hitTest, wallT, meleeTarget, pickupSpots, savedPrimary, REGEN } from './weapons.js';
 import { TEAM_HEX } from './model.js';
@@ -12,8 +13,8 @@ import { standSpot } from '../player/spot.js';
 import { usablePads } from '../player/input.js';
 
 const HIP_DIST = 2.6, EYE_DIST = 0.05, TRACER_S = 0.09, DARK = '#4b4f5c';
-export const COMBAT_SHOULDER = 0.85; // m: the hip-fire camera over the right shoulder
-const _L = new THREE.Vector3(), _R = new THREE.Vector3(), _D = new THREE.Vector3(), _T = new THREE.Vector3(), _UP = new THREE.Vector3(0, 1, 0), _M = new THREE.Matrix4(), _Q = new THREE.Quaternion();
+export const COMBAT_SHOULDER = 1.0; // m: the hip-fire camera over the right shoulder (0.85 left the figure too near the crosshair)
+const _A = new THREE.Vector3(), _F = new THREE.Vector3(), _L = new THREE.Vector3(), _R = new THREE.Vector3(), _D = new THREE.Vector3(), _T = new THREE.Vector3(), _UP = new THREE.Vector3(0, 1, 0), _M = new THREE.Matrix4(), _Q = new THREE.Quaternion();
 const CSS = `
 #cb { position: fixed; inset: 0; pointer-events: none; z-index: 4; font-family: system-ui, sans-serif; }
 #cb[hidden] { display: none; }
@@ -583,7 +584,12 @@ export class Combat {
     }
     f.o.minDist = EYE_DIST; f.o.shoulder = lerp(hipShoulder, 0, a); f.o.fov = lerp(this.saved.o.fov, fov, a);
     f.aimDist = lerp(HIP_DIST, EYE_DIST, a);
-    P?.character?.setFade?.(a > 0.02 && a < 0.98 ? Math.min(1, a * 2.2) : 0); // see-through while the camera passes through it
+    // see-through while the camera passes through it, and whenever the figure covers the crosshair
+    // (owner: "the shooting view is still obstructed"): the aim is never hidden behind your own back
+    const cp = this.camera.position, cd = this.camera.getWorldDirection(_F);
+    const block = alive ? figureBlocksAim([cp.x, cp.y, cp.z], [cd.x, cd.y, cd.z], st.pos) : 0;
+    this.blockK = (this.blockK || 0) + (block - (this.blockK || 0)) * Math.min(1, dt * 12);
+    P?.character?.setFade?.(Math.max(a > 0.02 && a < 0.98 ? Math.min(1, a * 2.2) : 0, this.blockK * 0.8));
 
     // a click shorter than a frame still fires (tap is cleared once the gun has seen it)
     // V: a quick stab with whatever is in the hands (the knife comes out, then the gun is back)
@@ -687,7 +693,7 @@ export class Combat {
     const bob = (1 - a * 0.85) * 0.006 * Math.min(1, 0.3 + this.speed / 3);
     const re = this.gun.reloading ? Math.sin(this.gun.reloadProgress * Math.PI) : 0; // dips while reloading
     const hip = new THREE.Vector3(0.19, -0.19, -0.42), aimAt = model.hand.userData.aim;
-    model.hand.position.lerpVectors(hip, aimAt, a);
+    model.hand.position.lerpVectors(hip, _A.set(aimAt.x + ADS_DROP[0], aimAt.y + ADS_DROP[1], aimAt.z + ADS_DROP[2]), a); // the sights just under the crosshair, not over it
     model.hand.position.x += Math.sin(this.sway) * bob; model.hand.position.y += Math.abs(Math.cos(this.sway)) * bob - re * 0.16;
     model.hand.position.z += this.kick * (def.feel?.back ?? 0.05);
     model.hand.rotation.set(this.kick * 0.05 - re * 0.7, (1 - a) * 0.06, re * 0.35);

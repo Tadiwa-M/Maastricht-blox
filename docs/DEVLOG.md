@@ -2049,3 +2049,4 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   trailer, loading screen and looks, from `build/site_maastricht` in an Edge/Chrome app window, local server stopped on
   close) and 'Maastricht Blox (Unity)' (the player on `build/world_maastricht`). Original brick icons from
   `scripts/make_icon.py`. Decision (owner): both icons now; web features are ported to Unity one at a time.
+- 2026-11-27 Shooting view: the figure fades when it covers the crosshair, the hip camera sits 1 m over the shoulder, and aimed guns drop below the crosshair (`mp/aimview.js`, guide 18). Parked (owner): the floating gun, the JoJo poses' dexterity, a pose button on keyboard and controller, Stand abilities checked on a real controller.

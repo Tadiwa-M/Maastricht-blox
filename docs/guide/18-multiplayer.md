@@ -255,3 +255,14 @@ tones, no sample files; `ImpactSound` plays them at the player's volume and resp
 event (`impact(kind)`, called from `hitmark`, `hurt` and `killed`), so the numbers can be tuned in one place and the Unity
 version can read the same table. Not done: a hit-stop (a freeze of a few frames). It would have to pause the local
 simulation without desynchronising the room, so it waits for a design that does not touch the network state.
+
+### A clear aim (`mp/aimview.js`, 2026-11-27)
+Owner: "the shooting view is still obstructed, this makes it very hard to aim" (photos: from the hip the figure's back sat
+over the crosshair; aiming, the brick rifle's sight block filled the middle of the screen). Three changes, Call of Duty's
+rule being that nothing of yours ever hides the target:
+- The hip camera sits further over the right shoulder (`COMBAT_SHOULDER` 0.85 -> 1.0 m).
+- `figureBlocksAim(cam, dir, feet)` measures how close the figure comes to the aim ray (in the way within 0.32 m, clear
+  past 0.6 m); the figure fades by that (up to 80% see-through), eased so it doesn't flicker. Covers walls pushing the
+  camera in, sprinting, and any pose where an arm crosses the line.
+- Aiming down the sights, every gun sits `ADS_DROP` (3 cm lower, 10 cm further) below its own aim point, so the sights
+  sit just under the crosshair instead of over it. The crosshair stays on screen while aiming (except scopes).
