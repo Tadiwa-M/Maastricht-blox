@@ -2021,3 +2021,7 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   haze, not brown. Shot args: `unity.ps1 shot -Out x.png -ShotArgs '-bloxCam','x,z,dist','-bloxHour','13','-bloxShotDelay','20'`.
 - 2026-11-27 Title screen print layer (`titlefx.js`): halftone patches, light leak and grain in each look's inks. shaders.com's package was tried and dropped (WebGPU-only, 2.6 MB, telemetry on by default, no output in the headless check); its effect stack was ported as one WebGL shader (guide 06).
 - 2026-11-27 `learn/`: the AI dilemma and its plan, a ten-track curriculum taught from this repo, real bug case studies, a no-credits checklist with a spec template, a tutor prompt, and two tools (`map.mjs`, `quiz.mjs`; tested in viewer/test/learn.test.mjs).
+- 2026-11-27 Open issue: the pipeline is not deterministic across platforms. Building the town fixture on Windows (the
+  workstation) puts one street's centroid at (1128, 2087); Linux (CI and the cloud) gives (1083, 2104). The workstation
+  regenerated `tests/fixtures/town_world/features.json` to its own output (e889c90), which broke CI; restored to the Linux
+  output. Until the cause is found (likely a geometry library or ordering difference), regenerate fixtures on Linux only.

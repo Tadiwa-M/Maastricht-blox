@@ -53,3 +53,12 @@ to guess the cause before reading on.
 - **Cause:** the fixes were committed but the live site was built from an older version.
 - **Lesson:** "fixed in code", "deployed" and "verified live" are three different states. Know which one you're in
   (the site's `world.js` shows its `build`).
+
+## The fixture that changed with the computer (determinism)
+
+- **Symptom:** after the workstation's Unity commits merged, one pipeline test failed: `stale fixture files ['features.json']`.
+- **Cause:** the workstation (Windows) regenerated a test fixture, and its pipeline puts one street's centre point in a
+  different place than Linux does (CI runs on Linux). Same code, same data, different answer per platform.
+- **Fix so far:** restore the Linux version (what CI checks); regenerate fixtures only on Linux. The root cause is open.
+- **Lesson:** "it passes on my machine" isn't "it passes". A generated file committed as a test fixture must be produced
+  where CI runs, and a pipeline that gives different answers on different computers has a hidden dependency to find.
