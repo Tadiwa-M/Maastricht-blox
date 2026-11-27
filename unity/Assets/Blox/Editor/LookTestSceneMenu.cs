@@ -18,40 +18,44 @@ namespace Blox.Editor
     /// and a WorldLoader + StudRenderer pointed at <c>build/testscene</c>, framed on the
     /// world found there, plus a bus looping along the road and a walking figure
     /// (<see cref="LookTestActors"/>; press C in Play mode to walk it with WASD).
-    /// Saved to Assets/Blox/Generated/Scenes/LookTest.unity.
+    /// Saved to Assets/Blox/Generated/Scenes/LookTest.unity. <see cref="OpenWorldMenu"/> rebuilds it
+    /// for another world (camera framed on that world, WorldLoader pointed at it).
     /// </summary>
     internal static class LookTestSceneMenu
     {
-        private const string WorldDirectory = "../build/testscene";
+        internal const string DefaultWorldDirectory = "../build/testscene";
 
         [MenuItem("Blox/Create Look Test Scene", priority = 20)]
         private static void CreateLookTestScene()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
-            Build();
+            Build(DefaultWorldDirectory);
         }
 
         /// <summary>Builds and saves the scene without prompts (menu and batch mode share it).</summary>
-        internal static void Build()
+        /// <param name="worldDirectory">Stored on the WorldLoader as given; relative paths are taken from the
+        /// Unity project folder (see <see cref="WorldLoader.ResolveDirectory"/>).</param>
+        internal static void Build(string worldDirectory)
         {
             var assets = ProjectSetupMenu.EnsureAssets();
-            var frame = WorldFrame.Read(WorldLoader.ResolveDirectory(WorldDirectory));
+            string resolved = WorldLoader.ResolveDirectory(worldDirectory);
+            var frame = WorldFrame.Read(resolved);
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var sun = CreateSun();
             ConfigureEnvironment(sun, assets.Sky);
             var volume = CreateVolume(assets.PostProcess);
             var camera = CreateCamera(volume, frame);
-            var loader = CreateWorld(assets, camera);
-            LookTestActors.Spawn(WorldLoader.ResolveDirectory(WorldDirectory), assets, camera, loader);
+            var loader = CreateWorld(assets, camera, worldDirectory);
+            LookTestActors.Spawn(resolved, assets, camera, loader);
             new GameObject("ShotRunner").AddComponent<ShotRunner>();  // idle unless -bloxShot is passed
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, BloxEditorPaths.LookTestScene);
             AddToBuildSettings(BloxEditorPaths.LookTestScene);
             if (!frame.Found)
-                Debug.LogWarning($"Blox: no world at '{WorldLoader.ResolveDirectory(WorldDirectory)}' yet; generate it (see unity/README.md), then press Play.");
-            Debug.Log($"Blox: look test scene saved to {BloxEditorPaths.LookTestScene}.");
+                Debug.LogWarning($"Blox: no world at '{resolved}' yet; generate it (see unity/README.md), then press Play.");
+            Debug.Log($"Blox: look test scene saved to {BloxEditorPaths.LookTestScene} (world {worldDirectory}).");
         }
 
         private static Light CreateSun()
@@ -132,7 +136,7 @@ namespace Blox.Editor
             return cam;
         }
 
-        private static WorldLoader CreateWorld(BloxAssets assets, Camera cam)
+        private static WorldLoader CreateWorld(BloxAssets assets, Camera cam, string worldDirectory)
         {
             var go = new GameObject("World");
             var studs = go.AddComponent<StudRenderer>();
@@ -145,7 +149,7 @@ namespace Blox.Editor
             var loader = go.AddComponent<WorldLoader>();
             using (var s = new SerializedSettings(loader))
             {
-                s.Str("worldDirectory", WorldDirectory);
+                s.Str("worldDirectory", worldDirectory);
                 s.Ref("opaqueMaterial", assets.BrickBody);
                 s.Ref("transparentMaterial", assets.BrickTransparent);
                 s.Ref("studRenderer", studs);

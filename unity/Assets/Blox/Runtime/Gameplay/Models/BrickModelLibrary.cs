@@ -27,6 +27,13 @@ namespace Blox.Gameplay
         {
             if (Path.IsPathRooted(dir)) return dir;
             string project = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            if (!Application.isEditor)
+            {
+                // A player has no project folder: dataPath/.. is the executable's folder, and the build
+                // (Blox.Editor.BatchMode.BuildPlayer) ships the folder there under its own name.
+                string shipped = Path.Combine(project, Path.GetFileName(dir.TrimEnd('/', '\\')));
+                if (Directory.Exists(shipped)) return shipped;
+            }
             return Path.GetFullPath(Path.Combine(project, dir));
         }
 

@@ -113,6 +113,7 @@ See [guide 01](01-coordinates-and-rotation.md).
 |---|---|---|
 | `Blox/Setup Project` | `Editor/ProjectSetupMenu.cs`, `UrpAssetFactory.cs`, `PostProcessProfileFactory.cs`, `BloxMaterialFactory.cs` | URP asset + renderer (Forward+, SSAO), post-processing profile, materials in `Assets/Blox/Generated/`; linear colour, GPU Resident Drawer, Input System |
 | `Blox/Create Look Test Scene` | `Editor/LookTestSceneMenu.cs`, `LookTestActors.cs` | `Generated/Scenes/LookTest.unity`: sun, sky, volume, camera rig, `World` (WorldLoader → `../build/testscene`) + StudRenderer, a bus on a `PathFollower`, a walker (`CharacterWalker`) |
+| `Blox/Open World...` | `Editor/OpenWorldMenu.cs` | pick a world folder (one with `manifest.json`; the dialog starts at the last one, else `build/world`); rebuilds the Look Test scene for it: WorldLoader → that folder (stored as `../build/...` when inside the repo), camera framed on it. Then press Play |
 
 Some URP settings are set by reflection or serialized names (`SerializedSettings.cs`). They
 log a `Blox setup:` warning if a name isn't found.

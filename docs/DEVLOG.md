@@ -2025,3 +2025,27 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   workstation) puts one street's centroid at (1128, 2087); Linux (CI and the cloud) gives (1083, 2104). The workstation
   regenerated `tests/fixtures/town_world/features.json` to its own output (e889c90), which broke CI; restored to the Linux
   output. Until the cause is found (likely a geometry library or ordering difference), regenerate fixtures on Linux only.
+- 2026-11-27 `Blox/Open World...` (`OpenWorldMenu.cs`): pick a world folder and the Look Test scene is rebuilt for it (WorldLoader
+  directory + camera framing), so Play in the Editor shows `build/world`. First Editor Play of it was a grey frame: every chunk with
+  no glass threw `dstIndex is outside the range` in `PendingChunkMesh.Complete` (empty transparent-index copy at offset = buffer
+  length; the Editor's collections safety check rejects it, release players have no checks, the testscene diorama always had glass),
+  so those chunks were never applied, and the MeshDataArray leaked. Empty copies are skipped and the mesh data is disposed on failure;
+  EditMode test `ChunkMeshCompleteTests` meshes every town_world chunk. After the fix the whole 2 km city renders in Editor Play with
+  no errors. `unity.ps1 editorshot -World <dir>` scripts the same Editor Play + shot (needs the open Editor closed). Unverified: run 1 reached Play then stalled (unfocused Editor; now sets
+  runInBackground), run 2 hung on a hidden 'Scene Backup Detected' dialog left by run 1 (the step now refuses to start
+  while unity/Temp/__Backupscenes has a backup). Run 3 (watched, stopped after a minute) showed the same dialog with that
+  folder empty: the trigger is something else. Open, to diagnose when the shared workstation is free (evening).
+- 2026-11-27 Unity 65k world (`world_maastricht`, 65110 chunks): the near-black player frame had two causes, shown by shots.
+  (1) Night: the sun follows the real clock and the shot ran at 19:38; the same camera at `-bloxHour 13` is daylight grey.
+  `unity.ps1` shots now default to 13:00. (2) A stale player (built 2026-11-25 12:47, scene baked for `build/world`): it
+  showed no city at any camera or wait; a fresh build of today's code renders the whole city, also at the old camera (A/B).
+  The old binary was overwritten by the rebuild before it was inspected, so its exact defect is not known. The
+  NativeArray exception was the glass-free chunk bug (Editor only, fixed above). Also: the player now finds the bus/walker
+  models (`build` ships `contract/` next to the exe), `shot` warns when the scene is framed on another world
+  (`build/unity/scene_world.txt`), and `unity.ps1` waits on the Unity process itself (`Start-Process -Wait` waited for
+  leftover `Unity.ILPP.Trigger.exe` helpers and hung after a finished run). Open: setup's 'BatchRendererGroup Variants
+  = Keep All' does not apply on 6000.6 (reflection finds no property; the Editor warns); players render anyway.
+- 2026-11-27 Desktop icons: `scripts/desktop-icons.ps1` makes 'Maastricht Blox' (`play.ps1`: the web game, with title,
+  trailer, loading screen and looks, from `build/site_maastricht` in an Edge/Chrome app window, local server stopped on
+  close) and 'Maastricht Blox (Unity)' (the player on `build/world_maastricht`). Original brick icons from
+  `scripts/make_icon.py`. Decision (owner): both icons now; web features are ported to Unity one at a time.
