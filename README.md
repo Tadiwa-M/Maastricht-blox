@@ -70,6 +70,7 @@ machine: `scripts/setup-workstation.ps1` (or `.sh`), then `docs/guide/00-worksta
 - `corrections/`: hand map fixes applied on every build (most map reports are fixed here)
 - `proxy/`: local live-data server (GTFS-RT, weather, river level), superseded by `relay/` for the site
 - `unity/`: a Unity 6 URP version (code written, parked until after the web launch)
+- `learn/`: learning the whole system from this repo: a curriculum, real bug case studies, a quiz and a folder map, and the plan for working when agent credits run out
 
 ## Licence and credits
 Code: MIT (`LICENSE`). Data: © OpenStreetMap contributors (ODbL; the generated world files are
