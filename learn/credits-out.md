@@ -11,7 +11,7 @@
 
 ## The spec template
 
-Write these into `PLAN.md` (or a note) before credits return. A good spec turns a vague agent session into a short one.
+Write these into [`PLAN.md`](../PLAN.md) (or a note) before credits return. A good spec turns a vague agent session into a short one.
 
 ```text
 Feature: <one line>

@@ -33,7 +33,7 @@ day several times more productive.
 - **Tight prompts.** Say exactly what to do, what not to touch, and "stop and report after each step".
 - **One builder per codebase at a time.** Two agents editing the same branch causes conflicts and lost work.
 - **Run cheap commands yourself.** Pasting a 40-line log costs nothing; an agent exploring to find it costs a lot.
-- **The repo is the memory.** `PLAN.md`, `docs/DEVLOG.md`, `docs/guide/` mean a fresh session doesn't re-learn everything.
+- **The repo is the memory.** [`PLAN.md`](../PLAN.md), [`docs/DEVLOG.md`](../docs/DEVLOG.md), [`docs/guide/`](../docs/guide/) mean a fresh session doesn't re-learn everything.
 
 ### 3. A fallback stack (in order)
 

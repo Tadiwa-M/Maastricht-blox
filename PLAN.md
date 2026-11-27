@@ -217,6 +217,15 @@ rebuild on the workstation, batched for the next one:
 Shared by all looks: window glazing bars, lamps and shop windows as real night lights, printed
 figure detail, tyre/rim/paint detail. Painted looks only: material textures, film materials.
 
+### Parked fine-tuning (owner 2026-11-27; not started)
+
+- The gun floats: it doesn't sit in the figure's hands in third person.
+- The JoJo (Manga) poses need more dexterity and drama: from pose data, ideally against the concept sheets.
+- Pose on demand: a dedicated key and a controller button (owner wants both).
+- Stand abilities on the controller: already on RB and X in code; confirm on a real DualSense.
+- The Spider-Verse figure's lower torso looked like stacked rings from behind (photo, 2026-11-27): check whether that is
+  the build or a rendering glitch.
+
 ### Next worlds (backlog, owner 2026-11-23; not started)
 
 - **A world drawn by the owner's friend** (an artist): wait for the designs, then build the look,
@@ -227,7 +236,7 @@ figure detail, tyre/rim/paint detail. Painted looks only: material textures, fil
   handmade figures with visible seams; its own cast and vehicles. The title riffs on a film's name:
   fine as a working title, pick an original name before release.
 
-### The Unity track (owner 2026-11-24; planned, credit-gated, not started)
+### The Unity track (owner 2026-11-24; phase 1 in progress)
 
 **Two products, one set of specs.** The **browser game** stays the launch product (one click, phones, LinkedIn).
 The **Unity desktop build** is the polished one: real lighting, bigger crowds, native controller, cinematics.
@@ -243,7 +252,9 @@ We expect them to be done in about a day of work once credits allow it (owner).
 - Costs: two codebases, a heavier download than a link, world data cannot ship in the repo (fetch or bundle).
 
 **Phases** (each stops if the one before shows no clear gain):
-1. *Prove it* (workstation, `scripts/unity.ps1 all`): chunks load through the contract; one screenshot per look; compare with the
+1. *Prove it* (workstation, `scripts/unity.ps1 all`) **in progress 2026-11-27: the whole 65k-chunk municipality renders in
+   Editor Play (`Blox/Open World...`) and in the player; desktop icon. Next: the looks, title, loading screen, trailer.**
+   Chunks load through the contract; one screenshot per look; compare with the
    web and with the concept sheets. Needs the workstation attached to a session (desktop app > Settings > Claude Code > Remote
    Control > add the repo folder) and credits.
 2. *Showcase:* lighting, water, wet streets, sky; the film from `contract/shots.json`; figures in the painted looks.

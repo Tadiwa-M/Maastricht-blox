@@ -12,7 +12,7 @@ Unity-specific (pipeline asset, renderer, post-processing, materials, scenes) is
 | `Blox.Rendering` | `Assets/Blox/Runtime/Rendering` | world streaming, chunk renderers, instanced studs, sun / time of day, shadow range |
 | `Blox.Live` | `Assets/Blox/Runtime/Live` | live proxy client: vehicles, weather, water (motion rule as pure logic) |
 | `Blox.Gameplay` | `Assets/Blox/Runtime/Gameplay` | map camera rig, brick models (bus, character), path following, walking (no dependency on `Blox.Rendering`) |
-| `Blox.Editor` | `Assets/Blox/Editor` | `Blox/Setup Project`, `Blox/Create Look Test Scene` |
+| `Blox.Editor` | `Assets/Blox/Editor` | `Blox/Setup Project`, `Blox/Create Look Test Scene`, `Blox/Open World...` |
 | shaders | `Assets/Blox/Shaders` | `Blox/BrickBody`, `Blox/BrickTransparent`, `Blox/Stud`, `StudCull.compute` |
 
 ## First run on Windows
@@ -44,7 +44,8 @@ Unity-specific (pipeline asset, renderer, post-processing, materials, scenes) is
    ```
    This writes `build/testscene/` (manifest, palette, catalogue, chunks, preview.png).
    A real slice is built with `uv run blox fetch` + `uv run blox build --out ../build/world`
-   (see `../pipeline/README.md`); point the WorldLoader's *World Directory* at it.
+   (see `../pipeline/README.md`); open it with **`Blox > Open World...`** (pick the folder;
+   the scene is rebuilt with the WorldLoader pointed at it and the camera framed on it).
 5. **Run `Blox > Create Look Test Scene`.** It builds and saves
    `Assets/Blox/Generated/Scenes/LookTest.unity`: sun with time of day, procedural sky,
    global volume, camera rig framed on the test world, a `World` object with

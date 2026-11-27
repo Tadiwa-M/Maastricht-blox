@@ -213,17 +213,22 @@ namespace Blox.Meshing
             if (_done) throw new InvalidOperationException("PendingChunkMesh.Complete called twice");
             _done = true;
             Handle.Complete();
+            Mesh.MeshDataArray arr = default;
+            bool applied = false;
             try
             {
                 int vCount = _sink.Vertices.Length, n0 = _sink.OpaqueIndices.Length, n1 = _sink.TransparentIndices.Length;
-                var arr = Mesh.AllocateWritableMeshData(1);
+                arr = Mesh.AllocateWritableMeshData(1);
                 var md = arr[0];
                 md.SetVertexBufferParams(vCount, BrickVertexLayout.Attributes);
                 md.SetIndexBufferParams(n0 + n1, IndexFormat.UInt32);
                 md.GetVertexData<BrickVertex>().CopyFrom(_sink.Vertices.AsArray());
                 var idx = md.GetIndexData<int>();
-                NativeArray<int>.Copy(_sink.OpaqueIndices.AsArray(), 0, idx, 0, n0);
-                NativeArray<int>.Copy(_sink.TransparentIndices.AsArray(), 0, idx, n0, n1);
+                // Skip empty copies: the collections safety check rejects dstIndex == length even for
+                // 0 elements, so a chunk with no glass (n1 == 0) threw here in the Editor and stayed
+                // invisible. Release players have no safety checks, which is why only the Editor showed it.
+                if (n0 > 0) NativeArray<int>.Copy(_sink.OpaqueIndices.AsArray(), 0, idx, 0, n0);
+                if (n1 > 0) NativeArray<int>.Copy(_sink.TransparentIndices.AsArray(), 0, idx, n0, n1);
                 md.subMeshCount = 2;
                 const MeshUpdateFlags flags = MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontNotifyMeshUsers;
                 var bounds = Bounds();
@@ -231,6 +236,7 @@ namespace Blox.Meshing
                 md.SetSubMesh(1, new SubMeshDescriptor(n0, n1) { bounds = bounds, vertexCount = vCount }, flags);
                 target.Clear();
                 Mesh.ApplyAndDisposeWritableMeshData(arr, target, flags);
+                applied = true;
                 target.bounds = bounds;
                 var studs = _sink.Studs.Length > 0 ? _sink.Studs.AsArray().ToArray() : Array.Empty<StudInstance>();
                 if (IsIsland) IslandMesherCore.StudsToWorld(studs, _pose); // local -> world, same as the GameObject transform
@@ -238,6 +244,7 @@ namespace Blox.Meshing
             }
             finally
             {
+                if (!applied && arr.Length > 0) arr.Dispose();  // a failure above must not leak the mesh data
                 _sink.Dispose();
                 if (_bricks.IsCreated) _bricks.Dispose();
             }

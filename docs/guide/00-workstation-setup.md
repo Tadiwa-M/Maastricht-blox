@@ -63,9 +63,13 @@ and lists the next commands.
 | `test` | Unity EditMode tests | `build/unity/editmode.xml`, `.log` |
 | `build` | standalone player of the look-test scene (`BatchMode.BuildPlayer`) | `unity/Builds/<target>/` |
 | `shot` | runs the player with `-bloxWorld build/testscene -bloxShot …`; `ShotRunner` waits 10 s, captures and quits | `build/shots/unity_hero.png` |
+| `editorshot -World <dir>` | the **Editor** (a window, not batch mode): runs what `Blox/Open World...` runs on `<dir>`, enters Play, saves the frame, quits (`Blox.Editor.EditorPlayShot`). Close the open Editor first: one instance per project | `build/shots/<Out>`, `build/unity/editorshot.log` |
 
 Unity is found through `UNITY_EXE`, or else the newest `6000.*` in the default Hub folder.
 When something fails, the log path is printed; the error lines are in it.
+
+**Full Unity guide for any machine** (getting a world onto it, the Editor, desktop icons, a debugging playbook and a
+symptom → fix table): `22-unity-setup.md`.
 
 ## 4. Real data (needs this machine's network)
 

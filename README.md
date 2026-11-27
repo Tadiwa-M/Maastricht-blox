@@ -59,6 +59,9 @@ about three times the city slice, so three times the build time and site size): 
 
 Windows (PowerShell): `.\scripts\check.ps1`, `.\scripts\site.ps1`, `.\scripts\publish.ps1`, `.\scripts\film.ps1`. New
 machine: `scripts/setup-workstation.ps1` (or `.sh`), then `docs/guide/00-workstation-setup.md`.
+Desktop icons (Windows): `.\scripts\desktop-icons.ps1` makes **Maastricht Blox** (the web game from `build\site_maastricht`
+in its own window, offline; `scripts\play.ps1`) and **Maastricht Blox (Unity)** (the Unity player on `build\world_maastricht`).
+Unity on any machine (install, worlds, Editor, debugging): `docs/guide/22-unity-setup.md`.
 `--slice centre` builds the smaller 2 × 2 km old town; `samples/markt_v3` is a ready-made sample
 (`scripts/site.sh samples/markt_v3 build/site_markt --serve`).
 
