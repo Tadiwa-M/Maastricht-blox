@@ -2049,3 +2049,8 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   trailer, loading screen and looks, from `build/site_maastricht` in an Edge/Chrome app window, local server stopped on
   close) and 'Maastricht Blox (Unity)' (the player on `build/world_maastricht`). Original brick icons from
   `scripts/make_icon.py`. Decision (owner): both icons now; web features are ported to Unity one at a time.
+- 2026-11-27 learn/: `quiz.mjs` split lines on \n only, so on a Windows checkout (CRLF) no question parsed and the
+  learn test failed; it splits on \r?\n now. New `learn/tools/links.mjs`: every repo path in backticks in learn/*.md
+  links to the file (doc folder, then repo root, then a unique ending), and a function named on the same line as its
+  file links to its definition line (`manga()` -> verse.js#L156). Idempotent; `x`<!--nolink--> opts out. The learn
+  test checks every link lands and every #L line still holds its name (re-run the tool when code moves).

@@ -7,7 +7,7 @@ import { createInterface } from 'node:readline';
 export function questions(md) {
   const out = [];
   let track = '', q = null;
-  for (const line of md.split('\n')) {
+  for (const line of md.split(/\r?\n/)) {   // \r?: a Windows checkout (core.autocrlf) has CRLF line ends
     const h = /^##\s+\d+\.\s+([a-z-]+):/.exec(line);
     if (h) { track = h[1]; continue; }
     const mq = /^\s*-\s+Q:\s+(.*)$/.exec(line), ma = /^\s*-\s+A:\s+(.*)$/.exec(line);
