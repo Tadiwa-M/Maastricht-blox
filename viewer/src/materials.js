@@ -8,6 +8,39 @@
 import * as THREE from 'three';
 import { rippleNormalTexture, addRipples } from './ripples.js';
 import { classOf } from './matkey.js';
+import { TEXTURED_LOOK } from './render/verse.js';
+import { installSurface, registerSurfaceEntry, registerLeafEntry } from './render/surface.js';
+
+// the comic test look paints opaque surfaces (render/surface.js)
+const PAINTED = TEXTURED_LOOK; // (every look: window bars and real night pools; painted looks: textures too)
+
+// Leaves in the wind: bricks flagged per instance (aSway, set by bricks.js for the leaf colours)
+// drift a few centimetres, in a slow wave that runs through a canopy (phase from where the brick
+// stands). One shared time and strength for every material (life/index.js sets them from the
+// clock and the real wind). Bricks without the attribute read 0 and stand still.
+export const swayUniforms = { uSwayT: { value: 0 }, uSwayAmp: { value: 0.03 } };
+export const SWAY = { calm: 0.012, perKmh: 0.0016, max: 0.09 }; // metres of drift: still air, per km/h of wind, storm cap
+/** Drift (m) for a wind speed (km/h). */
+export const swayAmp = (windKmh) => Math.min(SWAY.max, SWAY.calm + SWAY.perKmh * Math.max(0, windKmh || 0));
+
+function addSway(m, key) {
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, swayUniforms);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aSway;\nuniform float uSwayT;\nuniform float uSwayAmp;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        #ifdef USE_INSTANCING
+          if (aSway > 0.0) {
+            float swayPh = dot(instanceMatrix[3].xz, vec2(0.33, 0.27)) + instanceMatrix[3].y * 0.4;
+            transformed.x += sin(uSwayT * 1.25 + swayPh) * uSwayAmp * aSway;
+            transformed.z += cos(uSwayT * 0.95 + swayPh * 1.3) * uSwayAmp * aSway * 0.7;
+            transformed.y += sin(uSwayT * 1.7 + swayPh * 2.1) * uSwayAmp * aSway * 0.25;
+          }
+        #endif`);
+  };
+  m.customProgramCacheKey = () => key;
+  return m;
+}
 
 function plastic(extra = {}) {
   return new THREE.MeshPhysicalMaterial({
@@ -17,25 +50,73 @@ function plastic(extra = {}) {
 }
 
 /** Glass whose emissive light is multiplied by a per-instance colour (aGlow). */
+// Shared by every window material: the share of rooms lit now (glow.js litShare) and the game
+// clock in seconds; life/index.js sets both each frame.
+export const windowUniforms = { uLitShare: { value: 0.55 }, uWinT: { value: 0 } };
+
 function windowGlass(extra = {}) {
   const m = plastic({ ...extra, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.6,
     specularIntensity: 1, emissive: 0xffffff, emissiveIntensity: 0 });
   m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, windowUniforms);
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec3 aGlow;\nvarying vec3 vGlow;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = aGlow;');
+      .replace('#include <common>', `#include <common>
+        attribute vec3 aGlow; varying vec3 vGlow; varying float vRoomY;
+        uniform float uLitShare; uniform float uWinT;
+        float winHash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vGlow = aGlow;
+        vRoomY = 0.5;
+        #ifdef USE_INSTANCING
+          // which rooms have the light on: a share by the hour, each window on its own slow
+          // schedule (switches about every 6 to 18 game minutes), so the city changes as you watch
+          vec3 cell = floor(instanceMatrix[3].xyz * vec3(0.5, 0.35, 0.5));
+          float own = winHash(cell);
+          float slot = floor(uWinT / (360.0 + own * 720.0) + own * 17.0);
+          float lit = step(winHash(cell + slot * 0.731), uLitShare);
+          // a TV room (blue) flickers
+          float tv = step(vGlow.r * 1.5, vGlow.b);
+          float flick = 0.75 + 0.25 * sin(uWinT * 0.9 + own * 40.0) * sin(uWinT * 2.3 + own * 11.0);
+          vGlow *= lit * mix(1.0, flick, tv) * (0.7 + 0.5 * winHash(cell + 3.1));
+          vRoomY = fract(position.y + 0.5); // within the pane: 0 at the sill, 1 at the top
+        #endif`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vGlow;')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= vGlow;');
+      .replace('#include <common>', '#include <common>\nvarying vec3 vGlow; varying float vRoomY;')
+      // a room lit from the ceiling: the light falls off toward the sill
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= vGlow * (0.55 + 0.6 * smoothstep(0.0, 1.0, vRoomY));');
+    paneBars(sh);
   };
-  m.customProgramCacheKey = () => 'window-glass';
+  m.customProgramCacheKey = () => 'window-glass-bars';
   return m;
+}
+
+// Every look: glazing bars in every pane (a painted frame round the edge, a middle bar and
+// a transom), so windows read as Maastricht sash windows, not dark slots. In the pane's own space.
+function paneBars(sh) {
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vPaneP; varying vec3 vPaneN;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPaneP = position; vPaneN = normal;');
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', `#include <common>
+      varying vec3 vPaneP; varying vec3 vPaneN; float paneBar = 0.0;
+      float barLine(float x, float w) { float a = fwidth(x) + 1e-5; return 1.0 - smoothstep(w - a, w + a, abs(x)); }`)
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      {
+        float u = abs(vPaneN.z) > 0.5 ? vPaneP.x : vPaneP.z, v = vPaneP.y;
+        float edge = max(barLine(abs(u) - 0.5, 0.06), barLine(abs(v) - 0.5, 0.06));
+        paneBar = max(edge, max(barLine(u, 0.025), barLine(v - 0.12, 0.022)));
+        paneBar *= 1.0 - smoothstep(0.25, 0.5, fwidth(u) * 6.0); // gone where a bar would be under a pixel
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.76, 0.72), paneBar);
+      }`)
+    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.6, paneBar);')
+    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= 1.0 - paneBar;');
 }
 
 export class MaterialSet {
   /** clippingPlanes: optional, e.g. to cut moving models at the diorama edge. */
   constructor({ clippingPlanes = null } = {}) {
-    this.solid = plastic();
+    this.solid = addSway(plastic(), 'solid-sway');
+    installSurface(this.solid, 'solid', PAINTED);
     this.glass = windowGlass();
     this.trans = plastic({ roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.05, transparent: true,
       opacity: 0.75, envMapIntensity: 1.6, depthWrite: false });
@@ -58,6 +139,8 @@ export class MaterialSet {
   /** { key, material, cls } for a palette entry. */
   forEntry(entry) {
     const cls = this.classOf(entry);
+    if (PAINTED) registerSurfaceEntry(entry);
+    registerLeafEntry(entry); // the season turns and drops leaves in every look (render/season.js)
     if (cls === 'emissive') {
       const key = `emissive:${entry.idx}`;
       if (!this.emissive.has(key)) {
@@ -79,7 +162,7 @@ export class MaterialSet {
     if (this.far.has(key)) return this.far.get(key);
     let m;
     const std = (extra) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0, ...extra });
-    if (key === 'solid') m = std({});
+    if (key === 'solid') { m = std({}); installSurface(m, 'far-solid', PAINTED); }
     else if (key === 'metal') m = std({ metalness: 0.8, roughness: 0.28, envMapIntensity: 1.4 });
     else if (key === 'glass') m = windowGlass({ vertexColors: true });
     else if (key === 'trans') m = this.trans.clone();
@@ -110,16 +193,27 @@ export class MaterialSet {
     const uGlow = { value: 0 };
     m.onBeforeCompile = (sh) => {
       sh.uniforms.uGlow = uGlow;
+      Object.assign(sh.uniforms, windowUniforms);
       sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute vec4 aExtra;\nvarying vec4 vExtra;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvExtra = aExtra;');
+        .replace('#include <common>', '#include <common>\nattribute vec4 aExtra;\nvarying vec4 vExtra;\nvarying vec3 vWinP;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvExtra = aExtra;\nvWinP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying vec4 vExtra;\nuniform float uGlow;')
+        .replace('#include <common>', `#include <common>
+          varying vec4 vExtra; varying vec3 vWinP; uniform float uGlow; uniform float uLitShare; uniform float uWinT;
+          float winHashF(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }`)
         .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = vExtra.a > 0.75 ? 0.06 : (vExtra.a > 0.25 ? 0.28 : roughnessFactor);')
         .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = (vExtra.a > 0.25 && vExtra.a < 0.75) ? 0.8 : metalnessFactor;')
-        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vExtra.rgb * 2.0 * uGlow;');
+        // the bake lit 60 % of windows; keep the share the hour wants (glow.js litShare), each window
+        // (its metre cell) on its own slow schedule, as the near glass does
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+          vec3 wc = floor(vWinP * vec3(0.9, 0.6, 0.9) + 0.01);
+          float own = winHashF(wc);
+          float slot = floor(uWinT / (360.0 + own * 720.0) + own * 17.0);
+          float keep = step(winHashF(wc + slot * 0.731), min(1.0, uLitShare / 0.6));
+          totalEmissiveRadiance += vExtra.rgb * 2.0 * uGlow * keep;`);
     };
     m.customProgramCacheKey = () => 'city-far-opaque';
+    installSurface(m, 'city-far', PAINTED);
     m.userData.uGlow = uGlow;
     this.cityOpaque = m;
     this.setNight(this.night);
@@ -129,12 +223,12 @@ export class MaterialSet {
   /** night in [0, 1]: lamps and windows glow. */
   setNight(night) {
     this.night = night;
-    if (this.cityOpaque) this.cityOpaque.userData.uGlow.value = night * 1.6;
+    if (this.cityOpaque) this.cityOpaque.userData.uGlow.value = night * 1.2;
     for (const m of this.emissive.values()) m.emissiveIntensity = 0.8 + night * 3;
     for (const [key, m] of this.far) if (key.startsWith('emissive:')) m.emissiveIntensity = 0.8 + night * 3;
     for (const g of [this.glass, this.far.get('glass')]) {
       if (!g) continue;
-      g.emissiveIntensity = night * 1.6;
+      g.emissiveIntensity = night * 1.15; // a room's light, not a lamp: it should not light the street
       g.envMapIntensity = 1.6 * (1 - 0.6 * night);
     }
   }

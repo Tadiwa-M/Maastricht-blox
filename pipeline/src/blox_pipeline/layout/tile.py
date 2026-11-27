@@ -15,7 +15,8 @@ from ..palette import Palette, load_palette
 from .cull import exposed_mask
 from .pack2d import feet_table, pack_volume
 from .placed import as_records, placed_problems
-from .records import CHUNK, FLAG_HIDE_STUDS, RECORD_DTYPE, WORLD_STUDS, Records, sort_records
+from .. import geo
+from .records import CHUNK, FLAG_HIDE_STUDS, RECORD_DTYPE, Records, sort_records
 from .slopes import layout_slopes
 from .studs import hidden_studs
 
@@ -38,8 +39,8 @@ def emit_mask(dims: tuple[int, int, int], k0: int, I0: int, J0: int, border: int
     gi = I0 + np.arange(nx)
     gj = J0 + np.arange(ny)
     gk = k0 + np.arange(nz)
-    mi = (np.arange(nx) >= border) & (np.arange(nx) < nx - border) & (gi >= 0) & (gi < WORLD_STUDS)
-    mj = (np.arange(ny) >= border) & (np.arange(ny) < ny - border) & (gj >= 0) & (gj < WORLD_STUDS)
+    mi = (np.arange(nx) >= border) & (np.arange(nx) < nx - border) & (gi >= 0) & (gi < geo.CHUNKS_X * geo.CHUNK_STUDS)
+    mj = (np.arange(ny) >= border) & (np.arange(ny) < ny - border) & (gj >= 0) & (gj < geo.CHUNKS_Y * geo.CHUNK_STUDS)
     mk = (gk >= 0) & (gk <= MAX_K)
     return mi[:, None, None] & mj[None, :, None] & mk[None, None, :]
 

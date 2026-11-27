@@ -15,11 +15,17 @@
 import { build } from 'esbuild';
 import { mkdir, readFile, readdir, writeFile, copyFile, link, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { placeChunk } from './src/places.js';
 import { bakeFar } from './tools/bake-far.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
+const RELAY_URL = 'https://blox-relay.tmata1907.workers.dev'; // deployed by the owner, scripts/relay.ps1
+// the owner's Spotify Developer app (Melody Search's): its Client ID is public by design (PKCE login,
+// no secret); '' leaves music to Spotify links. BLOX_SPOTIFY_ID overrides. docs/guide/21-music.md
+const SPOTIFY_CLIENT_ID = '9818b6e351d84e1ab29bf345fa7ee898';
 const args = process.argv.slice(2);
 const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
 const around = opt('--around');
@@ -27,13 +33,12 @@ const site = opt('--site');
 const radius = Number(opt('--radius') ?? 3);
 const worldDir = resolve(args[0] || join(here, '..', 'build', 'testscene'));
 
-// Places in chunk coordinates: chunk = floor((RD - origin) / 32 m), origin RD (175700, 316500).
-const PLACES = { markt: [22, 47], vrijthof: [15, 38], brug: [32, 40], station: [53, 40], bonnefanten: [41, 18] };
-
-/** Chunk filter for --around, or null to embed everything. */
-function chunkFilter() {
+/** Chunk filter for --around, or null to embed everything. Places are RD points converted with
+ * the world's own origin (src/places.js), so they work for any slice. */
+function chunkFilter(manifest) {
   if (!around) return null;
-  const c = PLACES[around.toLowerCase()] ?? around.split(',').map(Number);
+  const chunkM = (manifest.chunkStuds || 64) * (manifest.studM || 0.5);
+  const c = placeChunk(around, manifest.originRD || [175700, 316500], chunkM) ?? around.split(',').map(Number);
   if (c.length !== 2 || c.some(Number.isNaN)) throw new Error(`--around: unknown place '${around}'`);
   return (cx, cy) => Math.abs(cx - c[0]) <= radius && Math.abs(cy - c[1]) <= radius;
 }
@@ -52,6 +57,24 @@ async function readModels() {
   return models;
 }
 
+/**
+ * Life export of a world (`blox life --out <world>`, Track L): life/index.json lists its files
+ * ({ files: { transit: 'transit.json', ... } }). Returns { names: [file names], data: { index,
+ * transit, ... } } or null when the world has none.
+ */
+async function readLife() {
+  const dir = join(worldDir, 'life');
+  if (!existsSync(join(dir, 'index.json'))) return null;
+  const index = await readJson(join(dir, 'index.json'));
+  const data = { index }, names = ['index.json'];
+  for (const [k, f] of Object.entries(index.files || {})) {
+    if (!existsSync(join(dir, f))) { console.warn(`life: ${f} listed but missing`); continue; }
+    data[k] = await readJson(join(dir, f));
+    names.push(f);
+  }
+  return { names, data };
+}
+
 async function embedWorld() {
   const manifest = await readJson(join(worldDir, 'manifest.json'));
   const palette = await readJson(join(worldDir, manifest.palette || 'palette.json'));
@@ -61,7 +84,7 @@ async function embedWorld() {
   let files = manifest.chunks?.length
     ? manifest.chunks.map((c) => c.file)
     : (await readdir(join(worldDir, 'chunks'))).filter((f) => f.endsWith('.bxc')).map((f) => `chunks/${f}`);
-  const keep = chunkFilter();
+  const keep = chunkFilter(manifest);
   if (keep) {
     files = files.filter((f) => { const m = /c_(\d+)_(\d+)\.bxc$/.exec(f); return m && keep(+m[1], +m[2]); });
     if (manifest.chunks) manifest.chunks = manifest.chunks.filter((c) => keep(c.cx, c.cy));
@@ -90,7 +113,9 @@ async function embedWorld() {
     catalogue: await readJson(join(here, '..', 'contract', 'brick_catalogue.json')),
     palette: await readJson(join(here, '..', 'contract', 'palette.json')),
   };
-  const js = `window.BLOX_WORLD = ${JSON.stringify({ manifest, palette, catalogue, features, chunks, islands, models, contract })};\n`;
+  const life = await readLife(); // null = no life export (life/ then skips fetching)
+  console.log(`life: ${life ? life.names.join(', ') : 'none'}`);
+  const js = `window.BLOX_WORLD = ${JSON.stringify({ manifest, palette, catalogue, features, chunks, islands, models, contract, life: life?.data ?? null })};\n`;
   await writeFile(join(dist, 'world.js'), js);
   console.log(`world.js: ${files.length} chunks (${(bytes / 1024).toFixed(1)} KiB), ${islandList.length} islands `
     + `(${(islandBytes / 1024).toFixed(1)} KiB) from ${worldDir}`);
@@ -113,9 +138,27 @@ const optionalModules = {
 
 async function bundle(out) {
   const common = { bundle: true, target: 'es2022', minify: true, sourcemap: false, logLevel: 'warning' };
-  await build({ ...common, entryPoints: [join(here, 'src', 'main.js')], format: 'esm', outfile: join(out, 'viewer.js'), plugins: [optionalModules] });
+  // iife: index.html loads viewer.js as a classic script, so the bundle keeps its own scope (as ESM
+  // output its top-level names became page globals: an unminified build clashed with window.top)
+  await build({ ...common, entryPoints: [join(here, 'src', 'main.js')], format: 'iife', outfile: join(out, 'viewer.js'), plugins: [optionalModules] });
   await build({ ...common, entryPoints: [join(here, 'src', 'stream-worker.js')], format: 'iife', outfile: join(out, 'stream-worker.js') });
   await copyFile(join(here, 'src', 'index.html'), join(out, 'index.html'));
+  // the phone trip planner (plan.html): its own small bundle, no 3D city
+  await build({ ...common, entryPoints: [join(here, 'src', 'plan', 'app.js')], format: 'esm', outfile: join(out, 'plan.js') });
+  for (const f of ['plan.html', 'plan.webmanifest', 'plan-icon.svg', 'game.webmanifest']) await copyFile(join(here, 'src', f), join(out, f));
+  await copyFile(join(here, 'node_modules', 'leaflet', 'dist', 'leaflet.css'), join(out, 'leaflet.css'));
+  await (await import('./src/interiors/copy-data.mjs')).copyPlaces(join(here, 'src', 'interiors', 'data'), join(out, 'interiors')); // interiors: place files, no world rebuild
+  // title-screen key art (rendered from the city by tools/keyart.mjs)
+  const art = join(here, 'src', 'title');
+  if (existsSync(art)) {
+    await mkdir(join(out, 'title'), { recursive: true });
+    for (const f of await readdir(art)) if (/\.(jpe?g|webp)$/.test(f)) await copyFile(join(art, f), join(out, 'title', f));
+  }
+}
+
+/** Short hash of the code commit (shown in reports), or '' outside a git checkout. */
+function gitShort() {
+  try { return execSync('git rev-parse --short HEAD', { cwd: here, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return ''; }
 }
 
 /** Hard link (fast, no extra disk) or copy when linking fails (other drive, Windows rules). */
@@ -138,6 +181,14 @@ async function buildSite(outDir) {
     if (existsSync(join(worldDir, f))) await place(join(worldDir, f), join(wdir, f.replace(/^.*\//, '')));
   }
   if (!existsSync(join(wdir, 'features.json'))) await writeFile(join(wdir, 'features.json'), '{"features":[]}');
+  // places.json: what the trip planner can search (names, streets, addresses), a few hundred KB
+  // instead of the whole feature file (src/plan/places.js)
+  {
+    const { placesFromFeatures } = await import('./src/plan/places.js');
+    const fd = await readJson(join(wdir, 'features.json'));
+    const list = Array.isArray(fd) ? fd : fd.features || [];
+    await writeFile(join(wdir, 'places.json'), JSON.stringify({ version: 1, places: placesFromFeatures(list, manifest.studM || 0.5) }));
+  }
   const baked = await bakeFar(worldDir, wdir);
   let bytes = 0;
   for (const e of [...baked.chunks, ...baked.islands]) {
@@ -147,6 +198,7 @@ async function buildSite(outDir) {
   const index = {
     version: 1, studM: manifest.studM || 0.5, plateM: manifest.plateM || 0.2, chunkStuds: manifest.chunkStuds || 64,
     chunksX: manifest.chunksX || 64, chunksY: manifest.chunksY || 64,
+    originRD: manifest.originRD || [175700, 316500],
     chunks: baked.chunks.map(({ cx, cy, file, minK, maxK, bytes: b }) => ({ cx, cy, file, minK, maxK, bytes: b })),
     islands: baked.islands.map(({ id, file, cx, cy, rect, minK, maxK, bytes: b }) => ({ id, file, cx, cy, rect: rect.map((v) => +v.toFixed(2)), minK, maxK, bytes: b })),
   };
@@ -156,12 +208,30 @@ async function buildSite(outDir) {
     palette: await readJson(join(here, '..', 'contract', 'palette.json')),
   };
   await writeFile(join(wdir, 'models.json'), JSON.stringify({ models: await readModels(), contract }));
-  await writeFile(join(outDir, 'world.js'), "window.BLOX_SITE = { base: 'world/' };\n");
+  const life = await readLife();
+  if (life) {
+    await mkdir(join(wdir, 'life'), { recursive: true });
+    for (const f of life.names) await place(join(worldDir, 'life', f), join(wdir, 'life', f));
+  }
+  console.log(`life: ${life ? life.names.join(', ') : 'none'}`);
+  // life: whether world/life/ exists, so the page doesn't fetch (and 404) when it doesn't
+  // relay: the Cloudflare Worker for live buses and map reports (relay/README.md); BLOX_RELAY
+  // overrides the deployed one, BLOX_RELAY=none builds without (PowerShell can't set an empty variable)
+  const relayEnv = process.env.BLOX_RELAY;
+  const siteCfg = { base: 'world/', life: !!life, relay: relayEnv === 'none' ? '' : relayEnv || RELAY_URL, spotifyClientId: process.env.BLOX_SPOTIFY_ID ?? SPOTIFY_CLIENT_ID, build: gitShort(),
+    originRD: index.originRD || null };
+  await writeFile(join(outDir, 'world.js'), `window.BLOX_SITE = ${JSON.stringify(siteCfg)};\n`);
   console.log(`site: ${index.chunks.length} chunks + ${index.islands.length} islands (${(bytes / 1048576).toFixed(1)} MiB) `
     + `from ${worldDir} -> ${outDir} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 }
 
-if (site) {
+const viewerOnly = opt('--viewer-only');
+if (viewerOnly) {
+  // only the game's code and its small files (no world, no far meshes): scripts/update-viewer.* adds them to the site repo
+  await mkdir(resolve(viewerOnly), { recursive: true });
+  await bundle(resolve(viewerOnly));
+  console.log(`viewer only: ${resolve(viewerOnly)}`);
+} else if (site) {
   await buildSite(resolve(site));
 } else {
   await mkdir(dist, { recursive: true });

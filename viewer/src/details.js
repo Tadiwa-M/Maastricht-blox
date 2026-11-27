@@ -1,9 +1,11 @@
-// Geometry for the v2 detail pieces (CONTRACT section 2.1, ids 38+).
+// Geometry for the v2 detail pieces (CONTRACT section 2.1, ids 38+; the look-v2 pieces 48-56 are
+// built in src/details-look.js and picked by name).
 //
 // Same local frame as every piece (src/shapes.js): centred footprint, +x = +i, y up,
 // FRONT toward -z (= +j at rot 0). Each builder returns { body, glass? }: `body` uses the
 // record colour, `glass` (window and door panes) always uses the glass material.
 import { INSET, merge, slab, brickBox, latheRound, extrudeFront, post } from './shapes.js';
+import { lookGeometry } from './details-look.js';
 
 const BAR = 0.06;       // frame bar width (contract)
 const PANE_BACK = 0.1;  // panes sit this far behind the front face (contract)
@@ -96,6 +98,8 @@ function grille(W, H, D) {
 
 /** Geometry for a detail kind, or null if `t.kind` is not a detail piece. */
 export function detailGeometry(t, S, P) {
+  const look = lookGeometry(t, S, P); // look-v2 pieces (ids 48+) are picked by name
+  if (look) return look;
   const W = t.w * S, D = t.d * S, H = t.h * P;
   switch (t.kind) {
     case 'arch': return arch(W, H, D, t.w - 2, S);

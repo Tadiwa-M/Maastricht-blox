@@ -6,7 +6,8 @@ import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png',
-  '.bin': 'application/octet-stream', '.bxc': 'application/octet-stream', '.bxi': 'application/octet-stream' };
+  '.bin': 'application/octet-stream', '.bxc': 'application/octet-stream', '.bxi': 'application/octet-stream',
+  '.css': 'text/css', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.jpg': 'image/jpeg' };
 
 /** Start serving dir on 127.0.0.1:port (0 = any). Returns { server, url }. */
 export async function serve(dir, port = 0) {

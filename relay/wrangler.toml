@@ -1,0 +1,20 @@
+# Cloudflare Worker for the Maastricht Blox site (see README.md). Secrets are set with
+# `npx wrangler secret put GITHUB_TOKEN` (and NS_KEY), never written here.
+name = "blox-relay"
+main = "src/worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+SITE_ORIGINS = "https://tadiwa-m.github.io,http://localhost:8000,http://127.0.0.1:8000"
+REPO = "Tadiwa-M/Maastricht-blox"
+REPORT_BRANCH = "map-reports"
+
+# Multiplayer rooms (src/room.js): one Durable Object per room code, WebSockets with hibernation.
+# SQLite-backed (the only kind on the free plan). The migration runs once, on the first deploy.
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "BloxRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["BloxRoom"]

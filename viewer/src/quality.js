@@ -5,35 +5,48 @@
 //           ratio up to 2; with one chunk every brick is drawn bevelled with studs (no LOD)
 //   medium  per-chunk LOD (bevelled + studs only near the camera, one bevel segment
 //           instead of two), half-res AO, pixel ratio 1, bloom only at night, 2048 shadows
-//   low     LOD with a small near zone, AO off, pixel ratio 1, bloom only at night
+//   low     LOD with a small near zone, AO off, pixel ratio 1, bloom only at night, 1024 shadows
+//   lite    for software rendering (no GPU) or by hand: 0.75 resolution, no shadows, no bloom,
+//           a short detail range and fewer people and vehicles. 'auto' never steps down to it
+//           on a real GPU (the governor's floor is low there)
 //
-// 'auto' starts at high for a single-chunk world and medium for anything bigger, then steps
+// 'auto' starts at high for a single-chunk world; a bigger world starts by GPU class (gpu.js:
+// software -> lite, integrated -> low, else medium), then steps
 // down while the measured frame time stays high. It never steps back up by itself (that
 // oscillates on machines right at the edge); pick 'high' in the HUD to force it.
 //
 // City mode (streamed site build) adds: streamRadius (m: chunks/islands within it are loaded
 // in the mid look), farDist ([m, m]: baked far level 1 within the first, level 2 within the
-// second, level 3 beyond) and aoDist (m: AO only when the orbit target is closer).
+// second, level 3 beyond), aoDist (m: AO only when the orbit target is closer) and nearTriCap
+// (triangles of near looks: one big island can hold 30k bricks, so items alone are no budget),
+// shadowRange (m: the sun's shadow box never grows past this around the orbit target; the shadow
+// pass draws everything inside it a second time, so on the overview it doubled the city's cost).
+// nearDetail 'lite' on every tier: one bevel step and 12-sided studs is the chunkier toy look the
+// owner prefers (and cheaper); High keeps its resolution, distances and shadows.
+// aa (High only): edge anti-aliasing folded into the final grade pass (render/grade.js), 6 extra
+// texture taps per pixel on edges, no extra pass.
 export const TIERS = Object.freeze({
-  high: { name: 'high', nearDetail: 'full', pixelRatio: 2, ao: 'full', bloom: 'always', shadowMap: 4096, nearDist: 70, maxNear: 9, studCap: 80000,
-    streamRadius: 300, farDist: [380, 1200], aoDist: 400 },
+  high: { name: 'high', nearDetail: 'lite', pixelRatio: 2, ao: 'full', bloom: 'always', aa: true, shadowMap: 4096, nearDist: 70, maxNear: 9, studCap: 80000,
+    streamRadius: 300, farDist: [800, 2600], aoDist: 400, nearTriCap: 8e6, shadowRange: 1600 }, // farDist: the map view gets the finest far city
   medium: { name: 'medium', nearDetail: 'lite', pixelRatio: 1, ao: 'half', bloom: 'night', shadowMap: 2048, nearDist: 40, maxNear: 3, studCap: 20000,
-    streamRadius: 200, farDist: [280, 900], aoDist: 250 },
-  low: { name: 'low', nearDetail: 'lite', pixelRatio: 1, ao: 'off', bloom: 'night', shadowMap: 2048, nearDist: 22, maxNear: 2, studCap: 8000,
-    streamRadius: 130, farDist: [200, 650], aoDist: 0 },
+    streamRadius: 200, farDist: [280, 900], aoDist: 250, nearTriCap: 2.5e6, shadowRange: 1000 },
+  low: { name: 'low', nearDetail: 'lite', pixelRatio: 1, ao: 'off', bloom: 'night', shadowMap: 1024, nearDist: 22, maxNear: 2, studCap: 8000,
+    streamRadius: 130, farDist: [200, 650], aoDist: 0, nearTriCap: 1.2e6, shadowRange: 450 },
+  lite: { name: 'lite', nearDetail: 'lite', pixelRatio: 0.75, ao: 'off', bloom: 'off', shadowMap: 1024, shadows: false, nearDist: 16, maxNear: 1,
+    studCap: 4000, streamRadius: 110, farDist: [140, 450], aoDist: 0, nearTriCap: 0.6e6, shadowRange: 0 },
 });
-export const MODES = ['auto', 'high', 'medium', 'low'];
-const ORDER = ['high', 'medium', 'low'];
+export const MODES = ['auto', 'high', 'medium', 'low', 'lite'];
+const ORDER = ['high', 'medium', 'low', 'lite'];
 
 /** Small worlds (one chunk) are drawn without LOD at high quality. */
 export function isSmallWorld({ chunks, bricks }) {
   return chunks <= 1 && bricks <= 20000;
 }
 
-/** Starting tier name for a mode ('auto' | tier name) and world size. */
-export function initialTier(mode, world) {
+/** Starting tier name for a mode ('auto' | tier name), world size and (auto) the GPU's tier. */
+export function initialTier(mode, world, gpuTier = 'medium') {
   if (TIERS[mode]) return mode;
-  return isSmallWorld(world) ? 'high' : 'medium';
+  return isSmallWorld(world) ? 'high' : gpuTier;
 }
 
 /** LOD switch for a tier: all near (no LOD) only for a small world at high quality. */
@@ -46,8 +59,9 @@ export function useLod(tierName, world) {
  * sample(ms) returns the new tier name, or null to stay.
  */
 export class FrameGovernor {
-  constructor(tier, { slowMs = 40, windowMs = 2000, settleMs = 3000 } = {}) {
-    Object.assign(this, { tier, slowMs, windowMs, settleMs });
+  /** floor: the cheapest tier auto may reach ('low' normally; 'lite' only for software GPUs). */
+  constructor(tier, { slowMs = 40, windowMs = 1500, settleMs = 1500, floor = 'low' } = {}) {
+    Object.assign(this, { tier, slowMs, windowMs, settleMs, floor });
     this.reset();
   }
 
@@ -60,11 +74,57 @@ export class FrameGovernor {
     const avg = this.sum / this.n;
     this.sum = 0; this.n = 0; this.span = 0;
     const i = ORDER.indexOf(this.tier);
-    if (avg > this.slowMs && i < ORDER.length - 1) {
+    if (avg > this.slowMs && i < ORDER.indexOf(this.floor)) {
       this.tier = ORDER[i + 1];
       this.reset();
       return this.tier;
     }
+    return null;
+  }
+}
+
+/**
+ * Dynamic resolution (owner: 60 fps on any device): the render resolution follows the frame time.
+ * Every windowMs it looks at the mean frame interval: slower than slowMs (missing 60 fps) -> 10 %
+ * fewer pixels each way (down to min); at the display's own pace (vsync, about 16.7 ms) for upMs ->
+ * try 6 % more (up to 1); a try that makes it slow again sets a ceiling for a while. sample(ms) ->
+ * the new scale, or null to stay. atFloor: no more pixels to give (then the tier may drop).
+ */
+export class DynamicResolution {
+  constructor({ min = 0.5, slowMs = 18.5, fastMs = 17.4, windowMs = 500, upMs = 3000 } = {}) {
+    Object.assign(this, { min, slowMs, fastMs, windowMs, upMs });
+    this.min0 = min;
+    this.scale = 1; this.ceiling = 1; this.sum = 0; this.n = 0; this.span = 0; this.calm = 0; this.lastUp = 0; this.t = 0;
+  }
+  get atFloor() { return this.scale <= this.min + 1e-6; }
+  sample(ms) {
+    this.t += ms; this.sum += ms; this.n++; this.span += ms;
+    if (this.span < this.windowMs) return null;
+    const avg = this.sum / this.n;
+    this.sum = 0; this.n = 0; this.span = 0;
+    if (this.t - this.lastUp > 120000) this.ceiling = 1; // try the full resolution again now and then
+    // a drop that bought nothing: the frame rate is capped elsewhere (a remote desktop, a 30 Hz
+    // screen, the CPU): go back to where it was and stop trying for a while
+    if (this.dropFrom && this.t - this.dropAt < 1200) {
+      if (avg > this.dropAvg * 0.94) { this.scale = this.dropFrom; this.min = Math.max(this.min, this.dropFrom); this.dropFrom = 0; this.lockUntil = this.t + 60000; return this.scale; }
+      this.dropFrom = 0;
+    }
+    if (this.lockUntil && this.t > this.lockUntil) { this.lockUntil = 0; this.min = this.min0; }
+    if (avg > this.slowMs) {
+      this.calm = 0;
+      if (this.t - this.lastUp < 1500) this.ceiling = Math.max(this.min, this.scale / 1.06 - 0.01); // that step up was too much
+      const next = Math.max(this.min, this.scale * 0.9);
+      if (next !== this.scale) { this.dropFrom = this.scale; this.dropAvg = avg; this.dropAt = this.t; this.scale = next; return next; }
+      return null;
+    }
+    if (avg <= this.fastMs) {
+      this.calm += this.windowMs;
+      if (this.calm >= this.upMs && this.scale < this.ceiling) {
+        this.calm = 0; this.lastUp = this.t;
+        this.scale = Math.min(this.ceiling, this.scale * 1.06);
+        return this.scale;
+      }
+    } else this.calm = 0;
     return null;
   }
 }

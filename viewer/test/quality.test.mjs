@@ -28,13 +28,27 @@ test('tiers get cheaper from high to low', () => {
   assert.ok(h.studCap > m.studCap && m.studCap > l.studCap);
   assert.equal(h.bloom, 'always');
   assert.equal(m.bloom, 'night');
+  assert.ok(h.shadowRange > m.shadowRange && m.shadowRange > l.shadowRange);
+  const lite = TIERS.lite; // the floor: below 1x resolution, no shadows, no bloom
+  assert.ok(lite.pixelRatio < 1 && lite.shadows === false && lite.bloom === 'off');
+  assert.ok(lite.farDist[1] < l.farDist[1] && lite.streamRadius < l.streamRadius && lite.nearTriCap < l.nearTriCap);
+});
+
+test('auto picks the start tier from the GPU class for big worlds only', () => {
+  const town = { chunks: 64, bricks: 1e6 }, one = { chunks: 1, bricks: 5000 };
+  assert.equal(initialTier('auto', town, 'lite'), 'lite');
+  assert.equal(initialTier('auto', one, 'lite'), 'high');
+  assert.equal(initialTier('medium', town, 'lite'), 'medium');
 });
 
 test('governor steps down after a slow window, ignores the settle period, never steps up', () => {
   const g = new FrameGovernor('medium', { slowMs: 40, windowMs: 1000, settleMs: 500 });
   for (let q = 0; q < 14; q++) assert.equal(g.sample(100), null); // 500 ms settle + 900 ms of window
   assert.equal(g.sample(100), 'low'); // window full (1000 ms) at 100 ms/frame
-  for (let q = 0; q < 50; q++) assert.equal(g.sample(100), null); // already at the bottom
+  for (let q = 0; q < 50; q++) assert.equal(g.sample(100), null); // low is the floor on a real GPU
+  const sw = new FrameGovernor('low', { slowMs: 40, windowMs: 1000, settleMs: 0, floor: 'lite' });
+  for (let q = 0; q < 9; q++) assert.equal(sw.sample(100), null);
+  assert.equal(sw.sample(100), 'lite'); // software rendering may go all the way down
   const fast = new FrameGovernor('high', { slowMs: 40, windowMs: 1000, settleMs: 0 });
   for (let q = 0; q < 200; q++) assert.equal(fast.sample(10), null);
   assert.equal(fast.tier, 'high');
@@ -50,4 +64,33 @@ test('fps meter measures real frame intervals and never rounds a slow machine to
   const slow = new FpsMeter(1000);
   slow.tick(0); slow.tick(2500); slow.tick(5000); // 2.5 s per frame
   assert.equal(slow.label(), '0.4 fps (2500.0 ms)');
+});
+
+test('performance mode: on by default, #perf wins over the saved choice', async () => {
+  const { perfMode } = await import('../src/citymode.js');
+  const store = (v) => ({ getItem: () => v });
+  assert.equal(perfMode(new URLSearchParams(''), store(null)), true);
+  assert.equal(perfMode(new URLSearchParams(''), store('off')), false);
+  assert.equal(perfMode(new URLSearchParams('perf=1'), store('off')), true);
+  assert.equal(perfMode(new URLSearchParams('perf=0'), store('on')), false);
+});
+
+test('dynamic resolution: fewer pixels while missing 60 fps, back up once it runs at the display pace, never below the floor', async () => {
+  const { DynamicResolution } = await import('../src/quality.js');
+  const d = new DynamicResolution();
+  let fake = 30; // a GPU-bound frame: fewer pixels, faster
+  for (let k = 0; k < 400; k++) { d.sample(fake); fake = 12 + 18 * d.scale * d.scale; }
+  assert.ok(d.scale < 0.9, `scale ${d.scale}`);
+  for (let k = 0; k < 2000; k++) d.sample(16.7); // vsync again
+  assert.ok(d.scale > 0.8, `back up: ${d.scale}`);
+  const e = new DynamicResolution();
+  for (let k = 0; k < 2000; k++) e.sample(16.7);
+  assert.equal(e.scale, 1, 'already smooth: full resolution');
+});
+
+test('dynamic resolution: a capped display (remote desktop, 30 Hz) keeps full resolution', async () => {
+  const { DynamicResolution } = await import('../src/quality.js');
+  const d = new DynamicResolution();
+  for (let k = 0; k < 2000; k++) d.sample(33.3); // fewer pixels change nothing
+  assert.ok(d.scale >= 0.99, `scale ${d.scale}`);
 });

@@ -47,7 +47,11 @@ namespace Blox.Tests
         public void CatalogueLoadsFromContract()
         {
             var c = Repo.Catalogue;
-            Assert.Equal(47, c.Types.Count);
+            Assert.Equal(57, c.Types.Count);
+            var w = c.ByName("wedge_1x2"); // catalogue v4: ramp wedge, a generic slope (no studs)
+            Assert.Equal(BrickKind.Slope, w.Kind);
+            Assert.Equal((1, 2, 1), (w.W, w.D, w.H));
+            Assert.Equal(0, w.StudRows);
             var s = c.ByName("slope33_2x3");
             Assert.Equal(BrickKind.Slope, s.Kind);
             Assert.Equal((2, 3, 3), (s.W, s.D, s.H));
@@ -112,13 +116,13 @@ namespace Blox.Tests
         }
 
         [Fact]
-        public void ManifestAcceptsV1ToV3AndRejectsOthers()
+        public void ManifestAcceptsV1ToV4AndRejectsOthers()
         {
-            Assert.Equal(3, WorldSpec.ContractVersion);
+            Assert.Equal(4, WorldSpec.ContractVersion);
             Assert.Equal(1, Manifest.Parse(ManifestJson).ContractVersion);
             Assert.Equal(2, Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 2")).ContractVersion);
             Assert.Equal(3, Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 3")).ContractVersion);
-            Assert.Throws<FormatException>(() => Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 4")));
+            Assert.Throws<FormatException>(() => Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 5")));
             Assert.Throws<FormatException>(() => Manifest.Parse(ManifestJson.Replace("\"contractVersion\": 1", "\"contractVersion\": 0")));
         }
 

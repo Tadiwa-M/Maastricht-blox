@@ -10,6 +10,9 @@ import * as THREE from 'three';
 import { BrickBatcher, brickColor, exposedStuds, glassEntry } from '../bricks.js';
 import { typeExtent, cellKey, ROT_MASK, NO_VARIATION, HIDE_STUDS } from '../world.js';
 import { gridToThree } from '../placement.js';
+import { LOOK } from '../render/verse.js';
+import { lookBusPrims } from './lookmodels.js';
+import { OUTLINE_ON, outlineFor } from '../render/outline.js';
 
 const CABIN_GLOW = new THREE.Color('#ffd49a').multiplyScalar(0.3);
 const X = new THREE.Vector3(1, 0, 0);
@@ -71,7 +74,8 @@ export function modelPrimitives(model, { palette, types, mats, studM = 0.5, plat
 export class InstancedModel {
   /** opts: { palette, types, mats, studM, plateM }. cap: maximum copies. */
   constructor(model, opts, cap, { shadows = true } = {}) {
-    const { prims, hinges } = modelPrimitives(model, opts);
+    const bricks = modelPrimitives(model, opts);
+    const { prims, hinges } = lookBusPrims(LOOK, model, bricks.hinges, opts) || bricks; // a painted look's own bus (lookmodels.js)
     this.model = model; this.cap = cap; this.count = 0; this.palette = opts.palette;
     this.hinges = hinges;
     this.group = new THREE.Group();
@@ -97,6 +101,7 @@ export class InstancedModel {
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       for (let s = 0; s < cap; s++) list.forEach((p, q) => mesh.setColorAt(s * list.length + q, p.base));
       this.group.add(mesh);
+      if (OUTLINE_ON && list[0].key === 'bus:body') { const o = outlineFor(mesh); if (o) { this.group.add(o); mesh.userData.outline = o; } } // ink round the painted bus
       this.batches.push({ mesh, list });
     }
     this._m = new THREE.Matrix4(); this._pose = new THREE.Matrix4(); this._part = new Map();
@@ -106,7 +111,7 @@ export class InstancedModel {
   /** Number of copies drawn (slots 0..n-1). */
   setCount(n) {
     this.count = Math.min(n, this.cap);
-    for (const { mesh, list } of this.batches) mesh.count = this.count * list.length;
+    for (const { mesh, list } of this.batches) { mesh.count = this.count * list.length; if (mesh.userData.outline) mesh.userData.outline.count = mesh.count; }
   }
 
   /**

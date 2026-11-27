@@ -3,7 +3,7 @@
 Turns open data into the brick world in `build/world/` (format: `../CONTRACT.md`).
 
 ```
-blox fetch   ->  data/raw/        AHN 0.5 m DTM/DSM, 3D BAG, OSM (Limburg), optional aerial photo
+blox fetch   ->  data/raw/        AHN 0.5 m DTM/DSM, 3D BAG, BGT, OSM (Limburg), optional aerial photo
 blox build   ->  build/world/     voxelise (sources/ + voxelise/) -> brick layout (layout/) -> chunks (io/) -> preview.png
 ```
 
@@ -33,7 +33,8 @@ All endpoints are constants in `sources/config.py`.
 | AHN DTM/DSM 0.5 m | PDOK WCS `dtm_05m` / `dsm_05m`, 512 m GeoTIFF blocks | `ahn/<coverage>/<x>_<y>_512.tif` | `HeightGrid` on the stud grid; DTM gaps (buildings, water) IDW-filled |
 | 3D BAG | OGC API `api.3dbag.nl/collections/pand/items?bbox=...`, 256 m blocks, all pages | `3dbag/<block>/page_NNNN.json` | `Building` list: BAG attributes + surfaces of the best LoD (2.2 first) with roof/wall/ground semantics |
 | OSM | Geofabrik `limburg-latest.osm.pbf`, clipped to slice + 300 m with pyosmium (back-references kept, so geometries are whole) | `osm/slice_clip.osm.pbf` | `OsmData`: roads (highway, width, bridge), road areas/squares, railways, water polygons, waterways, trees, landuse/parks, OSM buildings (names/addresses), named POIs, all in RD |
-| Aerial photo (optional) | PDOK WMS `Actueel_orthoHR`, 256 m PNG blocks at 0.5 m | `ortho/<block>.png` | `RGBGrid`, quantised to ground palette colours |
+| BGT | PDOK OGC API `api.pdok.nl/kadaster/bgt/ogc/v1/collections/<c>/items?bbox=...`, 512 m blocks, 10 collections, all pages; slimmed to current objects | `bgt/<block>/<collection>/page_NNNN.json` | `BgtData`: ground, water, bridge, wall and canopy polygons in RD + the covered extent (guide 02) |
+| Aerial photo (optional) | PDOK WMS `Actueel_orthoHR`, 256 m JPEG blocks at 0.5 m (the WMS stopped serving PNG; old `.png` blocks are still read) | `ortho/<block>.jpg` | `RGBGrid`, quantised to ground palette colours |
 
 The CityJSON reader also accepts downloaded 3D BAG tiles (`.city.json`) and CityJSONSeq (`.city.jsonl`).
 

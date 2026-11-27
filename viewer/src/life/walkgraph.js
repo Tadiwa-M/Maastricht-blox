@@ -28,6 +28,7 @@ export class WalkGraph {
     this.x = new Float32Array(n); this.z = new Float32Array(n);
     for (let q = 0; q < n; q++) { this.x[q] = doc.nodes[2 * q]; this.z[q] = doc.nodes[2 * q + 1]; }
     this.w = Float32Array.from({ length: n }, (_, q) => doc.weights?.[q] ?? 1);
+    this.base = this.w.slice(); // export weights; this.w may be boosted for the moment (density.js liveWeights)
     const deg = new Uint32Array(n + 1);
     for (let q = 0; q < doc.edges.length; q++) deg[doc.edges[q] + 1]++;
     for (let q = 0; q < n; q++) deg[q + 1] += deg[q];
@@ -52,12 +53,17 @@ export class WalkGraph {
   neighbours(q) { return this.adj.subarray(this.off[q], this.off[q + 1]); }
   dist(a, b) { return Math.hypot(this.x[b] - this.x[a], this.z[b] - this.z[a]); }
 
-  /** Next node after walking prev -> cur. prev < 0: any neighbour. */
-  pickNext(prev, cur, rand) {
+  /**
+   * Next node after walking prev -> cur. prev < 0: any neighbour. goal { x, z } (optional):
+   * neighbours towards it are favoured (a group heading somewhere; routines.js).
+   */
+  pickNext(prev, cur, rand, goal = null) {
     const nb = this.neighbours(cur);
     if (nb.length === 0) return prev >= 0 ? prev : cur;
     let dx = 0, dz = 0;
     if (prev >= 0) { const L = this.dist(prev, cur) || 1; dx = (this.x[cur] - this.x[prev]) / L; dz = (this.z[cur] - this.z[prev]) / L; }
+    let gx = 0, gz = 0;
+    if (goal) { const L = Math.hypot(goal.x - this.x[cur], goal.z - this.z[cur]) || 1; gx = (goal.x - this.x[cur]) / L; gz = (goal.z - this.z[cur]) / L; }
     let total = 0;
     const ws = new Float64Array(nb.length);
     for (let q = 0; q < nb.length; q++) {
@@ -66,6 +72,8 @@ export class WalkGraph {
       const L = this.dist(cur, m) || 1;
       const cos = prev >= 0 ? ((this.x[m] - this.x[cur]) * dx + (this.z[m] - this.z[cur]) * dz) / L : 0;
       ws[q] = Math.sqrt(this.w[m]) * (0.25 + 2 * Math.max(0, cos) ** 2);
+      if (goal) ws[q] *= 0.3 + 2 * Math.max(0, ((this.x[m] - this.x[cur]) * gx + (this.z[m] - this.z[cur]) * gz) / L) ** 2;
+      if (this.bias) ws[q] *= this.bias(cur, m); // e.g. cross roads at the crossings (signals.js walkBias)
       total += ws[q];
     }
     let r = rand() * total;
@@ -93,42 +101,65 @@ export class WalkGraph {
   }
 }
 
+const PACE_UP = 1.8, PACE_DOWN = 6; // 1/s: walking pace reached in ~0.55 s, a stop takes ~0.17 s
+
 const bez = (p0, p1, p2, u) => (1 - u) * (1 - u) * p0 + 2 * u * (1 - u) * p1 + u * u * p2;
 const bezD = (p0, p1, p2, u) => 2 * (1 - u) * (p1 - p0) + 2 * u * (p2 - p1);
 
 /** One walker on the graph: edge a -> b at distance s, prev node p, next node c. */
 export class Walker {
-  constructor(graph, start, rand, { speed = 1.3, lateral = 0 } = {}) {
-    Object.assign(this, { g: graph, rand, speed, lateral, lateralGoal: lateral, slow: 1 });
+  constructor(graph, start, rand, { speed = 1.3, lateral = 0, corner = CORNER_M, ease = false } = {}) {
+    Object.assign(this, { g: graph, rand, speed, lateral, lateralGoal: lateral, slow: 1, corner });
+    // ease: people don't change pace in one frame. pace (0..1) follows slow with a limited rate
+    // (quicker to brake than to set off); without it (bikes) pace is slow itself.
+    this.ease = ease; this.pace = ease ? 0 : 1;
     this.p = -1;
     this.a = start;
     this.b = graph.pickNext(-1, start, rand);
     this.c = graph.pickNext(this.a, this.b, rand);
     this.s = rand() * graph.dist(this.a, this.b);
     this.x = 0; this.z = 0; this.yaw = 0; this.heading = null;
+    this.goal = null; // { x, z } a place the walker is heading for (set by Pedestrians)
   }
 
   cornerR(a, b, c) {
     if (a < 0 || c < 0 || a === c) return 0;
-    return Math.min(CORNER_M, this.g.dist(a, b) / 2, this.g.dist(b, c) / 2);
+    return Math.min(this.corner, this.g.dist(a, b) / 2, this.g.dist(b, c) / 2);
   }
 
   /** Advance dt seconds. Returns metres travelled. */
   step(dt) {
-    const g = this.g, move = this.speed * this.slow * dt;
+    // (someone right in front, slow <= 0.15: an emergency stop, a few frames)
+    if (this.ease) this.pace += Math.max(-(this.slow <= 0.15 ? 3 * PACE_DOWN : PACE_DOWN) * dt, Math.min(PACE_UP * dt, this.slow - this.pace));
+    else this.pace = this.slow;
+    const g = this.g, move = this.speed * this.pace * dt;
     this.s += move;
     let L = g.dist(this.a, this.b);
     let guard = 0;
     while (this.s >= L && guard++ < 64) {
       this.s -= L;
       this.p = this.a; this.a = this.b; this.b = this.c;
-      this.c = g.pickNext(this.a, this.b, this.rand);
+      this.c = g.pickNext(this.a, this.b, this.rand, this.goal);
       L = g.dist(this.a, this.b);
       if (L === 0) { this.s = 0; break; }
     }
-    this.lateral += (this.lateralGoal - this.lateral) * Math.min(1, dt * 1.5);
+    if (!this.stopped) this.lateral += (this.lateralGoal - this.lateral) * Math.min(1, dt * 1.5); // (standing people don't slide)
     this.place();
     return move;
+  }
+
+  /**
+   * Turn round on the spot: walk the current edge back the way it came. The lateral offset is
+   * mirrored so the walker stays where it is (it is measured to the right of the heading).
+   */
+  reverse() {
+    const g = this.g, L = g.dist(this.a, this.b);
+    const back = this.p >= 0 && this.p !== this.b ? this.p : g.pickNext(this.b, this.a, this.rand, this.goal);
+    [this.p, this.a, this.b, this.c] = [this.c, this.b, this.a, back];
+    this.s = Math.max(0, L - this.s);
+    this.lateral = -this.lateral; this.lateralGoal = -this.lateralGoal;
+    if (this.baseLateral !== undefined) this.baseLateral = -this.baseLateral;
+    this.place();
   }
 
   /** Position (x, z) and heading (yaw degrees clockwise from north) from the edge state. */
@@ -169,7 +200,9 @@ export function turnToward(from, to, maxDeg) {
  * and step aside (to the right) for oncoming ones. Uses a uniform grid; O(n).
  */
 export function avoid(walkers, radius = 1.1) {
-  const cell = radius, grid = new Map();
+  // w.hw: half the width of what walks there (a group side by side) beyond one person
+  const wide = walkers.reduce((m, w) => Math.max(m, w.hw || 0), 0);
+  const cell = radius + 2 * wide, grid = new Map();
   const k = (i, j) => i * 73856093 ^ j * 19349663;
   for (const w of walkers) {
     w.slow = 1;
@@ -183,15 +216,193 @@ export function avoid(walkers, radius = 1.1) {
     for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) {
       for (const o of grid.get(k(i, j)) || []) {
         if (o === w) continue;
-        const dx = o.x - w.x, dz = o.z - w.z, d = Math.hypot(dx, dz);
-        if (d > radius || d === 0) continue;
+        const dx = o.x - w.x, dz = o.z - w.z, d = Math.hypot(dx, dz), R = radius + (w.hw || 0) + (o.hw || 0);
+        if (d > R || d === 0) continue;
         const ahead = (dx * w.dirX + dz * w.dirZ) / d;
         if (ahead < 0.3) continue;
+        if (o.stopped) { // people standing (a chat, waiting at the kerb): walk round them, don't through
+          side = 1;
+          w.slow = Math.min(w.slow, Math.max(0, (d - 0.6) / R));
+          continue;
+        }
         const same = o.dirX * w.dirX + o.dirZ * w.dirZ;
-        if (same > 0.5) w.slow = Math.min(w.slow, Math.max(0.3, d / radius * Math.min(1, o.speed / w.speed)));
+        if (same > 0.5) w.slow = Math.min(w.slow, Math.max(d < R * 0.55 ? 0 : 0.3, d / R * Math.min(1, o.speed / w.speed)));
         else side = 1;
       }
     }
-    w.lateralGoal = side ? Math.min(2, w.baseLateral + 0.9) : w.baseLateral ?? w.lateralGoal;
+    w.lateralGoal = side ? Math.min(2.5, (w.baseLateral ?? 0) + 0.9 + (w.hw || 0)) : w.baseLateral ?? w.lateralGoal;
   }
+}
+
+/** How pedestrians read each other (steer()). Metres, seconds. */
+export const STEER = {
+  ahead: 6, // an oncoming or standing group is noticed this far ahead
+  ramp: 1.5, // m over which the reaction builds up once noticed (no step in the path)
+  pass: 1.0, // clear gap between two people passing (centre to centre, before group widths)
+  near: 1.5, // closer than this behind someone going the same way: match their pace
+  overtake: 2.6, // a slower group this close ahead is passed
+  maxShift: 2.2, // most a group moves off its line for others
+  maxLateral: 2.5,
+};
+
+/**
+ * Anticipatory avoidance for people: each walker looks STEER.ahead metres down its line and
+ * starts easing sideways as soon as someone is on a collision course, instead of side-stepping
+ * at arm's length. Oncoming groups each give half the room and pass on the side they are already
+ * on (dead ahead: both keep right, as people do); standing groups are walked round on the nearer
+ * side; someone slower in front is overtaken on the free side, or followed at their pace when
+ * close. The shift grows as the other comes nearer, so the path is one smooth curve. Sets
+ * w.lateralGoal and w.slow (Walker eases both). O(n) with a grid; separate() still guarantees
+ * personal space afterwards.
+ */
+export function steer(walkers, o = STEER) {
+  const wide = walkers.reduce((m, w) => Math.max(m, w.hw || 0), 0);
+  const cell = o.ahead + 2 * wide, grid = new Map();
+  const k = (i, j) => i * 73856093 ^ j * 19349663;
+  for (const w of walkers) {
+    w.slow = 1;
+    // where the walker would be without giving way (its own line): reading each other's lines, not
+    // the places already moved to, keeps the answer steady while they pass (no wavering)
+    const off = w.stopped ? 0 : (w.lateral ?? 0) - (w.baseLateral ?? w.lateral ?? 0);
+    w.lx = w.x - (w.dirZ ?? 1) * off; w.lz = w.z + (w.dirX ?? 0) * off;
+    const key = k(Math.floor(w.x / cell), Math.floor(w.z / cell));
+    if (!grid.has(key)) grid.set(key, []);
+    grid.get(key).push(w);
+  }
+  for (const w of walkers) {
+    const i0 = Math.floor(w.x / cell), j0 = Math.floor(w.z / cell), fx = w.dirX ?? 0, fz = w.dirZ ?? 1;
+    let shift = 0, urgent = 0;
+    for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) {
+      for (const p of grid.get(k(i, j)) || []) {
+        if (p === w) continue;
+        const dx = p.x - w.x, dz = p.z - w.z;
+        const ahead = dx * fx + dz * fz;
+        if (ahead < 0.2 || ahead > o.ahead) continue;
+        const side = (p.lx - w.lx) * fz - (p.lz - w.lz) * fx; // + : the other's line is to my right
+        const need = o.pass + (w.hw || 0) + (p.hw || 0), miss = Math.abs(side);
+        if (miss >= need) continue;
+        const same = (p.dirX ?? 0) * fx + (p.dirZ ?? 1) * fz, d = Math.hypot(dx, dz);
+        const R = o.near + (w.hw || 0) + (p.hw || 0);
+        let want = 0, weight = 0;
+        if (p.stopped) { // standing: all the room is mine to make, round the nearer side
+          want = (side > 0 ? -1 : 1) * (need - miss + 0.1);
+          weight = Math.min(1, (o.ahead - ahead) / o.ramp);
+          if (d < R) w.slow = Math.min(w.slow, Math.max(0, (d - 0.7) / R));
+        } else if (same < -0.3) { // oncoming: half each, on the side we are already on; dead ahead: keep right
+          want = (miss < 0.12 ? 1 : side > 0 ? -1 : 1) * ((need - miss) / 2 + 0.1);
+          weight = Math.min(1, (o.ahead - ahead) / o.ramp);
+        } else if (same > 0.5) { // same way: pass someone slower, else fall in behind at their pace
+          const slower = (p.speed ?? 1) < (w.speed ?? 1) - 0.12;
+          if (slower && ahead < o.overtake + (w.hw || 0) + (p.hw || 0)) { want = (side > 0 ? -1 : 1) * (need - miss + 0.1); weight = 1; }
+          if (d < R) w.slow = Math.min(w.slow, Math.max(d < R * 0.5 ? 0 : 0.3, (d / R) * Math.min(1, (p.speed ?? 1) / (w.speed || 1))));
+        } else if (d < R) { // crossing close: ease off and pass behind them
+          w.slow = Math.min(w.slow, 0.55);
+          want = (side > 0 ? -1 : 1) * 0.6; weight = 0.9;
+        }
+        const rank = weight / ahead; // the nearest claim on my path decides
+        if (rank > urgent && want) { urgent = rank; shift = want * weight; }
+      }
+    }
+    const base = w.baseLateral ?? 0;
+    shift = Math.max(-o.maxShift, Math.min(o.maxShift, shift));
+    w.shift = shift; // (Pedestrians checks the room for it: never into a wall)
+    w.lateralGoal = Math.max(-o.maxLateral, Math.min(o.maxLateral, base + shift));
+  }
+}
+
+/**
+ * Personal space: groups (a disc of radius `body` + their half width w.hw) that overlap step
+ * apart sideways (their lateral offset, which eases back afterwards), and a walker with someone
+ * right in front slows nearly to a stop. Run after avoid(); O(n) with a grid.
+ */
+export const QUEUE_M = 0.35; // people stop this far short of someone waiting in front of them
+export function separate(walkers, body = 0.3, maxLateral = 3) {
+  const wide = walkers.reduce((m, w) => Math.max(m, w.hw || 0), 0);
+  const cell = 2 * (body + wide) + QUEUE_M || 1, grid = new Map(), key = (i, j) => i * 73856093 ^ j * 19349663;
+  for (const w of walkers) {
+    const k = key(Math.floor(w.x / cell), Math.floor(w.z / cell));
+    if (!grid.has(k)) grid.set(k, []);
+    grid.get(k).push(w);
+  }
+  const seen = new Set();
+  for (const w of walkers) {
+    const i0 = Math.floor(w.x / cell), j0 = Math.floor(w.z / cell);
+    seen.add(w);
+    for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) {
+      for (const o of grid.get(key(i, j)) || []) {
+        if (seen.has(o)) continue;
+        const dx = o.x - w.x, dz = o.z - w.z, d = Math.hypot(dx, dz) || 1e-3, R = 2 * body + (w.hw || 0) + (o.hw || 0);
+        if (d >= R + QUEUE_M) continue;
+        const nx = dx / d, nz = dz / d, push = (R - d) / 2;
+        for (const [a, s, b] of [[w, -1, o], [o, 1, w]]) {
+          const fx = a.dirX ?? 0, fz = a.dirZ ?? 1;
+          const ahead = s * (nx * fx + nz * fz) < -0.5; // the other one is right in front
+          // queue: behind someone standing (at a kerb, waiting for green) and going the same way,
+          // ease to a stop a step short of them instead of creeping into their back
+          if (ahead && b.stopped && !a.stopped && fx * (b.dirX ?? 0) + fz * (b.dirZ ?? 1) > 0.3) {
+            a.slow = Math.min(a.slow ?? 1, Math.max(0, (d - R) / QUEUE_M));
+          }
+          if (d >= R) continue;
+          a.lateral = Math.max(-maxLateral, Math.min(maxLateral, a.lateral + s * (nx * fz - nz * fx) * push));
+          if (ahead && !a.stopped) a.slow = Math.min(a.slow ?? 1, 0.15); // someone right in front
+        }
+      }
+    }
+  }
+}
+
+/** The node nearest (x, z) within rMax metres (any node with neighbours), or -1. */
+export function nearestNode(graph, x, z, rMax = 60) {
+  const c = graph.cell;
+  let best = -1, bd = rMax;
+  for (let i = Math.floor((x - rMax) / c); i <= Math.floor((x + rMax) / c); i++) {
+    for (let j = Math.floor((z - rMax) / c); j <= Math.floor((z + rMax) / c); j++) {
+      for (const q of graph.buckets.get(graph.key(i, j)) || []) {
+        const d = Math.hypot(graph.x[q] - x, graph.z[q] - z);
+        if (d < bd) { bd = d; best = q; }
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Shortest path from node a to node b (A*, straight-line heuristic) -> [node, ...] from a to b,
+ * or null when b can't be reached within maxVisit nodes (bots: life is short).
+ */
+export function findPath(graph, a, b, maxVisit = 20000) {
+  if (a < 0 || b < 0) return null;
+  if (a === b) return [a];
+  const g = new Map([[a, 0]]), from = new Map(), open = [[graph.dist(a, b), a]], closed = new Set();
+  const push = (f, q) => { // a small binary heap on f
+    open.push([f, q]);
+    for (let k = open.length - 1; k > 0;) { const p = (k - 1) >> 1; if (open[p][0] <= open[k][0]) break; [open[p], open[k]] = [open[k], open[p]]; k = p; }
+  };
+  const pop = () => {
+    const top = open[0], last = open.pop();
+    if (open.length) {
+      open[0] = last;
+      for (let k = 0; ;) { const l = 2 * k + 1, r = l + 1; let m = k;
+        if (l < open.length && open[l][0] < open[m][0]) m = l;
+        if (r < open.length && open[r][0] < open[m][0]) m = r;
+        if (m === k) break; [open[m], open[k]] = [open[k], open[m]]; k = m; }
+    }
+    return top;
+  };
+  while (open.length && closed.size < maxVisit) {
+    const [, q] = pop();
+    if (q === b) {
+      const path = [b];
+      for (let k = b; from.has(k);) { k = from.get(k); path.push(k); }
+      return path.reverse();
+    }
+    if (closed.has(q)) continue;
+    closed.add(q);
+    for (const m of graph.neighbours(q)) {
+      if (closed.has(m)) continue;
+      const gm = g.get(q) + graph.dist(q, m);
+      if (gm < (g.get(m) ?? Infinity)) { g.set(m, gm); from.set(m, q); push(gm + graph.dist(m, b), m); }
+    }
+  }
+  return null;
 }

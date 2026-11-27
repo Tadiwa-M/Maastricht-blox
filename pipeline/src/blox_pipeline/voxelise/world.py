@@ -29,6 +29,13 @@ class VoxelConfig:
     use_ortho_ground: bool = True
     facade_detail: bool = True  # facade grammar on axis-aligned walls (False: glass cells only)
     islands: bool = True  # rotated buildings on their own grid (CONTRACT 5.1); False: staircases
+    heroes: bool = True   # hand-authored landmark models (heroes.py) instead of their 3D BAG shape
+    street_props: bool = True  # lamp posts, bollards with chains, benches (street_props.py)
+    ramps: bool = True  # wedges soften one-plate steps on sloping paved ground (ramps.py)
+    railings: bool = True  # railing pieces along bridge deck edges (railings.py)
+    canopies: bool = True  # free-standing roofs from the BGT (canopies.py)
+    shelters: bool = True  # bus shelters at OSM stops tagged shelter=yes (shelters.py)
+    stands: bool = True  # seating rakes on the pitch side of stadiums (stands.py)
     island_min_yaw_deg: float = 3.0  # buildings turned more than this become islands
 
 
@@ -72,11 +79,19 @@ class PreparedBuilding:
     year: int | None = None
     facade: bool = False  # gets the facade grammar (not a landmark, not a church)
     shop: bool = False    # an OSM shop/amenity POI lies inside
+    centre: bool = False  # old-centre look (colours.old_centre): limestone, plaster, slate
+    hero: str | None = None  # hand-authored landmark model replacing the 3D BAG shape (heroes.py)
+    pitch: BaseGeometry | None = None  # a stadium's open pitch (stands.py): its inner side is stands
+    pitch_z: float | None = None       # ground of the pitch, m NAP
 
 
 @dataclass
 class SurfacePatch:
-    """A ground-surface paint: ``shape`` TILE (roads) or FULL (grass etc.)."""
+    """A ground-surface paint: ``shape`` TILE (roads) or FULL (grass etc.).
+
+    ``paint=False``: the patch only sets its feature id (and its deck): an OSM street inside the
+    BGT area names the ground without painting it. ``keep_feature``: the patch paints but keeps
+    the feature id already there (BGT surfaces have no names of their own)."""
 
     geom: BaseGeometry
     colour: int
@@ -84,6 +99,8 @@ class SurfacePatch:
     priority: float
     feature_id: int = 0
     deck: "Deck | None" = None
+    paint: bool = True
+    keep_feature: bool = False
 
 
 @dataclass
@@ -94,6 +111,7 @@ class Deck:
     z0: float
     z1: float
     body: int  # palette idx of the deck structure
+    piers: BaseGeometry | None = None  # pier footprints: columns of ``body`` from the ground up
 
     def z_at(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         import shapely
@@ -134,6 +152,11 @@ class PreparedWorld:
     streets: object | None = None  # streets.StreetContext
     facades: list = field(default_factory=list)  # facade_runs.RunPlan, sorted
     islands: list = field(default_factory=list)  # islands.IslandGroup: built apart, not in chunks
+    heroes: list = field(default_factory=list)   # heroes.HeroPlan: hand-authored landmark models
+    props: list = field(default_factory=list)    # street_props.Prop: lamps, bollards, benches
+    carriageways: BaseGeometry | None = None     # BGT drivable surfaces (props keep clear)
+    bgt_extent: BaseGeometry | None = None       # where the BGT is the ground (outside: OSM)
+    canopies: list = field(default_factory=list)  # canopies.Canopy: free-standing roofs (A3)
     _btree: STRtree | None = None
     _ptree: STRtree | None = None
     _wtree: STRtree | None = None
@@ -158,6 +181,9 @@ class PreparedWorld:
             self.index()
         assert self._ptree is not None
         return [self.patches[i] for i in sorted(self._ptree.query(area))]  # priority order
+
+    def canopies_in(self, area: BaseGeometry) -> list:
+        return [c for c in self.canopies if c.geom.intersects(area)]
 
     def water_in(self, area: BaseGeometry) -> list[WaterBody]:
         if self._wtree is None:

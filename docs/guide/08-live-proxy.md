@@ -99,3 +99,28 @@ What Unity does with `/v1/vehicles` is in [guide 05](05-movers-and-models.md#liv
 and RWS-shaped JSON). Every upstream is mocked at the HTTP layer. `tests/test_api.py` also writes
 real responses to `tests/fixtures/api_samples/`, which the C# `LiveTests` parse. That checks
 proxy → Unity end to end.
+
+## The city now on the website: the relay's `/city` (2026-11-14)
+
+The website does not use this Python proxy: it is static, and its live data comes through the
+Cloudflare Worker in `relay/`. The digital-twin data therefore went there.
+
+- **`relay/src/city.js`** (pure parsers, `test/city.test.mjs`), `GET /city`, one upstream round per
+  5 minutes for everyone (60 s when a source failed), each source independent:
+  - **Maas** (Rijkswaterstaat WaterWebservices ddapi20, `OphalenLaatsteWaarnemingen`, no key): level
+    at `maastricht.sintpieter` in m NAP (the same point also reports in the Belgian TAW datum, 2.33 m
+    higher: only NAP is used), inflow at `eijsden.grens` in m³/s, water temperature at
+    `maastricht.borgharen.maas.boven`. A point has many series, some ended years ago: the newest
+    reading under 6 h old counts. These location codes were checked against the live catalogue
+    (the proxy's `maastricht.borgharen.maas.beneden` is the level below the weir, not the city's).
+  - **Air** (Luchtmeetnet open API, no key): stations NL50007 Hoge Fronten and NL50010 A2 Philipsweg;
+    PM2.5, PM10, NO2, O3 and a label (good / moderate / poor, the worst pollutant against the
+    European index's first two bands).
+- **The game** (`viewer/src/life/cityfeed.js`, `test/life.cityfeed.test.mjs`): polled every 10 min,
+  published as `window.__bloxLife.city` and `.cityText`, shown in the status line and under the
+  time on the pause page ("Maas 44.07 m · 48 m³/s · 10 °C · air moderate"; above 1000 m³/s it says
+  high water, above 1500 flood level).
+- Weather (rain, cloud, wind, temperature) was already live, straight from Open-Meteo.
+- Not done: live roadworks and traffic (NDW publishes them as very large compressed files, too big
+  for a Worker to read per request); the river's drawn height does not follow the level yet.
+

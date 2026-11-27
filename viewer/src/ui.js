@@ -23,6 +23,7 @@ export function bindUI({ time, tilt, ao, anim, quality, onTime, onTilt, onAO, on
   }
   $('quality').value = quality;
   $('quality').addEventListener('change', (e) => onQuality(e.target.value));
+  bindHudToggle();
   return {
     set(o) {
       slider.value = o.time; label.textContent = fmtHours(o.time);
@@ -51,4 +52,77 @@ export function bindUI({ time, tilt, ao, anim, quality, onTime, onTilt, onAO, on
 
 export function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+}
+
+/**
+ * The open settings panel keeps its laptop layout everywhere and is scaled down on small screens
+ * so it always covers about the same top-left part of the screen (at most HUD_FIT of the width
+ * and of the height). Re-fitted on resize, rotation and when it opens.
+ */
+const HUD_FIT = { w: 0.7, h: 0.5 };
+export function fitHud(doc = document) {
+  const hud = doc.getElementById('hud');
+  if (!hud) return;
+  const win = doc.defaultView || window;
+  hud.style.setProperty('--hud-scale', '1');
+  const w = hud.offsetWidth || 600, h = hud.offsetHeight || 300;
+  const s = Math.min(1, (win.innerWidth * HUD_FIT.w) / w, (win.innerHeight * HUD_FIT.h) / h);
+  hud.style.setProperty('--hud-scale', String(Math.max(0.3, +s.toFixed(3))));
+  if (!fitHud.bound) {
+    fitHud.bound = true;
+    win.addEventListener('resize', () => fitHud(doc));
+    win.addEventListener('orientationchange', () => setTimeout(() => fitHud(doc), 200));
+    setInterval(() => fitHud(doc), 2000); // the stats lines change length
+  }
+}
+
+/** Collapse the panel to its title (button or U key). Starts collapsed (a game, not a map tool); remembered per browser. */
+export function bindHudToggle(doc = document) {
+  const hud = doc.getElementById('hud'), btn = doc.getElementById('hudToggle');
+  if (!hud || !btn) return;
+  let saved = null;
+  try { saved = localStorage.getItem('blox.hud2'); } catch { /* storage blocked: use the default */ }
+  const set = (collapsed) => {
+    hud.classList.toggle('collapsed', collapsed);
+    fitHud(doc);
+    btn.textContent = collapsed ? 'show' : 'hide';
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    try { localStorage.setItem('blox.hud2', collapsed ? 'collapsed' : 'open'); } catch { /* ignore */ }
+  };
+  set(saved ? saved === 'collapsed' : true);
+  fitHud(doc);
+  btn.addEventListener('click', () => set(!hud.classList.contains('collapsed')));
+  doc.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyU' && !e.repeat && !/^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName || '')) set(!hud.classList.contains('collapsed'));
+  });
+}
+
+/** A dismissable message at the top of the screen (e.g. hardware acceleration is off). */
+export function showNotice(text, doc = document) {
+  const el = doc.createElement('div');
+  el.className = 'panel notice';
+  el.setAttribute('role', 'alert');
+  el.textContent = text;
+  const close = doc.createElement('button');
+  close.type = 'button';
+  close.textContent = 'OK';
+  close.addEventListener('click', () => el.remove());
+  el.append(' ', close);
+  doc.body.append(el);
+  return el;
+}
+
+/** The "Performance mode" checkbox: saves the choice and reloads (the far city is built at load). */
+export function bindPerfToggle(on, doc = document) {
+  const box = doc.getElementById('perf');
+  if (!box) return;
+  box.closest('label').hidden = false;
+  box.checked = on;
+  box.addEventListener('change', () => {
+    try { localStorage.setItem('blox.perf', box.checked ? 'on' : 'off'); } catch { /* storage blocked: the hash still works */ }
+    const p = new URLSearchParams(location.hash.replace(/^#/, ''));
+    p.set('perf', box.checked ? '1' : '0');
+    location.hash = p.toString();
+    location.reload();
+  });
 }

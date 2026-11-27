@@ -8,10 +8,11 @@ The full source list is in `pipeline/README.md`; this page explains the flow.
 ```bash
 cd pipeline
 uv sync
-uv run pytest                                                   # 453 tests (2026-10-19)
+uv run pytest                                                   # 606 tests (2026-11-09)
 uv run python -m blox_pipeline.testscene --out ../build/testscene   # look-test chunk (no downloads)
 uv run python -m blox_pipeline.models                           # rewrite contract/models/*.json
-uv run blox fetch --bbox 176000,317500,176500,318000            # real data (needs internet)
+uv run blox fetch --bbox 176000,317500,176500,318000            # real data: AHN, 3D BAG, BGT, OSM
+uv run blox fetch --bbox 176000,317500,176500,318000 --only bgt  # one source (resumes where it stopped)
 uv run blox build --bbox 176000,317500,176500,318000 --out ../build/centre
 uv run python tests/town_fixture.py ../build/fixture_data       # synthetic town (no downloads) ...
 uv run blox build --data-dir ../build/fixture_data --bbox 176215,317495,176305,317550 \
@@ -19,14 +20,15 @@ uv run blox build --data-dir ../build/fixture_data --bbox 176215,317495,176305,3
 uv run python -m blox_pipeline.tools.island_share ../samples/markt   # share of turned buildings in a built world
 ```
 
-`blox fetch` and `blox build` have never run against live hosts: the build container blocks
-every data host (see `docs/DATA_SOURCES.md` and `docs/STATUS.md`).
+Since 2026-11-02 the cloud container reaches PDOK (AHN, BGT, aerial photo) and 3D BAG, so small
+areas can be fetched and built there. Geofabrik and overpass-api.de still drop the connection;
+for a container test area OSM came from the OSM API's `map` call instead (DEVLOG 2026-11-02).
 
 ## Stages and modules
 
 ```
 blox fetch:  sources/                 download + cache under data/raw/
-blox build:  sources/  load           -> AHN HeightGrid, 3D BAG Buildings, OsmData
+blox build:  sources/  load           -> AHN HeightGrid, 3D BAG Buildings, OsmData, BgtData
              voxelise/ prepare_world  -> slice-wide items: colours, feature ids, fixed heights,
                                          street context, facade runs (plan_facades, once);
                                          islands/plan_islands takes turned buildings off the grid
@@ -46,8 +48,8 @@ blox build:  sources/  load           -> AHN HeightGrid, 3D BAG Buildings, OsmDa
 | `geo.py` | constants and RD ↔ grid ↔ Unity ↔ WGS84 conversions, `RDBox`, `CellBox` |
 | `rotation.py` | the facing rule ([guide 01](01-coordinates-and-rotation.md)) |
 | `catalogue.py`, `palette.py` | load `contract/*.json`; stud offsets and extents per type/rot |
-| `sources/` | downloads (`http.py`: resumable, idempotent), `config.py` holds **all** endpoints; readers for AHN GeoTIFF, CityJSON, OSM PBF, aerial photo |
-| `voxelise/` | turn sources into a dense `VoxelTile`: terrain, water, bridges, buildings (roof planes → slope stacks), trees, colours (`colours.py`, `landmarks.py`), features (`features.py`); facades: runs (`facade_runs.py`), style (`facade_style.py`), street context (`streets.py`), painting + placed pieces (`facade_paint.py`); glass-cell windows as the fallback |
+| `sources/` | downloads (`http.py`: resumable, idempotent), `config.py` holds **all** endpoints; readers for AHN GeoTIFF, CityJSON, BGT pages (`bgt.py`), OSM PBF, aerial photo |
+| `voxelise/` | turn sources into a dense `VoxelTile`: terrain, water, BGT ground (`prepare_bgt.py`), bridges (`bridges.py`, railings `railings.py`), canopies (`canopies.py`), buildings (roof planes → slope stacks), stadium stands (`stands.py`), trees, colours (`colours.py`, `landmarks.py`), features (`features.py`); facades: runs (`facade_runs.py`), style (`facade_style.py`), street context (`streets.py`), painting + placed pieces (`facade_paint.py`); glass-cell windows as the fallback |
 | `facade/` | the facade grammar: facade runs (`run.py`, `frame.py`) used by test-scene houses and real buildings ([guide 04](04-facades-and-pieces.md)) |
 | `testscene/` | hand-authored look-test chunk (`scene.py`), the `Canvas` painter (`canvas.py`), build script (`build.py`) |
 | `layout/` | voxels → bricks (below) |
@@ -76,6 +78,139 @@ committed so the C# tests read real pipeline-built islands; `test_committed_town
 fails when it is stale: regenerate with `BLOX_REGEN_FIXTURES=1 uv run pytest tests/test_islands_town.py`.
 Cost: ~60 ms per island building. Full story: [guide 04](04-facades-and-pieces.md#rotated-buildings-islands-contract-51-pipelinesrcblox_pipelineislands);
 file format: [guide 03](03-chunk-format.md).
+
+### Buildings without 3D BAG (`sources/osm_buildings.py`)
+3D BAG is the primary building source. When it is down, or some blocks were never fetched,
+`load_all` fills the gaps: every OSM `building=*` footprint that no 3D BAG building covers
+(at least 30% overlap) becomes a synthetic building. Ground comes from the DTM median. The
+roof is a gable along the footprint's long axis (ridge at the DSM 90th percentile, eaves at the
+25th) when the rise is at least 1.5 m and the width is 3-18 m; otherwise it is flat. Ids are
+`osm-way/<id>`, there is no year, and the facade grammar and islands work unchanged.
+`blox fetch` keeps going after a failed source and lists the failures at the end, so OSM
+still downloads while 3D BAG is unreachable.
+
+### Corrections (`sources/corrections.py`, `corrections/corrections.json`)
+Hand fixes applied right after loading (after the OSM fallback buildings): `remove_building`,
+`set_height`, `add_building` (polygon + height, flat or gable roof, on the AHN ground) and
+`osm_tags` (edit an OSM object's tags). Coordinates are RD metres, as every map report lists
+them. The file is validated on load (a bad entry fails the build with its id); fixes that match
+nothing are logged. Format and examples: `corrections/README.md`.
+
+### Ground from the BGT (`sources/bgt.py`, `voxelise/prepare_bgt.py`; accuracy A1)
+
+The BGT (Basisregistratie Grootschalige Topografie, the municipality's large-scale map) maps
+every surface as a polygon. At `relatieve_hoogteligging` 0 its polygons tile the ground exactly
+(buildings excepted), so it replaces OSM centre lines buffered by guessed widths, which put road
+edges in the wrong place, let roads cut into squares and missed pavements, medians and islands.
+
+**Fetch.** PDOK OGC API Features, `https://api.pdok.nl/kadaster/bgt/ogc/v1/collections/<c>/items`
+(`lv/bgt/ogc/v1` is an alias), `bbox` + `crs` in RD (EPSG:28992), pages of 1000 following
+`links[rel=next]`. 512 m blocks, ten collections (`config.BGT_COLLECTIONS`): `wegdeel`,
+`ondersteunendwegdeel`, `begroeidterreindeel`, `onbegroeidterreindeel`, `waterdeel`,
+`ondersteunendwaterdeel` for the ground; `overbruggingsdeel`, `kunstwerkdeel_vlak`,
+`scheiding_vlak`, `overigbouwwerk` are cached for A2/A3 (bridge decks, platforms, quay walls,
+canopies; A2 uses the bridge decks, A3 the canopies). The API also returns **historic versions** (`eind_registratie` set; about half the
+objects): `slim_page` keeps only current objects and the attributes in `KEEP_PROPS`, coordinates
+to the millimetre, about 14 MB per km² (~320 MB for the city slice). Cache:
+`data/raw/bgt/<x>_<y>_512/<collection>/page_NNNN.json` + `done`; an interrupted fetch resumes at
+the first missing page. Only blocks with all ten collections done are used; their union is
+`BgtData.extent`.
+
+**Ground.** Inside the extent the BGT paints, OSM only names:
+
+| Paint priority | What |
+|---|---|
+| 10 / 20 / 30-39 | OSM landuse / squares / roads: **outside** the extent as before; inside it they keep only their feature id (street and park names for picking, `SurfacePatch.paint=False`) and their bridge deck; OSM kerbs are dropped there |
+| 40 | BGT green and unplanted terrain, verges, banks (`FULL`) |
+| 41 | footways, pedestrian areas, steps, paved verges and traffic islands (`TILE`) |
+| 42 | cycle paths (red asphalt = `brick_dark_red`) |
+| 43 | kerbs: a 0.6 m strip around the union of all carriageways, except decorative-sett (`sierbestrating`) shared streets such as the Markt |
+| 44 | carriageways, bus lanes, parking, driveways |
+| 50 / 60 | OSM rails / island paving, unchanged |
+
+BGT patches keep the feature id already on the cell (`keep_feature`). Colours come from the
+material (`plus_fysiek_voorkomen`: asphalt, tiles, setts, clay pavers, concrete, gravel), else
+the surface type (`fysiek_voorkomen`); in the old centre setts and pavers are the dark cobbles
+(look v2). Yards (`erf`) are left alone (aerial-photo colour or grass). Objects on bridges (level
+1+) and in tunnels (-1) are not ground.
+
+**Water.** BGT `waterdeel` polygons replace OSM water inside the extent; OSM water outside is
+clipped to the rest. Touching BGT parts form one body with one level (the BGT cuts the Maas at
+every bridge); the level and name come from the OSM water that overlaps the body most (the Maas
+keeps `maas_level_m`), otherwise the bank estimate.
+
+**Bridges** (A2, `voxelise/bridges.py`, `voxelise/railings.py`). Touching `overbruggingsdeel`
+parts (level 1+) form one bridge. Its deck follows the long axis of the minimum rotated
+rectangle; the height at each end is the AHN ground 3 m beyond it (an end over water takes the
+other end's), raised to `bridge_clearance_m` above water it spans, linear in between (the
+existing `Deck`). The BGT road parts on the bridge (level 1+ `wegdeel` etc.) paint the deck top
+with their class colours (cycle lanes red, walkways paved); the deck body is limestone in the old
+centre, light grey elsewhere. Picking a deck names it after the OSM bridge way it overlaps most.
+OSM bridge decks that overlap a BGT bridge are dropped (rail decks stay). Piers (`Deck.piers` ->
+`Layers.deck_pier` -> deck-body columns from the ground up to the deck): mapped piers first,
+i.e. land under the deck that water encloses within 15 m (the Servaasbrug's pier islands, which
+otherwise stood lower than the deck with a gap); a bridge without any gets a 2 m slab across the
+deck at spans of at most 30 m, where it stands in water. Railings: `railing_1x2` (metal)
+on every pair of deck-edge columns whose outward neighbour is open (no deck at that level, no
+ground up to it), so bridge ends stay open (`VoxelConfig.railings`).
+
+**Canopies** (A3, `voxelise/canopies.py`). BGT `overigbouwwerk` of type `overkapping` (free-standing
+roofs: the station's train platform roofs; not BAG buildings, so 3D BAG lacks them)
+become a 2-plate roof slab whose top is the DSM median inside the outline (clamped to 2.6-15 m
+above the ground; 4.5 m without a DSM), with metal posts on an 8 m grid 0.75 m inside the
+outline that keep off the carriageways (bus lanes stay clear). Underneath stays open
+(`Layers.canopy_k/canopy_color/canopy_post`); buildings win where they overlap; trees and street
+props keep out (`VoxelConfig.canopies`).
+
+**Bus shelters** (A3, `voxelise/shelters.py`). Every OSM stop node tagged `shelter=yes`
+(`highway=bus_stop` or `public_transport=platform`; a stop mapped twice within 6 m gets one)
+becomes a small canopy: a 4 x 1.5 m dark-grey roof 2.6 m above the ground, a glass back wall
+(`Canopy.wall`, filled like posts) and two metal front posts. It stands beside the nearest
+carriageway (BGT inside its area, OSM road buffers outside), long side along the road (snapped
+to the grid axes), front edge at least 0.75 m off the kerb; a stop node on the carriageway steps
+out at its nearest edge. A spot touching a building, water or another roof is skipped (logged).
+`VoxelConfig.shelters`. Test area 2026-11-03: 14 placed, 2 skipped.
+
+**Stadium stands** (`voxelise/stands.py`, `VoxelConfig.stands`). A 3D BAG stadium is a ring
+around an open pitch; voxelised like any building its pitch side was a brick wall with windows.
+Now that side is a seating rake.
+
+*Detection* (`plan_stadiums`, in `prepare_world` before islands): a building whose footprint has a
+hole of at least 2,500 m² (the pitch) **and** that OSM calls a stadium: a `leisure=stadium` area
+(kept named or not in `OsmData.stadiums`) or an OSM building tagged `building=stadium` /
+`leisure=stadium` covering at least 30% of the footprint. Both conditions come from data, so no
+list of ids. A stadium OSM does not tag is fixed with an `osm_tags` correction setting
+`building=stadium` on its OSM building. The hole becomes `PreparedBuilding.pitch`, the median DTM
+inside it `pitch_z`; `islands/frame.local_building` turns the pitch with the footprint, so a turned
+stadium (De Geusselt is 27° off the grid, an island split in four `.bxi` tiles) is built the same
+way in its own frame. The building's feature takes the name of the `leisure=stadium` area when its
+OSM building has none ("Stadion de Geusselt").
+
+*Rake* (`paint_stands` → `Layers.stand_k/stand_roof_k/stand_color/stand_cap`, `fill_stands` in
+`voxelise_tile`). Per building cell: distance `d` to the pitch and position `s` along its
+outline. Rows are 1 m deep (tread stud + seat stud) and rise one brick (3 plates, ~31°); the
+first tread is 1 m above the pitch (a concrete front wall). Seats are 2 plates above their tread in
+MVV red and white with a pattern per block (plain red, white rows, plain red, a white band); a
+1 m aisle every 20 m along the outline has the same steps in paving colour. Rows follow the
+outline, so they curve round the corners.
+
+*Roof.* Under a 3D BAG roof the column is rake, open air, then a 4-plate slab (light grey
+underside, roof colour on top), so the roof stays where 3D BAG has it and the stand is open toward
+the pitch. A row needs 2.4 m headroom; where the roof is lower the stand has ended and the rest of
+the column is the solid back block up to the roof. Where 3D BAG's roof is at or below the rake (an
+open, uncovered stand) the rake is the top and is seen from above. A "roof" more than 15 m above
+the rake is a floodlight mast or a tower and stays solid. Cells within 2 m of the outer wall stay
+solid and `facade_runs` plans no run facing the pitch, so the outside keeps its facade.
+
+All voxels, no new pieces: chunk and island formats are unchanged; rows are strips of one colour
+that pack into long plates. De Geusselt (test slice 2026-11-09): 57.6k → 50.0k bricks (the inner
+facade pieces go, the rake and roof underside come in). Tests: `tests/test_voxelise_stands.py`.
+
+**Street props** keep clear of the BGT carriageways (`world.carriageways`) inside the extent and
+of OSM road buffers outside it. Still OSM-based (later phases): tree positions relative to the
+carriageway (`off_carriageway`), walkways and bus paths in `blox life`, facade street context.
+
+No BGT cached: everything stays OSM, as before (the build logs a warning).
 
 ### Terrain smoothing (`voxelise/terrain_smooth.py`)
 
@@ -178,3 +313,34 @@ test scene build (`testscene/build.py`) refuses to write a chunk that fails it.
 | `tests/test_islands_town.py` | the town fixture's islands: grouping, layouts verify, pieces face out, shops from world streets, plinth, paving, occupancy, before/after detail share, determinism, 256-stud split, `blox build` + preview, the `island_share` estimator, party wall against an on-grid neighbour, committed `fixtures/town_world` is current |
 | `tests/test_models.py` | model generators and `check_model` |
 | `tests/test_testscene.py` | the look-test scene builds and verifies |
+
+## The whole of Maastricht: the `maastricht` slice (2026-11-14)
+
+`geo.SLICES["maastricht"] = (172140, 314000, 272, 240)`: 8704 x 7680 m, 65,280 chunk slots (the
+city slice has 22,528). West to the Belgian border (Wolder, Daalhof, Belfort, Pottenberg, Malberg,
+Caberg), east past Scharn, Heer, De Heeg and Amby, south as the city slice (ENCI, Sint
+Pietersberg), north to Borgharen. Itteren is left out (2 km of fields further north; +25 %).
+
+- Its origin is the city slice's moved 80 chunks west, same south edge: chunk boundaries match.
+- Nothing else in the pipeline is slice-specific: sources fetch the slice's box, OSM is clipped to
+  `slice_clip_maastricht.osm.pbf`, the manifest records origin and size, and the viewer reads
+  them (CONTRACT v4). Bus routes that left the city slice at its west and east edges stay inside.
+- The game follows: landmarks and studs shift from their data origin (`explore/logic.js`
+  `shiftTo`), interior doors too (`interiors/index.js` `shiftDoor`), multiplayer and the planner
+  work in RD. View presets `#view=wolder|daalhof|heer|amby` exist where the world has them.
+- **Not built yet**: it has to run on the workstation. Expect roughly three times the city
+  slice: 6 to 9 h for `build`, and a site of perhaps 600 to 750 MiB in 90 to 100 thousand files.
+  GitHub Pages allows 1 GB per site: check the size `site.ps1` prints before publishing, and keep
+  `build/site_city` until the new one is live and looks right.
+
+```
+cd pipeline
+uv run blox --slice maastricht fetch
+uv run blox --slice maastricht fetch --only gtfs
+uv run blox --slice maastricht build --out ../build/world_maastricht
+uv run blox --slice maastricht life  --out ../build/world_maastricht
+cd ..
+scripts/site.sh build/world_maastricht build/site_maastricht --serve
+scripts/publish.sh build/site_maastricht
+```
+

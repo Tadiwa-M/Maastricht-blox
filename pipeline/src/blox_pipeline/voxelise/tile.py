@@ -8,14 +8,20 @@ from numpy.typing import NDArray
 from .. import geo
 from ..geo import CellBox
 from . import palette
-from .facade_paint import paint_facades
+from .facade_paint import TileCanvas, paint_facades
+from .heroes import heroes_near, paint_heroes
+from .street_props import paint_props, props_near
 from .grid import FULL, SLOPE_STACK, TILE, WATER, VoxelTile
 from .layers import NONE, Layers, shifted
+from .canopies import SLAB_PLATES
+from .railings import RAILING_PLATES, paint_railings
+from .ramps import paint_ramps
+from .stands import fill_stands
 from .trees import tree_cells
 from .world import PreparedWorld, TreeSpec
 
 NEIGHBOURS = ((1, 0), (-1, 0), (0, 1), (0, -1))
-TREE_MARGIN = 12  # cells; crowns are at most 5 m (10 studs) in radius
+TREE_MARGIN = 14  # cells; crowns are at most 5.5 m (11 studs) in radius, branch stubs 3
 
 
 def tile_box_for_chunk(cx: int, cy: int, border: int = 1) -> CellBox:
@@ -31,11 +37,21 @@ def voxelise_tile(world: PreparedWorld, layers: Layers, box: CellBox) -> VoxelTi
     tree_vox = [tree_cells(t, int(layers_ground(layers, t.I, t.J))) for t in trees]
     tree_vox = [tv for tv in tree_vox if tv is not None]
 
+    heroes = heroes_near(world, box.i0, box.j0, box.i1, box.j1)
+    props = props_near(world, box.i0, box.j0, box.i1, box.j1)
     bottom = _terrain_bottom(ext, cfg.terrain_depth_plates)
     tops = [L.ground_k, L.water_k, L.deck_k, L.bld_top]
     k_hi = int(max(int(a.max()) for a in tops))
     for cells in tree_vox:
         k_hi = max(k_hi, int(cells[2].max()))
+    for h in heroes:
+        k_hi = max(k_hi, h.top_k)
+    for p in props:
+        k_hi = max(k_hi, p.top_k)
+    if (L.canopy_k != NONE).any():
+        k_hi = max(k_hi, int(L.canopy_k.max()))
+    if cfg.railings and (L.deck_k != NONE).any():
+        k_hi = max(k_hi, int(L.deck_k.max()) + RAILING_PLATES)
     valid_bottom = bottom[L.ground_k != NONE]
     if k_hi < 0 or valid_bottom.size == 0:
         return VoxelTile.empty(box.i0, box.j0, 0, box.ni, box.nj, 0)
@@ -47,11 +63,22 @@ def voxelise_tile(world: PreparedWorld, layers: Layers, box: CellBox) -> VoxelTi
     _fill_water(tile, L, kk)
     _fill_buildings(tile, L, kk)
     _fill_windows(tile, ext, L, kk, cfg.storey_plates, cfg.window_band)
+    fill_stands(tile, L, kk, _roof_band(L))
     _fill_decks(tile, L, kk)
+    _fill_canopies(tile, L, kk)
     for cells in tree_vox:
         _fill_tree(tile, *cells)
-    if world.facades:  # last: facade pieces win over tree leaves and glass cells
-        paint_facades(tile, world.facades_near(box.i0, box.j0, box.i1, box.j1))
+    cv = TileCanvas(tile)
+    if world.facades or heroes or props:  # last: pieces win over tree leaves and glass cells
+        paint_heroes(cv, heroes)
+        paint_facades(tile, world.facades_near(box.i0, box.j0, box.i1, box.j1), canvas=cv)
+        paint_props(cv, props)
+    if cfg.ramps:  # after the props: lamps and bollards keep their spot
+        paint_ramps(cv, L)
+    if cfg.railings:
+        paint_railings(cv, ext, box)
+    if cv.placed or world.facades or heroes or props:
+        tile.placed = cv.records()
     return tile
 
 
@@ -61,7 +88,7 @@ def layers_ground(layers: Layers, I: int, J: int) -> int:
     if not (0 <= i < layers.box.ni and 0 <= j < layers.box.nj):
         return NONE
     if (layers.bld_top[i, j] != NONE or layers.water_k[i, j] != NONE or layers.deck_k[i, j] != NONE
-            or layers.island_k[i, j] != NONE):
+            or layers.island_k[i, j] != NONE or layers.canopy_k[i, j] != NONE):
         return NONE
     return int(layers.ground_k[i, j])
 
@@ -170,7 +197,22 @@ def _fill_decks(tile: VoxelTile, L: Layers, kk: NDArray) -> None:
     has = d != NONE
     free = (tile.color == 0) | (tile.shape == WATER) | np.isin(tile.color, _water_colours())
     _put(tile, has & free & (kk >= d - 2) & (kk < d), L.deck_body, FULL, L.deck_feat)
+    pier = (has & (L.deck_pier[..., None] == 1)) & (kk > L.ground_k[..., None]) & (kk < d - 2)
+    _put(tile, pier & free, L.deck_body, FULL, L.deck_feat)
     _put(tile, has & free & (kk == d), L.deck_top, TILE, L.deck_feat)
+
+
+def _fill_canopies(tile: VoxelTile, L: Layers, kk: NDArray) -> None:
+    """Roof slab (``SLAB_PLATES`` up to the canopy top) and posts from the ground up to it;
+    cells already taken (buildings, decks) stay."""
+    c = L.canopy_k[..., None]
+    has = c != NONE
+    if not has.any():
+        return
+    free = tile.color == 0
+    _put(tile, has & free & (kk > c - SLAB_PLATES) & (kk <= c), L.canopy_color, FULL, 0)
+    post = has & (L.canopy_post[..., None] != 0) & (kk > L.ground_k[..., None]) & (kk <= c - SLAB_PLATES)
+    _put(tile, post & (tile.color == 0), L.canopy_post, FULL, 0)
 
 
 def _water_colours() -> list[int]:

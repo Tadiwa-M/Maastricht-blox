@@ -53,9 +53,9 @@ def build_gtfs_zip(path: Path) -> Path:
               ["r9", "ARR", "50", "Heerlen local", 3, ""],
               ["r30", "ARR", "30", "Express", 700, ""],
               ["rt", "NS", "RE", "Train", 2, ""]]
-    trips = [["route_id", "service_id", "trip_id", "trip_headsign", "shape_id"],
-             ["r4", "wk", "t4a", "Station", "sh4"],
-             ["r4", "wk", "t4b", "Station", "sh4"],  # same timing as t4a: shares its pattern
+    trips = [["route_id", "service_id", "trip_id", "trip_headsign", "shape_id", "realtime_trip_id"],
+             ["r4", "wk", "t4a", "Station", "sh4", "ARR:21004:1001"],
+             ["r4", "wk", "t4b", "Station", "sh4", "ARR:21004:1031"],  # same timing as t4a: shares its pattern
              ["r4", "sa", "t4sat", "Station", "sh4"],
              ["r4", "wk", "t4late", "Station", "sh4"],  # after midnight (25:10)
              ["r4", "old", "t4old", "Station", "sh4"],  # service not in the reference week
@@ -113,6 +113,11 @@ CYCLE = [(176200.0, 317600.0), (176400.0, 317600.0)]  # cycleway: not walked
 NOFOOT = [(176200.0, 317650.0), (176400.0, 317650.0)]  # footway with foot=no
 SQUARE = [(176420.0, 317880.0), (176460.0, 317880.0), (176460.0, 317920.0), (176420.0, 317920.0)]
 SHOP = (176320.0, 317905.0)
+CAFE = (176380.0, 317912.0)  # 12 m north of PED: terrace faces south
+SHOPS3 = [(176310.0, 317890.0), (176330.0, 317892.0), (176340.0, 317910.0)]
+ONEWAY = [(176450.0, 317700.0), (176550.0, 317700.0)]  # tertiary, oneway=yes, cycleway=lane
+TREES = [(176470.0, 317885.0), (176470.0, 317895.0), (176470.0, 317905.0)]  # a tree line beside the Markt
+PEDCAR = [(176450.0, 317750.0), (176550.0, 317750.0)]  # parking aisle: no cars
 MAAS = [(176700.0, 316400.0), (176750.0, 317500.0), (176800.0, 318700.0)]
 LIFE_BOX = geo.RDBox(176100.0, 317500.0, 176600.0, 318100.0)
 
@@ -143,11 +148,18 @@ def write_osm(path: Path) -> Path:
     way(5, NOFOOT, {"highway": "footway", "foot": "no"})
     way(6, SQUARE, {"place": "square", "name": "Markt"}, close=True)
     way(7, MAAS, {"waterway": "river", "name": "Maas"})
+    way(8, ONEWAY, {"highway": "tertiary", "oneway": "yes", "cycleway": "lane"})
+    way(9, PEDCAR, {"highway": "service", "service": "parking_aisle"})
     shop_id = len(nodes) + 1
     with osmium.SimpleWriter(str(path)) as w:
         for nid, p in sorted(nodes.items()):
             w.add_node(Node(id=nid, location=_lonlat(p)))
         w.add_node(Node(id=shop_id, location=_lonlat(SHOP), tags={"shop": "clothes", "name": "Winkel"}))
+        w.add_node(Node(id=shop_id + 1, location=_lonlat(CAFE), tags={"amenity": "cafe", "name": "Cafe"}))
+        for k, p in enumerate(TREES):
+            w.add_node(Node(id=shop_id + 10 + k, location=_lonlat(p), tags={"natural": "tree"}))
+        for k, p in enumerate(SHOPS3):
+            w.add_node(Node(id=shop_id + 2 + k, location=_lonlat(p), tags={"shop": "shoes", "name": f"Shop {k}"}))
         for wid, ids, tags in ways:
             w.add_way(Way(id=wid, nodes=ids, tags=tags))
     return path

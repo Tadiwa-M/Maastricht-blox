@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import logging
 import sys
 import time
@@ -27,9 +28,9 @@ def _bbox(text: str | None) -> RDBox:
 
 # ---------------------------------------------------------------------------- fetch
 def cmd_fetch(args: argparse.Namespace) -> int:
-    from .sources import fetch_all
+    from .sources import DEFAULT_SOURCES, fetch_all
 
-    only = tuple(s.strip() for s in args.only.split(",")) if args.only else ("ahn", "bag3d", "osm")
+    only = tuple(s.strip() for s in args.only.split(",")) if args.only else DEFAULT_SOURCES
     root = Path(args.data_dir) if args.data_dir else None
     bbox = _bbox(args.bbox)
     log.info("fetching %s for RD bbox %s", ",".join(only), bbox.as_tuple())
@@ -98,7 +99,7 @@ def log_facade_stats(world_runs: list, island_runs: list) -> None:
 
 
 def cmd_build(args: argparse.Namespace) -> int:
-    from .sources import ORTHO_CREDIT, SOURCE_CREDITS, load_all
+    from .sources import BGT_CREDIT, ORTHO_CREDIT, SOURCE_CREDITS, load_all
     from .voxelise import VoxelConfig, build_features, iter_chunk_tiles, prepare_world
 
     try:
@@ -137,6 +138,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         if n % 64 == 0:
             log.info("%d/%d chunks", n, len(chunks))
     sources = list(SOURCE_CREDITS) + ([ORTHO_CREDIT] if src.ortho is not None and not args.no_ortho else [])
+    sources += [BGT_CREDIT] if src.bgt is not None else []
     out_dir = Path(args.out)
     write_world(out_dir, out, build_features(world.registry), sources, islands=islands)
     if render_preview is not None and not args.no_preview:
@@ -171,8 +173,13 @@ def cmd_life(args: argparse.Namespace) -> int:
         osm = load_osm(osm_file, box)
     start = dt.date.fromisoformat(args.date) if args.date else dt.date.today()
     margin = config.GTFS_MARGIN_M if args.margin is None else args.margin
+    bgt = None
+    if osm is not None:
+        from .sources.bgt import load_bgt
+
+        bgt = load_bgt(box, root)  # water and bridges for walkways; optional
     index = export_life(Path(args.out), box=box, gtfs_zip=gtfs, osm=osm, start=start, margin_m=margin,
-                        modes=tuple(m.strip() for m in args.modes.split(",")))
+                        modes=tuple(m.strip() for m in args.modes.split(",")), bgt=bgt)
     log.info("wrote %s/life/ (%s)", args.out, ", ".join(f"{k} {v / 1024:.0f} KiB" for k, v in index["bytes"].items()))
     return 0
 
@@ -181,12 +188,16 @@ def cmd_life(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="blox", description="Maastricht Blox data pipeline")
     p.add_argument("-v", "--verbose", action="store_true")
+    p.add_argument("--slice", default=os.environ.get("BLOX_SLICE", "centre"), choices=sorted(geo.SLICES),
+                   help="city area: 'centre' (2x2 km, default), 'city' (4.1x5.6 km incl. Bosscherweg and "
+                        "Sint-Pietersberg) or 'maastricht' (8.7x7.7 km: the whole built-up municipality); "
+                        "also via env BLOX_SLICE")
     sub = p.add_subparsers(dest="command", required=True)
     bbox_help = "RD bbox xmin,ymin,xmax,ymax (default: the whole slice)"
 
-    f = sub.add_parser("fetch", help="download AHN, 3D BAG, OSM (and optionally ortho) into data/raw")
+    f = sub.add_parser("fetch", help="download AHN, 3D BAG, BGT, OSM (and optionally ortho, GTFS) into data/raw")
     f.add_argument("--bbox", help=bbox_help)
-    f.add_argument("--only", help="comma list of ahn,bag3d,osm,ortho,gtfs (default ahn,bag3d,osm)")
+    f.add_argument("--only", help="comma list of ahn,bag3d,bgt,osm,ortho,gtfs (default ahn,bag3d,bgt,osm)")
     f.add_argument("--data-dir", help="cache dir (default <repo>/data/raw or $BLOX_DATA_DIR)")
     f.set_defaults(func=cmd_fetch)
 
@@ -209,7 +220,7 @@ def build_parser() -> argparse.ArgumentParser:
     li.add_argument("--gtfs", help="GTFS zip (default: the cached OVapi feed from 'blox fetch --only gtfs')")
     li.add_argument("--date", help="first day of the reference week, YYYY-MM-DD (default: today)")
     li.add_argument("--margin", type=float, help="metres around the bbox for routes (default 500)")
-    li.add_argument("--modes", default="bus", help="comma list of GTFS modes to keep (default bus)")
+    li.add_argument("--modes", default="bus,rail", help="comma list of GTFS modes to keep (default bus,rail)")
     li.add_argument("--no-transit", action="store_true")
     li.add_argument("--no-walkways", action="store_true")
     li.set_defaults(func=cmd_life)
@@ -218,6 +229,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    geo.configure(args.slice)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     from .sources.http import DownloadError

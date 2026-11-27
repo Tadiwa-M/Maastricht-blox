@@ -17,7 +17,7 @@ const vertexShader = /* glsl */`
 
 const fragmentShader = /* glsl */`
   uniform vec3 top, horizon, below, sunDir, sunColor;
-  uniform float sunGlow, clouds;
+  uniform float sunGlow, clouds, stars, grey;
   varying vec3 vDir;
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float noise(vec2 p) {
@@ -37,12 +37,25 @@ const fragmentShader = /* glsl */`
     c = mix(c, below, smoothstep(0.0, -0.25, y));
     float s = max(dot(d, normalize(sunDir)), 0.0);
     c += sunColor * (pow(s, 6.0) * 0.18 + pow(s, 64.0) * 0.35 + pow(s, 900.0) * 3.0) * sunGlow;
+    if (stars > 0.0 && y > 0.0) {
+      // stars: one per cell of a direction grid, a few of them bright; the moon sits where the
+      // sun direction points at night
+      vec2 g = vec2(atan(d.z, d.x) * 120.0, asin(clamp(y, 0.0, 1.0)) * 120.0);
+      vec2 cell = floor(g), f = fract(g) - 0.5;
+      float h = hash(cell);
+      float star = step(0.985, h) * smoothstep(0.12, 0.0, length(f)) * (0.4 + 2.0 * fract(h * 37.0));
+      c += vec3(0.85, 0.9, 1.0) * star * stars * smoothstep(0.02, 0.25, y);
+      c += vec3(0.75, 0.82, 1.0) * (smoothstep(0.9992, 0.9995, s) * 1.6 + pow(s, 40.0) * 0.08) * stars;
+    }
     if (y > 0.0 && clouds > 0.0) {
       vec2 uv = d.xz / (y + 0.08) * 1.6;               // flat cloud layer seen in perspective
       float n = fbm(uv + vec2(7.3, 2.1));
-      float cover = smoothstep(0.58 - 0.22 * clouds, 0.78, n) * smoothstep(0.0, 0.04, y);
-      vec3 lit = mix(horizon, vec3(1.0), 0.75) + sunColor * 0.12 * sunGlow;
-      c = mix(c, lit * mix(0.82, 1.0, n), cover * 0.85);
+      // clouds: the real cover (0 clear .. 1 overcast); grey: rain darkens them; at night they are
+      // dark shapes that hide the stars instead of glowing
+      float cover = smoothstep(0.66 - 0.56 * clouds, 0.8 - 0.3 * clouds, n) * smoothstep(0.0, 0.04, y);
+      vec3 lit = mix(horizon, vec3(1.0), 0.75 * (1.0 - 0.6 * grey)) * (1.0 - 0.45 * grey) + sunColor * 0.12 * sunGlow;
+      lit = mix(horizon * 0.55 + vec3(0.02, 0.02, 0.035), lit, smoothstep(0.0, 0.6, sunGlow));
+      c = mix(c, lit * mix(0.82, 1.0, n), cover * mix(0.85, 0.97, clouds));
     }
     gl_FragColor = vec4(c, 1.0);
     #include <tonemapping_fragment>
@@ -54,7 +67,7 @@ export function skyMaterial() {
     uniforms: {
       top: { value: new THREE.Color() }, horizon: { value: new THREE.Color() },
       below: { value: new THREE.Color('#7d776c') }, sunDir: { value: new THREE.Vector3(0, 1, 0) },
-      sunColor: { value: new THREE.Color('#fff2d8') }, sunGlow: { value: 1 }, clouds: { value: 0.5 },
+      sunColor: { value: new THREE.Color('#fff2d8') }, sunGlow: { value: 1 }, clouds: { value: 0.5 }, stars: { value: 0 }, grey: { value: 0 },
     },
     vertexShader, fragmentShader, side: THREE.BackSide, depthWrite: false, fog: false, toneMapped: true,
   });
@@ -76,7 +89,7 @@ export class Sky {
   }
 
   /** Update colours (THREE.Color) and sun; re-bakes the environment map. */
-  set({ top, horizon, sunDir, sunColor, sunGlow }) {
+  set({ top, horizon, sunDir, sunColor, sunGlow, stars = 0, clouds = 0.4, grey = 0 }) {
     for (const m of [this.material, this.envMaterial]) {
       m.uniforms.top.value.copy(top);
       m.uniforms.horizon.value.copy(horizon);
@@ -84,9 +97,12 @@ export class Sky {
       m.uniforms.sunDir.value.copy(sunDir);
       m.uniforms.sunColor.value.copy(sunColor);
       m.uniforms.sunGlow.value = sunGlow;
-      m.uniforms.clouds.value = 0.5 * sunGlow; // no clouds at night (they'd glow)
+      m.uniforms.clouds.value = clouds; // the real cloud cover (render/weatherfx.js)
+      m.uniforms.grey.value = grey;
+      m.uniforms.stars.value = stars;
     }
     this.envMaterial.uniforms.sunGlow.value = sunGlow * 0.25; // no blinding sun dot in reflections
+    this.envMaterial.uniforms.stars.value = 0; // nor stars (noise in the blurred env map)
     const old = this.env;
     this.env = this.pmrem.fromScene(this.envScene, 0, 0.1, 200);
     old?.dispose();

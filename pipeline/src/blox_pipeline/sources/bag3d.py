@@ -97,12 +97,29 @@ def _poly2d(ext, holes) -> Polygon | None:
     return p if p.is_valid else p.buffer(0)
 
 
+def cached_blocks(bbox: RDBox, root: Path | None = None) -> list[Path]:
+    """Every cached block dir whose area touches ``bbox``, whatever grid it was fetched on
+    (a centre-slice fetch is reused by the city slice even though their block grids differ)."""
+    base = (root or config.data_dir()) / "3dbag"
+    if not base.is_dir():
+        return []
+    out = []
+    for d in sorted(base.iterdir()):
+        parts = d.name.split("_")
+        if len(parts) != 3 or not all(p.lstrip("-").isdigit() for p in parts):
+            continue
+        x, y, size = (int(p) for p in parts)
+        if x < bbox.xmax and x + size > bbox.xmin and y < bbox.ymax and y + size > bbox.ymin:
+            out.append(d)
+    return out
+
+
 def load_buildings(bbox: RDBox, root: Path | None = None, extra_files: list[Path] | None = None) -> list[Building]:
     """Parse cached pages (and optional local CityJSON tiles), dedupe by BAG id and keep
     buildings whose footprint touches ``bbox``."""
     files: list[Path] = []
-    for block in geo.iter_blocks(bbox, config.BAG3D_BLOCK_M):
-        files.extend(sorted(block_dir(block, root).glob("page_*.json")))
+    for d in cached_blocks(bbox, root):
+        files.extend(sorted(d.glob("page_*.json")))
     files.extend(local_tiles(root))
     files.extend(extra_files or [])
     if not files:

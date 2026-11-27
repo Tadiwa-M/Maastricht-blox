@@ -128,5 +128,6 @@ def expect_magic(*magics: bytes) -> Validator:
 
 TIFF_MAGIC = (b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+")
 PNG_MAGIC = (b"\x89PNG",)
+JPEG_MAGIC = (b"\xff\xd8\xff",)
 JSON_MAGIC = (b"{",)
 PBF_MAGIC = (b"\x00\x00",)  # BlobHeader length prefix starts with zero bytes

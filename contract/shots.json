@@ -1,0 +1,101 @@
+{
+ "version": 1,
+ "about": "Camera shots for tools/film.mjs (and, later, the Unity cinematic renderer). kind: orbit | move. view/from/to name a preset (the same names in every engine); look: classic (default) | verse | manga; hash: the scene (t = hours, day = mon..sun); hours: a sun time-lapse; seconds: the length.",
+ "shots": [
+  {
+   "name": "city",
+   "hash": "t=18&day=sat",
+   "kind": "orbit",
+   "view": "city",
+   "deg": 30,
+   "zoom": 1.0,
+   "seconds": 7
+  },
+  {
+   "name": "dive",
+   "hash": "t=17.5&day=sat",
+   "kind": "move",
+   "from": "city",
+   "to": "markt",
+   "seconds": 6
+  },
+  {
+   "name": "markt",
+   "hash": "t=11.5&day=fri",
+   "kind": "orbit",
+   "view": "markt",
+   "deg": 45,
+   "zoom": 0.55,
+   "seconds": 8
+  },
+  {
+   "name": "street",
+   "hash": "t=11.5&day=fri",
+   "kind": "orbit",
+   "view": "street",
+   "deg": 25,
+   "zoom": 1.0,
+   "seconds": 6
+  },
+  {
+   "name": "station",
+   "hash": "t=8.5&day=tue",
+   "kind": "orbit",
+   "view": "station",
+   "deg": 35,
+   "zoom": 0.5,
+   "seconds": 6
+  },
+  {
+   "name": "bosscherweg",
+   "hash": "t=17&day=sat",
+   "kind": "orbit",
+   "view": "bosscherweg",
+   "deg": 30,
+   "zoom": 0.6,
+   "seconds": 5
+  },
+  {
+   "name": "enci",
+   "hash": "t=17.5&day=sat",
+   "kind": "orbit",
+   "view": "enci",
+   "deg": 30,
+   "zoom": 1.4,
+   "seconds": 5
+  },
+  {
+   "name": "night",
+   "hash": "t=17&day=sat",
+   "kind": "orbit",
+   "view": "markt",
+   "deg": 30,
+   "zoom": 0.8,
+   "hours": [
+    17,
+    22
+   ],
+   "seconds": 8
+  },
+  {
+   "name": "markt-manga",
+   "look": "manga",
+   "hash": "t=16&day=fri",
+   "kind": "orbit",
+   "view": "markt",
+   "deg": 45,
+   "zoom": 0.45,
+   "seconds": 8
+  },
+  {
+   "name": "markt-verse",
+   "look": "verse",
+   "hash": "t=20&day=fri",
+   "kind": "orbit",
+   "view": "markt",
+   "deg": 45,
+   "zoom": 0.45,
+   "seconds": 8
+  }
+ ]
+}

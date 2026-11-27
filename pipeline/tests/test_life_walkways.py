@@ -103,3 +103,16 @@ def test_river_from_osm_and_fallback(osm_file: Path) -> None:
     assert np.hypot(*np.diff(path, axis=0).T).max() <= 20.01
     fb = build_river(None, box)
     assert fb["meta"]["source"] == "fallback" and len(fb["path"]) >= 4
+
+
+def test_snap_reaches_nodes_split_earlier_in_the_same_pass() -> None:
+    """City-build crash: a dead end looked at an edge another dead end had just split."""
+    from blox_pipeline.life.walkways import Graph, _snap_dead_ends
+
+    g = Graph()
+    a, b = g.node(0, 0, 1), g.node(12, 0, 1)
+    g.edge(a, b)
+    for x, y0, y1 in ((6, 2, 20), (7, -2, -20)):  # two spurs ending near the middle of a-b
+        g.edge(g.node(x, y0, 1), g.node(x, y1, 1))
+    assert _snap_dead_ends(g) == 2
+    assert len(g.xy) == 8  # one split node per spur

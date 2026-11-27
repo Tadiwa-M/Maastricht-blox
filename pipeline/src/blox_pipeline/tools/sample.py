@@ -64,7 +64,8 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--name", help="sample folder name (default: the place)")
     a = ap.parse_args(argv)
     out = repo_root() / "samples" / (a.name or a.around.replace(",", "_"))
-    st = export_sample(a.world, out, resolve_place(a.around), a.radius)
+    origin = tuple(read_manifest(a.world).get("originRD", (175700, 316500)))  # the world's own slice
+    st = export_sample(a.world, out, resolve_place(a.around, origin), a.radius)
     print(f"wrote {out}: {st['chunks']} chunks, {st['islands']} islands, {st['features']} features, {st['bytes'] / 1024:.0f} KiB")
 
 

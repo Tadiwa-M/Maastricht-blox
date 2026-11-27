@@ -8,11 +8,13 @@ import * as THREE from 'three';
 import { Sky } from './sky.js';
 import { makeGround } from './ground.js';
 import { Post } from './post.js';
+import { lookAt } from './render/look.js';
+import { windowUniforms } from './materials.js';
+import { litShare } from './glow.js';
+import { installHaze, setHazeSun } from './render/haze.js';
 
-const DAY_TOP = new THREE.Color('#3a78d4'), DAY_HORIZON = new THREE.Color('#c9dcee');
-const DUSK_TOP = new THREE.Color('#40619a'), DUSK_HORIZON = new THREE.Color('#f3c39a');
-const NIGHT_TOP = new THREE.Color('#060a17'), NIGHT_HORIZON = new THREE.Color('#1b2540');
-const SUN_NOON = new THREE.Color('#fff4e2'), SUN_LOW = new THREE.Color('#ffb46b');
+installHaze(); // before any material compiles: fog with sun scattering (render/haze.js)
+const srgb = (c, rgb) => c.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace);
 const MIN_DAY_ELEVATION = THREE.MathUtils.degToRad(22);
 const MAX_ELEVATION = THREE.MathUtils.degToRad(52);
 
@@ -20,18 +22,24 @@ const MAX_ELEVATION = THREE.MathUtils.degToRad(52);
 export function sunAt(hours) {
   const dayT = (hours - 6) / 12; // 0 at sunrise, 1 at sunset
   const raw = Math.sin(Math.PI * dayT) * MAX_ELEVATION;
-  const night = THREE.MathUtils.smoothstep(-raw, -0.05, 0.12);
+  // twilight: night goes 0 -> 1 from just before sunset to ~19:30 (blue hour around 18:30)
+  const night = THREE.MathUtils.smoothstep(-raw, -0.05, 0.3);
   const az = THREE.MathUtils.degToRad(90 + 180 * dayT); // east -> south -> west
   // day: clamp low suns; night: a moon high in the opposite sky keeps shadows sensible
-  const elevation = raw > 0 ? Math.max(raw, MIN_DAY_ELEVATION) : 0.5;
-  const azimuth = raw > 0 ? az : az + Math.PI;
+  // the light switches from sun to moon half way through twilight, where render/look.js dims
+  // direct light to almost nothing, so the shadows never jump
+  const moon = night > 0.5;
+  const elevation = moon ? 0.5 : Math.max(raw, MIN_DAY_ELEVATION);
+  const azimuth = moon ? az + Math.PI : THREE.MathUtils.clamp(az, Math.PI / 2, Math.PI * 1.5);
   const low = 1 - THREE.MathUtils.smoothstep(raw, 0.05, 0.6); // 1 near sunrise/sunset
   return { elevation, azimuth, night, low };
 }
 
 export class Stage {
   constructor(canvas, width, height) {
-    const r = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    // no canvas MSAA: the scene is drawn into the post chain's render targets, so a multisampled
+    // canvas only cost memory and bandwidth (it never smoothed the bricks)
+    const r = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
     r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     r.setSize(width, height, false);
     r.outputColorSpace = THREE.SRGBColorSpace;
@@ -76,6 +84,7 @@ export class Stage {
 
   initPost() {
     this.post = new Post(this.renderer, this.scene, this.camera, this.width, this.height, this.box);
+    if (this.look) { this.post.setNight(this.night); this.post.setGrade(this.look.grade); }
   }
 
   /**
@@ -112,37 +121,66 @@ export class Stage {
     cam.updateProjectionMatrix();
   }
 
-  /** hours in [0, 24). Returns the night factor 0..1 (for window and lamp glow). */
+  /** hours in [0, 24). Returns the night factor 0..1 (for window and lamp glow). Look: render/look.js. */
   setTime(hours) {
-    const { elevation: el, azimuth: az, night: n, low } = sunAt(hours);
+    const sun = sunAt(hours), { elevation: el, azimuth: az, night: n } = sun;
+    const L = lookAt(sun);
+    windowUniforms.uLitShare.value = litShare(hours); // rooms with the light on at this hour (glow.js)
+    this.look = L;
     this.sunDir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el));
-    this.sun.color.copy(SUN_NOON).lerp(SUN_LOW, low);
-    this.sun.intensity = THREE.MathUtils.lerp(3.0, 0.45, n);
-    if (n > 0.5) this.sun.color.set('#9fb4e0');
-    this.hemi.intensity = THREE.MathUtils.lerp(0.55, 0.3, n);
-    this.hemi.color.set(n > 0.5 ? '#4a5d8c' : '#cfe0f5');
-    this.scene.environmentIntensity = THREE.MathUtils.lerp(0.7, 0.25, n);
-    const top = DAY_TOP.clone().lerp(DUSK_TOP, low).lerp(NIGHT_TOP, n);
-    const hor = DAY_HORIZON.clone().lerp(DUSK_HORIZON, low * 0.7).lerp(NIGHT_HORIZON, n);
+    srgb(this.sun.color, L.sunColor);
+    this.sun.intensity = L.sunIntensity;
+    srgb(this.hemi.color, L.hemiSky);
+    srgb(this.hemi.groundColor, L.hemiGround);
+    this.hemi.intensity = L.hemiIntensity;
+    this.scene.environmentIntensity = L.envIntensity;
+    const top = srgb(new THREE.Color(), L.top), hor = srgb(new THREE.Color(), L.horizon);
     this.scene.environment = this.sky.set({
-      top, horizon: hor, sunDir: this.sunDir, sunColor: this.sun.color, sunGlow: 1 - n,
+      top, horizon: hor, sunDir: this.sunDir, sunColor: this.sun.color, sunGlow: 1 - THREE.MathUtils.smoothstep(n, 0, 0.3),
+      stars: THREE.MathUtils.smoothstep(n, 0.6, 1),
+      clouds: this.weatherCloud ?? 0.4, grey: this.weatherGrey ?? 0, // the real sky (render/weatherfx.js)
     });
     this.scene.fog.color.copy(hor);
-    this.renderer.toneMappingExposure = THREE.MathUtils.lerp(1.0, 1.6, n);
+    // scattered sunlight in the haze (render/haze.js): the sun's colour, a touch brighter
+    this.hazeColor = this.sun.color.clone().multiplyScalar(L.haze);
+    this.hours = hours;
+    this.sun.intensity *= this.weatherSun ?? 1; // an overcast or wet sky (render/weatherfx.js)
+    this.renderer.toneMappingExposure = L.exposure;
+    if (this.post?.verse) { // the painted looks: a film's lighting, a stronger key against a coloured fill
+      const manga = this.post.look === 'manga'; // (an anime background: a strong sun, deep shadow)
+      this.sun.intensity *= manga ? 1.35 : 1.15; this.hemi.intensity *= manga ? 0.88 : 0.78;
+      if (manga) { // (owner: grey roofs and the street went navy in shade: the blue sky fill was all that
+        // lit them, and the comic pass then read that tint as colour; the fill goes near neutral and
+        // the shader's own gentle violet sets the shade's tone)
+        this.hemi.color.lerp(new THREE.Color(0.86, 0.84, 0.82), 0.7 * (1 - n));
+        this.sun.color.lerp(new THREE.Color(1, 0.96, 0.9), 0.45 * (1 - n)); // (the low sun was orange and tinted people orange)
+        this.scene.environmentIntensity *= 0.7;
+      }
+    }
     if (this.box) this.fitShadow();
     this.night = n;
     this.post?.setNight(n);
+    this.post?.setGrade(L.grade);
+    this.post?.setSun?.(this.sunDir);
     return n;
   }
 
   /** Apply a quality tier (src/quality.js): pixel ratio, shadow map size, AO and bloom. */
+  /** Dynamic resolution (quality.js DynamicResolution): a share 0.5..1 of the tier's pixel ratio. */
+  setResolutionScale(s) {
+    this.resScale = s;
+    if (this.tier) this.setQuality(this.tier);
+  }
+
   setQuality(tier) {
-    const pr = Math.min(window.devicePixelRatio || 1, tier.pixelRatio);
+    this.tier = tier;
+    const pr = Math.min(window.devicePixelRatio || 1, tier.pixelRatio) * (this.resScale ?? 1);
     if (pr !== this.renderer.getPixelRatio()) {
       this.renderer.setPixelRatio(pr);
       this.renderer.setSize(this.width, this.height, false);
       this.post?.setPixelRatio(pr);
     }
+    this.sun.castShadow = tier.shadows !== false; // a change recompiles materials once
     const sh = this.sun.shadow;
     if (sh.mapSize.x !== tier.shadowMap) {
       sh.mapSize.set(tier.shadowMap, tier.shadowMap);
@@ -162,8 +200,10 @@ export class Stage {
 
   render(target) {
     this.sky.follow(this.camera);
+    this.camera.updateMatrixWorld();
+    if (this.sunDir) setHazeSun(this.camera, this.sunDir, this.hazeColor, 1);
     if (target) this.post.updateTiltShift(target);
-    this.renderer.shadowMap.needsUpdate = true; // consumed by the first scene render (RenderPass)
+    this.renderer.shadowMap.needsUpdate = this.sun.castShadow; // consumed by the first scene render (RenderPass)
     this.post.render();
     if (this.overlay.children.length) {
       this.renderer.autoClear = false;

@@ -37,6 +37,10 @@ def is_poi(tags: dict[str, str]) -> bool:
     return any(k in tags for k in POI_KEYS)
 
 
+# road nodes the traffic rules use (life/streets.py: signals, crossings)
+TRAFFIC_NODES = frozenset({"traffic_signals", "crossing", "give_way", "stop"})
+
+
 def classify_node(tags: dict[str, str]) -> list[str]:
     out = []
     if tags.get("natural") == "tree":
@@ -45,6 +49,8 @@ def classify_node(tags: dict[str, str]) -> list[str]:
         out.append("addresses")
     if is_poi(tags):
         out.append("pois")
+    if tags.get("highway") in TRAFFIC_NODES or tags.get("crossing") in ("traffic_signals", "zebra", "marked", "uncontrolled"):
+        out.append("traffic")
     return out
 
 
@@ -95,6 +101,8 @@ def classify_area(tags: dict[str, str]) -> list[str]:
         out.append("road_areas")
     if is_poi(tags) and "landuse" not in out and "water" not in out:
         out.append("pois")  # named parks/water become park/water features instead
+    if tags.get("leisure") == "stadium":
+        out.append("stadiums")  # voxelise/stands.py: which 3D BAG rings get seating rakes
     return out
 
 

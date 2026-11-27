@@ -24,6 +24,7 @@ import { bindUI, escapeHtml } from './ui.js';
 import { cityFromWorlds } from './city.js';
 import { SolidMap } from './solidmap.js';
 import { cityMain } from './citymode.js';
+import { loadingScreen } from './loading.js';
 import { httpSource } from './source.js';
 
 function parseHash() {
@@ -206,7 +207,7 @@ async function main() {
       ui.stats({ bricks: totalBricks, studs: ls.studs, near: ls.near, chunks: ls.chunks, calls: r.info.render.calls,
         triangles: r.info.render.triangles, fps: meter.label(), actors: demo?.actors.length || 0 });
     }
-    if (++frames === 4) window.__bloxReady = true;
+    if (++frames === 4) { window.__bloxReady = true; loadingScreen().hide(); }
     if (still && frames >= 4) return; // screenshot mode: freeze so capture is cheap
     requestAnimationFrame(frame);
   }
@@ -241,10 +242,29 @@ async function main() {
  */
 async function initHooks(ctx) {
   const out = [];
+  if (/[#&]hooks=0\b/.test(location.hash)) return out; // debug: engine alone (perf, memory)
   // [player hook] walk mode (src/player/): wraps stage.render to run each frame before drawing
   try { out.push(await (await import('./player/index.js')).initPlayer?.(ctx)); } catch (e) { console.error('player', e); }
   // [life hook] timetable buses, pedestrians, river boats (src/life/)
   try { out.push(await (await import('./life/index.js')).initLife?.(ctx)); } catch (e) { console.error('life', e); }
+  // [ride hook] the Transit panel and riding buses and trains (src/ride/); after life (its vehicles)
+  try { out.push(await (await import('./ride/index.js')).initRide?.(ctx)); } catch (e) { console.error('ride', e); }
+  // [trip hook] the in-game trip planner and navigation (src/plan/ingame.js); after ride (boards through it)
+  try { out.push(await (await import('./plan/ingame.js')).initTrip?.(ctx)); } catch (e) { console.error('trip', e); }
+  // [report hook] the "Report a mistake" button (src/report/)
+  try { out.push(await (await import('./report/index.js')).initReport?.(ctx)); } catch (e) { console.error('report', e); }
+  try { out.push(await (await import('./audio/index.js')).initAudio?.(ctx)); } catch (e) { console.error('audio', e); }
+  // [music hook] your own Spotify in a dock while you play (src/music/spotify.js); after audio (it ducks the city)
+  if (!ctx.still) try { window.__bloxMusic = (await import('./music/spotify.js')).initMusic?.(); } catch (e) { console.error('music', e); }
+  try { out.push(await (await import('./explore/index.js')).initExplore?.(ctx)); } catch (e) { console.error('explore', e); }
+  try { out.push(await (await import('./activities/index.js')).initActivities?.(ctx)); } catch (e) { console.error('activities', e); }
+  try { out.push(await (await import('./goals/index.js')).initGoals?.(ctx)); } catch (e) { console.error('goals', e); }
+  try { out.push(await (await import('./interiors/index.js')).initInteriors?.(ctx)); } catch (e) { console.error('interiors', e); }
+  try { out.push(await (await import('./mp/index.js')).initMultiplayer?.(ctx)); } catch (e) { console.error('mp', e); }
+  // [menu hook] the pause menu, full-screen map and fast travel (src/menu/); last: it drives the others
+  try { out.push(await (await import('./menu/index.js')).initMenu?.(ctx)); } catch (e) { console.error('menu', e); }
+  // [tour hook] the first-time walkthrough (src/menu/tour.js)
+  if (!ctx.still) try { window.__bloxTour = (await import('./menu/tour.js')).initTour(); } catch (e) { console.error('tour', e); }
   return out.filter((h) => h && typeof h === 'object');
 }
 
@@ -259,6 +279,7 @@ async function boot() {
 
 boot().catch((err) => {
   console.error(err);
+  loadingScreen().error(`Could not load the city: ${err.message}`);
   document.getElementById('info').hidden = false;
   document.getElementById('info').textContent = `Error: ${err.message}`;
   window.__bloxError = String(err.stack || err);

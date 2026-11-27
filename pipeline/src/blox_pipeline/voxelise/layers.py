@@ -15,8 +15,10 @@ from .. import geo
 from ..geo import CellBox
 from . import palette
 from .grid import FULL, RIDGE_I, RIDGE_J, SLOPE_E, SLOPE_N, SLOPE_S, SLOPE_W, SLOPE_STACK
+from .canopies import paint_canopy
+from .stands import paint_stands
 from .prepare_buildings import roof_pitch_ok
-from .raster import cover, sub
+from .raster import cell_hash, cover, sub
 from .world import PreparedBuilding, PreparedWorld, SurfacePatch
 
 NONE = -1
@@ -37,6 +39,7 @@ class Layers:
     deck_top: NDArray[np.uint8]
     deck_body: NDArray[np.uint8]
     deck_feat: NDArray[np.uint32]
+    deck_pier: NDArray[np.uint8]  # 1: a pier stands under the deck here
     bld_top: NDArray[np.int32]
     bld_feat: NDArray[np.uint32]
     bld_wall: NDArray[np.uint8]
@@ -45,6 +48,13 @@ class Layers:
     win_period: NDArray[np.uint8]
     win_offset: NDArray[np.uint8]
     island_k: NDArray[np.int32]  # top K of an island building over this column (occupancy only)
+    canopy_k: NDArray[np.int32]  # top K of a canopy roof slab (canopies.py), open underneath
+    canopy_color: NDArray[np.uint8]
+    canopy_post: NDArray[np.uint8]  # palette idx of a post under the canopy here, 0 = none
+    stand_k: NDArray[np.int32]  # top K of a stadium stand's rake here (stands.py), NONE = no stand
+    stand_roof_k: NDArray[np.int32]  # first roof cell above the stand: open air in between
+    stand_color: NDArray[np.uint8]  # colour of the rake's top cells (seat, tread or aisle)
+    stand_cap: NDArray[np.uint8]  # how many top cells take ``stand_color``
 
     @classmethod
     def empty(cls, box: CellBox) -> "Layers":
@@ -76,9 +86,16 @@ def build_layers(world: PreparedWorld, box: CellBox) -> Layers:
     _water(world, L, area)  # first, so bridge decks compare against the lowered river bed
     for p in world.patches_in(area):
         _patch(p, L)
-    for b in world.buildings_in(area):
+    buildings = world.buildings_in(area)
+    for b in buildings:
         _building(world, b, L)
+    for b in buildings:  # after all buildings: a stand only where its stadium won the column
+        if b.pitch is not None:
+            paint_stands(b, L)
     _islands(world, L, area)
+    for c in world.canopies_in(area):
+        paint_canopy(c, L)
+    _heroes(world, L)
     _ridges(L)
     return L
 
@@ -116,11 +133,30 @@ def _patch(p: SurfacePatch, L: Layers) -> None:
         sub(L.deck_top, L.box, win)[bridge] = p.colour
         sub(L.deck_body, L.box, win)[bridge] = p.deck.body
         sub(L.deck_feat, L.box, win)[bridge] = p.feature_id
+        if p.deck.piers is not None:
+            ph = cover(p.deck.piers, win)
+            if ph is not None:
+                pw, pm = ph
+                pier = np.zeros(mask.shape, bool)
+                sub(pier, win, pw)[pm] = True
+                sub(L.deck_pier, L.box, win)[bridge & pier] = 1
         mask = mask & ~bridge
     mask = mask & (sub(L.water_k, L.box, win) == NONE)  # no road/grass paint under water
-    sub(L.ground_color, L.box, win)[mask] = p.colour
+    if not p.paint:  # names the ground only (an OSM street inside the BGT area)
+        if p.feature_id:
+            sub(L.ground_feat, L.box, win)[mask] = p.feature_id
+        return
+    colour = np.full(mask.shape, p.colour, np.uint8)
+    if p.colour == palette.idx("cobble_dark"):  # setts of a few tones, as in the owner's photos
+        ii, jj = np.meshgrid(np.arange(win.i0, win.i1), np.arange(win.j0, win.j1), indexing="ij")
+        h = cell_hash(ii, jj, seed=7) % 100
+        colour[h < 9] = palette.idx("dark_grey")
+        colour[(h >= 9) & (h < 15)] = palette.idx("limestone_dark")
+        colour[(h >= 15) & (h < 19)] = palette.idx("rail_brown")
+    sub(L.ground_color, L.box, win)[mask] = colour[mask]
     sub(L.ground_shape, L.box, win)[mask] = p.shape
-    sub(L.ground_feat, L.box, win)[mask] = p.feature_id
+    if not p.keep_feature:
+        sub(L.ground_feat, L.box, win)[mask] = p.feature_id
 
 
 def _water(world: PreparedWorld, L: Layers, area) -> None:
@@ -156,6 +192,18 @@ def _islands(world: PreparedWorld, L: Layers, area) -> None:
             win, mask = hit
             cur = sub(L.island_k, L.box, win)
             cur[mask] = np.maximum(cur[mask], g.top_k(b))
+
+
+def _heroes(world: PreparedWorld, L: Layers) -> None:
+    """Hero models (heroes.py) are painted, not rasterised: their footprint rectangle is
+    occupied up to the model's top, like an island."""
+    for h in world.heroes:
+        i0, i1, j0, j1 = h.cells
+        a0, a1 = max(i0, L.box.i0), min(i1, L.box.i1)
+        b0, b1 = max(j0, L.box.j0), min(j1, L.box.j1)
+        if a0 < a1 and b0 < b1:
+            cur = L.island_k[a0 - L.box.i0: a1 - L.box.i0, b0 - L.box.j0: b1 - L.box.j0]
+            cur[:] = np.maximum(cur, h.top_k)
 
 
 def slope_shape(nx: float, ny: float) -> int:

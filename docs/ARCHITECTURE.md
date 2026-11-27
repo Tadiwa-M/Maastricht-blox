@@ -99,3 +99,12 @@ Blox.Data      → nothing (pure C#: formats, Rotation, Pose, PathMover, BrickMo
 
 Data and Gameplay never reference Rendering (project rule). Gameplay gets the loaded world
 through the `Blox.Data.IWorldSource` interface, which Rendering's `WorldLoader` implements.
+
+## Two engines, one design (browser now, Unity later; owner 2026-11-24)
+
+- The interface is `CONTRACT.md` and `contract/*.json`, plus other plain data: camera shots, the impact table, poses,
+  look and figure specs. Numbers that shape the game live in data, not in engine code.
+- Logic modules are pure (no three.js or UnityEngine calls) and tested. Rendering and input are thin layers around them.
+- One responsibility per module, small interfaces, no cross-layer reach: rendering never decides gameplay.
+- When a shared spec changes, update both engines in the same change, or record the gap in `PLAN.md`.
+- Prefer composition over big classes.

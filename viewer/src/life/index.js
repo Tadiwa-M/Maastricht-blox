@@ -1,22 +1,51 @@
-// City life for the web game: timetable buses, pedestrians and river boats, with zero
-// servers. Entry point, called once from main.js initHooks (the `// [life hook]`):
+// City life for the web game: timetable buses, pedestrians, cyclists, cars, cafe terraces,
+// the market and river boats, with zero servers. People, bikes, cars and props are smooth toy
+// figures (src/figure/) in one shared set of instanced meshes (~45 draw calls in all). Entry point, called once from main.js initHooks (the `// [life hook]`):
 //   const hook = await initLife(ctx); hook.update(dt) every frame before drawing
 // ctx = { stage, camera, controls, city, models, ui, world, islands, box, demo, quality, still }.
 // Data: life/*.json from `blox life` (data.js); without it, walkers use the world's paved
 // cells and the demo bus/boat (src/demo.js) stay. Guide: docs/guide/05-movers-and-models.md.
+// The city's day: routines (routines.js: who is where when), events by date (calendar.js), the
+// real weather near real time (weather.js), people reacting to the player (reactions.js).
 import * as THREE from 'three';
+import { SEASON } from '../render/season.js';
+import { OLD_TOWN_RD } from '../audio/places.js';
+import { XmasMarket } from './xmas.js';
+import { comicFx } from '../render/comicfx.js';
+import { WeatherFx } from '../render/weatherfx.js';
 import { MaterialSet } from '../materials.js';
 import { placeholderModels } from '../placeholders.js';
 import { LifeClock, zonedWeekTime, parseDay } from './clock.js';
+import { LiveFeed } from './live.js';
 import { Timetable } from './schedule.js';
 import { WalkGraph } from './walkgraph.js';
 import { TimetableBuses } from './buses.js';
-import { Pedestrians, WALKERS_BY_TIER, crowdFactor } from './walkers.js';
+import { Pedestrians } from './walkers.js';
+import { Cyclists, parkedBikes } from './cyclists.js';
+import { Cars } from './cars.js';
+import { CrossingMap, footwayAt, walkBias } from './signals.js';
+import { SignalProps } from './signalsdraw.js';
+import { RoadLamps } from './roadlamps.js';
+import { Terraces, parasolsOpen } from './terraces.js';
+import { Market } from './market.js';
+import { FIGURES_BY_TIER, LIFE_RADIUS_BY_TIER, CYCLISTS_BY_TIER, CARS_BY_TIER, PARKED_BIKES_BY_TIER, nearestWithin, crowdFactor, trafficFactor, liveWeights, marketState, busyness } from './density.js';
+import { FigureCrowd } from '../figure/crowd.js';
+import { VehicleFleet } from '../figure/vehicles.js';
+import { PropSet } from '../figure/props.js';
+import { figureMaterial } from '../figure/parts.js';
 import { Boats } from './boats.js';
-import { makeGround, cityOf } from './ground.js';
+import { makeGround, makeDeck, cityOf } from './ground.js';
+import { auditLife } from './audit.js';
 import { loadLifeData } from './data.js';
 import { walkwaysFromWorld, islandBlocker } from './fallback.js';
 import { bindLifeUI } from './ui.js';
+import { parseYmd, weekdayOf, zonedDayNumber, clockDate, eventsAt } from './calendar.js';
+import { placesUnity, spotPulls, spotWeights, goalPlan, nightFactor, eventCrowd, eventOutfit } from './routines.js';
+import { WeatherFeed, weatherState, hashWeather } from './weather.js';
+import { CityFeed, cityText } from './cityfeed.js';
+import { swayUniforms, swayAmp, windowUniforms } from '../materials.js';
+import { dress } from './outfits.js';
+import { PlayerWatch, playerSample, hitByVehicle } from './reactions.js';
 
 /** Keep only walk-graph nodes inside rect [x0, z0, x1, z1] (Unity metres). */
 export function clipWalkways(doc, rect) {
@@ -35,15 +64,90 @@ export function clipWalkways(doc, rect) {
   return { ...doc, nodes, weights, edges };
 }
 
-/** Initial clock from the URL (#t=16.5&day=sat) or real Maastricht time. */
+/** Keep only road-graph nodes inside rect (edges with both ends inside). */
+export function clipRoads(doc, rect) {
+  if (!rect) return doc;
+  const [x0, z0, x1, z1] = rect, map = new Map(), nodes = [], edges = [], flags = [];
+  for (let q = 0; q < doc.nodes.length / 2; q++) {
+    const x = doc.nodes[2 * q], z = doc.nodes[2 * q + 1];
+    if (x < x0 || x > x1 || z < z0 || z > z1) continue;
+    map.set(q, nodes.length / 2);
+    nodes.push(x, z);
+  }
+  for (let q = 0; q < doc.flags.length; q++) {
+    const a = map.get(doc.edges[2 * q]), b = map.get(doc.edges[2 * q + 1]);
+    if (a !== undefined && b !== undefined) { edges.push(a, b); flags.push(doc.flags[q]); }
+  }
+  return { ...doc, nodes, edges, flags };
+}
+
+const inRect = (pois, rect) => (rect ? pois.filter((p) => p.x > rect[0] && p.x < rect[2] && p.z > rect[1] && p.z < rect[3]) : pois);
+
+/**
+ * Initial clock from the URL (#t=16.5&day=sat, #date=2027-02-07 for a date's events) or real
+ * Maastricht time. anchor { dn, t }: a day number at a week time, for calendar.js clockDate.
+ */
 export function initialClock(hash = typeof location !== 'undefined' ? location.hash : '', now = new Date()) {
   const p = new URLSearchParams(String(hash).replace(/^#/, ''));
   const real = zonedWeekTime(now);
-  const day = parseDay(p.get('day')) ?? real.day;
+  const date = parseYmd(p.get('date'));
+  const day = parseDay(p.get('day')) ?? (date !== null ? weekdayOf(date) : real.day);
   const fixed = p.has('t');
   const sec = fixed ? Math.round(+p.get('t') * 3600) : real.sec;
   const speed = [1, 10, 60].includes(+p.get('speed')) ? +p.get('speed') : 1;
-  return { clock: new LifeClock({ day, sec, speed }), fixed };
+  const anchor = date !== null ? { dn: date, t: weekdayOf(date) * 86400 + 43200 }
+    : { dn: zonedDayNumber(now), t: real.day * 86400 + real.sec };
+  return { clock: new LifeClock({ day, sec, speed }), fixed, anchor };
+}
+
+/** Seconds between the game clock and real Maastricht time (the short way round the week). */
+export function clockOffset(clock, real) {
+  return Math.abs(((clock.day * 86400 + clock.sec) - (real.day * 86400 + real.sec) + 302400 + 604800) % 604800 - 302400);
+}
+
+/**
+ * What the traffic rules see this frame (life/traffic.js stepTraffic env): the light clock (game
+ * seconds of the day), people who may be on a crossing (walker groups, the player), obstacles in
+ * the lanes (cyclists, the player) and the buses and trains (footprint, speed and timetable
+ * sweep, buses.js: cars give way to them, also where paths cross at junctions).
+ */
+function trafficEnvFor(state, clock, buses) {
+  const obstacles = [], people = [];
+  const vehicles = state.vehicles || buses;
+  if (state.cyclists) state.cyclists.positions(obstacles, 0.8); // (and where they will be: crossing a car's path)
+  for (const g of state.walkers?.groups || []) if (g.walker) people.push({ x: g.walker.x, z: g.walker.z, zebra: g.zebra ?? -1 });
+  const pl = typeof window !== 'undefined' ? window.__bloxPlayer : null;
+  if (pl?.mode === 'walk') {
+    const p = { x: pl.ctrl.pos[0], z: -pl.ctrl.pos[2], r: 0.4 };
+    obstacles.push(p); people.push(p);
+  }
+  return { t: clock.sec, people, obstacles, vehicles };
+}
+
+/**
+ * Buses and trains hold back for what is right in front of them (cars, bikes, the player) and
+ * make the lag up afterwards (buses.js hold). Only at normal clock speed; fast-forward just
+ * catches up.
+ */
+function holdTransit(state, clock, dt, at) {
+  if (!state.buses && !state.trains) return;
+  const blockers = [];
+  if (clock.speed === 1) {
+    if (state.cars) blockers.push(...state.cars.footprints(null, 1000));
+    if (state.cyclists) state.cyclists.positions(blockers, 0.8);
+    const pl = typeof window !== 'undefined' ? window.__bloxPlayer : null;
+    if (pl?.mode === 'walk') blockers.push({ x: pl.ctrl.pos[0], z: -pl.ctrl.pos[2], r: 0.4 });
+  }
+  // red lights and people on zebras (signals.js): a stop line ahead
+  let rules = null;
+  if (state.crossings && clock.speed === 1) {
+    const people = [];
+    for (const g of state.walkers?.groups || []) if (g.walker && (g.zebra >= 0 || Math.hypot(g.walker.x - at[0], g.walker.z - at[1]) < 260)) people.push({ x: g.walker.x, z: g.walker.z, zebra: g.zebra ?? -1 });
+    rules = (b, ahead) => state.crossings.transitGap(b, ahead, people, clock.sec);
+  }
+  const gdt = dt * (clock.speed || 1);
+  state.buses?.hold(gdt, blockers, at, 250, rules);
+  state.trains?.hold(gdt, blockers, at, 250, rules);
 }
 
 /** Unity y of the water surface: water tops along the river in the world, else 44.1 m NAP. */
@@ -65,9 +169,13 @@ function waterLevel(world, river, ctx) {
   return 44.1 - 30.0;
 }
 
+const LIFE_VIEW_M = 650; // camera farther than this from its target: no people or vehicles drawn
+const FIGURE_CULL_M = 320; // single figures farther than this from the camera are skipped
+
 /** Returns { update(dt) } for the render loop (main.js initHooks). */
 export async function initLife(ctx) {
-  const state = { ready: false, buses: null, walkers: null, boats: null, clock: null, source: null };
+  const state = { ready: false, buses: null, walkers: null, cyclists: null, cars: null, terraces: null, market: null,
+    boats: null, clock: null, source: null, crowd: null, fleet: null, props: null };
   if (typeof window !== 'undefined') window.__bloxLife = state;
   const { stage, world } = ctx;
   const camera = ctx.camera || stage.camera;
@@ -76,35 +184,141 @@ export async function initLife(ctx) {
     new THREE.Plane(new THREE.Vector3(0, 0, 1), -box.min.z), new THREE.Plane(new THREE.Vector3(0, 0, -1), box.max.z)] : null;
   const mats = new MaterialSet({ clippingPlanes: planes });
   const ph = placeholderModels();
-  const models = { bus: ctx.models?.bus || ph.bus, boat: ctx.models?.boat || ph.boat, character: ctx.models?.character || ph.walker_a };
+  const models = { bus: ctx.models?.bus || ph.bus, train: ctx.models?.train || ctx.models?.bus || ph.bus, boat: ctx.models?.boat || ph.boat, character: ctx.models?.character || ph.walker_a };
+  const toyMat = figureMaterial({ clippingPlanes: planes });
+  const capOf = (t) => t.high;
+  const crowd = new FigureCrowd(capOf(FIGURES_BY_TIER) + 900, { material: toyMat }); // walkers + riders + seated + market
+  const fleet = new VehicleFleet({ bikes: capOf(CYCLISTS_BY_TIER) + 500, cars: capOf(CARS_BY_TIER) + 10, material: toyMat });
+  const props = new PropSet({ material: toyMat });
+  Object.assign(state, { crowd, fleet, props });
   const opts = { palette: world.palette, types: world.types, mats, studM: world.studM, plateM: world.plateM };
   const ground = makeGround(ctx, world);
   const group = new THREE.Group();
   group.name = 'life';
   stage.scene.add(group);
+  group.add(crowd.group, fleet.group, props.group);
   const rect = box ? [box.min.x, -box.max.z, box.max.x, -box.min.z] : null; // three box -> Unity x/z
 
   const data = await loadLifeData(ctx);
   state.source = data ? 'export' : 'world';
-  const { clock, fixed } = initialClock();
+  const { clock, anchor } = initialClock();
   state.clock = clock;
   const tier = () => (typeof ctx.quality === 'function' ? ctx.quality() : 'medium');
   const hideDemo = (name) => { for (const a of ctx.demo?.actors || []) if (a.obj.userData.model?.name === name || a.obj.name === `model:${name}`) a.obj.visible = false; };
 
   if (data?.transit?.trips?.length) {
-    state.buses = new TimetableBuses({ timetable: new Timetable(data.transit), model: models.bus, opts, ground });
+    state.timetable = new Timetable(data.transit);
+    const relay = typeof window !== 'undefined' ? window.BLOX_SITE?.relay : '';
+    if (relay && !ctx.still) { state.live = new LiveFeed(relay, state.timetable); state.live.start(); }
+    const deck = makeDeck(ctx);
+    state.buses = new TimetableBuses({ timetable: state.timetable, model: models.bus, opts, ground, deck, modes: ['bus', 'tram', 'other'] });
     group.add(state.buses.group);
+    if (state.timetable.routes.some((r) => r.mode === 'rail')) { // trains on the rails, no lane offset
+      state.trains = new TimetableBuses({ timetable: state.timetable, model: models.train, opts, ground, deck, modes: ['rail', 'metro'],
+        laneM: 0, caps: { full: 8, box: 40 } });
+      group.add(state.trains.group);
+    }
     hideDemo('bus');
   }
+  // (Maastricht's named places: the routines below, the festive lights)
+  const originRD = ctx.originRD || (typeof window !== 'undefined' ? window.BLOX_SITE?.originRD : null)
+    || ctx.world?.manifest?.originRD || [175700, 316500];
+  const places = placesUnity(originRD);
   let walkDoc = data?.walkways || null;
   if (!walkDoc && world.count > 0) walkDoc = walkwaysFromWorld(world, { blocked: islandBlocker(ctx.islands) });
+  state.walkDoc = walkDoc; // the trip guide's green line routes on it (plan/ingame.js)
+  let walkGraph = null;
   if (walkDoc) {
     const graph = new WalkGraph(clipWalkways(walkDoc, rect));
     if (graph.buckets.size) {
-      state.walkers = new Pedestrians({ graph, model: models.character, opts, ground });
-      group.add(state.walkers.group);
+      walkGraph = graph;
+      // a person standing at y there: is the body (1 m and 1.6 m up) clear of walls? unknown: yes
+      const room = (x, z, y) => { const c = cityOf(ctx); return !c?.isSolid || (c.isSolid(x, y + 1.0, -z) !== true && c.isSolid(x, y + 1.6, -z) !== true); };
+      state.walkers = new Pedestrians({ graph, ground: ground.walk, room, cap: FIGURES_BY_TIER.high, roof: ground.isRoof || (() => false) });
+      // the player running into someone (walkers.js bumps): the player feels it and loses speed
+      state.walkers.onBump = (kind, at) => { if (typeof window !== 'undefined') { window.dispatchEvent(new CustomEvent('blox:bump', { detail: { kind } })); comicFx(kind === 'knock' ? 'knock' : 'shove', at); } };
       hideDemo(models.character.name);
     }
+  }
+  const streets = data?.streets || null;
+  if (streets?.cycle?.edges?.length) {
+    const graph = new WalkGraph(clipWalkways(streets.cycle, rect));
+    if (graph.buckets.size) state.cyclists = new Cyclists({ graph, ground, cap: CYCLISTS_BY_TIER.high });
+  }
+  if (streets?.roads?.edges?.length) state.cars = new Cars({ doc: clipRoads(streets.roads, rect), ground, cap: CARS_BY_TIER.high });
+  if (state.cars) { // traffic lights and crossings at their real places (signals.js, signalsdraw.js)
+    state.crossings = new CrossingMap(state.cars.g, { footway: walkGraph ? (x, z) => footwayAt(walkGraph, x, z) : null });
+    state.signals = new SignalProps({ map: state.crossings, ground, clip: planes });
+    // street lights along every road (roadlamps.js): the city at night is lit
+    const cityQ = cityOf(ctx);
+    // the festive season: light crowns beside the old town's lamps (render/season.js, render/festive.js)
+    const [ox, oz, orr] = [OLD_TOWN_RD[0] - originRD[0], OLD_TOWN_RD[1] - originRD[1], OLD_TOWN_RD[2]];
+    const festive = SEASON.festive ? (x, z) => Math.hypot(x - ox, z - oz) < orr : null;
+    state.streetLights = new RoadLamps(state.cars.g, ground, (x, y, z) => cityQ?.isSolid?.(x, y, -z) === true, festive);
+    group.add(state.streetLights.group);
+    group.add(state.signals.group);
+    if (walkGraph) walkGraph.bias = walkBias(walkGraph, state.crossings); // walk routes use the crossings
+    if (state.walkers) state.walkers.crossings = state.crossings;
+    if (state.cyclists) state.cyclists.crossings = state.crossings;
+  }
+  // the Christmas market on the Vrijthof (life/xmas.js), from the week before Magisch Maastricht
+  if (SEASON.market && !ctx.still) {
+    // chalets keep off the roads round the square (the cars' road graph, roads 3.5 m either side)
+    const g = state.cars?.g, roadNear = (x, z) => {
+      if (!g) return false;
+      for (let e = 0; e < g.count; e++) {
+        const a = g.from[e], b = g.to[e], ax = g.x[a], az = g.z[a], dx = g.x[b] - ax, dz = g.z[b] - az, L2 = dx * dx + dz * dz || 1;
+        if (Math.abs(ax - x) > 150 && Math.abs(g.x[b] - x) > 150) continue;
+        const u = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2));
+        if (Math.hypot(x - ax - dx * u, z - az - dz * u) < 4.5) return true;
+      }
+      return false;
+    };
+    state.xmas = new XmasMarket({ origin: originRD, ground, solid: (x, y, z) => cityOf(ctx)?.isSolid?.(x, y, -z) === true, state: SEASON.market, road: roadNear });
+    group.add(state.xmas.group);
+  }
+  if (streets?.pois?.length) state.terraces = new Terraces({ pois: inRect(streets.pois, rect), ground });
+  if (streets?.market?.poly?.length >= 6) {
+    const near = walkGraph ? (x, z) => walkGraph.spawnNear(x, z, 4, () => 0.5) >= 0 : () => true;
+    state.market = new Market({ market: streets.market, ground, keep: near });
+  }
+  const parked = parkedBikes((streets?.bikes || []).filter(([x, z]) => !rect || (x > rect[0] && x < rect[2] && z > rect[1] && z < rect[3])));
+  state.parked = parked; // (activities: a bike the player takes is not drawn at its rack too)
+  // the day's routines and events at Maastricht's named places (routines.js, calendar.js)
+  state.events = [];
+  let marketWas = null;
+  /**
+   * Spawn weights and goals for the moment: busy squares by day, the market square when it is on,
+   * the routines' places (students, shoppers, commuters, nightlife) and the date's events.
+   * Recomputed every game quarter-hour.
+   */
+  function reweigh() {
+    const dn = clockDate(clock.t, anchor.dn, anchor.t);
+    const events = eventsAt(dn, clock.hours);
+    state.events = events;
+    state.date = dn;
+    if (!walkGraph) return;
+    const open = state.market ? marketState(streets.market, clock.day, clock.sec) === 'open' : false;
+    const key = `${open}|${clock.hours >= 9 && clock.hours <= 19}|${Math.floor(clock.t / 900)}|${dn}|${Math.round((state.weather?.tempC ?? 15) / 3)}`;
+    if (key === marketWas) return;
+    marketWas = key;
+    const pulls = spotPulls(clock.hours, clock.day, events);
+    state.routine = pulls;
+    const w = liveWeights(walkGraph.base, walkGraph.x, walkGraph.z, { market: streets?.market, open, hours: clock.hours });
+    walkGraph.w = spotWeights(w, walkGraph.x, walkGraph.z, places, pulls);
+    if (state.walkers) {
+      state.walkers.plan = goalPlan(places, pulls);
+      const outfit = eventOutfit(events), tempC = state.weather?.tempC ?? null;
+      state.walkers.dressFor = outfit || (Number.isFinite(tempC) && tempC < 8) ? (v) => dress(v, { outfit, tempC }) : null;
+    }
+  }
+  let parasolsWere = null, weatherFx = null, busy = 0, busyT = 0, busyRef = 0;
+  function rebuildProps() {
+    props.begin();
+    state.terraces?.props(props, parasolsOpen(clock.hours));
+    state.market?.props(props);
+    for (const r of parked.racks) props.add('rack', r.x, ground(r.x, r.z), -r.z, (-r.yaw * Math.PI) / 180);
+    props.end();
   }
   if (data?.river?.path?.length >= 4) {
     state.boats = new Boats({ river: data.river, model: models.boat, opts, waterY: waterLevel(world, data.river, ctx) });
@@ -117,38 +331,189 @@ export async function initLife(ctx) {
     still,
     onNow: () => { const r = zonedWeekTime(); clock.set(r.day, r.sec); },
   });
+  // where life is centred: on the walking player, else on the map's orbit point (the map target
+  // stays where you entered walk mode, so people would thin out as you walk away from it)
   const target = () => {
+    const pl = typeof window !== 'undefined' ? window.__bloxPlayer : null;
+    if (pl?.mode === 'walk' && pl.ctrl?.pos) return [pl.ctrl.pos[0], -pl.ctrl.pos[2]];
     const t = ctx.controls?.target || new THREE.Vector3();
     return [t.x, -t.z];
   };
-  const livingRadius = () => {
-    const t = ctx.controls?.target, h = t ? camera.position.distanceTo(t) : 100;
-    return Math.max(50, Math.min(220, h * 1.1));
-  };
-  let night = -1, statT = 0;
+  // how far out life is simulated: by quality tier only (the same density near you on every tier)
+  const livingRadius = () => LIFE_RADIUS_BY_TIER[tier()] ?? LIFE_RADIUS_BY_TIER.medium;
+  let night = -1, statT = 0, t = 0;
   const busHalf = [models.bus.size[0] * world.studM / 2, models.bus.size[1] * world.studM / 2];
-  function step(dt) {
-    if (stage.night !== undefined && stage.night !== night) { night = stage.night; mats.setNight(night); }
-    clock.advance(dt);
-    const buses = state.buses ? state.buses.update(clock, camera) : [];
-    if (state.walkers) {
-      const max = WALKERS_BY_TIER[tier()] ?? WALKERS_BY_TIER.medium;
-      state.walkers.setCount(Math.round(max * crowdFactor(clock.hours)), target());
-      const vehicles = buses.map((b) => ({ x: b.x, z: b.z, yaw: b.yaw, halfW: busHalf[0], halfL: busHalf[1] }));
-      state.walkers.update(dt, target(), livingRadius(), vehicles);
+  state.busHalf = busHalf; // the player's vehicle contacts (player/bump.js) use the same footprints
+  const by = (table) => table[tier()] ?? table.medium;
+  // the Maas and the air right now (cityfeed.js), through the relay
+  const cityRelay = typeof window !== 'undefined' ? window.BLOX_SITE?.relay : '';
+  const cityFeed = cityRelay && !ctx.still ? new CityFeed(cityRelay) : null;
+  cityFeed?.start();
+  // weather (weather.js): #rain= / #temp= in the URL, else the real Maastricht weather while the
+  // clock shows the real time, else ctx.weather?.rain or a dry, mild day. state.weather is read
+  // by the terraces and the HUD: { rain, tempC, cloud, wind, live, terrace, crowd }.
+  const hashW = typeof location !== 'undefined' ? hashWeather(location.hash) : {};
+  const weatherFeed = !still && typeof fetch !== 'undefined' && !('rain' in hashW) ? new WeatherFeed() : null;
+  weatherFeed?.start();
+  let nearReal = false;
+  const updateWeather = () => {
+    state.weather = weatherState({ hash: hashW, live: weatherFeed?.now, near: nearReal, ctxRain: ctx.weather?.rain });
+  };
+  updateWeather();
+  const rainNow = () => state.weather.rain;
+  // people reacting to the player (reactions.js): a knock-down is seen here (a fast vehicle's
+  // footprint on the player, as player/bump.js) or announced with a 'blox:knockdown' event
+  const watch = new PlayerWatch();
+  let knockedAt = -Infinity, knockSignal = false;
+  if (typeof window !== 'undefined') window.addEventListener?.('blox:knockdown', () => { knockSignal = true; });
+  // From far away people and vehicles are a pixel or less, yet they were half of all triangles
+  // drawn on the overview (and again in the shadow pass): hide them beyond LIFE_VIEW_M, cull
+  // single figures beyond FIGURE_CULL_M, and let only the higher tiers' life cast shadows.
+  let shadowTier = null;
+  function budget() {
+    if (ctx.perf === false) { crowd.cullDist2 = 0; return; } // performance mode off: draw as before
+    const t = ctx.controls?.target, d = t ? camera.position.distanceTo(t) : 0;
+    group.visible = d < LIFE_VIEW_M;
+    crowd.cullDist2 = FIGURE_CULL_M * FIGURE_CULL_M;
+    const tierNow = tier();
+    if (tierNow !== shadowTier) {
+      shadowTier = tierNow;
+      const cast = tierNow === 'high' || tierNow === 'medium';
+      group.traverse((o) => {
+        if (!o.isMesh) return;
+        o.userData.castShadow0 ??= o.castShadow;
+        o.castShadow = cast && o.userData.castShadow0;
+      });
     }
+  }
+  let liveCheck = -Infinity;
+  function step(dt) {
+    budget();
+    if (performance.now() - liveCheck > 1000) { // live delays and weather only while the game clock shows the real time
+      liveCheck = performance.now();
+      nearReal = clockOffset(clock, zonedWeekTime()) < 300 && clock.speed === 1;
+      if (state.timetable) state.timetable.delaysOn = nearReal;
+      updateWeather();
+    }
+    if (stage.night !== undefined && stage.night !== night) { night = stage.night; mats.setNight(night); fleet.setNight(night); }
+    clock.advance(dt);
+    t += dt;
+    swayUniforms.uSwayT.value = t; // leaves in the wind (materials.js): the real wind decides how much
+    swayUniforms.uSwayAmp.value = swayAmp(state.weather?.wind);
+    // rain, snow, wet streets, an overcast sky, lightning (render/weatherfx.js)
+    if (!ctx.still) { weatherFx ||= new WeatherFx(stage, { tier: tier() }); weatherFx.update(dt, state.weather, camera); }
+    windowUniforms.uWinT.value = clock.sec;
+    const at = target(), R = livingRadius();
+    const trafficEnv = (buses) => trafficEnvFor(state, clock, buses, state.busHalf);
+    const buses = state.buses ? state.buses.update(clock, camera) : [];
+    // every scheduled vehicle this frame (Ride: the transit panel and the passenger camera read this)
+    state.vehicles = state.trains ? buses.concat(state.trains.update(clock, camera)) : buses;
+    if (state.crossings) state.crossings.t = clock.sec; // the light clock for walkers and bikes
+    state.signals?.update(at, clock.sec, tier()); // round the player, or where the map camera looks
+    state.streetLights?.update(at, camera, stage.night || 0);
+    state.xmas?.update(dt, stage.night || 0);
+    holdTransit(state, clock, dt, at); // (the lag shows from the next frame on)
+    // how busy it is here (density.js busyness): the crowds, bikes and cars scale with it
+    if ((busyT -= dt) <= 0 || !busy) {
+      busyT = 2;
+      const sumNear = (x, z) => { if (!walkGraph) return 0; let w = 0; for (let i = Math.floor((x - R) / walkGraph.cell); i <= Math.floor((x + R) / walkGraph.cell); i++) for (let j = Math.floor((z - R) / walkGraph.cell); j <= Math.floor((z + R) / walkGraph.cell); j++) for (const q of walkGraph.buckets.get(walkGraph.key(i, j)) || []) if (Math.hypot(walkGraph.x[q] - x, walkGraph.z[q] - z) < R) w += walkGraph.w[q]; return w; };
+      const [tx, tz] = [OLD_TOWN_RD[0] - originRD[0], OLD_TOWN_RD[1] - originRD[1]];
+      busyRef ||= sumNear(tx, tz) || 1;
+      busy = busyness(sumNear(at[0], at[1]), busyRef, Math.hypot(at[0] - tx, at[1] - tz));
+      state.busy = busy;
+    }
+    const traffic = trafficFactor(clock.hours, clock.day);
+    if (state.cars) {
+      state.cars.setCount(Math.round(by(CARS_BY_TIER) * traffic * (0.25 + 0.75 * busy)), at);
+      state.cars.update(dt, at, R, trafficEnv(buses));
+    }
+    // every vehicle's footprint near the action: people and bikes wait for them and keep clear
+    const trainHalf = [models.train.size[0] * world.studM / 2, models.train.size[1] * world.studM / 2];
+    state.trainHalf = trainHalf;
+    const vehicles = state.vehicles.map((b) => (b.mode === 'rail'
+      ? { x: b.x, z: b.z, yaw: b.yaw, halfW: trainHalf[0], halfL: trainHalf[1], v: b.v } // (v 0: waiting at a light or zebra)
+      : { x: b.x, z: b.z, yaw: b.yaw, halfW: busHalf[0], halfL: busHalf[1], v: b.v }));
+    if (state.cars) vehicles.push(...state.cars.footprints(at, 200, R + 15)); // every car where the people and bikes are
+    if (state.cyclists) {
+      state.cyclists.setCount(Math.round(by(CYCLISTS_BY_TIER) * traffic * (0.15 + 0.85 * busy)), at);
+      state.cyclists.update(dt, at, R, vehicles);
+    }
+    reweigh();
+    if (state.walkers) {
+      state.walkers.setRain(rainNow());
+      // the day curve x the night (routines.js) x the events x the weather, at most 1.6
+      const out = Math.min(1.6, crowdFactor(clock.hours, clock.day) * nightFactor(clock.hours, clock.day) * eventCrowd(state.events) * state.weather.crowd);
+      state.walkers.setCount(Math.round(by(FIGURES_BY_TIER) * out * busy), at);
+      const seen = watch.sample(playerSample(typeof window !== 'undefined' ? window.__bloxPlayer : null), dt, false);
+      if (seen) {
+        const hit = knockSignal || hitByVehicle(seen.x, seen.z, vehicles);
+        knockSignal = false;
+        if (hit && t - knockedAt > 3) { knockedAt = t; seen.events.push({ kind: 'knock', x: seen.x, z: seen.z }); }
+      }
+      state.walkers.react(seen, dt);
+      state.walkers.update(dt, at, R, vehicles);
+    }
+    let dirty = state.terraces ? state.terraces.refresh(at) : false;
+    const shade = parasolsOpen(clock.hours); // parasols fold at night
+    if (shade !== parasolsWere) { parasolsWere = shade; dirty = true; }
+    if (state.market?.refresh(clock)) dirty = true;
+    if (dirty || !props.built) { rebuildProps(); props.built = true; }
+    crowd.begin(camera.position); fleet.begin();
+    state.walkers?.draw(crowd);
+    state.terraces?.draw(crowd, clock, t, rainNow()); // terraces.js reads state.weather itself (cold, cloud): don't count it twice
+    state.market?.draw(crowd, t);
+    state.cyclists?.draw(crowd, fleet);
+    state.cars?.draw(fleet);
+    state.market?.drawVans(fleet);
+    const pb = ctx.perf === false ? { r: Infinity, cap: Infinity } : by(PARKED_BIKES_BY_TIER);
+    for (const b of nearestWithin(parked.bikes, camera.position.x, -camera.position.z, pb.r, pb.cap)) {
+      fleet.addBike(b.x, ground(b.x, b.z), -b.z, (-b.yaw * Math.PI) / 180, { colour: b.colour });
+    }
+    crowd.end(); fleet.end();
     if (state.boats) state.boats.update(dt);
     ui.update();
     if ((statT += dt) > 0.5 || dt === 0) {
       statT = 0;
+      state.city = cityFeed?.now || null; // (window.__bloxLife.city)
+      state.cityText = cityText(state.city);
       const b = state.buses?.stats;
-      ui.stats([b ? `${b.active} buses (${b.full} near)` : 'no timetable', `${state.walkers?.count || 0} walkers`,
-        `${state.boats?.items.length || 0} boats`].join(' · '));
+      state.stats = { people: crowd.count, walkers: state.walkers?.people || 0, cyclists: state.cyclists?.count || 0,
+        cars: state.cars?.count || 0, carsMoving: state.cars ? state.cars.cars.slice(0, state.cars.count).filter((c) => c.v > 0.5).length : 0, seated: state.terraces?.seated || 0, market: state.market?.state || 'none',
+        drawCalls: crowd.drawCalls() + fleet.drawCalls() + props.drawCalls() + (state.signals?.drawCalls() || 0) };
+      ui.stats([b ? `${b.active} buses (${b.full} near)` : 'no timetable', `${crowd.count} people`,
+        `${state.stats.cyclists} bikes`, `${state.stats.cars} cars`, `${state.boats?.items.length || 0} boats`,
+        ...state.events.slice(0, 1).map((e) => e.name), ...(state.weather.live ? [`${Math.round(state.weather.tempC)}°C${state.weather.rain > 0 ? ' rain' : ''}`] : []),
+        ...(state.city ? [cityText(state.city)] : [])].filter(Boolean).join(' · '));
     }
   }
   state.step = step; // screenshots: re-place everything after moving the camera
+  // tools/life-audit.mjs: what looks broken right now (life/audit.js)
+  state.audit = () => {
+    const city = cityOf(ctx);
+    const street = city?.groundHeight ? (x, z) => { // the lowest walkable top within 5 m: street level
+      let low = Infinity;
+      for (let a = 0; a < 8; a++) for (const d of [0, 2.5, 5]) {
+        const g = city.groundHeight(x + d * Math.cos(a * 0.785), -(z + d * Math.sin(a * 0.785)));
+        if (Number.isFinite(g)) low = Math.min(low, g);
+      }
+      return low === Infinity ? null : low;
+    } : null;
+    const half = (b) => (b.mode === 'rail' ? state.trainHalf : state.busHalf) || state.busHalf;
+    return auditLife({
+      people: state.walkers?.members() || [],
+      buses: (state.vehicles || []).map((b) => ({ x: b.x, z: b.z, yaw: b.yaw, halfW: half(b)[0], halfL: half(b)[1] })),
+      cars: state.cars ? state.cars.footprints(null, 1000) : [],
+      bikes: state.cyclists ? state.cyclists.riders.slice(0, state.cyclists.count).map((c) => ({ x: c.walker.x, z: c.walker.z, yaw: c.yaw ?? c.walker.yaw ?? 0 })) : [],
+      street,
+    });
+  };
   step(0);
-  if (state.walkers) for (let q = 0; q < 3; q++) state.walkers.update(0.4, target(), livingRadius()); // spread the walk cycles
+  for (let q = 0; q < 4; q++) { // spread the walk cycles and let traffic settle
+    state.walkers?.update(0.4, target(), livingRadius());
+    state.cars?.update(0.5, target(), livingRadius());
+    state.cyclists?.update(0.4, target(), livingRadius());
+  }
+  step(0);
   state.ready = true;
   /** Called by main.js / citymode.js every frame before drawing. A shot is one still frame. */
   return {

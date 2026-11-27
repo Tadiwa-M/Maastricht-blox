@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # One-command quality gate: every test suite in the repo. Run before each push; CI runs the same.
-# Usage: scripts/check.sh [pipeline|proxy|dotnet|viewer ...]   (default: all)
+# Usage: scripts/check.sh [pipeline|proxy|dotnet|viewer|relay ...]   (default: all)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-targets=("${@:-pipeline proxy dotnet viewer}")
+targets=("${@:-pipeline proxy dotnet viewer relay}")
 read -ra targets <<< "${targets[*]}"
 fail=0
 
@@ -24,7 +24,10 @@ for t in "${targets[@]}"; do
       fi ;;
     viewer)
       [ -d viewer/node_modules ] || (cd viewer && npm ci --no-audit --no-fund)
-      run viewer viewer npm test --silent ;;
+      run viewer viewer npm test --silent
+      # the whole game must bundle (a syntax error in a module no test imports would ship otherwise)
+      run viewer-bundle viewer npx esbuild src/main.js --bundle --target=es2022 --format=iife --outfile=/dev/null --log-level=error ;;
+    relay)    run relay relay npm test --silent ;;
     *) echo "unknown target: $t"; exit 2 ;;
   esac
 done

@@ -2,20 +2,28 @@
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from ..geo import RDBox
 from .ahn import fetch_ahn, load_ahn
 from .bag3d import fetch_bag3d, load_buildings
+from .bgt import fetch_bgt, load_bgt
 from .ortho import fetch_ortho, load_ortho
 from .osm import clip_path, fetch_osm, load_osm
-from .model import Building, HeightGrid, OsmData, OsmFeature, RGBGrid, Surface
+from .http import DownloadError
+from .model import BgtData, BgtFeature, Building, HeightGrid, OsmData, OsmFeature, RGBGrid, Surface
+from .osm_buildings import fallback_buildings
+from .corrections import apply_corrections, load_corrections
 
 __all__ = [
-    "Building", "HeightGrid", "OsmData", "OsmFeature", "RGBGrid", "Surface", "SourceData",
-    "fetch_all", "load_all", "SOURCE_CREDITS",
+    "BgtData", "BgtFeature", "Building", "HeightGrid", "OsmData", "OsmFeature", "RGBGrid", "Surface", "SourceData",
+    "fetch_all", "load_all", "SOURCE_CREDITS", "BGT_CREDIT", "ORTHO_CREDIT",
 ]
+
+log = logging.getLogger(__name__)
 
 SOURCE_CREDITS = [
     {"name": "AHN", "version": "AHN 0.5 m DTM/DSM", "licence": "CC0 (AHN4 via PDOK) / CC BY 4.0 (AHN5, AHN6)",
@@ -25,6 +33,8 @@ SOURCE_CREDITS = [
     {"name": "OpenStreetMap", "version": "Geofabrik limburg-latest", "licence": "ODbL",
      "attribution": "OpenStreetMap contributors"},
 ]
+BGT_CREDIT = {"name": "BGT", "version": "PDOK OGC API Features (kadaster/bgt/ogc/v1)", "licence": "CC0 1.0",
+              "attribution": "Basisregistratie Grootschalige Topografie (BGT), via PDOK"}
 ORTHO_CREDIT = {"name": "PDOK Luchtfoto", "version": "Actueel_orthoHR", "licence": "CC BY 4.0",
                 "attribution": "Beeldmateriaal Nederland"}
 
@@ -36,25 +46,41 @@ class SourceData:
     buildings: list[Building]
     osm: OsmData
     ortho: RGBGrid | None
+    bgt: BgtData | None = None  # ground surfaces; None = OSM only (nothing cached)
 
 
-ALL_SOURCES = ("ahn", "bag3d", "osm", "ortho", "gtfs")
+ALL_SOURCES = ("ahn", "bag3d", "bgt", "osm", "ortho", "gtfs")
+DEFAULT_SOURCES = ("ahn", "bag3d", "bgt", "osm")
 
 
-def fetch_all(bbox: RDBox, only: tuple[str, ...] = ("ahn", "bag3d", "osm"), root: Path | None = None) -> None:
-    if "ahn" in only:
-        fetch_ahn("dtm", bbox, root)
-        fetch_ahn("dsm", bbox, root)
-    if "bag3d" in only:
-        fetch_bag3d(bbox, root)
-    if "osm" in only:
-        fetch_osm(root)
-    if "ortho" in only:
-        fetch_ortho(bbox, root)
-    if "gtfs" in only:
-        from ..life.fetch import fetch_gtfs
+def fetch_all(bbox: RDBox, only: tuple[str, ...] = DEFAULT_SOURCES, root: Path | None = None) -> None:
+    """Fetch each requested source. A failing source does not stop the others; the
+    failures are raised together at the end (3D BAG can be down while OSM is fine)."""
+    steps: dict[str, Callable[[], object]] = {
+        "ahn": lambda: (fetch_ahn("dtm", bbox, root), fetch_ahn("dsm", bbox, root)),
+        "bag3d": lambda: fetch_bag3d(bbox, root),
+        "bgt": lambda: fetch_bgt(bbox, root),
+        "osm": lambda: fetch_osm(root),
+        "ortho": lambda: fetch_ortho(bbox, root),
+        "gtfs": lambda: _fetch_gtfs(root),
+    }
+    failed: list[str] = []
+    for name in ALL_SOURCES:
+        if name not in only:
+            continue
+        try:
+            steps[name]()
+        except DownloadError as exc:
+            log.error("fetch %s failed: %s", name, exc)
+            failed.append(name)
+    if failed:
+        raise DownloadError(f"failed sources: {', '.join(failed)} (the others are cached; rerun to resume)")
 
-        fetch_gtfs(root)
+
+def _fetch_gtfs(root: Path | None) -> None:
+    from ..life.fetch import fetch_gtfs
+
+    fetch_gtfs(root)
 
 
 def load_all(bbox: RDBox, root: Path | None = None) -> SourceData:
@@ -67,7 +93,22 @@ def load_all(bbox: RDBox, root: Path | None = None) -> SourceData:
     osm_file = clip_path(root)
     if not osm_file.exists():
         raise FileNotFoundError(f"OSM clip {osm_file} missing, run 'blox fetch'")
+    osm = load_osm(osm_file, bbox)
+    try:
+        buildings = load_buildings(bbox, root)
+    except FileNotFoundError:
+        log.warning("no 3D BAG data cached: all buildings come from OSM footprints + AHN heights")
+        buildings = []
+    buildings += fallback_buildings(osm, buildings, dtm, dsm)
+    buildings, _ = apply_corrections(load_corrections(), buildings, osm, dtm)  # corrections/corrections.json
     return SourceData(
-        dtm=dtm, dsm=dsm, buildings=load_buildings(bbox, root),
-        osm=load_osm(osm_file, bbox), ortho=load_ortho(bbox, root),
+        dtm=dtm, dsm=dsm, buildings=buildings,
+        osm=osm, ortho=load_ortho(bbox, root), bgt=_load_bgt(bbox, root),
     )
+
+
+def _load_bgt(bbox: RDBox, root: Path | None) -> BgtData | None:
+    bgt = load_bgt(bbox, root)
+    if bgt is None:
+        log.warning("no BGT cached: ground surfaces come from OSM lines ('blox fetch --only bgt')")
+    return bgt

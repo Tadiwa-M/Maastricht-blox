@@ -5,17 +5,40 @@ with keyboard + mouse, a gamepad or touch. Phase 2 track P (see `PLAN.md`).
 
 ## How to use
 
+Walk mode plays like an open-world third-person game. **Drag on the world to look around**; the
+cursor stays free, so every button on screen (Map, Play, the tour card, the menu) can be clicked
+straight away and Esc opens the menu. The mouse is held (Pointer Lock: just move it to look, no
+button) only in a match, where aiming needs it, or when the player turns on Settings > "Hold the
+mouse for looking"; then Esc frees it (the browser's rule) and Esc again opens the menu. M goes
+back to the map. (2026-11-23, owner: with the mouse always held, every button needed an Esc first,
+so people were stuck in an Esc, click, re-held, Esc loop.) The one rule is `input.mayLock`
+(player/index.js); every request for the lock goes through it, and a lock that is no longer
+allowed (a match ended, the setting switched off) is let go on the next frame. Full screen (Start, loading.js) on a desktop also
+locks the Escape key for the game (Keyboard Lock, Chrome and Edge): without it the browser keeps Esc
+to leave full screen, so Esc could never open the menu; now a press opens the menu and holding Esc
+leaves full screen (the browser shows that). While the key is locked a press with the mouse held
+frees the mouse itself (`escapeIsOurs`, input.js) and opens the menu.
+
 | Action | Keyboard + mouse | Gamepad (standard mapping) | Touch |
 |---|---|---|---|
 | Walk here (from the map) | F (point under the cursor) / double-click / "Walk here" button (screen centre) | A (screen centre) | double-tap |
-| Move | W A S D / arrows | left stick | joystick (left half) |
+| Look (walk) | drag on the world (or, when the mouse is held, just move it); Q E turn | right stick (curve + turn boost) | drag on the right half |
+| Free the mouse | Esc (when it is held: in a match, or by the setting) | | |
+| Move (camera-relative) | W A S D / arrows | left stick | joystick (left half) |
 | Run | Shift | push the stick fully / LB | push the joystick fully |
 | Jump | Space | A | JUMP button |
-| Look (orbit camera) | drag the mouse / Q E | right stick | drag on the right half |
 | Zoom | wheel / + - | LT (out) / RT (in) | pinch |
-| Back to the map | Esc / "Map" button | B | "Map" button |
-| Help overlay | H | Select | |
-| Map mode with a gamepad | | left stick pans, right stick orbits, LT/RT zoom | |
+| Back to the map | M / "Map" button | B | "Map" button |
+| Menu: controls + camera settings | H, or Esc while the mouse is free | Start | |
+| Rotate the map | right drag / Ctrl or Alt + left drag / Q E (hold) | right stick | two-finger drag |
+| Tilt the map | middle drag / right drag up-down | right stick up-down | two-finger drag up-down |
+| Face north | click the compass (bottom right) | | tap the compass |
+| Pan / zoom the map | left drag / wheel | left stick / LT RT | one finger / pinch |
+
+**Camera settings** (in the menu, saved per browser in `localStorage` under
+`blox.player.settings.v1`; storage failures fall back to the defaults): mouse/touch
+sensitivity (0.2-3×), invert Y (mouse/touch), controller sensitivity (0.3-2.5×), invert Y
+(controller), and "camera eases behind you while walking" (auto-recenter, on by default).
 
 Walking is 1.4 m/s, running 4 m/s; an analog stick between scales the walk speed. Plugging in
 a controller shows "Controller connected" and switches the hints to gamepad buttons.
@@ -37,11 +60,22 @@ node screenshot.mjs ../build/shots/player hero "mode=walk&at=700,1505&yaw=0"
 main.js  [player hook] -> player/index.js initPlayer(ctx)   ctx = { stage, camera, controls, city?, models, ui, world, islands, lod }
   index.js        modes (map <-> walk), camera tweens, per-frame tick (wraps stage.render), URL hash, window.__bloxPlayer
   city-adapter.js city query API from the in-memory World + islands (used until/unless ctx.city is given)
-  controller.js   CharacterController: kinematic cylinder against city.isSolid
-  camera.js       FollowCamera + pullIn (collision-aware third-person orbit)
-  input.js        BINDINGS table, deadzones, keyboard/gamepad/touch -> one frame of actions
+  controller.js   CharacterController: kinematic cylinder against city.isSolid; stops at water
+                  (onWater: the first solid cell within 8 m below the feet is a water brick)
+  locomotion.js   heading + speed: turn arcs, sharp-turn cost, pivots, eased speed (G1a)
+  motion.js       figure motion layer: walk/idle blend, stride, lean, bank, air, landing (G1a)
+  creator.js      character creator panel (choices and link code: figure/custom.js)
+  bump.js         vehicle contacts: pushed by slow vehicles, knocked by moving ones (G1a)
+  scatter.js      knock-down: the figure pops apart and snaps back together (G1a)
+  camera.js       FollowCamera (aim + damped shown values) + pullIn (collision-aware orbit)
+  look.js         rotation math: yaw wrap, pitch clamp, mouse sensitivity/invert, camera-relative
+                  heading, smoothDamp, gamepad StickLook curve, auto-recenter, map spin damping
+  input.js        BINDINGS table, deadzones, pointer lock, keyboard/gamepad/touch -> one frame of actions
+  settings.js     camera settings: defaults, sanitize, localStorage load/save (try/catch)
+  maporbit.js     map mode extras: Ctrl/Alt-drag orbit, middle-drag tilt, damped Q/E/stick turn, north()
   character.js    contract/models/character.json + WalkCycle (mover.js), run lean, idle sway
-  hud.js          Walk/Map button, hints, street name, help overlay, toasts, touch joystick
+  hud.js          Walk/Map button, hints (follow the mouse lock), street name, menu with the
+                  settings form, compass, toasts, touch joystick
   ray.js          raycastCity (screen point -> ground) + spawn point
   streets.js      nearest street name from features.json
   hash.js         #mode=walk parser
@@ -51,7 +85,11 @@ main.js  [player hook] -> player/index.js initPlayer(ctx)   ctx = { stage, camer
 
 Everything collides through two functions in three.js world metres (x east, y up, z = -north):
 `isSolid(x, y, z) -> true | false | 'unknown'` and `groundHeight(x, z) -> y | 'unknown'`
-('unknown' = not loaded). The viewer core's streaming `src/city.js` provides them; until it is
+('unknown' = not loaded). Water bricks are solid (boats and the river ripples sit on them), so
+the controller also asks `isWater` when the city has it: a move whose footing would be water
+is refused like a wall, unless the player is already on water (so they can climb out). Bridge
+decks are not water, so they stay walkable (accuracy A2, 2026-11-02).
+The viewer core's streaming `src/city.js` provides them; until it is
 passed in as `ctx.city`, `city-adapter.js` builds them from the World (chunk occupancy, unknown
 outside loaded chunks, solid below the world) and each island (the point goes through the
 inverse island pose into local cells, exactly like picking). Island buildings therefore
@@ -64,25 +102,108 @@ collide like any other brick.
 - Anything that is not `false` is solid, so **unknown (unloaded) space is a wall and a floor**:
   you stop at its edge and can never fall through it. Standing inside unknown space freezes the
   player until the city knows what is there.
-- Horizontal velocity eases toward the wanted velocity (12 m/s² on the ground, 3 in the air);
-  the move is cut into ≤ 0.1 m sub-steps and resolved per axis, so the body slides along walls
+- **Locomotion** (`locomotion.js`, G1a 2026-11-05, the Assassin's Creed / God of War pattern): the
+  body keeps a heading and a speed instead of easing a velocity vector, and always faces its
+  heading (no sideways slide). The heading turns toward the wanted direction at 14 rad/s on the
+  spot, 9 at a walk, 3.2 at a sprint (wide arcs when fast); a sharp turn costs speed (55% kept at
+  90°); a reversal of more than ~130° above 2.4 m/s plants the feet, brakes at 16 m/s² and pivots.
+  Speed eases up at 7 m/s² and down at 10. In the air grip is 25%. A wall that cuts the move
+  short also cuts the speed. Outputs angular velocity, smoothed acceleration and steer angle for
+  the animation.
+- The move is cut into ≤ 0.1 m sub-steps and resolved per axis, so the body slides along walls
   (also turned island walls) and never tunnels through one at a low frame rate.
 - **Step up** to 0.42 m (1-2 plates: kerbs, steps); a 3-plate (0.6 m) brick is a wall. Walking
   off a step of up to 0.42 m snaps down instead of hopping. Higher drops fall with gravity
   (18 m/s²) and land exactly on the surface (bisection). Jump: 4.4 m/s, a ~0.5 m hop.
-- The figure turns toward the move direction (12 rad/s); movement is camera-relative.
+- Movement is camera-relative (`look.js moveHeading`: W walks where the camera looks, S toward
+  it).
+
+### Motion-captured gait (`figure/gait.js`, `figure/gait-data.js`, G1a)
+
+Every walking figure (player and crowds) plays real human gait: stride-cycle tables measured
+from motion capture (CMU Graphics Lab Motion Capture Database, BVH conversion by B. Hahne; "free
+for use in research and commercial projects", credited in the page footer). The pipeline tool
+`python -m blox_pipeline.tools.gait --default` fetches the clips (cached in `data/raw/mocap`:
+walk 16_15/16/21/22/31/32, jog 16_35/36/45/46/56, run 16_55, 09_01, 09_04), measures our rig's
+angles in the body's frame (hips, knees, ankles, shoulders relative to the spine, abduction,
+elbows, lean, bounce, pelvis twist and drop, chest twist), cuts stride cycles, averages them
+(12 walk, 11 jog/run) and writes `gait-data.js` (32 samples per curve, phase-aligned to the rig:
+left thigh peaks at pi/2). No mesh, skeleton or model is imported: only angles, on our own figure.
+The rig blends walk (1.31 m/s) to run (3.3 m/s) by speed, ambles below a walk and lengthens the
+swing in a sprint. Stride per step follows the capture (0.70 m walking, 1.0 m running, ~1.3 m
+sprinting at scale 1). A brick-game feel layer (`FEEL`) exaggerates a little: arm swing x1.25,
+bounce x1.3, hip sway x1.1, lean x0.7. The pelvis twists and drops and the chest counter-twists
+(new rig fields `pelvisYaw`, `pelvisRoll`, `chestYaw`); the trunk counter-tilts against the hip
+drop and keeps only 15% of it (`TRUNK_ROLL`), so the head stays nearly level (1.9 cm side sway
+walking, 5.1 cm running; a test holds it under 6 cm).
+
+### Knock-downs (`bump.js`, `scatter.js`, G1a)
+
+Vehicles from the life system (`window.__bloxLife`: buses, trains, car footprints) are checked
+against the player each frame; their speed is measured between frames. A vehicle slower than
+1.5 m/s pushes the player out to its nearer long side; a faster one knocks the player flying
+(forward, sideways and up), and so does landing faster than 11 m/s (a ~3.4 m drop). Then the
+figure **pops apart**: every part flies with the impulse, tumbles and bounces on the street for
+1.5 s, then the parts fly back in an arc and snap together where the body landed (0.45 s);
+controls pause meanwhile. No physics engine: a city of millions of bricks can't be a physics
+scene, and these few bodies don't need one (Rapier stays an option for G2 props).
+
+### Figure motion (`motion.js` + `figure/rig.js`, G1a)
+
+- Walk and idle **blend** by speed (smoothstep 0.05-0.9 m/s), so starting and stopping ease
+  instead of snapping between modes.
+- **Stride** follows the motion capture (`gait.js strideAt`): about 1.9 steps/s walking, 4
+  sprinting, so the feet don't skate.
+- **Lean** forward into acceleration and back when braking (±0.12-0.16 rad), a little more at pace;
+  **bank** into turns from speed × turn rate (up to 0.22 rad, a roll about the feet); the **head**
+  leads toward where you steer.
+- **Air** tucks the legs and spreads the arms; a **landing** dips hips and knees in proportion to
+  the fall speed, then recovers.
+- These are optional rig fields (`blend`, `lean`, `bank`, `air`, `dip`); crowds don't set them and
+  look exactly as before (G1c gives them the same layer).
 - Spawned inside geometry (a click on a wall or roof), the body is lifted up to 4 m to free
   space, then falls.
 
 ### Camera
 
-Orbit around the shoulder (1.6 m above the feet): yaw, pitch (−26° to 72°), distance 1.2-14 m
-(default 5 m, pitch 13°, so the sky is visible behind the city). Each frame `pullIn` marches
+**Over the shoulder** (God of War style, G1a): the focus is 1.6 m above the feet and 0.5 m to
+the right of it (the player sits left of centre), shrunk when a wall is on that side; the focus
+trails the body (`smoothDamp`, 0.09 s) instead of being welded on; sprinting (above 3 m/s) pulls
+the camera back up to 0.9 m and widens the field of view from 55° by up to 7°.
+
+Orbit around that focus: yaw (unlimited, wrapped to ±180°), pitch
+(−35° to 70°), distance 1.2-14 m (default 5 m, pitch 13°, so the sky is visible behind the
+city). Input moves an *aim* (`aimYaw`, `aimPitch`, `aimDist`); the shown values follow it with
+a critically damped spring (`smoothDamp`, 0.05 s for rotation, 0.14 s for zoom), stable and
+overshoot-free at 10 fps, so mouse, stick and touch input never jitter. Assigning
+`follow.yaw/pitch/want` (URL hash, scripts) snaps aim and view together.
+
+Look sources: pointer-lock mouse 0.003 rad/px × sensitivity (raw input via
+`unadjustedMovement` where the browser supports it; the first events after locking and lone
+jumps over 2000 px are dropped, a Chrome-on-Windows quirk); unlocked mouse drag uses the same
+rate (only one path feeds an event, so deltas are never applied twice); touch 0.006 rad/px ×
+sensitivity; right stick |v|^1.8 × 3.2 rad/s yaw / 2.1 rad/s pitch, +70% after 0.25 s at
+full tilt (ramped over 0.5 s); Q/E 1.8 rad/s.
+
+Auto-recenter: after 2 s without look input while walking forward-ish (move within 50° of
+straight ahead), the aim yaw eases behind the figure (rate 0.9 /s, at most 1.2 rad/s, faded in
+over a second). Walking toward the camera or sideways never recenters (that would chase the
+player in circles). Off in the menu. Each frame `pullIn` marches
 5 parallel rays (centre and ±0.18 m around it, the size of the near plane) from the shoulder
 toward the wanted camera point and stops 0.3 m before the first solid sample; pulling in is
 instant, easing back out is smooth. Unknown space does not block the camera. When the camera is
 squeezed closer than 0.9 m the figure is hidden. Walk mode uses a 55° field of view and a 0.1 m
 near plane (restored on exit). Entering and leaving walk mode tweens the camera over 1.1 s.
+
+### Map mode camera
+
+`MapControls` keeps left-drag pan, right-drag orbit and wheel zoom (with `CityCamera`'s tilt
+rules in the streamed city). `maporbit.js` adds, in a capture-phase `pointerdown` so it runs
+before MapControls: Ctrl/Alt (or Cmd) + left drag orbits, middle drag tilts. Q/E and the
+gamepad right stick queue rotation on the same pending spin, applied each frame with
+exponential damping (rate 14 /s) around `controls.target`, with the polar angle kept inside the
+controls' (zoom-dependent) limits. The compass (bottom right, both modes) points north on
+screen; a click turns the map view (or the walk camera) to face north.
 
 ### Input
 
@@ -100,7 +221,10 @@ win over a long diagonal road whose box covers half the map.
 
 ## Tests
 
-`viewer/test/player-input.test.mjs`, `player-controller.test.mjs`, `player-camera.test.mjs`
+`viewer/test/player-look.test.mjs` (yaw wrap, pitch clamp, sensitivity, invert Y,
+camera-relative heading, smoothDamp at 144/60/10/4 fps, stick curve + boost, auto-recenter,
+settings load/save with a throwing storage, map orbit + spin damping, map drag mapping, HUD
+hints), `viewer/test/player-input.test.mjs`, `player-controller.test.mjs`, `player-camera.test.mjs`
 (+ `player-city.mjs`, a synthetic cell grid with rotated boxes and an unknown region):
 deadzones, key/gamepad mapping, edges, speeds; walk/run speed, step-up of 1 and 2 plates,
 3-plate wall stop, sliding, step-down snap, fall and exact landing, no tunnelling at 10 fps,
@@ -118,3 +242,200 @@ street names and the URL hash.
   door. A slimmer character model (pipeline `blox_pipeline.models`) would fix both.
 - Water is solid (you can walk on the Maas). The city API has no material query yet.
 - Map-mode "Walk here" with a gamepad uses the screen centre (no cursor).
+- Pointer lock cannot be exercised in headless Chromium: the lock path (`movementX/Y`, spike
+  filter, Esc handling) is unit-tested as pure functions but only hand-tested in a real browser.
+- Browsers refuse a new pointer lock for about a second after Esc released it; a click right
+  away does nothing (click again).
+- Entering walk mode via the "Walk here" button or F captures the mouse at once; via the
+  gamepad (no user gesture) the hint asks for a click.
+
+## Character creator (G1a, 2026-11-05)
+
+C (or "Your character" in the menu) in walk mode opens a panel and turns the camera round to
+face the figure, circling it slowly: the figure is the preview. Choices (`figure/custom.js`):
+height, build, skin, hair style and colour, hat colour (for caps, beanies and hats), top style
+and colour, trousers, shoes, carrying (nothing, backpack, bag) and its colour; "Surprise me";
+"Copy link". Every change applies at once and is saved in the browser (`localStorage`
+`blox.look`) and the link (`#look=a…`: a version letter and one base-36 digit per choice), so a
+shared link opens the city with your character, and G2 can send the same code to other players.
+`#figure=<seed>` still picks a random look instead. The parts stay our own figure design.
+
+## Getting back to the map (2026-10-30)
+
+Visitors kept asking how to get back to the map from walk mode: the mouse is captured, so the
+bottom bar's Map button can't be clicked, and people try to zoom out the Google Maps way. Now:
+- **Scroll or pinch out past the farthest walk camera** -> back to the map (`ZoomOutExit` in
+  `camera.js`: zoom-out that arrives while the camera is at `maxDist` builds up, and 1.6 m of it
+  leaves; zooming in resets it, idle time drains it; "Keep zooming out for the map" shows on the way).
+- A **Map** button with a `M` key cap, top right, always visible while walking (`#pl-back`).
+- A tip the first three times someone starts walking ("To fly back to the map, press M or
+  scroll out"; touch: pinch out or tap Map; controller: press B), counted in `localStorage`.
+- Hints now say "M or scroll out: map"; the start screen's "Back to map" card says the same.
+
+## Ride: buses and trains (2026-10-30, phase R1: timetable)
+
+The owner's goal: open the app instead of Google Maps, see the buses and trains on the city map,
+tap one and ride along as a passenger, looking around and out of the windows.
+- **Transit button** (bottom left, or `T`): a side panel with two tabs.
+  - **Running now:** line chips (tap one to draw its route on the city and filter), and every
+    vehicle on the move with "Next: <stop> · 2 min" and **Ride**.
+  - **Stops:** search a stop name to get the next departures there; **Jump on** skips the life
+    clock to just before that departure and boards it.
+  While the panel is open, route-coloured badges float over the vehicles on the map; tapping one
+  boards it.
+- **Riding** (`ride/index.js`, math in `ride/seat.js`): every frame the camera sits on a
+  passenger seat (`SEATS`: a little ahead of the middle on the left, eye 2.1 m above the
+  road, inside the window band) of the vehicle's current pose (`life/buses.js` poses). The
+  vehicle heading is smoothed (`smoothYaw`), since shapes are polylines. Look around by dragging,
+  with arrows/Q/E, or the right stick. The HUD shows the line, the destination, the next stop with
+  minutes, and the following stops, plus buttons: **Get off at <stop>** (steps off when the
+  vehicle reaches it and continues in walk mode from the stop), **Outside view** (chase camera),
+  **Fast** (life clock 10x) and **Map**. Esc / B also leave. When the trip ends you are put back
+  on the map above it.
+- **Cabin** (`ride/cabin.js`, 2026-10-30): seen from inside, the brick models are a box of studs
+  with slit windows, so in the seat view the ridden vehicle is hidden (the fleet's `hideId`) and a
+  light passenger cabin follows its pose instead: floor, low blue panels up to the sill (1.5 m),
+  window openings up to 2.6 m between thin pillars, a ceiling, seat backs ahead that stay below
+  the sill, and a yellow grab pole. `CABINS` holds the bus and train sizes; the seat eye (2.1 m)
+  sits in the middle of the windows (`ride.cabin.test.mjs`). The outside view shows the real
+  model again.
+- **Trains:** `blox life` now keeps `bus,rail` by default. Rail routes get their own fleet with
+  the new `train` brick model (6 x 52 studs, hollow saloon, doors both sides) and no lane offset.
+- **Data:** `transit.json` v2 adds `stops` (name, Unity m), `patterns[].stops`, `routes[].id` and
+  `tripIds` (GTFS trip ids per row, for the live feed). v1 files still work: no stop names or
+  boards. Re-run `blox life` to get v2.
+
+Phase R2 (live positions and delays) is next; see PLAN.md.
+
+## Movement feel and crowd behaviour (2026-11-12)
+
+What changed in how moving feels, and where each number lives.
+
+### Player body (`controller.js`, `locomotion.js`)
+
+| Thing | Value | Where |
+| --- | --- | --- |
+| Walk / run | 1.5 / 5.0 m/s (was 1.4 / 4.0) | `DEFAULTS.walk`, `.run` |
+| Speeding up / braking | 11 / 14 m/s² (was 7 / 10): running pace in ~0.45 s | `LOCO.accel`, `.brake` |
+| Turn rate at a sprint | 4.2 rad/s (was 3.2) | `LOCO.turnSprint` |
+| Jump | 5.4 m/s up, gravity 20 rising / 30 falling: ~0.73 m apex, ~0.6 s in the air | `jumpSpeed`, `gravity`, `fallGravity` |
+| Short hop | letting go of the key early keeps 45 % of the upward speed | `jumpCut`, `update({ jumpHeld })` |
+| Coyote time | a jump still counts 0.12 s after walking off an edge | `coyote` |
+| Jump buffer | a press up to 0.14 s before landing jumps on landing | `jumpBuffer` |
+| Kerbs and stairs | the collision body still steps at once; the *drawn* height (`ctrl.visualY`) eases behind it | `stepEase`, `stepLag` |
+
+`ctrl.jumped` is true in the step a jump starts (for a sound or an effect). A touch jump is
+always a full jump (a tap has no "held"). The knock-down from a long fall keeps its old height
+(the threshold speed moved with the stronger fall gravity).
+
+### Camera (`camera.js`)
+
+- **Posts are looked past.** A solid run shorter than `CAM.thin` (0.55 m: one stud) with free
+  space on both sides is a lamp post, a trunk or a sign, not a wall; the pull-in ray continues
+  through it. Walking past a pole no longer punches the camera in and out. A thin *wall* (solid
+  to either side) still blocks.
+- **Pull-in is eased, not a jump cut** (`pullRate` 30/s: there in about five frames), and after
+  the view clears the camera **waits `outHold` 0.3 s, then eases out** (`outTime`).
+- Height follows the feet quickly on the ground (kerbs, stairs) and slowly in the air, so a jump
+  plays out in frame instead of the camera bouncing with it; never more than 1.1 m behind.
+- A sprint pulls back 1.1 m and widens the view by 9 degrees.
+
+### Touch (`input.js`)
+
+`BINDINGS.touch`: the stick has a 14 % dead zone (a resting thumb does not creep) and runs past
+82 % of its radius (was 92 %, hard to hold). Look drags are spread over a few frames
+(`smoothTouchLook`: nothing is lost, the turn is even), turn 0.0052 rad per pixel, and the
+vertical part counts 70 % (thumbs wobble up and down while swiping sideways).
+
+### Figure animation (`motion.js`, `figure/rig.js`, `figure/gait.js`)
+
+- **Feet that don't skate.** `strideAt(speed)` is measured on the posed legs: while a foot is
+  planted the body must advance exactly as fast as that ankle moves back under the hip, so the
+  stride is the median planted-ankle speed (forward kinematics of the angles the rig draws),
+  blended into the captured stride from a jog up. The phase advances by distance at the stride
+  of the speed *actually* moved at, so starts and stops don't slide either. Slow walks take
+  short steps (amplitude `(v / walk)^0.6`) at a human cadence (1.4 steps/s at 0.5 m/s).
+- Thighs swing a little wider (`FEEL.legs`), which lengthens the step.
+- Turning on the spot shuffles the feet; stopping settles where the feet pass each other.
+- Jump pose follows the arc (`pose.rise`): knee drive and arms up going up, legs reaching and
+  arms out coming down. A landing at a run recovers almost twice as fast as a standing one.
+- Standing: breathing, the weight shifting from leg to leg with the free knee giving.
+- `IDLE` activities for anyone standing (`pose.idle`, eased by `pose.idleK`): `PHONE`, `TALK`,
+  `LOOK`, `HIPS`.
+- Every person has a walking style (`variant.gait`: arm swing, bounce, shoulder roll); kids
+  bounce, older people keep it small, a hand carrying a bag hangs. The player's figure walks the
+  plain captured gait.
+
+### Crowd (`life/walkers.js`, `life/walkgraph.js`)
+
+- **`steer()` replaces the last-moment side-step.** Each group looks `STEER.ahead` (6 m) down its
+  line. Oncoming groups each give half the room and pass on the side they are already on (dead
+  ahead: both keep right); standing groups are walked round on the nearer side; someone slower
+  is overtaken, or followed at their pace when close. The answer is read from each other's
+  *lines* (where they would walk without giving way), so it does not waver while they pass.
+  `separate()` still guarantees personal space afterwards. Bikes keep the old `avoid()`.
+- **Never into a wall:** `Pedestrians.fitShift` probes the room on the side a group wants to
+  move to and halves the shift until it fits; with no room the group eases off instead.
+- **Pace eases** (`Walker` option `ease`): people reach walking pace in ~0.55 s and stop in
+  ~0.17 s, a kerb stop twice as firmly, instead of switching in one frame.
+- Drawing: the walk and the standing pose blend, each person's stride matches the pace walked,
+  people pick something to do per stop (`pickAct`), friends drift a little ahead and behind each
+  other, and heads turn (`headTarget`) to what the group looks at, to the player passing within
+  6 m (about two in three people, a glance at a time) and to the friend alongside.
+
+Cost: `steer()` is one grid pass like `avoid()` was (a 6 m cell instead of 1.1 m); the walk/stand
+blend poses a figure twice only during the half second of a start or stop.
+
+## Running into people; carrying a gun on the move (2026-11-14)
+
+- **Contact** (`life/reactions.js` `contact`, applied in `life/walkers.js` `bumps`): the player
+  touching a person (0.55 m) while moving toward them. At a full run (4.3 m/s and up) the one hit
+  is knocked over: their figure flies apart along the player's direction and gathers itself
+  again (`player/scatter.js`, as the player's own fall), their friends startle and stay. Slower,
+  they are shoved aside: their group steps to the side the player came past, the person stumbles
+  (a lean and a dip) and looks round. A person bumped is left alone for 1.6 s. The player loses
+  speed (`blox:bump`: x0.7 for a shove, x0.45 for a knock-down) and the controller bumps.
+- **Gun on the move** (`figure/rig.js` `holdGun(k, pitch, out, { sprint, phase, speed })`): the
+  arms keep the hold and ride the stride (a bob and a counter-swing of the chest), the body leans
+  into a run; above 4.2 m/s, not aiming or firing, the gun drops to a sprint carry, low across the
+  chest with the elbows bent and a deeper lean (`combat.js` `sprintK`); a shot or aiming brings
+  it up at once. Other players carry theirs the same way from their speed.
+- Tests: `test/life.contact.test.mjs`, `test/life.people.test.mjs` (a sprint and a walk into a
+  real crowd). The sprint carry has not been seen on screen yet (the headless check could not
+  drive a run).
+
+## Moving like someone carrying a gun (2026-11-14)
+
+- **Three holds** (`figure/rig.js` `holdGun`, blended): LOW READY by default (at the hip, elbow
+  bent, support hand across, barrel down and a little across), SHOULDERED when aiming or within
+  1.4 s of a shot (`combat.js` `readyK`: up in about a tenth of a second, the quick draw, down
+  slowly), and the SPRINT CARRY across the chest above 4.2 m/s. The stride bobs and swings the
+  gun, more in a sprint; the head looks down the sights when shouldered. The third-person gun model
+  turns with the hold (barrel down at the hip, along the aim when shouldered).
+- **Legs and chest** (`player/stance.js` `stance`): the chest and gun face the aim, the legs face
+  where the body travels, up to a 60-degree waist twist (`pose.twist` turns the chest in the rig);
+  moving backwards the legs face the aim and the walk cycle runs in reverse (a real backpedal).
+  The legs ease round instead of snapping.
+- Other players use the same holds (at the hip unless they just fired, sprint carry by speed).
+- Tests: `test/stance.test.mjs` (including that the chest really faces the aim when the legs turn).
+
+
+## The controller's other buttons (2026-11-23)
+
+Owner: make the other buttons useful (pause to pause, share to share). `input.js BINDINGS.pad.buttons`
+(standard mapping), handled in one place (`player/index.js padButtons`):
+
+| Button | Action |
+|---|---|
+| Start | pause menu |
+| Share / Back (8), PlayStation touchpad (17) | photo mode; press again for the postcard (shared or saved); B leaves photo mode |
+| Y | the Stand's rush (manga look; in a match Y swaps weapons) |
+| RB | the Stand's ability (Guard, Encore, Short Circuit) |
+| R3 | strike a pose now (manga look; in a match R3 stabs) |
+| L3 | your character (creator) |
+| D-pad up / down | journal / plan a trip |
+| D-pad left / right | previous / next song (without the Spotify app: next plays or pauses) |
+
+Help moved off Share: it is in the pause menu (Controls & help). The help panel's table and the
+bottom hint list the new buttons. A test keeps one action per button (A's walk-here shares jump on
+purpose).

@@ -1,4 +1,4 @@
-// Loading life data: life/index.json (+ transit, walkways, river) written by
+// Loading life data: life/index.json (+ transit, walkways, streets, river) written by
 // `blox life --out <world>`. Looked up, in order: window.BLOX_WORLD.life (embedded),
 // the #life=<dir> URL parameter, ctx.lifeUrl, then <site base>life/ (streamed site build) or
 // "life/" next to the page.
@@ -18,16 +18,15 @@ export function lifeBase(ctx, hash = typeof location !== 'undefined' ? location.
   return base.endsWith('/') ? base : `${base}/`;
 }
 
-/** { index, transit, walkways, river } (each may be null), or null when there is no export. */
+/** { index, transit, walkways, river, streets } (each may be null), or null when there is no export. */
 export async function loadLifeData(ctx) {
   const embedded = typeof window !== 'undefined' ? window.BLOX_WORLD?.life : null;
-  if (embedded) return { index: embedded.index || null, transit: embedded.transit || null,
-    walkways: embedded.walkways || null, river: embedded.river || null };
+  if (embedded) return { index: null, transit: null, walkways: null, river: null, streets: null, ...embedded };
   if (typeof fetch === 'undefined') return null;
   const base = lifeBase(ctx);
   let index;
   try { index = await fetchJson(`${base}index.json`); } catch { return null; }
-  const out = { index, transit: null, walkways: null, river: null };
+  const out = { index, transit: null, walkways: null, river: null, streets: null };
   await Promise.all(Object.entries(index.files || {}).map(async ([k, f]) => {
     try { out[k] = await fetchJson(base + f); } catch (e) { console.warn(`life: ${k}: ${e.message}`); }
   }));

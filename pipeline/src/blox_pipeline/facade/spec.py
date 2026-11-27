@@ -56,6 +56,18 @@ class HouseSpec:
     plinth: str = "dark_grey"
     corner_west: bool = False   # end of a row: the west side wall gets windows too
     balcony: bool = False       # first-floor balcony with a fence in front of the middle bay
+    # look v2 (owner's Markt photos): see ``run.FacadeRun``; defaults keep the v2 houses
+    stone: str | None = None
+    door: str | None = None
+    window: str = "window_1x2x3"
+    shop_window: str = "window_1x2x3"
+    surrounds: bool = False
+    pediments: bool = False
+    iron_balcony: bool = False
+    french: bool = False
+    vents: bool = False
+    pier: int = 1
+    dormer: str | None = None   # dormer cheek colour (None: the wall), e.g. white dormers on slate
 
     PLINTH = PLINTH
     GROUND_H = GROUND_H
@@ -76,7 +88,9 @@ class HouseSpec:
             x0=self.x0, x1=self.x1, y0=self.y0, storeys=self.storeys, fid=self.fid, wall=self.wall,
             trim=self.trim, accent=self.accent, plinth=self.plinth, ground=self.ground,
             awning=self.awning, quoins=self.quoins, shutters=self.shutters, flowers=self.flowers,
-            balcony=self.balcony,
+            balcony=self.balcony, stone=self.stone, door=self.door, window=self.window,
+            shop_window=self.shop_window, surrounds=self.surrounds, pediments=self.pediments,
+            iron_balcony=self.iron_balcony, french=self.french, vents=self.vents, pier=self.pier,
         )
 
     @property

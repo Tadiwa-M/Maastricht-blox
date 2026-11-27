@@ -45,6 +45,7 @@ export class CityLoader {
       studM: index.studM, plateM: index.plateM, chunkStuds: index.chunkStuds,
       chunksX: index.chunksX ?? 64, chunksY: index.chunksY ?? 64,
       hasChunk: (cx, cy) => chunkSet.has(`${cx},${cy}`),
+      bounded: true, // hasChunk says where the built city ends (the trip planner keeps inside it)
       islandsOver: (cx, cy) => over.get(`${cx},${cy}`) || [],
     });
     const items = [

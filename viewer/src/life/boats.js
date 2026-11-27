@@ -1,7 +1,10 @@
 // River cruise boats on the Maas: a loop up one side of the river and back down the other
 // (keeping right), from life/river.json's centreline. Boat pivot = waterline (CONTRACT 7.1).
+// The player can ride along (src/activities/): nearest() finds the boat to board.
 import { PathMover, poseToObject } from '../mover.js';
 import { buildModel } from '../models.js';
+import { LOOK } from '../render/verse.js';
+import { lookBoat } from './lookmodels.js';
 
 /** Polyline [[x, z], ...] offset sideways by d metres (+ = right of the direction of travel). */
 export function offsetLine(pts, d) {
@@ -29,10 +32,20 @@ export class Boats {
     if (pts.length < 2) return;
     const L0 = new PathMover({ path: loop, loop: true }).length;
     for (let q = 0; q < count; q++) {
-      const obj = buildModel(model, opts);
+      const obj = lookBoat(LOOK, model, opts) || buildModel(model, opts); // a painted look's own boat (lookmodels.js)
       obj.name = 'life:boat';
       this.items.push({ obj, mover: new PathMover({ path: loop, loop: true, speed: 3 + q * 0.4, turnRadius: 14, start: (L0 * q) / count + 40 }) });
     }
+  }
+
+  /** Nearest boat to three.js (x, z): { item, d } (horizontal metres) or null. */
+  nearest(x, z) {
+    let best = null;
+    for (const item of this.items) {
+      const d = Math.hypot(item.obj.position.x - x, item.obj.position.z - z);
+      if (!best || d < best.d) best = { item, d };
+    }
+    return best;
   }
 
   update(dt) {

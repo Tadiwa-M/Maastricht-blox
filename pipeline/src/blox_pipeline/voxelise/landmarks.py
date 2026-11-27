@@ -1,8 +1,14 @@
 """Hand-curated overrides for well-known Maastricht buildings and zones.
 
-A landmark is matched to a 3D BAG building when an OSM object whose ``name`` contains
-one of ``names`` overlaps the footprint by >= 30 %, or when ``point`` (RD) lies inside
+A landmark is matched to a 3D BAG building by, in this order: one of its ``bag_ids``; an
+overlapping OSM object (>= 30 %) whose ``wikidata`` tag is one of ``wikidata``; an
+overlapping OSM object whose ``name`` contains one of ``names``; ``point`` (RD) lying inside
 the footprint. Points marked approximate are only a fallback for the name match.
+
+A landmark with a ``model`` (the Stadhuis) is not voxelised from its 3D BAG shape at all: a
+hand-authored brick model (``heroes.py``) is built on its footprint instead, on the world
+grid or as an island as the footprint's orientation dictates. As a safety net the model is
+only used when the footprint lies within ``model_radius_m`` of ``point``.
 """
 
 from __future__ import annotations
@@ -33,6 +39,10 @@ class Landmark:
     windows: bool = False
     accent: Accent | None = None
     tags: tuple[tuple[str, str], ...] = ()
+    model: str | None = None  # hand-authored brick model replacing the 3D BAG shape (heroes.py)
+    wikidata: tuple[str, ...] = ()  # OSM ``wikidata`` ids that identify it (beside the names)
+    bag_ids: tuple[str, ...] = ()   # 3D BAG ids that identify it (checked first)
+    model_radius_m: float = 150.0   # a model is only built this close to ``point`` (safety net)
 
 
 LANDMARKS: tuple[Landmark, ...] = (
@@ -56,7 +66,7 @@ LANDMARKS: tuple[Landmark, ...] = (
     Landmark(
         key="stadhuis", display_name="Stadhuis Maastricht", names=("Stadhuis",),
         point=(176430.0, 318007.0),  # Markt (CONTRACT reference point); stadhuis stands on it
-        wall="light_grey", roof="slate",
+        wall="limestone", roof="slate", model="stadhuis",
     ),
     Landmark(
         key="bonnefanten", display_name="Bonnefanten", names=("Bonnefanten",),

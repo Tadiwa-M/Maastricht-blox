@@ -7,19 +7,39 @@
 // The player runs inside stage.render (wrapped here), i.e. after main's controls.update()
 // and right before drawing, so the walk camera is never one frame behind or overridden.
 //
+// Walk mode is an open-world third-person camera: clicking the canvas captures the mouse
+// (pointer lock) and mouse movement turns the camera with no button held; Esc frees the
+// mouse, Esc again opens the pause menu (src/menu/; H the controls help with the camera settings), M goes back to the map.
+// Movement is camera-relative and the camera eases back behind the player after ~2 s of
+// walking without look input (setting). Map mode adds Ctrl/Alt-drag orbit, middle-drag tilt,
+// smooth Q/E turning and a compass (maporbit.js, hud.js).
+//
 // URL hash: #mode=walk&at=x,z[&yaw=deg][&camyaw=deg][&pitch=deg][&dist=m]
 //   at = Unity metres (x east, z north; CONTRACT 1), yaw = compass degrees the player faces,
 //   camyaw = compass degrees the camera looks toward (default: same as yaw).
+import { standSpot } from './spot.js';
 import * as THREE from 'three';
 import { cityFromWorld } from './city-adapter.js';
 import { CharacterController } from './controller.js';
-import { FollowCamera } from './camera.js';
+import { FollowCamera, ZoomOutExit } from './camera.js';
 import { Input, frameSpeed } from './input.js';
 import { Character } from './character.js';
-import { Hud, TouchControls } from './hud.js';
+import { Hud, TouchControls, isTouchDevice } from './hud.js';
+import { MapOrbit } from './maporbit.js';
+import { loadSettings, saveSettings } from './settings.js';
 import { streetFinder } from './streets.js';
 import { raycastCity, spawnPoint } from './ray.js';
 import { parseWalkHash } from './hash.js';
+import { Creator } from './creator.js';
+import { rumble, canRumble, haptic } from '../mp/combat.js';
+import { VehicleContacts, lifeVehicles } from './bump.js';
+import { Scatter } from './scatter.js';
+import { defaultChoices, loadChoices } from '../figure/custom.js';
+import { PROPORTION } from '../figure/rig.js';
+import { Stand } from './stand.js';
+import { resolveStand, ABILITIES } from './standdesigns.js';
+import { Captions } from '../render/captions.js';
+import { comicFx } from '../render/comicfx.js';
 
 const DEG = Math.PI / 180;
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
@@ -31,29 +51,155 @@ export function initPlayer(ctx) {
   const city = ctx.city || cityFromWorld(world, ctx.islands || []);
   const ctrl = new CharacterController(city);
   const follow = new FollowCamera();
-  const character = new Character(ctx.models, world);
+  const store = (() => { try { return localStorage; } catch { return null; } })();
+  const hashFigure = new URLSearchParams(location.hash.replace(/^#/, '')).has('figure');
+  let look = hashFigure ? null : loadChoices(location.hash, store);
+  const character = new Character(ctx.models, world, { look });
   character.group.visible = false;
   stage.scene.add(character.group);
+  // the manga look: the player's Stand (player/stand.js), the design picked in the creator
+  let stand = null;
+  const captions = new Captions();
+  window.__bloxCaptions = captions; // (tests)
+  if (PROPORTION.style?.poses) {
+    stand = new Stand(stage.scene, character.variant.standSpec || character.variant.stand);
+    window.__bloxStand = stand;
+    window.addEventListener('keydown', (e) => { if (e.code === 'KeyE' && mode === 'walk' && !window.__bloxMp?.combat?.active && !e.repeat) stand.rush(); });
+    window.addEventListener('keydown', (e) => { if (e.code === 'KeyX' && !e.repeat && !/INPUT|TEXTAREA|SELECT/.test(e.target?.tagName || '')) standAbility(); });
+  }
+  // the controller's other buttons (input.js BINDINGS.pad.buttons): photos and postcards, the Stand,
+  // a pose, your character, the journal, a trip, the music
+  const explore = () => window.__bloxExplore;
+  function padButtons(p) {
+    if (!p.size || window.__bloxMenu?.isOpen) return;
+    const match = !!window.__bloxMp?.combat?.active, walk = mode === 'walk' && !tween;
+    if (p.has('photo') || p.has('photoPad')) { const ex = explore(); if (ex?.state?.().photo) ex.shoot?.(); else ex?.photo?.(true); }
+    if (p.has('journal')) explore()?.journal?.(!explore()?.journalOpen);
+    if (p.has('trip')) window.__bloxTrip?.open?.(true);
+    if (p.has('songNext')) window.__bloxMusic?.next?.();
+    if (p.has('songPrev')) window.__bloxMusic?.prev?.();
+    if (!walk) return;
+    if (p.has('creator')) { if (creator.open) closeCreator(); else openCreator(); }
+    if (p.has('ability')) standAbility();
+    if (!match && p.has('rush')) stand?.rush(); // (in a match Y swaps weapons, R3 stabs: mp/combat.js)
+    if (!match && p.has('pose')) character.poseNow = true;
+  }
+  // the Stand's ability (X): Guard, Encore or Short Circuit (player/standdesigns.js ABILITIES)
+  let abilityReady = 0;
+  const trail = []; // where the player was, for Encore: [{ t, pos }], the last few seconds
+  function standAbility() {
+    if (!stand || mode !== 'walk' || tween || riding()) return;
+    const now = performance.now(), A = ABILITIES[stand.ability];
+    if (now < abilityReady) { hud.toast(`${A.name}: ready in ${Math.ceil((abilityReady - now) / 1000)} s`, 1200); return; }
+    abilityReady = now + A.coolS * 1000;
+    const combat = window.__bloxMp?.combat;
+    if (stand.ability === 'guard') { stand.guard(2); combat?.guard?.(); }
+    else if (stand.ability === 'encore') { // back to where you were 3 s ago
+      const then = trail.find((p) => now - p.t <= 3000) || trail[0];
+      if (then) { ctrl.pos[0] = then.pos[0]; ctrl.pos[1] = then.pos[1]; ctrl.pos[2] = then.pos[2]; ctrl.vel[1] = 0; ctrl.visualY = then.pos[1]; }
+      stand.flare(); comicFx('land', null);
+    } else { // Short Circuit: a lightning dash forward that hits whoever is at the end of it
+      const fx = Math.sin(ctrl.yaw), fz = -Math.cos(ctrl.yaw);
+      ctrl.dash(fx * 18, fz * 18, 0.22); stand.flare();
+      setTimeout(() => combat?.standPunch?.([ctrl.pos[0] + fx * 0.8, ctrl.pos[1] + 1.2, ctrl.pos[2] + fz * 0.8]), 230);
+    }
+    hud.toast(`「${stand.name}」 ${A.name}!`, 1200);
+  }
+  {
+  }
   const findStreet = world?.features ? streetFinder(world.features.values()) : () => '';
   const S = world?.studM || 0.5;
   const still = /[?&]shot=1/.test(location.search);
 
+  // knock-downs: vehicles push or knock the player; a big fall too; the figure pops apart (scatter.js)
+  const contacts = new VehicleContacts();
+  let scatter = null, airMinVy = 0, wasGrounded = true;
+  const scatterGround = (x, z) => { const g = city.groundHeight(x, z); return typeof g === 'number' ? g : null; };
+  function knockDown(impulse) {
+    scatter = new Scatter(character.currentParts(), impulse, scatterGround);
+    const L = ctrl.loco;
+    L.heading = Math.atan2(impulse[0], -impulse[2]); L.speed = Math.hypot(impulse[0], impulse[2]) * 0.6; L.pivoting = false;
+    ctrl.vel[1] = Math.max(ctrl.vel[1], impulse[1] * 0.5);
+    ctrl.grounded = false;
+  }
+  // running into people (life/walkers.js): a shove costs a little speed, knocking someone over more
+  window.addEventListener('blox:bump', (e) => {
+    if (mode !== 'walk' || scatter) return;
+    const knock = e.detail?.kind === 'knock';
+    ctrl.loco.speed *= knock ? 0.45 : 0.7;
+    haptic(knock ? 'kill' : 'shove');
+  });
+  const zoomExit = new ZoomOutExit();
   let mode = 'map', tween = null, mapView = null, jumpQueued = false, hover = null, streetT = 0;
-  let padCount = 0;
+  let padCount = 0, lookIdle = 0, jumpKey = false;
+  const drawFeet = [0, 0, 0];
   const focusVec = new THREE.Vector3(), smoothFeet = [0, 0, 0];
+  const settings = loadSettings();
 
-  const hud = new Hud({ onWalk: () => enterAt(centreRay()), onExit: exitWalk });
-  const touch = new TouchControls(canvas, () => { jumpQueued = true; }, (x, y) => mode === 'map' && enterAt(screenRay(x, y)));
+  const orbit = new MapOrbit(canvas, controls, camera);
+  const hud = new Hud({
+    onWalk: () => enterAt(centreRay()), onExit: exitWalk, settings,
+    onSettings: (s) => saveSettings(s),
+    onNorth: () => { if (mode === 'walk') follow.aimYaw = 0; else orbit.north(); },
+  });
+  // character creator: C or the menu (walk mode); the camera turns round to face the figure
+  let creatorCam = null;
+  const creator = new Creator(look || defaultChoices(), {
+    store,
+    onChange: (v, ch) => {
+      look = ch; character.setVariant(v);
+      const spec = v.standSpec || v.stand; // a new Stand picked or designed: build it again
+      if (stand && spec && resolveStand(spec).key !== stand.key) { stand.dispose(); stand = new Stand(stage.scene, spec); window.__bloxStand = stand; }
+    },
+    onDone: () => closeCreator(),
+  });
+  function openCreator() {
+    if (mode !== 'walk' || tween || creator.open) return;
+    hud.toggleHelp(false);
+    input.releaseLock();
+    creatorCam = { yaw: follow.aimYaw, pitch: follow.aimPitch, dist: follow.aimDist, spin: 0 };
+    creator.show(true);
+  }
+  function closeCreator() {
+    creator.show(false);
+    if (creatorCam) { follow.aimYaw = creatorCam.yaw; follow.aimPitch = creatorCam.pitch; follow.aimDist = creatorCam.dist; }
+    creatorCam = null;
+  }
+  const creatorBtn = document.createElement('button');
+  creatorBtn.textContent = 'Your character (C)';
+  creatorBtn.addEventListener('click', () => openCreator());
+  hud.help.insertBefore(creatorBtn, hud.help.lastChild);
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'KeyC' || e.repeat || /INPUT|TEXTAREA|SELECT/.test(e.target?.tagName || '')) return;
+    if (creator.open) closeCreator(); else openCreator();
+  });
+  // riding a bus or train (src/ride/): the ride owns the camera; walk/map input stands down
+  const riding = () => !!window.__bloxRide?.state?.ride;
+  const touch = new TouchControls(canvas, () => { jumpQueued = true; }, (x, y) => mode === 'map' && !riding() && enterAt(screenRay(x, y)));
   const input = new Input(canvas, {
-    touch,
+    touch, settings,
+    onLock: (locked) => hud.setLocked(locked),
     onPad: (name, on) => {
       padCount = Math.max(0, padCount + (on ? 1 : -1));
-      hud.toast(on ? `Controller connected: ${name.replace(/\s*\(.*$/, '').slice(0, 40)}` : 'Controller disconnected');
+      // say whether this browser lets the pad rumble (and give a short buzz to prove it)
+      const pad = on ? [...(navigator.getGamepads?.() || [])].find((p) => p?.connected && p.id === name) : null;
+      const buzz = pad ? rumble(pad, { ms: 180, weak: 0.6, strong: 0.8 }) : false;
+      hud.toast(on ? `Controller connected: ${name.replace(/\s*\(.*$/, '').slice(0, 40)}${canRumble(pad) ? (buzz ? ' · rumble on' : '') : ' · this browser gives it no rumble'}` : 'Controller disconnected', 4000);
       hud.setMode(mode, padCount > 0);
     },
   });
+  // the mouse is held only to aim in a match, or when the player asked for it (Settings); otherwise
+  // the cursor stays free: drag to look, every button clickable without Esc first
+  input.mayLock = () => !!settings.captureMouse || !!window.__bloxMp?.combat?.active;
+  hud.captures = input.mayLock;
+  let lastMayLock = input.mayLock(), wasPosing = false;
   canvas.addEventListener('pointermove', (e) => { hover = [e.clientX, e.clientY]; });
-  canvas.addEventListener('dblclick', (e) => { if (mode === 'map' && !tween) enterAt(screenRay(e.clientX, e.clientY)); });
+  canvas.addEventListener('dblclick', (e) => { if (mode === 'map' && !tween && !riding()) enterAt(screenRay(e.clientX, e.clientY)); });
+  // walk mode: a click on the world captures the mouse (open-world look)
+  canvas.addEventListener('click', (e) => {
+    if (mode === 'walk' && e.pointerType !== 'touch' && !isTouchDevice()) { hud.toggleHelp(false); input.requestLock(); }
+  });
+  const lockable = () => !still && !isTouchDevice();
 
   // ---- rays from the screen -------------------------------------------------------------
   const rc = new THREE.Raycaster();
@@ -76,6 +222,13 @@ export function initPlayer(ctx) {
     return true;
   }
 
+  /** Enter on open street ground near Unity (x, z): a point inside a building's footprint (a bus
+   * stop, a trip start) puts you on the pavement beside it, not on the roof (player/spot.js). */
+  function enterNearUnity(x, z, yaw = 0, camYaw = yaw, animate = true) {
+    const s = standSpot(city, x, -z);
+    return s ? enterAtUnity(s.x, -s.z, yaw, camYaw, animate) : enterAtUnity(x, z, yaw, camYaw, animate);
+  }
+
   /** Enter at Unity metres (x east, z north); y from the city's column top. */
   function enterAtUnity(x, z, yaw = 0, camYaw = yaw, animate = true) {
     const g = city.groundHeight(x, -z);
@@ -88,27 +241,47 @@ export function initPlayer(ctx) {
     if (mode === 'map') mapView = { pos: camera.position.clone(), target: controls.target.clone(), fov: camera.fov, near: camera.near };
     ctrl.spawn(feet[0], feet[1], feet[2], yaw);
     smoothFeet.splice(0, 3, ...ctrl.pos);
-    follow.yaw = camYaw;
+    follow.yaw = camYaw; // snaps (no easing from the last walk's yaw)
+    follow.snap();
     follow.dist = follow.want;
+    lookIdle = 0;
     character.group.visible = true;
     character.update(ctrl.pos, ctrl.yaw, 0, 0, 0);
     controls.enabled = false;
+    orbit.enabled = false;
     input.lookActive = true;
+    if (lockable()) input.requestLock(); // works when entered by a click or key; else the hint says click
     camera.near = 0.1;
     mode = 'walk';
+    zoomExit.reset();
     hud.setMode('walk', padCount > 0);
+    hud.firstWalkTip(padCount > 0);
     touch.show(true);
-    const { focus, position } = follow.update(city, ctrl.pos, 1);
-    if (animate) startTween(position, focus, 55, 'walk');
-    else { tween = null; setCamera(position, focus, 55); }
+    follow.aspect = camera.aspect;
+    const { focus, position, fov } = follow.update(city, ctrl.pos, 1);
+    if (animate) startTween(position, focus, fov, 'walk');
+    else { tween = null; setCamera(position, focus, fov); }
   }
 
-  function exitWalk() {
+  /** Back to the map: a short flight up, or instant (no camera move) when something else takes
+   * the camera over, e.g. boarding a bus: the map's lens and controls come back at once. */
+  function exitWalk(instant = false) {
     if (mode !== 'walk') return;
     mode = 'map';
     input.lookActive = false;
+    input.releaseLock();
     touch.show(false);
     hud.setMode('map', padCount > 0);
+    if (instant === true) {
+      tween = null;
+      character.group.visible = false;
+      camera.near = mapView?.near ?? 0.3; camera.fov = mapView?.fov ?? 40;
+      camera.updateProjectionMatrix();
+      controls.target.set(...ctrl.pos);
+      controls.enabled = true;
+      orbit.enabled = true;
+      return;
+    }
     const t = new THREE.Vector3(...ctrl.pos);
     const back = new THREE.Vector3(-Math.sin(follow.yaw), 0, Math.cos(follow.yaw));
     const pos = t.clone().addScaledVector(back, 32).add(new THREE.Vector3(0, 38, 0));
@@ -142,6 +315,7 @@ export function initPlayer(ctx) {
       camera.updateProjectionMatrix();
       controls.target.copy(look);
       controls.enabled = true;
+      orbit.enabled = true;
       controls.update();
     }
     tween = null;
@@ -158,14 +332,25 @@ export function initPlayer(ctx) {
       const d = fwd.multiplyScalar(my).add(right.multiplyScalar(mx)).multiplyScalar(dist * 0.9 * dt);
       controls.target.add(d); camera.position.add(d);
     }
-    if (frame.look[0] || frame.look[1] || frame.zoom) {
+    // Q/E and the right stick: queued on the damped map orbit (smooth start and stop)
+    if (frame.look[0] || frame.look[1]) orbit.add(-frame.look[0], frame.look[1]);
+    if (frame.zoom) {
       const sph = new THREE.Spherical().setFromVector3(off);
-      sph.theta -= frame.look[0];
-      sph.phi = THREE.MathUtils.clamp(sph.phi + frame.look[1], 0.05, controls.maxPolarAngle);
       sph.radius = THREE.MathUtils.clamp(sph.radius * Math.exp(frame.zoom * 0.15), controls.minDistance, controls.maxDistance);
       camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
       camera.lookAt(controls.target);
     }
+  }
+
+  function toggleMenu(on = hud.help.hidden) {
+    hud.toggleHelp(on);
+    if (on) input.releaseLock(); // the sliders need a cursor
+  }
+  // Esc / Start: close the help panel if it is up, else the pause menu (src/menu/) when there is one
+  function menuKey() {
+    if (!hud.help.hidden) toggleMenu(false);
+    else if (window.__bloxMenu) window.__bloxMenu.toggle();
+    else if (mode === 'walk') toggleMenu();
   }
 
   let last = performance.now();
@@ -174,37 +359,117 @@ export function initPlayer(ctx) {
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
     last = now;
     const frame = input.poll(dt);
-    if (frame.pressed.has('help')) hud.toggleHelp();
+    // the player tick runs at draw time, after the ride hook: while riding it must not touch the
+    // camera (no map pan/zoom/orbit, no tween), or pinches and stray input pull it off the seat
+    if (riding()) { tween = null; return; }
+    // the pause menu is open: the game stands still (Start closes it again)
+    if (window.__bloxMenu?.isOpen) { if (frame.pressed.has('menu')) menuKey(); return; }
+    if (frame.pressed.has('help')) toggleMenu();
     if (mode === 'map') {
+      if (frame.pressed.has('menu')) menuKey();
       if (frame.pressed.has('enter') && !tween) {
         const byKey = frame.kbHeld.has('enter') && hover; // F aims at the cursor, gamepad A at the centre
         enterAt(byKey ? screenRay(...hover) : centreRay());
       } else if (!tween) mapPad(frame, dt);
+      if (!tween) orbit.step(dt);
     } else {
-      if (frame.pressed.has('exit')) { if (!hud.help.hidden) hud.toggleHelp(false); else exitWalk(); }
+      // Esc with a free mouse (the locked one only frees it) / Start: menu; M / B: map
+      if (frame.pressed.has('menu')) menuKey();
+      if (frame.pressed.has('map')) { if (explore()?.state?.().photo) explore().photo(false); else { hud.toggleHelp(false); exitWalk(); } } // (B leaves photo mode first)
     }
+    padButtons(frame.pressed);
+    if (mode === 'walk' && !tween) { // scroll / pinch / LT past the farthest camera: back to the map
+      const leave = zoomExit.update(frame.zoom, follow.aimDist >= follow.o.maxDist - 1e-3, dt);
+      if (zoomExit.progress() > 0.3) hud.toast('Keep zooming out for the map');
+      if (leave) { zoomExit.reset(); hud.toggleHelp(false); exitWalk(); }
+    }
+    if (creator.open && mode !== 'walk') closeCreator();
     if (mode === 'walk' || (tween && tween.to === 'walk')) {
-      if (!tween) follow.input(frame.look, frame.zoom);
+      if (creator.open) { // turntable: the camera faces the figure and circles it slowly
+        creatorCam.spin += dt * 0.25;
+        follow.aimYaw = ctrl.yaw + Math.PI + 0.5 * Math.sin(creatorCam.spin);
+        follow.aimPitch = 0.08; follow.aimDist = 2.6;
+      } else if (!tween) follow.input(frame.look, frame.zoom);
+      const moving = Math.hypot(...frame.move) > 0.2;
+      lookIdle = frame.lookInput ? 0 : lookIdle + dt;
+      if (!tween && !creator.open && settings.recenter && ctrl.grounded) {
+        follow.recenter(ctrl.yaw, { idle: lookIdle, moving, moveAngle: Math.atan2(frame.move[0], frame.move[1]), dt });
+      }
       const jump = jumpQueued || frame.pressed.has('jump');
+      if (frame.pressed.has('jump')) jumpKey = true; else if (jumpQueued) jumpKey = false; // a tap jump is always a full one
+      const jumpHeld = !jumpKey || frame.held.has('jump');
       jumpQueued = false;
       const speed = frameSpeed(frame, ctrl.o.walk, ctrl.o.run);
-      const res = tween ? ctrl.update(dt, {}, follow.yaw) : ctrl.update(dt, { move: frame.move, speed, jump }, follow.yaw);
-      character.update(ctrl.pos, ctrl.yaw, res.speed, res.travelled, dt);
+      const frozen = tween || creator.open || scatter;
+      const res = frozen ? ctrl.update(dt, {}, follow.yaw) : ctrl.update(dt, { move: frame.move, speed, jump, jumpHeld }, follow.yaw);
+      const L = ctrl.loco;
+      if (!tween && !scatter) {
+        // vehicles: pushed aside by a slow one, knocked flying by a moving one (three.js z = -north)
+        const life = window.__bloxLife;
+        const hit = life ? contacts.check([ctrl.pos[0], -ctrl.pos[2]],
+          lifeVehicles(life, [ctrl.pos[0], -ctrl.pos[2]], life.busHalf, life.trainHalf), dt) : null;
+        if (hit?.push) { ctrl.moveAxis(hit.push[0], 0); ctrl.moveAxis(0, -hit.push[1]); }
+        else if (hit?.knock) { knockDown([hit.knock[0], hit.knock[1], -hit.knock[2]]); hud.toast('Ouch!'); }
+        // a big fall: more than ~3.4 m (landing faster than 11 m/s)
+        if (!ctrl.grounded) airMinVy = Math.min(airMinVy, ctrl.vel[1]);
+        if (!scatter && ctrl.grounded && !wasGrounded && airMinVy < -14) knockDown([0, 2, 0]);
+        else if (ctrl.grounded && !wasGrounded && airMinVy < -7) comicFx('thud', [ctrl.pos[0], ctrl.visualY, ctrl.pos[2]]); // the comic looks letter a hard landing
+        if (ctrl.grounded) airMinVy = 0;
+      }
+      wasGrounded = ctrl.grounded;
+      if (scatter) {
+        character.drawParts(scatter.update(dt, scatter.gathering ? character.partsAt(ctrl.pos, ctrl.yaw) : null));
+        if (scatter.done && ctrl.grounded) { scatter = null; airMinVy = 0; }
+      } else {
+        drawFeet[0] = ctrl.pos[0]; drawFeet[1] = ctrl.visualY; drawFeet[2] = ctrl.pos[2]; // eased over kerbs and stairs
+        character.update(drawFeet, ctrl.yaw, res.speed, res.travelled, dt,
+          { angVel: L.angVel, accel: L.accel, steer: L.steer, grounded: ctrl.grounded, vy: ctrl.vel[1] });
+      }
+      // the Stand shows while posing or aiming (and during a rush); each punch goes to the match, if any
+      if (stand) stand.setPose((character.poseK || 0) > 0.5 ? (character.poseN || 0) : -1);
+      // Encore's trail: where the player stood, the last 3.5 s
+      { const now = performance.now(), last = trail[trail.length - 1];
+        if (last && Math.hypot(ctrl.pos[0] - last.pos[0], ctrl.pos[2] - last.pos[2]) > 20) trail.length = 0; // a fast travel or a walk-in: no rewinding across town
+        trail.push({ t: now, pos: [ctrl.pos[0], ctrl.pos[1], ctrl.pos[2]] }); while (trail.length && now - trail[0].t > 3500) trail.shift(); }
+      if (stand) stand.update(dt, drawFeet, character.aim?.yaw ?? ctrl.yaw, (character.poseK || 0) > 0.5 || (window.__bloxMp?.combat?.aim || 0) > 0.5 || creator.open, // (designing it: it stays out)
+        (at) => window.__bloxMp?.combat?.standPunch?.(at));
       // smooth the followed height (step-ups and landings), keep x/z exact
       smoothFeet[0] = ctrl.pos[0]; smoothFeet[2] = ctrl.pos[2];
-      smoothFeet[1] += (ctrl.pos[1] - smoothFeet[1]) * Math.min(1, dt * 10);
+      // the map's orbit point walks along: clip planes, shadows and haze are measured from it
+      controls.target.set(ctrl.pos[0], ctrl.pos[1], ctrl.pos[2]);
+      // the camera rides steps and stairs smoothly and lets a jump play out in frame (slower in the air),
+      // but never falls far behind a long drop
+      smoothFeet[1] += (ctrl.pos[1] - smoothFeet[1]) * (1 - Math.exp(-dt * (ctrl.grounded ? 11 : 4.5)));
+      smoothFeet[1] = Math.max(ctrl.pos[1] - 1.1, Math.min(ctrl.pos[1] + 1.1, smoothFeet[1]));
+      // the mouse is held only while that is allowed (a match ended, the setting switched off: let go)
+      const may = input.mayLock();
+      if (input.locked && !may) input.releaseLock();
+      if (may !== lastMayLock) { lastMayLock = may; hud.refreshHint(); }
+      follow.aspect = camera.aspect; // portrait phones: wider view, less shoulder offset
+      // the manga look: a pose gets the manga's shot (camera.js drama): front three-quarter, low, looking up
+      const wantDrama = !!PROPORTION.style?.poses && (character.poseK || 0) > 0.6 && !character.aim ? 1 : 0;
+      if (wantDrama && !wasPosing) window.__bloxLife?.walkers?.poseWithMe?.(ctrl.pos[0], -ctrl.pos[2]); // people nearby pose with you
+      wasPosing = !!wantDrama;
+      follow.drama = (follow.drama || 0) + (wantDrama - (follow.drama || 0)) * Math.min(1, dt * (wantDrama ? 1.6 : 6));
+      // the shot of the pose being struck (lookstyle.js STAND_POSES cam: yaw from straight in front of
+      // the figure); a slow drift round it keeps the frame alive
+      const poses = PROPORTION.style?.poses, cam = poses?.[(character.poseN || 0) % poses.length]?.cam || {};
+      follow.dramaYaw = ctrl.yaw + Math.PI + (cam.yaw ?? 0.55) + 0.06 * Math.sin(performance.now() / 3000);
+      follow.dramaShot = cam;
       if (!tween) {
-        const { focus, position } = follow.update(city, smoothFeet, dt);
-        setCamera(position, focus, camera.fov);
+        const { focus, position, fov } = follow.update(city, smoothFeet, dt, res.speed);
+        setCamera(position, focus, fov);
       }
       // camera squeezed against a wall: hide the figure instead of filling the view with it
       character.group.visible = follow.dist > 0.9 || !!tween;
       if ((streetT -= dt) <= 0) {
         streetT = 0.5;
-        hud.setStreet(findStreet(Math.floor(ctrl.pos[0] / S), Math.floor(-ctrl.pos[2] / S)));
+        const street = findStreet(Math.floor(ctrl.pos[0] / S), Math.floor(-ctrl.pos[2] / S));
+        hud.setStreet(street); captions.place(street); // (the Spider-Verse look narrates it in a caption box)
       }
     }
     if (tween) stepTween(dt);
+    hud.setHeading(mode === 'walk' && !tween ? follow.yaw : orbit.yaw());
   }
 
   const render = stage.render.bind(stage);
@@ -228,7 +493,9 @@ export function initPlayer(ctx) {
     get mode() { return mode; },
     state: () => ({ mode, pos: [...ctrl.pos], yaw: ctrl.yaw, grounded: ctrl.grounded, frozen: ctrl.frozen,
       cam: camera.position.toArray(), camDist: follow.dist, street: hud.street.textContent }),
-    enterAtUnity, exitWalk, enterAt, ctrl, follow, city,
+    enterAtUnity, enterNearUnity, exitWalk, enterAt, ctrl, follow, city, orbit, input, settings, knockDown, character,
+    openCreator, closeCreator, get creatorOpen() { return creator.open; }, toggleHelp: (on) => toggleMenu(on),
+    get busy() { return !!tween; },
   };
   window.__bloxPlayer = api;
   return api;

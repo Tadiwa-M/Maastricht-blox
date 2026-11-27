@@ -2,7 +2,7 @@
 // x east, y up, z = -north) with a flat floor, plus optional rotated solid boxes (island-like)
 // and an 'unknown' region.
 export function synthCity({ size = 40, floorK = 5, rotBoxes = [], unknownX = Infinity } = {}) {
-  const S = 0.5, P = 0.2, cells = new Set();
+  const S = 0.5, P = 0.2, cells = new Set(), wet = new Set();
   const key = (I, J, K) => `${I},${J},${K}`;
   const city = {
     S, P, floorY: floorK * P,
@@ -21,6 +21,15 @@ export function synthCity({ size = 40, floorK = 5, rotBoxes = [], unknownX = Inf
         if (Math.abs(u) <= b.hx && Math.abs(v) <= b.hz && y >= b.y0 && y < b.y1) return true;
       }
       return false;
+    },
+    // water(...) cells are solid (as in the query API) and answer isWater
+    water(I0, J0, K0, I1, J1, K1) {
+      city.fill(I0, J0, K0, I1, J1, K1);
+      for (let I = I0; I <= I1; I++) for (let J = J0; J <= J1; J++) for (let K = K0; K <= K1; K++) wet.add(key(I, J, K));
+    },
+    isWater(x, y, z) {
+      const I = Math.floor(x / S), J = Math.floor(-z / S), K = Math.floor(y / P);
+      return wet.has(key(I, J, K));
     },
     groundHeight(x, z) {
       if (city.isSolid(x, 0, z) === 'unknown') return 'unknown';

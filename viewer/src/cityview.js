@@ -8,7 +8,9 @@
 // Islands hang under a group at their pose (src/island.js), exactly as in src/lod.js.
 import * as THREE from 'three';
 import { buildWorldMeshes, worldContext } from './bricks.js';
-import { arraysToGeometry } from './farmesh.js';
+import { LampLights, lampsFromRecords, LAMP } from './render/lamps.js';
+import { poolSources, shopLightsFromRecords, SHOP_TYPES } from './render/pools.js';
+import { arraysToGeometry, releaseAfterUpload, uploadSoon } from './farmesh.js';
 import { applyIslandPose, worldToLocalThree } from './island.js';
 import { worldFromRecords } from './prepare.js';
 import { pickNearest } from './picking.js';
@@ -23,11 +25,16 @@ export class CityView {
     this.group = new THREE.Group();
     this.group.name = 'city';
     this.group.add(far.group);
+    this.lamps = new LampLights(); // warm pools and glows under the near zone's street lamps at night (render/lamps.js)
+    // shop windows spill light at night (render/pools.js), world space per item
+    this.shops = new Map();
+    poolSources.add({ lights: () => [...this.shops.values()].flat() });
+    this.group.add(this.lamps.group);
     this.views = new Map(); // item key -> view
     this.coverDirty = true;
     this.frame = 0;
     this.studsShown = 0;
-    this.tier = { nearDist: 40, maxNear: 3, studCap: 20000, nearDetail: 'lite' };
+    this.tier = { nearDist: 40, maxNear: 3, studCap: 20000, nearDetail: 'lite', nearTriCap: 2.5e6 };
     // islands owned per chunk (baked faces of an island belong to its owning chunk)
     this.owned = new Map();
     for (const i of index.islands) {
@@ -47,9 +54,9 @@ export class CityView {
     return true;
   }
 
-  setTier({ nearDist = 40, maxNear = 3, studCap = 20000, nearDetail = 'lite' }) {
+  setTier({ nearDist = 40, maxNear = 3, studCap = 20000, nearDetail = 'lite', nearTriCap = Infinity }) {
     const changed = nearDetail !== this.tier.nearDetail;
-    this.tier = { nearDist, maxNear, studCap, nearDetail };
+    this.tier = { nearDist, maxNear, studCap, nearDetail, nearTriCap };
     if (changed) for (const v of this.views.values()) this.freeNear(v);
   }
 
@@ -62,20 +69,37 @@ export class CityView {
       box: new THREE.Box3(new THREE.Vector3().copy(it.box.min), new THREE.Vector3().copy(it.box.max)) };
     for (const [fam, arrays] of Object.entries(p.far || {})) {
       const mat = this.mats.cityFar(fam);
-      const mesh = new THREE.Mesh(arraysToGeometry(arrays), mat);
+      const mesh = uploadSoon(new THREE.Mesh(releaseAfterUpload(arraysToGeometry(arrays)), mat));
       mesh.castShadow = !mat.transparent;
       mesh.receiveShadow = true;
       mesh.name = `mid|${fam}`;
       parent.add(mesh);
       view.mid.push(mesh);
     }
+    delete p.far; // the arrays live in the geometry now (and leave the CPU after upload)
     parent.updateMatrixWorld(true);
     this.group.add(parent);
+    // street lamps in this item light the street at night (from the raw records: every streamed chunk)
+    if (p.records) {
+      const cs = this.index.chunkStuds || 64, I0 = it.kind === 'chunk' ? it.entry.cx * cs : 0, J0 = it.kind === 'chunk' ? it.entry.cy * cs : 0;
+      this.lampType ??= (this.meta.catalogue?.types || this.meta.catalogue?.bricks || this.meta.catalogue || []).find?.((t) => t.name === LAMP.type) || null;
+      this.lamps.add(it.key, lampsFromRecords(p.records, I0, J0, this.lampType, this.index.studM, this.index.plateM), parent);
+      if (this.shops) {
+        const cat = this.meta.catalogue?.types || this.meta.catalogue?.bricks || this.meta.catalogue || [];
+        this.shopTypes ??= SHOP_TYPES.map((n) => cat.find?.((t) => t.name === n)).filter(Boolean);
+        const v = new THREE.Vector3();
+        const ls = shopLightsFromRecords(p.records, I0, J0, this.shopTypes, this.index.studM, this.index.plateM)
+          .map((l) => ({ ...l, p: v.fromArray(l.p).applyMatrix4(parent.matrixWorld).toArray() }));
+        if (ls.length) this.shops.set(it.key, ls); else this.shops.delete(it.key);
+      }
+    }
     this.views.set(it.key, view);
     this.coverDirty = true;
   }
 
   remove(it) {
+    this.lamps.remove(it.key);
+    this.shops?.delete(it.key);
     const v = this.views.get(it.key);
     if (!v) return;
     this.freeNear(v);
@@ -123,15 +147,23 @@ export class CityView {
   /** Per frame. all: build every wanted near look now (screenshots). */
   update(camera, { all = false } = {}) {
     this.frame++;
+    this.lamps.update(camera, this.mats.night || 0);
     const eye = camera.position;
     const views = [...this.views.values()];
     for (const v of views) v.dist = boxDistance(v.box, eye);
     views.sort((a, b) => a.dist - b.dist);
-    const { nearDist, maxNear, studCap } = this.tier;
+    const { nearDist, maxNear, studCap, nearTriCap } = this.tier;
     const want = new Set();
+    let budget = nearTriCap;
     for (const v of views) {
       if (want.size >= maxNear) break;
-      if (v.dist < (v.isNear ? nearDist * HYSTERESIS : nearDist)) want.add(v);
+      if (!(v.dist < (v.isNear ? nearDist * HYSTERESIS : nearDist))) continue;
+      // near cost ~ 25x the mid look (lite bevels); the closest item may take up to twice the
+      // budget (a giant island right next to the camera stays in the mid look on weak tiers)
+      const cost = v.nearTris ?? v.triangles * 25;
+      if (cost > (want.size ? budget : nearTriCap * 2)) continue;
+      budget -= cost;
+      want.add(v);
     }
     let built = 0, pending = false;
     for (const v of views) {
@@ -154,7 +186,12 @@ export class CityView {
     for (const v of cached.slice(maxNear + 4)) { this.freeNear(v); v.world = null; v.ctx = null; }
     // keep the World (cell map) of near items only: it is the biggest per-item structure
     for (const v of views) if (!v.near && v.world && v.dist > nearDist * 3) { v.world = null; v.ctx = null; }
-    this.far.update(eye, this.coverDirty);
+    // merged far blocks draw only their regions in view (a block is drawn as one or a few groups)
+    camera.updateMatrixWorld();
+    this._pv ??= new THREE.Matrix4(); this._frustum ??= new THREE.Frustum(); this._box ??= new THREE.Box3();
+    this._frustum.setFromProjectionMatrix(this._pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    const inView = (b) => this._frustum.intersectsBox(this._box.set(b.min, b.max));
+    this.far.update(eye, this.coverDirty, inView);
     this.coverDirty = false;
     return pending;
   }

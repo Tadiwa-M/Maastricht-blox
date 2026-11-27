@@ -21,12 +21,15 @@ import datetime as dt
 from pathlib import Path
 
 import numpy as np
+import shapely
+from shapely.geometry import LineString
 
 from .. import geo
 from ..geo import RDBox
 from .calendar import read_calendar, reference_week
 from .csvzip import gtfs_seconds, iter_rows
 from .polyline import cumulative, densify, inside_run, project
+from .snap import snap_path
 
 log = logging.getLogger(__name__)
 
@@ -112,23 +115,30 @@ def _read_shapes(zf: zipfile.ZipFile, ids: set[str], box: RDBox) -> dict[str, _S
     return out
 
 
-def build_transit(zip_path: Path, box: RDBox, start: dt.date, modes: tuple[str, ...] = ("bus",)) -> dict:
-    """Read the GTFS zip and return the ``transit.json`` document for RD ``box``."""
+def build_transit(zip_path: Path, box: RDBox, start: dt.date, modes: tuple[str, ...] = ("bus",),
+                  roads: list[LineString] | None = None) -> dict:
+    """Read the GTFS zip and return the ``transit.json`` document for RD ``box``. ``roads``
+    (``snap.road_lines``): bus shapes are pulled onto these centrelines (``snap.py``)."""
     t0 = time.monotonic()
     with zipfile.ZipFile(zip_path) as zf:
         cal = read_calendar(zf)
         week = reference_week(cal, start)
         touching = _shapes_touching(zf, box)
-        routes: dict[str, tuple[str, str, str, str]] = {}  # id -> short, long, colour, mode
-        cols = ["route_id", "route_short_name", "route_long_name", "route_type", "route_color"]
-        for rid, short, long_, rtype, colour in iter_rows(zf, "routes.txt", cols, frozenset({"route_short_name", "route_long_name", "route_color"})):
+        routes: dict[str, tuple[str, str, str, str, str]] = {}  # id -> short, long, colour, mode, agency
+        cols = ["route_id", "route_short_name", "route_long_name", "route_type", "route_color", "agency_id"]
+        opt = frozenset({"route_short_name", "route_long_name", "route_color", "agency_id"})
+        for rid, short, long_, rtype, colour, agency in iter_rows(zf, "routes.txt", cols, opt):
             mode = mode_for_route_type(int(rtype))
             if mode in modes:
-                routes[rid] = (short or long_ or rid, long_, route_colour(colour, mode), mode)
+                routes[rid] = (short or long_ or rid, long_, route_colour(colour, mode), mode, agency)
         trips: dict[str, tuple[str, str, int, str]] = {}  # trip -> route, shape, mask, headsign
-        tcols = ["trip_id", "route_id", "service_id", "shape_id", "trip_headsign"]
+        realtime: dict[str, str] = {}  # trip -> OVapi realtime_trip_id ("ARR:21004:1234"), for live delays
+        tcols = ["trip_id", "route_id", "service_id", "shape_id", "trip_headsign", "realtime_trip_id"]
         masks: dict[str, int] = {}
-        for tid, rid, svc, shp, head in iter_rows(zf, "trips.txt", tcols, frozenset({"shape_id", "trip_headsign"})):
+        for tid, rid, svc, shp, head, rt in iter_rows(zf, "trips.txt", tcols,
+                                                      frozenset({"shape_id", "trip_headsign", "realtime_trip_id"})):
+            if rt:
+                realtime[tid] = rt
             if rid not in routes or shp not in touching:
                 continue
             if svc not in masks:
@@ -137,6 +147,8 @@ def build_transit(zip_path: Path, box: RDBox, start: dt.date, modes: tuple[str, 
                 trips[tid] = (rid, shp, masks[svc], head)
         shapes = _read_shapes(zf, {t[1] for t in trips.values()}, box)
         trips = {k: t for k, t in trips.items() if t[1] in shapes}
+        if roads:
+            _snap_bus_shapes(shapes, {t[1] for t in trips.values() if routes[t[0]][3] == "bus"}, roads)
         calls: dict[str, list[tuple[int, int, int, str]]] = defaultdict(list)
         scols = ["trip_id", "arrival_time", "departure_time", "stop_id", "stop_sequence"]
         for tid, arr, dep, stop, seq in iter_rows(zf, "stop_times.txt", scols):
@@ -145,15 +157,20 @@ def build_transit(zip_path: Path, box: RDBox, start: dt.date, modes: tuple[str, 
                 calls[tid].append((int(seq), a, gtfs_seconds(dep or arr), stop))
         need = {c[3] for cs in calls.values() for c in cs}
         stops: dict[str, tuple[float, float]] = {}
+        names: dict[str, str] = {}
         sid_l: list[str] = []
         lat_l: list[float] = []
         lon_l: list[float] = []
-        for sid, la, lo in iter_rows(zf, "stops.txt", ["stop_id", "stop_lat", "stop_lon"]):
+        for sid, name, la, lo in iter_rows(zf, "stops.txt", ["stop_id", "stop_name", "stop_lat", "stop_lon"],
+                                           frozenset({"stop_name"})):
             if sid in need and la and lo:
                 sid_l.append(sid); lat_l.append(float(la)); lon_l.append(float(lo))
+                names[sid] = name or sid
         for sid, p in zip(sid_l, _rd(lat_l, lon_l)):
             stops[sid] = (float(p[0]), float(p[1]))
-    doc = _assemble(routes, trips, shapes, calls, stops, week)
+    doc = _assemble(routes, trips, shapes, calls, stops, week, names)
+    if realtime:  # v2: OVapi realtime ids per trips row, parallel to tripIds
+        doc["realtimeIds"] = [[realtime[t] for t in ids if t in realtime] for ids in doc["tripIds"]]
     doc["meta"]["feed"] = zip_path.name
     log.info("transit: %d routes, %d shapes, %d patterns, %d trips (week from %s) in %.1f s",
              len(doc["routes"]), len(doc["shapes"]), len(doc["patterns"]), len(doc["trips"]), week[0],
@@ -161,9 +178,25 @@ def build_transit(zip_path: Path, box: RDBox, start: dt.date, modes: tuple[str, 
     return doc
 
 
+def _snap_bus_shapes(shapes: dict[str, _Shape], ids: set[str], roads: list[LineString]) -> None:
+    t0, tree = time.monotonic(), shapely.STRtree(roads)
+    moved = []
+    for sid in ids:
+        s = shapes[sid]
+        i0, i1 = s.run
+        before = s.pts[i0:i1 + 1]
+        after = snap_path(before, roads, tree)
+        moved.append(np.hypot(*(after - before).T))
+        s.pts = s.pts.copy()
+        s.pts[i0:i1 + 1] = after
+    m = np.concatenate(moved) if moved else np.zeros(1)
+    log.info("transit: %d bus shapes snapped to %d road lines (median move %.1f m, max %.1f m) in %.1f s",
+             len(ids), len(roads), float(np.median(m)), float(m.max()), time.monotonic() - t0)
+
+
 def _project_calls(shape: _Shape, seq: list[tuple[int, int, int, str]], stops: dict[str, tuple[float, float]],
-                   cache: dict) -> list[tuple[int, int, float]]:
-    """[(arr, dep, dist)] for the calls that snap to the shape, in order."""
+                   cache: dict) -> list[tuple[int, int, float, str]]:
+    """[(arr, dep, dist, stop_id)] for the calls that snap to the shape, in order."""
     key = (id(shape), tuple(c[3] for c in seq))
     if key not in cache:
         dists: list[float | None] = []
@@ -180,20 +213,32 @@ def _project_calls(shape: _Shape, seq: list[tuple[int, int, int, str]], stops: d
             dists.append(d)
             last = d
         cache[key] = dists
-    return [(c[1], c[2], d) for c, d in zip(seq, cache[key]) if d is not None]
+    return [(c[1], c[2], d, c[3]) for c, d in zip(seq, cache[key]) if d is not None]
 
 
-def merge_trips(trips: list[tuple[int, int, int]]) -> list[list[int]]:
+def merge_trips(trips: list[tuple]) -> list[list[int]]:
     """One row per (pattern, start) with the day masks OR-ed (feeds often split one timetable
     over several services, e.g. one per date set), sorted by start time."""
+    return merge_trips_with_ids(trips)[0]
+
+
+def merge_trips_with_ids(trips: list[tuple]) -> tuple[list[list[int]], list[list[str]]]:
+    """merge_trips, plus the GTFS trip ids behind each row (items may carry a 4th element, the
+    trip id), so live feeds (GTFS-Realtime, keyed by trip id) can find their row."""
     merged: dict[tuple[int, int], int] = {}
-    for p, start, mask in trips:
+    ids: dict[tuple[int, int], list[str]] = defaultdict(list)
+    for t in trips:
+        p, start, mask = t[0], t[1], t[2]
         merged[(p, start)] = merged.get((p, start), 0) | mask
-    return [[p, start, mask] for (p, start), mask in sorted(merged.items(), key=lambda kv: (kv[0][1], kv[0][0]))]
+        if len(t) > 3:
+            ids[(p, start)].append(t[3])
+    keys = sorted(merged, key=lambda k: (k[1], k[0]))
+    return [[p, start, merged[(p, start)]] for p, start in keys], [sorted(ids[k]) for k in keys]
 
 
 def _assemble(routes: dict, trips: dict, shapes: dict[str, _Shape], calls: dict, stops: dict,
-              week: list[dt.date]) -> dict:
+              week: list[dt.date], names: dict[str, str] | None = None) -> dict:
+    names = names or {}
     patterns: dict[tuple, int] = {}
     raw_trips: list[tuple[int, int, int]] = []
     cache: dict = {}
@@ -210,11 +255,11 @@ def _assemble(routes: dict, trips: dict, shapes: dict[str, _Shape], calls: dict,
         if len(st) < 2 or st[-1][2] <= shp.d0 or st[0][2] >= shp.d1:
             continue
         start = st[0][0]
-        rel = tuple(v for a, d, dist in st for v in (a - start, d - start, q(dist)))
-        key = (sid, rid, head, rel)
+        rel = tuple(v for a, d, dist, _ in st for v in (a - start, d - start, q(dist)))
+        key = (sid, rid, head, rel, tuple(c[3] for c in st))
         if key not in patterns:
             patterns[key] = len(patterns)
-        raw_trips.append((patterns[key], start, mask))
+        raw_trips.append((patterns[key], start, mask, tid))
     shape_ids = sorted({k[0] for k in patterns})
     shape_idx = {s: n for n, s in enumerate(shape_ids)}
     route_ids = sorted({k[1] for k in patterns}, key=lambda r: (len(routes[r][0]), routes[r][0], r))
@@ -227,14 +272,21 @@ def _assemble(routes: dict, trips: dict, shapes: dict[str, _Shape], calls: dict,
         for (x, y), d in zip(s.pts[i0:i1 + 1], s.cum[i0:i1 + 1]):
             pts += [q(x - geo.X0), q(y - geo.Y0), q(d)]
         shapes_doc.append({"id": sid, "pts": pts})
+    stop_ids = sorted({s for k in patterns for s in k[4]})
+    stop_idx = {s: n for n, s in enumerate(stop_ids)}
+    rows, tids = merge_trips_with_ids(raw_trips)
     return {
-        "version": 1,
+        "version": 2,
         "kind": "transit",
         "meta": {"tz": "Europe/Amsterdam", "week": [d.isoformat() for d in week], "units": "m, s"},
-        "routes": [{"short": routes[r][0], "long": routes[r][1], "colour": routes[r][2], "mode": routes[r][3]}
-                   for r in route_ids],
+        "routes": [{"id": r, "short": routes[r][0], "long": routes[r][1], "colour": routes[r][2], "mode": routes[r][3],
+                    "agency": routes[r][4]} for r in route_ids],
+        # v2: stops (name, Unity m) and per-pattern stop lists, for "next stop" and departure boards
+        "stops": [{"id": s, "name": names.get(s, s), "x": q(stops[s][0] - geo.X0), "y": q(stops[s][1] - geo.Y0)}
+                  for s in stop_ids],
         "shapes": shapes_doc,
-        "patterns": [{"shape": shape_idx[k[0]], "route": route_idx[k[1]], "head": k[2], "st": list(k[3])}
-                     for k in patterns],
-        "trips": merge_trips(raw_trips),
+        "patterns": [{"shape": shape_idx[k[0]], "route": route_idx[k[1]], "head": k[2], "st": list(k[3]),
+                      "stops": [stop_idx[s] for s in k[4]]} for k in patterns],
+        "trips": rows,
+        "tripIds": tids,  # v2: GTFS trip ids per trips row (live GTFS-Realtime matching)
     }

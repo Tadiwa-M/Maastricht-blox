@@ -5,6 +5,7 @@
 // whole city is drawn in a handful of draw calls. Per-instance data: transform, colour
 // (with a small deterministic variation) and, for glass, the night glow colour.
 import * as THREE from 'three';
+import { leafShadows } from './render/season.js';
 import { bodyParts, studGeometry, INSET } from './geometry.js';
 import { typeExtent, typeCell, studCells, ROT_MASK, NO_VARIATION, HIDE_STUDS } from './world.js';
 import { brickMatrix, gridToThree } from './placement.js';
@@ -36,9 +37,12 @@ export function exposedStuds(t, rot, I, J, K, covered) {
   return out;
 }
 
+/** Tree foliage (the palette's leaf colours): these bricks sway in the wind. */
+export const isLeaf = (entry) => entry?.material === 'solid' && /^leaf/.test(entry.name || '');
+
 class Bucket {
   constructor(geometry, material, key) {
-    Object.assign(this, { geometry, material, key, mats: [], cols: [], glow: null });
+    Object.assign(this, { geometry, material, key, mats: [], cols: [], glow: null, sway: null });
   }
   push(matrix, color, glow) {
     this.mats.push(matrix.clone());
@@ -46,6 +50,8 @@ class Bucket {
     if (glow) (this.glow ||= new Array(this.mats.length - 1).fill(BLACK)).push(glow);
     else if (this.glow) this.glow.push(BLACK);
   }
+  /** Mark the brick just pushed as a leaf that moves in the wind (materials.js addSway). */
+  swayLast() { (this.sway ||= []).push(this.mats.length - 1); }
   build() {
     let geometry = this.geometry;
     if (this.glow) { // per-instance glow: needs its own copy of the geometry
@@ -55,12 +61,18 @@ class Bucket {
       this.glow.forEach((c, q) => c.toArray(a, q * 3));
       geometry.setAttribute('aGlow', new THREE.InstancedBufferAttribute(a, 3));
     }
+    if (this.sway) { // per-instance sway: its own copy of the geometry too
+      if (geometry === this.geometry) { geometry = geometry.clone(); geometry.userData.owned = true; }
+      const a = new Float32Array(this.mats.length);
+      for (const q of this.sway) a[q] = 1;
+      geometry.setAttribute('aSway', new THREE.InstancedBufferAttribute(a, 1));
+    }
     const mesh = new THREE.InstancedMesh(geometry, this.material, this.mats.length);
     this.mats.forEach((m, q) => { mesh.setMatrixAt(q, m); mesh.setColorAt(q, this.cols[q]); });
     mesh.instanceMatrix.needsUpdate = true;
     mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-    mesh.castShadow = !this.material.transparent;
+    mesh.castShadow = !this.material.transparent && !(this.sway && !leafShadows()); // bare trees: no leafy shadow (render/season.js)
     mesh.receiveShadow = true;
     mesh.name = this.key;
     return mesh;
@@ -87,7 +99,9 @@ export class BrickBatcher {
     const parts = bodyParts(t, this.S, this.P, seamless, this.lite);
     const m4 = brickMatrix(I, J, K, t.w, t.d, rot, this.S, this.P);
     const col = brickColor(entry, I, J, K, exact);
-    this.bucket(parts.body, material, `${t.name}|${key}`).push(m4, col, cls === 'glass' ? glow : null);
+    const body = this.bucket(parts.body, material, `${t.name}|${key}${isLeaf(entry) ? '|leaf' : ''}`);
+    body.push(m4, col, cls === 'glass' ? glow : null);
+    if (isLeaf(entry)) body.swayLast();
     if (parts.glass) {
       const g = this.glassEntry || entry;
       const gm = this.mats.forEntry(g);
@@ -101,7 +115,9 @@ export class BrickBatcher {
     const { key, material } = this.mats.forEntry(entry);
     const p = gridToThree(I, J, K, this.S, this.P);
     const m4 = new THREE.Matrix4().makeTranslation(p.x, p.y - INSET, p.z);
-    this.bucket(studGeometry(this.lite), material, `stud|${key}`).push(m4, color, null);
+    const studs = this.bucket(studGeometry(this.lite), material, `stud|${key}${isLeaf(entry) ? '|leaf' : ''}`);
+    studs.push(m4, color, null);
+    if (isLeaf(entry)) studs.swayLast(); // the studs on a leaf ride with it
     this.studs++;
   }
 
@@ -134,7 +150,7 @@ export function worldContext(world, mats) {
   return {
     grid, codeOf,
     covered: (I, J, K) => world.occupied(I, J, K) || !outside(I, J, K),
-    glows: windowGlow(world, (n) => mats.classOf(world.palette.get(world.color[n])) === 'glass'),
+    glows: windowGlow(world, (n) => mats.classOf(world.palette.get(world.color[n])) === 'glass', { all: true }),
     glassEntry: glassEntry(world.palette),
   };
 }

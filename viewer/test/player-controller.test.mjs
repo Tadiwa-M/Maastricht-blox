@@ -168,3 +168,113 @@ test('adapter over a World: solid bricks, air above, unknown outside loaded chun
   assert.ok(Math.abs(c.pos[1] - 0.6) < 0.02, `on the floor: ${c.pos[1]}`);
   assert.ok(c.pos[0] < 5 - 0.2, 'brick on top of the floor is a wall');
 });
+
+test('stops at the river bank (level or 1.8 m below) but walks a bridge deck over it', () => {
+  // floor top at K 20. North of J = 20 a quay `drop` plates high; south of it the river: one
+  // plate of water on the floor (top at K 21), except under a deck at I 8..12 (x 4-6.5 m), which
+  // is solid stone up to the quay top
+  for (const drop of [1, 10]) {
+    const city = synthCity({ floorK: 20 });
+    city.fill(0, 20, 20, 39, 39, 20 + drop - 1);
+    city.water(0, 0, 20, 7, 19, 20);
+    city.water(13, 0, 20, 39, 19, 20);
+    city.fill(8, 0, 20, 12, 19, 20 + drop - 1);
+    const quay = city.floorY + drop * 0.2;
+    const c = new CharacterController(city);
+    c.spawn(2, quay, -15); // I 4, J 30: on the quay, in line with the water
+    run(c, 0.3, {});
+    run(c, 6, { move: [0, -1], speed: 1.4 });
+    assert.ok(-c.pos[2] / 0.5 >= 19.5, `drop ${drop}: walked onto the water (J ${-c.pos[2] / 0.5})`);
+    assert.ok(Math.abs(c.pos[1] - quay) < 0.05, `drop ${drop}: left the quay height (${c.pos[1]})`);
+    const b = new CharacterController(city);
+    b.spawn(5, quay, -15); // I 10: in line with the deck
+    run(b, 0.3, {});
+    run(b, 6, { move: [0, -1], speed: 1.4 });
+    assert.ok(-b.pos[2] / 0.5 < 15, `drop ${drop}: the deck was not walkable (J ${-b.pos[2] / 0.5})`);
+  }
+});
+
+test('a city without isWater walks as before', () => {
+  const city = synthCity();
+  delete city.isWater;
+  const c = new CharacterController(city);
+  c.spawn(5, city.floorY, -5);
+  run(c, 0.3, {});
+  run(c, 1, north());
+  assert.ok(c.pos[2] < -6);
+});
+
+const jumpTrace = (c, input, seconds = 1.2) => { let top = c.pos[1], air = 0; for (let t = 0; t < seconds; t += DT) { c.update(DT, t === 0 ? input : { ...input, jump: false }, 0); top = Math.max(top, c.pos[1]); if (!c.grounded) air += DT; } return { top, air }; };
+
+test('jump feel: a full arc, a short hop when let go, faster down than up', () => {
+  const city = synthCity();
+  const c = new CharacterController(city);
+  c.spawn(5, city.floorY, -5);
+  run(c, 0.2, {});
+  const full = jumpTrace(c, { jump: true, jumpHeld: true });
+  assert.ok(full.top - city.floorY > 0.6 && full.top - city.floorY < 0.85, `apex ${full.top - city.floorY}`);
+  assert.ok(full.air > 0.45 && full.air < 0.7, `air time ${full.air}`);
+  const hop = jumpTrace(c, { jump: true, jumpHeld: false });
+  assert.ok(hop.top - city.floorY < (full.top - city.floorY) * 0.6, `short hop ${hop.top - city.floorY}`);
+  // rise takes longer than the fall from the apex
+  c.update(DT, { jump: true }, 0);
+  let up = 0, down = 0;
+  for (let t = 0; t < 1.2 && !c.grounded; t += DT) { c.update(DT, {}, 0); if (c.vel[1] > 0) up += DT; else down += DT; }
+  assert.ok(down < up, `up ${up} s, down ${down} s`);
+});
+
+test('jump buffer and coyote time: early and late presses still jump; no double jump', () => {
+  const city = synthCity();
+  const c = new CharacterController(city);
+  c.spawn(5, city.floorY, -5);
+  run(c, 0.2, {});
+  c.update(DT, { jump: true }, 0);
+  let jumps = 1, pressed = false;
+  for (let t = 0; t < 1.5; t += DT) { // press again 0.1 s before landing: remembered
+    const press = !pressed && c.vel[1] < 0 && c.pos[1] - city.floorY < 0.35;
+    if (press) pressed = true;
+    c.update(DT, { jump: press }, 0);
+    if (c.jumped) jumps++;
+  }
+  assert.ok(pressed);
+  assert.equal(jumps, 2, 'the buffered press jumped on landing');
+  // a press in mid-air long before landing is forgotten, and never jumps in the air
+  run(c, 1, {});
+  c.update(DT, { jump: true }, 0);
+  run(c, 0.1, {});
+  c.update(DT, { jump: true }, 0);
+  assert.ok(!c.jumped, 'no double jump');
+  // coyote: walk off a ledge, press 0.08 s later
+  const g = synthCity();
+  g.fill(0, 0, 5, 39, 12, 12); // a platform; its edge is at Unity z = 13 * S
+  const f = new CharacterController(g);
+  const topY = 13 * g.P;
+  f.spawn(5, topY, -(12.6 * g.S));
+  run(f, 0.2, {});
+  assert.ok(f.grounded);
+  let off = -1, did = false;
+  for (let t = 0; t < 3 && !did; t += DT) {
+    const late = off >= 0 && (off += DT) >= 0.08;
+    f.update(DT, { move: [0, 1], speed: 3, jump: late }, 0);
+    if (!f.grounded && off < 0) off = 0;
+    did ||= f.jumped;
+    if (late) break;
+  }
+  assert.ok(did, 'jumped just after leaving the edge');
+});
+
+test('kerbs and steps: the drawn height eases, the body itself steps at once', () => {
+  const city = synthCity();
+  city.fill(0, 14, 5, 39, 39, 5); // one plate up from Unity z = 7
+  const c = new CharacterController(city);
+  c.spawn(5, city.floorY, -5);
+  let maxJump = 0, maxBody = 0, prev = c.visualY, prevBody = c.pos[1];
+  for (let t = 0; t < 3; t += DT) {
+    c.update(DT, north(), 0);
+    maxJump = Math.max(maxJump, Math.abs(c.visualY - prev)); prev = c.visualY;
+    maxBody = Math.max(maxBody, Math.abs(c.pos[1] - prevBody)); prevBody = c.pos[1];
+  }
+  assert.ok(maxBody > 0.15, `the body stepped: ${maxBody}`);
+  assert.ok(maxJump < maxBody * 0.4, `drawn height eased: ${maxJump} per frame vs ${maxBody}`);
+  assert.ok(Math.abs(c.visualY - c.pos[1]) < 1e-3, 'caught up');
+});

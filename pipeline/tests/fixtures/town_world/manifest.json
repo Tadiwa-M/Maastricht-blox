@@ -1,10 +1,11 @@
 {
- "contractVersion": 3,
+ "contractVersion": 4,
  "crs": "EPSG:28992",
  "originRD": [
-  175700,
-  316500
+  175700.0,
+  316500.0
  ],
+ "slice": "centre",
  "baseNapM": 30.0,
  "studM": 0.5,
  "plateM": 0.2,
@@ -14,7 +15,7 @@
  "palette": "palette.json",
  "catalogue": "brick_catalogue.json",
  "features": "features.json",
- "generated": "2026-10-19T18:44:37Z",
+ "generated": "2026-11-02T17:32:58Z",
  "sources": [
   {
    "name": "AHN",
@@ -40,55 +41,55 @@
    "cx": 16,
    "cy": 31,
    "file": "chunks/c_16_31.bxc",
-   "bricks": 2861,
+   "bricks": 3362,
    "minK": 98,
    "maxK": 197,
-   "sha1": "43d83fedc366107e489fb7076f32d4d877fb92b9"
+   "sha1": "0e7fb2f0385c448ed1272584de0a35a09f9d20f1"
   },
   {
    "cx": 16,
    "cy": 32,
    "file": "chunks/c_16_32.bxc",
-   "bricks": 860,
+   "bricks": 983,
    "minK": 98,
    "maxK": 173,
-   "sha1": "39c2deab818ba6025175a8d046b31c0d7bc31acd"
+   "sha1": "54f0974973d9b005d3079c464db2135382f4f199"
   },
   {
    "cx": 17,
    "cy": 31,
    "file": "chunks/c_17_31.bxc",
-   "bricks": 2187,
+   "bricks": 2575,
    "minK": 100,
    "maxK": 197,
-   "sha1": "6ba7d31eb7b8e123031dc97abfbee68a9c686df8"
+   "sha1": "2e8ec20726d19e45a7b1440d65bc8e598b8ef776"
   },
   {
    "cx": 17,
    "cy": 32,
    "file": "chunks/c_17_32.bxc",
-   "bricks": 1370,
+   "bricks": 1513,
    "minK": 100,
    "maxK": 173,
-   "sha1": "906458586194fa275ee7694587950b6f8a913d17"
+   "sha1": "0c0ef587e1eb5cff91f68df41a631fbb63a2613a"
   },
   {
    "cx": 18,
    "cy": 31,
    "file": "chunks/c_18_31.bxc",
-   "bricks": 560,
+   "bricks": 879,
    "minK": 101,
-   "maxK": 106,
-   "sha1": "18078200be59850f9c079c8a2bc5a4c6994cc44a"
+   "maxK": 111,
+   "sha1": "0ce0630822282ff1b0dcd604b28533819999474d"
   },
   {
    "cx": 18,
    "cy": 32,
    "file": "chunks/c_18_32.bxc",
-   "bricks": 992,
+   "bricks": 981,
    "minK": 101,
    "maxK": 164,
-   "sha1": "9fa745d959224c1f598901156549cdae955fff0e"
+   "sha1": "e2b0593dc6551268b30f30fcb5da1b452e798279"
   }
  ],
  "islands": [
@@ -98,15 +99,15 @@
    "cx": 18,
    "cy": 32,
    "bricks": 998,
-   "sha1": "0db1dd6185fd804691ac9d11610de5228213f272"
+   "sha1": "1132de140c280b3b5125f1c2dc6fb25b3db3cc55"
   },
   {
    "id": 2,
    "file": "islands/i_000002.bxi",
    "cx": 17,
    "cy": 32,
-   "bricks": 2722,
-   "sha1": "035bc3ce106cffc74d0c3eaed9e52e267e153162"
+   "bricks": 2542,
+   "sha1": "078a2e798eb0214d799548dd5ff9573ed0b2a62d"
   }
  ]
 }

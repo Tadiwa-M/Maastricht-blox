@@ -487,3 +487,1541 @@ browser from a clock. Guide: `docs/guide/05-movers-and-models.md` (City life).
 - Walkers don't wait at crossings or stops, and buses don't yield to walkers (walkers are pushed
   aside). Trains (`--modes bus,rail`) are exported but would be drawn as buses.
 - The river fallback line is approximate (only used without OSM).
+
+## 2026-10-23: Streamed web city (phase 2, track S: streaming)
+
+The viewer can now run the whole city in the browser: a static site streams chunks and islands
+around the camera, and a pre-baked silhouette keeps all 2 km visible. Guide: 06 "Streamed city".
+
+- **Site build:** `node build.mjs <world> --site <out>` (`scripts/site.sh` / `site.ps1`, default
+  `build/world` -> `build/site`; they print how to serve locally and publish to GitHub Pages or any
+  static host). World files are hard-linked (copied as fallback); `index.json` holds chunk boxes
+  and island world boxes; `world/life/` is copied when the world has a life export (and embedded
+  as `BLOX_WORLD.life` in embed mode; `BLOX_SITE.life` says whether it exists). The embed mode is
+  unchanged (look-test chunk: same 380 draws / 4.89 M triangles).
+- **Streaming:** `StreamScheduler` (nearest first, frustum priority, concurrency, abort, unload,
+  retry, several eyes), `CityLoader` (fetch, Web Worker pool, query API), `CityView` (near / mid
+  / baked rings). The mid look puts every opaque class in one material (per-vertex glow + shine),
+  so a chunk is ~1 draw call. Workers: on the synthetic city the street view is ready 22 % sooner
+  and the main thread stops hitching (per item 26-490 ms of work moved off it).
+- **Query API** (`src/city.js`): `isSolid`, `isWater`, `groundHeight(x, z, fromY)` over chunks
+  and islands, `'unknown'` where a chunk or an island overlapping it is not loaded; the diorama
+  offers the same API. 1-bit solid maps (64 KB per real chunk).
+- **Far bake** (`tools/bake-far.mjs`, `src/farbake.js`, format `BXF1`): 3 levels of coarse voxels
+  (1 m / 2 m / 4 m), majority colours with top-face colours, flood-filled outside air, greedy
+  quads per owner chunk so baked chunks hide as the real ones stream in. Synthetic city (8x8 Markt
+  = 3136 chunks + 2560 islands): level 3 = 0.72 M triangles for everything, 93 s bake.
+- **Map camera** (`src/citycam.js`): zoom to cursor from the whole city to street level, tilt
+  allowance and preferred tilt follow the zoom (sky in frame near the ground), target on the
+  ground, inside the city, camera never under bricks; fog, shadow box and AO follow the zoom.
+  `street` preset looks for open ground and a free line of sight once the area is streamed.
+- **Hooks:** `main.js initHooks(ctx)` holds `// [player hook]` and `// [life hook]`, called by both
+  modes; missing modules are stubbed by an esbuild plugin.
+- **Numbers** (headless SwiftShader, all passes): synthetic city overview 131 draws / 1.44 M
+  triangles, silhouette 1-2 s, 9 MB; street level 464 / 8.3 M (was 28 M and 538 MB before the
+  triangle budget and buffer release), 88 MB. `samples/markt_v3`: embed hero 362 / 3.49 M ready
+  6.1 s, 162 MB -> site hero 320 / 2.66 M, silhouette 0.3 s, 24 MB. Tests: +19 (stream, city,
+  farbake, citycam).
+- Fixes found by screenshots: wrong winding on the mirrored region meshes, fog near > far at
+  street level, baked tops coloured by the earth under the paving, the baseplate covering streets
+  (now under the lowest brick), street preset on a roof.
+
+**Open decisions**
+- Not yet run on the real 4096-chunk city or on a laptop iGPU: the synthetic city is denser than
+  Maastricht everywhere, so real numbers should be lower; measure with `scripts/site.sh` +
+  `tools/perf.mjs` on the workstation.
+- Street level on the dense synthetic city is ~4.7 M triangles per pass; medium AO adds a full
+  geometry pass close up. `auto` steps down to low (no AO, 130 m stream radius) when slow.
+- Baked levels 2/3 glow little at night: glass rarely wins a 2-4 m cell's vote.
+- Life data fetch: `life/data.js` should skip fetching when `BLOX_SITE.life === false` or
+  `BLOX_WORLD.life === null` (no 404 noise); that's in Track L's file.
+- GitHub Pages limits (1 GB, 100 MB per file) fit the city (~100 MB in ~6,500 files).
+
+## 2026-10-24: contract v4, the slice comes from the manifest
+
+- The owner's street (Bosscherweg, RD 176197 319239) is 691 m north of the 2×2 km slice, and
+  Sint-Pietersberg is south of it. New named slice **city**: origin RD (174700, 314000),
+  128 × 176 chunks (4.1 × 5.6 km). Build it with `blox --slice city ...` or `BLOX_SLICE=city`.
+- Contract v4: `originRD`/`chunksX`/`chunksY` in the manifest are authoritative. Pipeline
+  (`geo.configure`), viewer (site index carries `originRD`; places are RD points in
+  `viewer/src/places.js`) and Unity (`WorldSpec.FromManifest`) read them. Readers accept v1–v4.
+- The OSM clip is per slice (`slice_clip_city.osm.pbf`), so switching slices never reuses the
+  wrong clip.
+- Owner photos of the Markt (2026-10-24): grey limestone and white/cream plaster facades, tall
+  many-paned white windows, wrought-iron balconies, dark slate roofs with white dormers, dark
+  cobbles, long rows of parked bikes under plane trees, double-lantern lamp posts, delivery vans.
+  Notes are in `docs/reference/markt.md`.
+
+## 2026-10-24: Life v2: a busy city and a new toy figure (phase 2, track L)
+
+Owner feedback: the Markt is busier (bikes, people, buses, cars), Maastricht's buses are blue,
+and the brick-built character was too blocky (a head of 2 bricks). Later photos: long rows of
+parked bikes under the trees, delivery vans on the square, umbrellas in the rain, stall frames.
+
+- **New figure** (`viewer/src/figure/`): an original smooth toy figure built in code (rounded
+  boxes, capsules, lathe) in the city's glossy plastic: rounded-rectangle head on a neck, dot
+  eyes and a smile, separate hair/hats (10 styles), shirts/jackets/coats/dresses, mitten hands,
+  knees, shoes, backpacks/bags/umbrellas; adults 1.70-1.90 m with ~0.45 m shoulders, kids ~1.2 m,
+  older people slower and stooped. Not a minifigure shape (no cylinder head/stud, trapezoid
+  torso, C-hands, hip block). Poses: walk, run, idle, sit, cycle (leg IK on the pedals), browse.
+  The player uses it too. Design sheets: `tools/figure-sheet.mjs` -> `build/shots/figures/`.
+- **Rendering**: one InstancedMesh per part geometry, two LODs (detailed within 32 m, ~4.5k
+  triangles; far ~1.5k). 1000 people = 12-15 draw calls far away, up to ~37 at street level
+  (the < 30 target holds only when the nearest 160 are not all close; see open decisions).
+  Posing uses in-place affine maths: ~4 ms per 1000 figures.
+- **Busy city** (`life/density.js`): people 900/500/200 by tier, day curve, Saturday boost,
+  quiet Sunday mornings; groups of 1-4 at the slowest pace, stops to chat; busiest nodes x1.6 by
+  day and the market square x3 while it is on. Cafe **terraces** from OSM POIs (tables, chairs,
+  parasols, people sitting and sipping), the **Wednesday/Friday market** (striped stalls in
+  back-to-back rows, vendors, browsing shoppers, frames during setup/packing, parked delivery
+  vans), **cyclists** on a cycle graph and **parked bike rows** (stations, squares, shops, and
+  between the trees of tree lines), **cars and vans** on a directed road graph (right-hand
+  traffic, one-way streets, IDM car following, slowing into junctions, no cars on pedestrian
+  streets), **rain**: umbrellas and empty terraces (`#rain=1` until a weather source exists).
+- **Buses blue**: `life/livery.js` colours buses by GTFS operator (Arriva `#0B5FA5`); route
+  colours stay on the signs. Movers may use non-palette colours (skin/hair tones, cars,
+  liveries); documented in the guide.
+- **Pipeline**: `blox life` writes `streets.json` (cycle graph, road graph with one-way + class
+  flags, terraces with the direction to the street, bike spots incl. tree rows, the market
+  polygon + schedule); routes carry `agency`. `python -m blox_pipeline.life.sample` makes a
+  synthetic export for `samples/markt_v3` (bus routes, walkways, streets, terraces at facades,
+  tree rows) for screenshots without data hosts.
+- Tests: `viewer/test/figure.test.mjs`, `life.traffic.test.mjs`, `pipeline/tests/test_life_streets.py`.
+- Screenshots: `build/shots/figures/{sheet,poses,vehicles}.png`,
+  `build/shots/life/{market_street,market_high,bus_terrace,bike_rows,overview,rain_market,thursday_high}.png`.
+
+**Open decisions**
+- Draw calls at street level are ~37 for people (24 detailed meshes: 10 hair styles, 4 tops,
+  3 accessories, 7 body parts + 13 far meshes); getting under 30 needs `BatchedMesh` (several
+  geometries per call) or fewer hair styles near the camera.
+- Triangles: life adds 7-11 M per frame over all passes on the sample (shadow + AO + main);
+  parked bikes (~400) are a big share. Next: a far bike/car LOD, no shadows for far figures.
+- JS: a life step is 5-14 ms under headless software GL (~4 ms of it posing ~850 figures). Next:
+  pose far figures every other frame.
+- The synthetic sample's roads cross the Markt (picked on the top map); real OSM keeps cars off
+  pedestrian squares. Not yet run on a real `blox life` export (data hosts blocked here).
+- Bus model is still the brick bus (contract model); only its colour changed.
+
+## 2026-10-24: Look v2: the old centre from the owner's Markt photos (track: look)
+
+The owner's photos of the Markt (notes in `docs/reference/markt.md`; photos stay out of the repo)
+showed a different city than our heuristics drew: blue-grey limestone and grey/white/cream
+plaster under dark slate, tall many-paned white windows, iron balconies, white panelled doors,
+dark wet cobbles, plane and chestnut trees, and the Stadhuis. What changed:
+
+- **Contract (append-only, no `contractVersion` bump)**: palette v3 adds idx 47-53 `limestone`,
+  `limestone_dark`, `plaster_white`, `plaster_cream`, `plaster_grey`, `cobble_dark`, `lead_grey`
+  (slate a touch bluer); catalogue v3 adds ids 48-56 `window_1x2x4`, `shop_window_1x2x4`,
+  `balcony_2x4`, `railing_1x2`, `pediment_1x4`, `lamp_double_1x3`, `bollard_1x1`, `chain_1x4`,
+  `vent_1x2` (CONTRACT 2.1). They **reuse existing kinds** so Unity's catalogue parser still
+  loads them; the viewer picks their geometry by name (`viewer/src/details-look.js`, far
+  templates in `farmesh.js`). Unity's mesher draws them as the generic shape of their kind
+  until it learns them (Unity is parked). `dotnet` catalogue count test 47 -> 56.
+- **Old centre** (`voxelise/colours.py`): within 700 m of the Markt or the Vrijthof, or built
+  before 1900: limestone/plaster walls (one in twelve dark red brick, no ochre), slate roofs
+  (5 in 6). Elsewhere the era variety stays. Centre streets and squares are `cobble_dark` setts
+  in four tones; a dark stone **kerb** (0.6 m, `limestone_dark`) runs outside every car road.
+- **Facade grammar** (`facade/`): new `FacadeRun` fields (default off, so v2 houses are
+  unchanged): `stone` dressings, `door` colour, tall `window_1x2x4`, stone shop fronts with
+  `shop_window_1x2x4` between proud stone piers, flush stone jambs (only where >= 3 studs of
+  wall remain), pediments over first-floor windows, wrought-iron `balcony_2x4` before a french
+  window, `railing_1x2` french windows, cellar `vent_1x2` in the plinth, `pier` spacing. The
+  old-centre style (`facade_style._centre_style`) turns them on for real buildings, plus white
+  **dormers and a chimney on real pitched roofs** that fall toward the street
+  (`facade_runs.roof_details`, painted in `facade_paint.dormer`).
+- **Trees** (`voxelise/trees.py`): plane/chestnut style: a bare one-stud trunk of >= 4 m,
+  branch stubs, a large crown of 4-6 overlapping blobs with paler autumn leaves; default
+  height 8-15 m, crown up to 5.5 m (`TREE_MARGIN` 14).
+- **Street props** (`voxelise/street_props.py`): double-lantern lamps along squares and
+  pedestrian streets, bollard-chain-bollard groups along centre car streets, stone benches on
+  squares; planned once per world from OSM, kept clear of buildings/islands/water/trees/decks,
+  flat ground, never across a chunk border.
+- **Stadhuis hero** (`facade/stadhuis.py`, `voxelise/heroes.py`, `Landmark.model`): the
+  landmark match (BAG id, OSM `wikidata`, name "Stadhuis", or the Markt point; within 150 m of
+  it) replaces the 3D BAG shape by a hand-authored model on its footprint: banded grey
+  limestone, giant pilasters, cornices, the risalit with a 3-arch arcade on piers (balustrades
+  in the arches), the double stair with stepped parapets, the full-width balustraded balcony,
+  an attic storey with window pediments, a pediment with a carved relief and corner
+  cartouches, side pediments, iron railings with gilt tips and gate piers, a hipped slate
+  roof with lead hips, and the lead-grey tower (square base with a dormer, oculi row, tall
+  arched windows, clock stage with gold dials, gallery with balustrade and flags, open belfry
+  with bells, bell-shaped dome, lantern, gilded orb and vane). On the grid or as an island
+  (CONTRACT 5.1) as its footprint dictates; the front faces the side with most square.
+- **Look test** (`testscene`): now two chunks; chunk 23,47 is a photo-like Markt row (5
+  houses, every new piece, plane trees, lamps, bollards, benches). New synthetic
+  `pipeline/tests/markt_fixture.py` (Stadhuis + square + terraces + tree row + streets) runs
+  the real data path; `test_look_v2.py` covers it (also the Stadhuis as an island at 12°).
+- Committed `tests/fixtures/town_world` regenerated (`BLOX_REGEN_FIXTURES=1`): new palette and
+  catalogue copies, old-centre facades.
+- Screenshots: `build/shots/look_v2/` (before/after pairs, Stadhuis front/SW/tower, gallery).
+
+**Open decisions**
+- Unity: add the 9 pieces to `DetailMesher` (now the generic shape of their kind).
+- Real data not rebuilt here (data hosts blocked): the owner must rebuild the city
+  (`blox build`) to see it; the Stadhuis match there is by name/point (no BAG id or wikidata
+  id set yet: add them to `landmarks.py` once checked on the real data).
+- Lamps' glass does not glow at night (glow is for window/door kinds only).
+- Bench and chain heights are fixed; street props on slopes > 1 plate are skipped.
+
+## 2026-10-24: Open-world camera (phase 2, track P)
+
+Owner feedback after playing on Windows: "just need to make rotating the camera easier, I want
+it to feel like an open world environment."
+
+**What changed** (`viewer/src/player/`, guide `docs/guide/09-player.md`)
+- Walk mode: click the world to capture the mouse (Pointer Lock, raw input where supported);
+  mouse movement turns the camera with no button held. Yaw unlimited (wrapped), pitch −35°..70°.
+  Esc frees the mouse, Esc with a free mouse (or H, gamepad Start/Select) opens the menu, M (or
+  B) goes back to the map. This is the usual open-world split (Esc = pause menu, M = map) and
+  fits the browser rule that Esc always releases a pointer lock; the Esc press that released
+  the lock is swallowed so it does not also open the menu.
+- Camera rotation and zoom go through a critically damped spring (aim -> shown values), so
+  pointer-lock deltas, stick and touch input are smooth and overshoot-free at any frame rate;
+  collision pull-in runs on the damped values as before.
+- Movement stays camera-relative (shared `look.js moveHeading`); the figure turns with a
+  frame-rate independent exponential (10 /s).
+- Auto-recenter: after 2 s without look input while walking forward-ish, the camera eases
+  behind the figure (gentle, faded in; never when walking toward the camera or sideways).
+- Gamepad right stick: response curve |v|^1.8, 3.2 rad/s yaw, +70% turn boost after holding
+  full tilt for 0.25 s; own sensitivity and invert Y.
+- Menu has camera settings (mouse/touch sensitivity, invert Y, controller sensitivity, invert
+  Y, auto-recenter) saved in `localStorage` with try/catch fallbacks (`settings.js`).
+- Map mode (`maporbit.js`): Ctrl/Alt + left drag orbits, middle drag tilts, Q/E and the right
+  stick turn through a damped spin (smooth start/stop); a compass (bottom right, both modes)
+  shows north and turns the view north on click.
+- New `test/player-look.test.mjs` (11 tests); input/camera tests updated and extended
+  (bindings `exit` -> `map` + `menu`, pointer-lock spike filter, sensitivity/invert, damped turn
+  at 60 and 10 fps, pull-in on damped values).
+
+**Open decisions**
+- Pointer lock is not testable in headless Chromium; the owner should try it on Windows
+  (Chrome/Edge) and tune the default mouse sensitivity (0.003 rad/px × 1.0) if needed.
+- `citycam.js` is unchanged: the map extras live in the player track so the diorama (plain
+  MapControls) gets them too.
+- Rotation smoothing (0.05 s) is light on purpose; if anyone wants raw, unsmoothed mouse look,
+  add a "smoothing" slider.
+
+## 2026-10-24: buildings survive a 3D BAG outage
+
+The city fetch on the workstation stopped at 3D BAG: `api.3dbag.nl` timed out, and the whole
+`3dbag.nl` domain (site and docs) did not resolve from an independent network either, so this
+was an outage on their side. Because `fetch_all` stopped at the first failure, OSM was never
+fetched either.
+- `fetch_all` now runs every requested source and raises one `DownloadError` listing the
+  failures at the end.
+- New `sources/osm_buildings.py`: OSM footprints plus AHN DTM/DSM give synthetic buildings
+  (gabled or flat) wherever 3D BAG has no building. `load_all` uses them, and also when no 3D
+  BAG data is cached at all.
+- Verified on the town fixture with the 3D BAG tile hidden and its roofs burned into the DSM:
+  9/9 buildings, 2 islands, 100% facade runs, and the gables look right (screenshot reviewed).
+- Tests: `test_sources_osm_buildings.py` (gable axis, flat roof, covered footprints skipped,
+  fetch continues past a failure).
+
+**Open decisions**
+- Fallback houses have no construction year, so they get the default colour mix. If 3D BAG
+  comes back before launch, refetch (`blox --slice city fetch --only bag3d`) and rebuild for
+  the real roofs.
+- `load_buildings` now finds cached 3D BAG block dirs by area (`cached_blocks`), not by
+  recomputing the block grid. The centre slice (origin 175700) and the city slice (origin
+  174700) use different 256 m grids, so the city build ignored the centre pages already
+  fetched. Now the centre keeps its real 3D BAG roofs and only the rest uses the fallback.
+
+## 2026-10-24: two city-build crashes fixed
+
+The first full `--slice city` build exposed two bugs the 2×2 km centre never hit.
+- `blox build` failed with "placed pieces rejected: 1 placed pieces outside the tile". A facade
+  piece reached past the tile's k range, which comes only from terrain, building tops, trees,
+  heroes and props. `TileCanvas.place` now gives such a piece a voxel stand-in, the same as a
+  piece straddling a chunk border, instead of emitting it.
+- `blox life` failed with an IndexError in `_snap_dead_ends`. Splitting an edge added a node
+  that a later dead end reached through the neighbour map, but the point array was a snapshot.
+  The array now grows with each split.
+- Regression tests: `test_canvas_stands_in_for_pieces_above_the_tile` and
+  `test_snap_reaches_nodes_split_earlier_in_the_same_pass`.
+
+## 2026-10-26: launch: audit, licence, publish script
+
+- The city slice built on the workstation: 22,355 chunks, 8,050 islands, 30,807 features in
+  2 h 20 min; the site is 265 MB in ~30,400 files.
+- Hosting: the code repo `Tadiwa-M/Maastricht-blox` (public, for the owner's CV) plus a separate
+  site repo `Tadiwa-M/Maastricht_larper` on GitHub Pages. Cloudflare Pages was ruled out because
+  its free plan caps a site at 20,000 files.
+- New `scripts/publish.ps1` / `publish.sh`: copy the site, add `.nojekyll` and a README, and
+  force-push one commit, so the site repo never accumulates builds. Tested against a local bare
+  repo (two publishes leave one commit). The site was verified under a sub-path, since all URLs
+  are relative.
+- Public-repo audit: no keys or tokens in the history, no images ever committed (the owner's
+  Markt photos never were), no blobs over 2 MB, the "not affiliated" line present. One commit
+  carries the owner's university email as its author; it's left as is, because rewriting public
+  history isn't worth it. A GitHub noreply address is suggested for new commits.
+- Added an MIT `LICENSE`, and rewrote `README.md` for the launch (play link, what it is, how it
+  works, how to build).
+
+**Open decisions**
+- Laptop performance on the full city is not measured yet; the far L1 bake is 24.5 M triangles.
+  If the overview stutters, cap the L1 distance in the viewer (no rebuild needed).
+
+## 2026-10-26: loading screen
+
+The owner saw a stutter on first load (city index, silhouette bake upload, first streaming
+ring and shader compile all land at once). New `viewer/src/loading.js` plus a `#loading` cover in
+`index.html`: animated bricks, a progress bar with phase messages, and a controls tip. It lifts
+after the first ring (90% loaded, settled, or 8 s at most) and 8 drawn frames, then fades.
+Load errors show on it. Skipped under `?shot=1`/webdriver, so the screenshot tools are unchanged.
+4 new tests (147 total). Checked in headless Chromium on the Markt sample (cover screenshot and
+scene after it).
+
+**Open decisions**
+- The stutter is hidden, not removed. If people still notice hitches right after the cover
+  lifts, warm the shaders explicitly (`renderer.compileAsync`) or spread the uploads of the
+  first ring across frames.
+
+## 2026-10-26: film tool (demo video + stills)
+
+The owner asked whether the video and screenshots could be made for them. A live screen
+recording needs a GPU and steady hands. Instead there's now `viewer/tools/film.mjs` (wrapped by
+`scripts/film.ps1|sh`). The city page gets a `?film=1` mode with no render loop and a stepping API,
+and the tool flies 8 scripted shots: city orbit, a dive onto the Markt, the Markt on market day,
+street level, the station at rush hour, Bosscherweg, Sint-Pietersberg/ENCI, and a sunset-to-night
+time-lapse. Each frame advances life by 1/fps, waits for streaming, and is captured as a PNG;
+ffmpeg encodes the MP4, and the middle frame of each shot is saved as a still. Tested headless
+on the Markt sample (orbit and dive frames reviewed); `shotPose` has unit tests.
+
+**Open decisions**
+- Hands-on shots (walking with the PS5 controller, the phone, the TV) still need a real
+  recording; the film covers the cinematic part.
+- The shots use the presets' camera angles; if one frames badly on the full city, tweak `deg`
+  or `zoom` in `SHOTS`.
+
+## 2026-10-26: collapsible panel, viewer-only deploy
+
+The owner's phone screenshots showed the HUD covering about a third of the screen, with no way
+to hide it. It now has a hide/show button and the U key, starts collapsed on phones, and the
+choice is remembered. Checked at phone and desktop sizes. The owner had set quality to
+`high`, which runs at 5-7 fps on the phone; `auto` picks a lighter tier.
+The workstation was unavailable, so the loading screen and this toggle were deployed by
+updating only `index.html`, `viewer.js` and `stream-worker.js` in the site repo (a blobless
+clone plus one normal commit; the world data is unchanged). The next `publish.ps1` run replaces
+it with a fresh single commit as usual.
+
+## 2026-10-27: performance on weak laptops (in progress)
+
+The owner says the city runs fine on their phone and workstation but very slowly on their laptop.
+Measured on the real city (`tools/perf.mjs`, medium tier): the overview is 2.2 M city triangles
+but 7.9 M per frame and 1,509 draw calls (the shadow pass redraws the city, plus life). The Markt
+view is 7.2 M triangles in view, 11.9 M per frame. Changes:
+- New `lite` tier: 0.75 render scale, no shadows (`shadows: false` -> `sun.castShadow`), no
+  bloom, short far/stream ranges, fewer people and vehicles (`density.js`).
+- `gpu.js`: classifies the WebGL renderer string (software / integrated / mobile / discrete).
+  `auto` starts big worlds at lite / low / medium accordingly, and a software renderer
+  (hardware acceleration off) gets an on-screen notice explaining how to fix it.
+- Per-tier `shadowRange` caps the sun's shadow box (high 1600 m, medium 1000, low 450, lite off).
+- The governor reacts faster (1.5 s settle, 1.5 s window).
+- No canvas MSAA: the scene renders into the post chain's targets, so it only cost bandwidth.
+Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
+
+**Open decisions**
+- Draw calls: 352 far regions × ~3 materials = ~1,050 calls on the overview. Merging them
+  (BatchedMesh or per-block merges of L3) is the next big CPU win.
+- The new-tier numbers on the real city are being measured; the lite and low looks still need
+  a review on the full city.
+- Owner feedback: the lite look is not acceptable as the normal experience. `auto` now never
+  steps below `low` on a real GPU (`FrameGovernor` `floor`); lite is reserved for software
+  rendering or a manual pick in the Quality menu.
+- Life cost, measured per mesh at the Markt (medium): 640 parked bikes at full detail across the
+  whole loaded area were 1.4 M triangles (2.8 M with their shadows); people were cheap. Parked
+  bikes are now the nearest within a tier range (`PARKED_BIKES_BY_TIER`: medium 90 m / 160
+  bikes). Life is hidden when the camera is over 650 m from its target, single figures beyond
+  320 m are skipped, and only high/medium life casts shadows.
+- Real city, renderer.info per frame (calls / triangles), medium: overview 1,509 / 7.9 M ->
+  1,188 / 3.3 M; Markt 796 / 11.9 M -> 796 / 8.0 M; street 1,310 / 12.8 M -> 1,310 / 9.3 M.
+  Low: overview 1,044 / 2.5 M, Markt 312 / 4.3 M (before the bike fix).
+- Merged far blocks: the coarsest far level is one mesh per family for every 4x4 regions, and
+  only regions in the camera frustum are drawn. Real city at medium, calls / triangles: overview
+  73 / 3.9 M (was 1,509 / 7.9 M), Markt 588 / 7.8 M (796 / 11.9 M), street 628 / 9.2 M
+  (1,310 / 12.8 M). The images look unchanged (overview, Markt and street reviewed).
+  Tests: `farblock.test.mjs` (vertices land where the region meshes put them; grouping).
+- The owner asked for the optimisations to be toggleable: a **Performance mode** checkbox
+  (`#perf=0|1`, saved per browser) turns the merged far blocks and the life budget on or off.
+  Rule from the owner (2026-10-27): no commits, pushes or deploys without their approval.
+
+## 2026-10-30: game-style start screen, a clear way back to the map
+
+- The start screen was redone in the Limburg flag colours, with an original brick emblem rather
+  than the province's logo (its brand guide requires written consent, and a logo implies
+  endorsement). It has a brick progress bar, phase messages, rotating tips and a "how to play"
+  card, and ends on PRESS ANY KEY / TAP TO START (key, click, tap or gamepad button). The
+  software-rendering notice now waits until after start.
+- Everyone the owner showed it to asked how to get back to the map. Zooming out past the walk
+  camera's farthest distance now returns to the map (`ZoomOutExit`). There is also an always-visible
+  Map button top right in walk mode, a tip the first three walks, and updated hints.
+- Checked in headless Chromium: desktop and phone start screens while loading and when ready, tap
+  to start, the Map button and hints in walk mode, and 60 wheel notches out of walk mode -> map.
+  159 tests pass.
+- Owner: the first start screen looked like a web page. Redone as a console-style title screen:
+  Anton display logo with BLOX on a yellow brick, the live city behind it once the skyline has
+  loaded (attract-mode camera circling the start view), GTA-style tips bottom-left, a brick
+  spinner bottom-right, PRESS ANY KEY with button prompts, and the game UI hidden until start.
+  Also fixed: the walk-mode Map button showed in map mode too (`display: flex` beat `hidden`).
+
+## 2026-10-30: Ride (phase R1), trains, transit.json v2
+
+- Pipeline: `transit.json` v2 has stops with names, per-pattern stop lists, GTFS route ids and
+  trip ids per row (`merge_trips_with_ids`). `blox life --modes` defaults to `bus,rail`, so the
+  Maastricht <-> Randwyck trains are exported. Tests for v2, rail and the trip-id merge.
+- New brick model `train` (`models/train.py`, contract/models/train.json, 302 bricks).
+- Viewer: the Transit panel (running now, lines, stop departure boards), route ribbons, vehicle
+  badges, and riding with a passenger seat camera, free look, next stop, get off, outside view
+  and fast-forward. Buses and trains are separate fleets (`TimetableBuses` `modes`, `laneM`).
+  Tests: `ride.schedule`, `ride.seat`, `ride.routes`.
+- Live data (R2): the planned Worker would decode the national GTFS-Realtime protobuf (MBs) on
+  every request, which doesn't fit Cloudflare's free 10 ms CPU limit. The alternative is OVapi's
+  per-line JSON API (small). Whether a browser can call it directly (CORS, HTTPS) is to be checked
+  from the owner's browser, since the cloud sandbox can't reach OVapi.
+- Ride fixes found in browser tests on the real city: a vehicle over a spot not streamed in yet
+  has a NaN ground height, and a NaN camera poisons the clipping-plane uniforms and stops
+  rendering (`firstElem.toArray is not a function` inside three.js). The seat now falls back to
+  the last or approximate ground and never sets a non-finite camera. The seat eye height was
+  raised to 2.1 m, since both models have their cabin floor at 1.2 m, and the outside view moved
+  back and up. Title key art: slides whose image doesn't load are dropped, so a site without
+  `src/title/*.jpg` simply shows the plain backdrop.
+- Key art views now avoid the bridges (Vrijthof, Stadhuis, a high view over the Maas): the
+  Sint Servaasbrug currently renders as a thin deck on grassy islands. See the accuracy plan.
+
+## 2026-10-31: viewer deployed; report button, relay, live delays, corrections
+
+- Deployed the viewer (title screen, back to map, Ride) to the live site. The site repo's
+  `models.json` gained the train model; the city data is unchanged.
+- OVapi blocks browsers (the owner's console check showed CORS blocked), so live data goes
+  through `relay/`, a Cloudflare Worker: `/live` (OVapi per-line JSON, reduced to per-journey delays,
+  edge-cached 20 s, so the free CPU limit holds), `/trains` (NS Reisinformatie, optional `NS_KEY`)
+  and `/report` (map report -> GitHub issue, with images on the `map-reports` branch; 5 per IP per
+  hour, JPEG only, `[map]` titles only). Deployed with `scripts/relay.ps1` from any PC.
+- Pipeline: `transit.json` gains `realtimeIds` (OVapi `realtime_trip_id` per trips row).
+  Viewer: `LiveFeed` applies the delays near real time.
+- "Report a mistake" (flag button): description, category, screenshot (default on), own photo,
+  exact location and a link back to the spot. Reports are triaged by hand into
+  `corrections/corrections.json`.
+- `corrections/corrections.json` with `sources/corrections.py`: data-only map fixes applied on every
+  build. Tests for all of it (viewer 174, relay 5, pipeline 520).
+
+**Open decisions**
+- OVapi's JSON field names come from its documentation; the sandbox can't reach OVapi. Verify
+  once the relay is deployed: `<relay>/live?lines=ARR_<line>` should list journeys with delays.
+- A partial rebuild (one area into an existing world) is blocked by feature ids being numbered
+  city-wide. Until that is solved, corrections land with the next full city build.
+
+## 2026-10-30: ride cabin, buses on the road
+
+- The owner rode a bus: from inside, the brick model is a box of studs with slit windows, so
+  there was nothing to see. The seat view now hides the ridden vehicle (fleet `hideId`) and draws
+  a light passenger cabin around the camera (`ride/cabin.js`): blue panels up to the sill, large
+  window openings between thin pillars, ceiling, low seat backs, grab pole. The outside view shows
+  the real model again.
+- Buses drove through trees and people. Measured cause: GTFS shapes run a median 3-4 m (75th
+  percentile 6.5 m) off the OSM road centrelines; with the 1.6 m lane offset that put buses on
+  the pavement. `blox life` now snaps bus shapes onto the drivable OSM roads (`life/snap.py`,
+  direction-aware, sticky, median-smoothed): 95 % of bus points within 2.2 m of a centreline.
+  Needs a `blox life` re-run on the workstation; no world rebuild.
+- Trees: brick crowns start at >= 4 m, above a bus, so what buses hit are trunks. OSM tree
+  points standing on a carriageway now move to the kerb (`prepare_osm.off_carriageway`), or are
+  dropped where there is no room. Needs a world rebuild (lands with the accuracy rebuild).
+- People keep further clear of vehicles (0.9 m alone, 1.9 m in groups) and now also of trains.
+- Ride cabin screenshots: the grab pole moved 1.6 m ahead into the aisle; it blocked the view
+  when looking right.
+
+- "Get off" did nothing on the live site: it still has the v1 timetable (no stop positions,
+  `blox life` not re-run yet), so the request found no stop and quietly reset. It now steps off
+  at the stop when the data has one, else beside the doors on the kerb side (`seat.doorSide`).
+  The walk facing was also passed in degrees where the player takes radians.
+- `tools/keyart.mjs --url <site>` renders the title key art from the published site, so any PC
+  with a GPU can make the slides (about a minute each). In this GPU-less container a 1080p city
+  view took hours and container restarts killed both runs.
+
+**Open decisions**
+- One checked spot (line 4 along the Markt) follows a mapped pedestrian way within 1 m: the
+  real bus lane there. Whether that way has `bus=*` tags (then snapping and the tree rule cover
+  it) can only be checked with the real OSM extract on the workstation.
+
+## 2026-10-30: relay script on Windows PowerShell
+
+- `scripts/relay.ps1` stopped on the owner's PC at the login check: Windows PowerShell 5.1 with
+  `$ErrorActionPreference = "Stop"` turns any native stderr line (Wrangler's "out-of-date"
+  warning) into a terminating error. The script now runs native tools under "Continue" and
+  checks exit codes. Wrangler stays pinned at 3.114.0 (its nodejs_compat deprecation note does
+  not apply: the relay doesn't use nodejs_compat).
+- Wrangler login ends on Cloudflare's welcome page (welcome.developers.workers.dev), which showed
+  a certificate error on the owner's network; the login itself completes on localhost before that.
+
+## 2026-10-30: relay deployed, wired into the site
+
+- The owner deployed the relay: https://blox-relay.tmata1907.workers.dev. The live site's
+  `world.js` now carries it (`BLOX_SITE.relay`), and site builds use it by default (`build.mjs`
+  `RELAY_URL`; `BLOX_RELAY` overrides, `BLOX_RELAY=none` builds without), so a workstation publish
+  keeps it.
+- Live delays start only with a v2 timetable (`realtimeIds`): the live site still has v1 until
+  `blox life` is re-run on the workstation, so buses stay SCHEDULED until then.
+- Report button: a relay without the `GITHUB_TOKEN` secret (501) or one that can't be reached
+  (some networks block workers.dev) now falls back to the pre-filled GitHub issue instead of
+  showing "Could not send".
+
+**Open decisions**
+- Add `GITHUB_TOKEN` (`npx wrangler secret put GITHUB_TOKEN` in `relay/`, a fine-grained token for
+  this repo only: Contents + Issues read/write) so reports need no GitHub account.
+- Verify `<relay>/live?lines=ARR_<line>` against real OVapi data (field names are from the docs).
+
+## 2026-10-30: key art without ffmpeg
+
+- `tools/keyart.mjs` now encodes the JPEGs in the browser (canvas `toDataURL`), so it runs on a
+  Windows PC with only Node. Before, without ffmpeg it left PNGs, which the title screen ignores.
+- Status: the title slideshow is live but has no slides yet (`viewer/src/title/` is empty); the
+  owner renders them on a GPU PC with `--url`.
+- First run on the owner's laptop showed nothing for minutes (no output until a view was done)
+  and the laptop hibernated. Now: progress lines while loading and streaming, a load error is
+  reported, `--quality`. Bug fixed on the way: the streaming loop ran 400 frames back-to-back,
+  seconds on a fast GPU, before chunks arrive over the network (`--url`), so views came out half
+  loaded; it now waits in real time until the view has settled (max 240 s).
+- With the real-time wait the tool renders a view in about a minute even in software
+  (`--quality low`), so the three slides were rendered here: `viewer/src/title/` stadhuis (high
+  over the Markt), vrijthof (moved to 10:30 and raised to 38 m: at 16:12 the camera looked into
+  the sun and Sint Servaas was a flat backlit block) and maas (dusk, high over the river). Sint
+  Servaas is still a rough block (no facade detail): a hero model candidate.
+
+## 2026-11-02: v2 timetable live; trip planner planned
+
+- On the workstation: fresh GTFS, `blox life` (84 bus shapes snapped, median move 2.6 m; 28 lines,
+  2,317 trips for the week from 2026-11-02), site build with the slides, published. The owner saw
+  live schedule data through the relay. Buses still drive through people, bikes and cars: traffic
+  rules are planned (PLAN.md).
+- PLAN.md: Phase R3 is now a maps-style trip planner (start and destination, bus options, route
+  drawn, a green racing-line arrow path for walking), modelled on the owner's earlier routing app
+  (Tadiwa-M/Maastricht-and-Heerlan-Routing-Applications).
+- Next on the workstation: retry the 3D BAG fetch; only if it completes, build `build/world_city2`
+  next to the current world and compare before publishing.
+
+## 2026-11-02: accuracy phase 3a, ramps (wedges)
+
+- The owner chose wedges over smoothing for "steps on the road". New catalogue piece
+  `wedge_1x2` (id 57, kind `slope`, 1x2x1, no studs; catalogue v4). Like ids 48-56 it reuses an
+  existing kind, so no `contractVersion` bump: the viewer, far meshes and Unity draw it with the
+  generic slope profile.
+- `voxelise/ramps.py` places it on paved ground one plate below a paved neighbour (vectorised
+  site search, then the canvas rules: air only, props win, no chunk straddling). Before/after
+  screenshots on the test town (fixture regenerated: 99 wedges in 5 chunks).
+- The 3D BAG fetch for the whole city completed on the workstation (no "giving up"): real
+  buildings are cached for the accuracy rebuild.
+- BGT (phase 1) waits for a session with network access to api.pdok.nl (the owner added the
+  domains; this container predates the change).
+
+**Open decisions**
+- Kerb lines are paved too and get wedges where they step; check on real streets after the rebuild.
+- Steps of two plates or more (steep streets, about 20 %) keep their steps.
+
+## 2026-11-02: accuracy A1, ground from the BGT
+
+- Network: the owner opened the container's network. PDOK (api.pdok.nl, service.pdok.nl) and
+  api.3dbag.nl answer; download.geofabrik.de and overpass-api.de drop the connection upstream
+  (TLS reset, not the policy). For the container test area OSM came from the OSM API's `map` call
+  (12 tiles + 5 incomplete multipolygons via `relation/<id>/full`, merged with pyosmium); the
+  workstation keeps using Geofabrik.
+- API choice: PDOK's **OGC API Features** (`api.pdok.nl/kadaster/bgt/ogc/v1`, the `lv/...` path is an
+  alias) over the download API: per-bbox requests fit the existing block cache, RD in and out
+  (`bbox-crs`, `crs`), pages of 1000 with `links[rel=next]`, no async job polling. It returns
+  historic versions too (`eind_registratie` set, about half of all objects), so pages are slimmed
+  on arrival to current objects and the fields we use (~14 MB/km², ~320 MB for the city slice;
+  the raw pages are ~75 MB/km²). Licence: CC0 1.0 (the API's licence link); credited in the
+  manifest only when used.
+- `sources/bgt.py`: `blox fetch --only bgt` (also in the default fetch), 512 m blocks, ten
+  collections: the six ground ones plus bridge decks, platforms, walls/quay walls and
+  canopies (`overkapping`) for A2/A3. Resumes at the first missing page; a block counts only when
+  all ten collections are done (`BgtData.extent`).
+- `voxelise/prepare_bgt.py`: level-0 BGT polygons paint the ground inside the extent (green 40,
+  footways 41, cycle paths 42 in red, kerbs 43, carriageways/parking 44; colours from the
+  material, dark cobbles in the old centre). OSM patches inside the extent only name the ground
+  (`SurfacePatch.paint=False`) and keep their bridge decks and rails; outside it everything is OSM
+  as before. BGT water replaces OSM water inside the extent; touching parts share one level (the
+  BGT cuts the Maas at every bridge, which first showed as seams). Street props avoid the BGT
+  carriageways. Yards (`erf`) keep the aerial-photo colour.
+- First container build showed two of my own bugs, both fixed and tested: OSM rails were dropped
+  inside the BGT area, and kerb lines criss-crossed the Markt (its car lanes are flush
+  decorative setts; `sierbestrating` carriageways now get no kerb).
+- Test area: `blox build --bbox 176250,317600,177550,318200` (station Wyck side, Markt,
+  Sint Servaasbrug and Wilhelminabrug; 820 chunks, 3,755 BGT objects, 3.5 min) with and without the BGT; top-down and 3D
+  before/after shots shown to the owner. Visible: real pavements, medians, traffic islands and
+  roundabout islands in Wyck, the Stationsplein and bus lanes as mapped instead of buffered
+  lines, the river's true outline at the quays, no OSM footway stripes across the Markt.
+- Found on the way: PDOK's aerial WMS serves JPEG only now, so `blox fetch --only ortho` failed
+  everywhere. It asks for JPEG (`ortho/<block>.jpg`); old `.png` blocks are still read.
+  `viewer/screenshot.mjs` takes `BLOX_CHROMIUM` for containers whose browser does not match the
+  pinned Playwright. Tests: pipeline 568 (+36: BGT source on two real PDOK pages, ground
+  classification and paint order, water, ortho).
+
+**Open decisions**
+- Bridges still use the OSM deck lines; BGT bridge decks (`overbruggingsdeel`, level 1+) and the
+  roads on them are cached but unused until A2.
+- Still OSM-based: tree placement relative to carriageways, `blox life` walkways and bus snapping,
+  facade street context. Walkways over water are A2 ("nobody walks on water").
+- Ballast and the station square came out darker (BGT unpaved = soil, concrete pavers = grey);
+  correct per the BGT, but tell me if a lighter look reads better.
+- City fetch on the workstation: `blox --slice city fetch --only bgt`, ~20 min, ~320 MB.
+
+## 2026-11-02: accuracy A2, bridges and water
+
+- Correction to the A1 entry: the before/after shots labelled "servaasbrug" (RD y ~318040) show
+  the **Wilhelminabrug**; the Sint Servaasbrug is the stone bridge at y ~317786 (the viewer's
+  `brug` preset). Both are in the test area.
+- Bridge decks from the BGT (`voxelise/bridges.py`): touching `overbruggingsdeel` parts are one
+  bridge, the deck runs along its long axis at road height (AHN just beyond each end), at least
+  the clearance above the water, and the BGT road parts on it paint its top. OSM bridge decks
+  that overlap one are dropped; picking still names the bridge (the OSM way's feature id). The
+  Servaasbrug now has its real width with the paved walkway and the steel lift span at the Wyck
+  end in asphalt; the Wilhelminabrug its red cycle lanes.
+- Piers: the mapped pier islands under a deck (land enclosed by water) rise to the deck; the
+  first build used evenly spaced slabs, which missed the Servaasbrug's real piers and left the
+  deck floating above them. Bridges without mapped piers still get slabs every <= 30 m in the
+  water (`Layers.deck_pier`). Railings
+  (`railing_1x2`, metal) along open deck edges (`voxelise/railings.py`); the catalogue already had
+  the piece, so no catalogue or contract change.
+- Nobody walks on water: `blox life` drops walkway edges over water that is not under a bridge
+  (`life/water.py`, BGT water when cached), 10 of 11,133 edges in the test area. In the viewer the
+  real cause of "water is walkable" was the player: water bricks are solid in the query API, so
+  the controller walked on the river. It now refuses a move whose footing is water (bridges are
+  not water). Cars, buses and cyclists follow OSM roads, which cross water only on bridges, which
+  now have decks.
+- Test area rebuilt (A1 vs A2 top-down and 3D shots shown to the owner). Tests: pipeline +10
+  (bridges, piers, railings, walkways), viewer +2 (water bank, bridge deck).
+
+**Open decisions**
+- The deck is a straight ramp between its ends: no arch. The Servaasbrug's real hump (and the
+  cutwaters on its piers) would need a hero model.
+- Railings are metal for every bridge; the Servaasbrug has stone parapets in reality.
+- Needs on the workstation: the world rebuild (decks, piers, railings) and a `blox life` re-run
+  (walkways).
+
+## 2026-11-03: accuracy A3, station canopies
+
+- The station's platform roofs are BGT `overkapping` objects (5,921 m² and 2,001 m² over the
+  tracks, ~4.7 m high by the AHN surface model); 3D BAG doesn't have them (not BAG buildings), so
+  they were missing. `voxelise/canopies.py`: a 2-plate roof slab at the DSM median height, metal
+  posts every 8 m that keep off carriageways, open underneath (buses and walkers find the street
+  under a roof: ground lookups use 2.5 m headroom over the chunk's ground level).
+- The **bus** platforms (OSM stops "Station A-H", RD ~177320-177350, 317910-318010) have no canopy
+  in any source: no BGT `overkapping`, no OSM roof, and the AHN surface there is at the ground
+  (0.0-0.3 m). OSM tags them `shelter=yes` only. Asked the owner: a shelter prop at every
+  `shelter=yes` stop, or an outline they draw (a corrections entry).
+- First container build hung: the post placement buffered the city-wide carriageway union once
+  per candidate post. It now clips the union to the canopy first (0.07 s for the test area).
+- "Building in the road": nothing in the repo says where it is. With the BGT I listed buildings
+  standing on carriageway or water in the test area: two 3D BAG buildings partly over a street
+  (RD 176273,318094: 58 of 115 m²; 177106,317633: 14 of 39 m²), possibly passages, and five OSM
+  houseboats at the Maaspromenade (`building=houseboat`, real). Waiting for the owner's location.
+- Tests: pipeline +4 (canopies).
+
+**Open decisions**
+- Bus-platform shelters (above).
+- Canopy roofs are light grey with 1-stud metal posts.
+- The workstation rebuild (A1-A3) can run now; the two open items land as corrections later.
+
+## 2026-11-03: bus shelters
+
+- The owner chose shelters at every OSM stop tagged `shelter=yes` (the bus platforms have no
+  canopy in any source). `voxelise/shelters.py`: a 4 x 1.5 m roof at 2.6 m, glass back wall away
+  from the road, two metal posts, beside the nearest carriageway (BGT or OSM), skipped where a
+  building, water or another roof is in the way. Built on the canopy layers (`Canopy.wall`).
+  Test area: 14 placed, 2 skipped. Tests: pipeline +6.
+- The owner's first try at the overnight rebuild ran from the home folder, so nothing ran
+  (`..\build` resolved to `C:\Users\build`); the commands now start with a `cd` into the repo.
+
+## 2026-11-04/05: accuracy rebuild published; game phase G1a (player feel, character creator)
+
+- Workstation: BGT fetched for the city (88 blocks), `world_city2` built (22,358 chunks, 10,253
+  islands, 54,966 BGT objects over 23.07 km², 76 shelters), `blox life` re-run, published. Old
+  world archived as `build\world_city_2026-10-26.tgz` (30,419 entries, 0.18 GB). Video filmed
+  (needed `npx playwright install chromium` in `viewer/` on that PC); LinkedIn post out. Stills
+  were rendered here from the live site (`keyart.mjs`-style views, headless).
+- Found in those stills: walkers and cyclists over the river under the Servaasbrug stand on the
+  water (the life ground lookup's 2.5 m headroom over the chunk's median ground misses a deck
+  ~5 m above the water: G1c), and BAG `0935100000022003` (1935, 14.7 m) rises through the
+  Servaasbrug's city end (owner to confirm against reality before a correction).
+- Owner: the next phase is the game. Plan in PLAN.md Phase 4: G1 movement and traffic (G1a
+  player feel + character creator, G1b traffic rules, G1c scripted NPC behaviour), G2 multiplayer
+  capture the flag, G3 smarter NPCs later; NPCs stay scripted for now. NVIDIA SimReady (realistic
+  OpenUSD props, rigid-body physics for robotics) was considered and not adopted: off-style and
+  not what G1 needs.
+- G1a, viewer only (no rebuild): `player/locomotion.js` (heading + speed: turn arcs slower at
+  speed, sharp turns cost speed, a hard reversal at speed plants and pivots, eased acceleration
+  and braking, walls cut speed; the body faces its heading instead of sliding), `player/motion.js`
+  + optional rig fields (walk/idle blend by speed, stride matched to speed, lean into
+  acceleration, bank into turns, head leads the turn, jump tuck, landing dip), over-the-shoulder
+  follow camera with trailing and a sprint pull-back/FOV widening, and the character creator
+  (`figure/custom.js`, `player/creator.js`; C or the menu; saved in the browser and `#look=`).
+  Tests: viewer +16 (locomotion, motion, camera, creator data).
+
+**Open decisions**
+- Feel numbers (turn rates, acceleration, lean, bank, shoulder offset, sprint speed 4 m/s) need
+  the owner's play-test on a GPU; this container can't judge motion.
+- `film.ps1` should install the Playwright browser itself when it is missing.
+
+## 2026-11-05: G1a part 2, motion capture, knock-downs, feel layer
+
+- Owner: "move like actual people", with the feel of open-world brick games; asked about open
+  resources (NVIDIA SimReady was the example). Chosen: the CMU Graphics Lab Motion Capture
+  Database (free for commercial use; mocap.cs.cmu.edu's HTTPS certificate doesn't verify from the
+  container, so the clips come from the archive.org mirror of B. Hahne's BVH conversion, the same
+  files). Not used: Ubisoft LaFAN1 (non-commercial, no derivatives), Mixamo (Adobe licence).
+- `pipeline/.../tools/gait.py` (BVH reader, forward kinematics, rig angles in the body frame,
+  stride cycles, averaging; `--default` fetches the 14 clips and writes `viewer/src/figure/gait-data.js`,
+  reproducible byte for byte). Every walking figure now plays the captured gait (heel strike,
+  double knee flex, arm counter-swing, hip twist and drop, chest counter-twist, real stride
+  lengths) through `figure/gait.js`, with a small brick-game exaggeration (`FEEL`). Crowds get it
+  too (same rig), ahead of G1c.
+- Rapier was proposed and then not adopted for now: the city can't be a physics scene, and the
+  G1 needs are a few bodies. Instead `player/bump.js` (slow vehicles push, moving ones knock;
+  speed measured between frames) and `player/scatter.js`: knocked down or after a big fall the
+  figure pops apart into its parts, they tumble and bounce, then fly back and snap together.
+- Feel: the head looks around after standing still for a few seconds. Page footer credits BGT and
+  the motion capture.
+- Tests: pipeline +4 (gait on a synthetic BVH), viewer +15 (gait ranges and phase, bump, scatter,
+  fidget). Smoke-tested in a browser (diorama build, software rendering): walk, creator, knock-down.
+
+**Open decisions**
+- `FEEL` numbers, the knock speed (1.5 m/s) and the fall height (~3.4 m) need the owner's play-test.
+- Not yet captured: start/stop transitions and jumps (CMU has them: 16_57 sudden stop, 16_01/05
+  jumps); turning gaits. Next candidates once the owner has felt the basic gait.
+- In the streamed city the link's walk position (`#mode=walk&at=`) is applied before the chunks
+  load, so it is ignored there (only the diorama honours it); worth fixing for shareable links.
+
+## 2026-11-05: trip planner R3a (phone first)
+
+- Owner: at a bus stop, wants "how long from my location (or anywhere) to a destination"; phone
+  first, Maastricht only. Plan in PLAN.md R3a-c.
+- `viewer/src/plan/raptor.js`: RAPTOR over the existing timetable (`transit.json` v2) with live
+  delays, walking access/egress and transfers; returns the fastest, a fewer-transfers option and
+  the next departures. Chosen over the connection-scan search the plan named: one search gives
+  the fastest and fewest-transfer answers. `plan/geo.js`: GPS -> RD in the browser.
+- `plan.html` (+ `plan.js` 15 KB, web app manifest, icon) in every site build; the Transit panel
+  links to it. Location stays on the phone.
+- Checked on the real timetable (fresh OVapi GTFS, test area: 85 stops, 216 patterns, 2,319
+  trips): Markt -> station 9-10 min on lines 1/12/5 from Boschstraat/Markt; 3-14 ms per search.
+  Phone-sized browser test with a simulated GPS fix: found a real layout bug (the form overflowed
+  a 390 px screen and hid the location button), fixed.
+- Tests: viewer +8 (RAPTOR on a synthetic network: one bus, transfers, missed connections, walking,
+  next departures, days, after-midnight trips, live delays; GPS -> RD vs pyproj).
+
+**Open decisions**
+- Walking times are straight-line estimates until R3b routes walks on the walk graph.
+- Destinations are stops only until R3c (addresses, postcodes, places).
+- Needs a site build and publish from the workstation (the live timetable already has v2 stops).
+
+## 2026-11-05: walk sway fix
+
+- Owner play-test on the workstation: the run looks good, the walk "bobs side to side". Cause: the
+  captured hip drop (pelvis roll, about +-6 deg walking) tilted the whole upper body, which hangs
+  from the pelvis in the rig: the head swayed 12.8 cm per cycle (real walkers: 3-5 cm). The chest
+  now counter-tilts and keeps 15% of the drop (`rig.js TRUNK_ROLL`): 1.9 cm walking, 5.1 cm running.
+  Test added. Viewer only: lands with the next site build.
+
+## 2026-11-05: trip planner R3b (route on a map), hips calmer
+
+- Owner: picking a trip should show the route drawn out like a maps app, walking as the green
+  racing line. The phone page now draws the best route at once on PDOK's base map (Leaflet): bus
+  legs on their line's shape in the line colour, walks on the walk graph (A*) with green chevrons,
+  a GPS dot, and "Walk all the way" always offered with real footpath timing.
+- Bugs found in the phone test: the walking estimate pruned every bus slower than walking (short
+  trips showed only "walk"), fixed; the map first drew before its box had a size, fixed; the local
+  test server didn't send `.css`/`.svg`/`.webmanifest`/`.jpg` types (Leaflet's stylesheet was
+  ignored), fixed in `tools/serve.mjs`.
+- Owner play-test: the walk's hips still look odd. The captured hip twist and drop are halved in the
+  feel layer (`FEEL.hips` 0.5): they read oddly on a blocky hip piece.
+- Tests: viewer +4 (A* walking routes, shape cutting, journey geometry, RD -> GPS).
+
+## 2026-11-05: G1b traffic rules
+
+- `streets.json` roads gain `signals`, `crossings` (OSM nodes snapped to the graph) and
+  `roundabout` edges; roundabouts without a `oneway` tag were exported two-way (cars could go round
+  the wrong way), now one-way. Needs a `blox life` re-run (minutes), no world rebuild.
+- `life/traffic.js`: city-wide light cycle (north-south vs east-west, never both green), right of
+  way (bigger road, give way to the right, roundabout priority, 6 s impatience), crossings, lane
+  obstacles (buses, bikes, the player); braking capped so a car can still hit you. Cars see the
+  player, cyclists and buses through a per-frame env built in `life/index.js`.
+- Simulated on the real test-area roads: no red-light running, no standoffs.
+- Tests: pipeline +1 (export), viewer +6 (lights, red/green, priority, roundabout, four-way, crossings
+  and lanes).
+
+**Open decisions**
+- Buses follow the timetable and don't yield; making them queue would need the schedule to slip.
+- The light cycle isn't drawn yet (no visible traffic-light models); cars just stop.
+
+## 2026-11-05: trip navigation in the 3D city
+
+- Owner: the green racing line belongs on the ground in the 3D world; picking a plan should be
+  "start trip" like Google Maps: the line leads to the bus stop, you board, ride, get off and are led
+  on; teleporting onto the planned bus stays possible; you can exit the trip.
+- `plan/ingame.js` (in-game planner + trip HUD), `plan/trip.js` (the step logic: walk, wait,
+  board, ride, get off, walk, arrive, missed), `plan/groundline.js` (flowing green chevrons on the
+  ground). Boarding and getting off reuse `ride/` (board, wantOff/offK, leave at the stop);
+  teleport reuses its clock jump. Bus legs now carry the running vehicle's id (`vid`).
+- Tests: viewer +3 (the whole trip, missed bus, teleport).
+
+## 2026-11-05: plan to any place; GPS in the game
+
+- Owner: only stop names worked as destinations (e.g. "Missouri", a coffee shop, didn't); the
+  GPS start seemed gone (the Transit panel's "Plan a trip" now opens the in-game planner, which
+  had no location button).
+- `plan/places.js` + `plan/suggest.js`: search over named POIs, landmarks, streets, addresses and
+  stops with a suggestion list; `places.json` written by the site build; the game indexes its
+  loaded features. 📍 Me in the in-game planner (GPS start; the trip puts you there).
+- Phone test: GPS at the Markt, "bierwin" -> the Bierwinkel Stadsbrouwerij, planned and drawn.
+- Tests: viewer +2 (places from features, search).
+
+## 2026-11-05: planner on phones: no zoom-in, no jumps
+
+- Owner: picking a trip on mobile "zooms me in", buggy.
+- Causes: iOS zooms into any input under 16 px (the in-game planner's were 14 px); double-tap
+  zoom on buttons; the route map fit to zoom 18 and the page scrolled the map into view on every
+  pick; one-finger swipes over the map panned it instead of scrolling the page.
+- Fixes: inputs 16 px; `touch-action: manipulation` on the planner (no double-tap zoom); the
+  phone page's map is sticky at the top (42vh), fits without animation at most zoom 16, no
+  `scrollIntoView`; on touch screens one finger scrolls the page, two fingers move/zoom the map.
+
+## 2026-11-05: walk camera on phones; trips start facing the route
+
+- Owner: "the camera angle is weird".
+- A fixed 55° vertical FOV on a portrait phone (390x844) is only ~27° across: a tunnel view, with
+  the over-the-shoulder offset pushing the player well off centre. `player/camera.js` `fitFov`
+  widens the vertical FOV on narrow screens (at least 62° across, at most 78° vertical) and
+  `shoulderScale` shrinks the shoulder offset there; landscape is unchanged. The bus passenger
+  view uses the same fit.
+- "Start trip" spawned you facing north; it now faces the first leg (stop or destination).
+- Tests: viewer +1 (fitFov/shoulderScale). Screens checked at 390x844 and 1280x720.
+
+## 2026-11-05: trips stay inside the built city
+
+- Owner (phone): "Teleport onto the bus" showed only sky and green baseplate. The bus network
+  reaches past the built city: 126 of 309 stops (Malberg, Laathofruwe, Vendelplein, outer villages)
+  are outside the world's chunks, and a GPS start there planned a trip on a bus driving over empty
+  baseplate.
+- `TripPlanner.setUsable(fn)`: journeys only walk to, board, get off and transfer at usable stops
+  (buses still drive through the others). The in-game planner marks stops usable where the
+  streamed city has a chunk (`CityQuery.bounded` + `hasChunk`), leaves stops outside out of the
+  place search, and refuses a GPS start outside the built part with a message. The phone page
+  (`plan.html`) keeps every stop: it plans real trips, not game ones.
+- Open: buses ridden from the Transit panel can still drive out of the city.
+- Tests: viewer +1 (usable stops).
+
+## 2026-11-06: the ride camera owns the camera
+
+- Owner (phone): after jumping onto a ride the camera broke: zoomed-in outside view, a grey wall
+  for the inside view, the ride panel cut off at the left.
+- Cause: the player hook runs at draw time, after the ride hook. Boarding while walking started
+  the 1.1 s fly-out to the map; it overrode the seat camera, then restored the map lens (fov 40,
+  near up to 8 m, clipping the cabin) and switched the map controls back on, so pinches, map keys
+  and the map orbit pulled the camera off the seat, and a tap could even start walking mid-ride.
+  Pinches and double taps on the panels zoomed the page itself (the cut-off panel).
+- Fixes: `exitWalk(true)` leaves walk mode instantly (boarding uses it); the player tick, tap and
+  double-click to walk stand down while riding; the page can't be browser-zoomed
+  (`user-scalable=no`, `touch-action: manipulation` outside the canvas).
+- Checked headless (walk, board, press W): before fov 40 / near 1.36 / controls on / camera moved;
+  after fov 78 / near 0.15 / controls off / camera on the seat.
+
+## 2026-11-06: the game opens on the street, not on a map tool
+
+- Owner: loves the title screen and how the game loads into the city, but the static city
+  overview with the settings panel open after it "takes it out of the experience".
+- `src/intro.js` + `citymode.js`: pressing start flies the camera from the city view down to the
+  Markt (5.5 s), streams the landing spot first and hands over to the player in walk mode on open
+  ground. Skipped for links to a view/spot, screenshots, films and automated browsers (`#intro=1`
+  forces it).
+- The settings panel starts collapsed for everyone (new storage key, so old "open" choices reset).
+- Checked headless (`#intro=1`, 1280x720): 3.6 km -> 24 m over 5.5 s, then walk mode next to the
+  town hall. Tests: viewer +4 (path, yaw, when it runs).
+
+## 2026-11-06: start in the street; rides that stay on the map; more key art
+
+- Owner (videos from the workstation): the fly-in clipped through buildings and the whole-city
+  3D shot behind the title "takes you out of it"; jumping on a ride sometimes dropped them off the
+  map; getting off at Bouillonstraat put the player on the roofs.
+- The fly-in is gone. The title slides stay up until start (no 3D city behind the logo, no attract
+  orbit); behind them the camera waits at street level at the Markt, and start cuts straight to
+  the player on the most open spot of the square (`player/spot.js` `openSpot`).
+- Rides: buses outside the built city (or leaving it) can't be boarded (Running now shows
+  "Outside the built city"), stop search lists stops inside only, a bus about to leave drops you
+  at its last stop inside, the ride pins its lens every frame, and getting off lands beside the
+  doors on open pavement (`standSpot`; stop points often sit inside building footprints).
+- Key art: six new views (Onze Lieve Vrouweplein, Sint Servaasbrug, Station, Bonnefanten, Helpoort,
+  ENCI), framed with low-res previews here; the final 1080p renders are made on the GPU
+  workstation (`tools/keyart.mjs --size`, `BLOX_CHROMIUM`). Slides without an image are skipped.
+- Checked headless on the city data: start -> walk on the open Markt; outside bus refused; ride +
+  get off -> feet at street level beside the bus. Tests: viewer +3 (spots), intro tests trimmed.
+- Owner: a bus to the station "drove on the water, after driving on the bridge for a bit". The
+  life ground lookup starts 2.5 m above the area's baked ground (so tree crowns aren't taken for
+  the ground); over the river that baked ground is the water, so the high middle of the
+  Wilhelminabrug deck was above the search start and the water under it was returned: 1,242 of
+  3,608 bus line points near the bridge. `life/ground.js` now looks again up to 25 m higher when
+  the answer is water and takes a dry deck (0 left); walkers and cyclists on bridges get it too.
+  `makeDeck` also moves a vehicle whose route line runs beside a deck over the water onto it.
+- Seen in the videos, still open: buses drive through crowds on shared streets (pedestrians don't
+  give way), and "next stop · now" can stay up while the bus is still driving.
+
+## 2026-11-06: traffic that keeps to the rules; buses in traffic; the police car
+
+- Owner (videos): no traffic laws visible, buses through bikes, a car body through the passenger
+  cabin of the bus being ridden, vehicles phasing through each other at junctions. Wants cars that
+  behave like cars and respect buses and the rules, and a police car as an easter egg.
+- Causes found: (1) right of way only looked at cars still approaching a junction, so a car
+  already in the box was invisible to cross traffic, and a car on green had no check at all;
+  (2) rules only looked at the end of the current edge, so a short OSM edge before a light hid
+  the red until it was too late to stop; (3) the signal stop line sat 1.5 m from the node centre,
+  inside the crossing lane; (4) buses were three circles seen only once in front of a car, no
+  prediction, trains not at all; (5) buses, being timetable-driven, drove into cars queuing in
+  front of them; (6) `carPose` jumped between lane lines at corners (a right turn showed yaw 304°).
+- Changed: junction boxes with movements and commit (`life/junctions.js`), two-node lookahead,
+  stop line before the box, conflict-aware right of way, left turns yield on green, ring
+  detection, lane-corner poses; buses/trains carry a timetable sweep the cars give way to; a
+  per-trip hold-back lag for buses (max 120 s, made up at 1.25x; `life/busflow.js`); the police
+  car (`life/police.js`, `CAR_TYPES.police`, light bar lenses in `figure/vehicles.js`, also on the
+  vehicles design sheet). Guide: 05, "Junction boxes, buses in traffic, the police car".
+- Measured on a synthetic grid (70 cars, 3 buses, 240 s): car-car overlap frames 870 -> 0,
+  car-bus 550 -> 0, distance driven -5 %. Tests: viewer +13 (`life.junctions`, `life.busflow`);
+  the four-way standoff test now allows 24 s (cars cross one at a time).
+- Open: buses ignore red lights; with very dense traffic a bus reaches its lag cap and goes on.
+
+## 2026-11-06: people behave like people; the street-life audit
+
+- Owner: back to starting at the city view (the fly-in and the street cut are gone; the title
+  slides and the bus fixes stay). Then: people walking through each other and on roofs, buses
+  driving through bikes, nobody giving way.
+- `src/life/audit.js` + `tools/life-audit.mjs`: counts, per snapshot of the running game, people
+  through people, people inside vehicles, people on roofs (> 2.5 m above the street within 5 m),
+  bikes inside vehicles, bikes through bikes, cars inside buses, cars through cars.
+- People (`walkers.js`, `walkgraph.js`): `separate()` gives every group its personal space (a disc
+  as wide as the group) through the lateral offset, and slows whoever has someone right in front;
+  `avoid()` counts group widths and walks round people standing still; groups fall into single
+  file where a member would stand in a wall (`fitRoom`), and nobody is drawn more than 1.2 m above
+  the group's leader; people wait at the kerb for a moving bus or car about to cross their path
+  (`inVehiclePath`, the road it covers in ~2.5 s), up to 8 s.
+- Bikes (`cyclists.js`): queue behind the bike in front (`queue()`), avoid each other, brake for a
+  vehicle in the way, and step aside from one for good (lateral offset).
+- Measured with the audit at high quality (900 people, 109 bikes; Markt, Vrijthof, Station,
+  60 s each; average per snapshot, before -> after together with the junction work above):
+  cars through cars 11.9 -> 0.56, cars in buses 0.03 -> 0, people through people 46.6 -> 15.9,
+  people in vehicles 0.49 -> 0.06, bikes through bikes 11.5 -> 3.6, bikes in vehicles 14.6 -> 10.4.
+- Open: bikes in vehicles (cars and buses don't wait for bikes crossing their path yet); about 45
+  people at the Station stand > 2.5 m above the ground within 5 m (platforms and the footbridge or
+  real roofs: to check on the workstation); people still cross roads anywhere (no crossings yet).
+
+
+## 2026-11-06: start above the city, not above the map
+
+- Owner: the start is "way too zoomed out", "above the generation of the city". The default view
+  is now `above` (citymode presets): the Markt from 650 m at 38 degrees, old town and the Maas
+  filling the screen, the map's edges out of sight. `#view=city` keeps the whole-map view.
+
+## 2026-11-06: trips start at your GPS position; full screen on phones
+
+- Owner (phone video): "Start trip" from My real location showed the trip HUD but no avatar: the
+  start was outside the streamed area, `enterAtUnity` refused ("not loaded") and nothing retried.
+  Now the map moves there, streams it and the player stands there once the ground is in.
+- `standSpot` was too loose: at the station it picked a sunken spot inside the building (the
+  lowest top within 14 m), squeezing the camera into walls. A spot now needs street level among
+  open spots, open sky up to 6 m and room for the camera (3 of 8 directions clear), within 30 m.
+  Checked headless: GPS at the station -> standing on the Stationsplein, green line to the stop.
+- Full screen: the title's start (key, click or tap) asks for it on every device (laptops too); `game.webmanifest`
+  (display fullscreen) for Add to Home Screen.
+
+## 2026-11-06: full screen on phones
+
+- Owner: full screen worked on the laptop, not on their Android phone. The start listens to
+  `pointerdown`, and for touch that is not a user activation (only `pointerup`/`touchend`/`click`
+  are), so Chrome refused the request. It is now asked again on the finger's `pointerup`.
+- Owner (S23+ screenshot): full screen works now, but the settings panel sat under the status bar
+  and the walk bar covered the footer. Pinned UI now keeps to the safe-area insets; on phones the
+  footer line moves above the Transit button.
+- The settings panel was wider than a phone screen (the view links have no spaces between them, so
+  they never wrapped), pushing its hide button off the edge: the links wrap now and the panel is
+  capped at the screen width.
+- Phones: the settings panel is a compact 260 px box in the top-left corner (as on a laptop) with
+  smaller text, not a full-width sheet; the clock row wraps.
+- Owner: on a phone, full screen should be landscape; portrait without full screen is fine.
+  `goFullscreen` locks landscape on touch screens once full screen (unlocks on exit); the
+  manifest asks for landscape; short (landscape phone) screens get the compact settings panel too,
+  scrollable when open.
+- Owner: the settings box must stay a rectangle covering the same top-left part of the screen.
+  It keeps the laptop layout (600 px) everywhere and is scaled to fit (`fitHud`: at most 70 % of the
+  width, 50 % of the height): phone portrait 70 x 19 %, landscape 37 x 50 %, laptop 42 x 41 %.
+
+## 2026-11-07: quality tiers change detail, not how busy the streets are; High from above
+
+- Owner: tiers should not change the crowd. Each tier had a fixed count crammed into a radius set
+  by camera height (~50 m at street level), so High was ~4.5x denser around you than Low. Life now
+  lives within a radius per tier (`LIFE_RADIUS_BY_TIER`: 180 / 135 / 85 / 54 m) with the same
+  counts, so every tier has the same density near you (~0.9 people per 100 m²); Low just stops
+  simulating far away. Test: `life.tiers.test.mjs`.
+- High from the map view: the finest baked far level only showed within 380 m of the camera, but
+  the start view is ~420 m up, so it never showed. High now shows level 1 within 800 m and level 2
+  within 2.6 km (far l1/l2/l3 15/134/352 -> 64/285/352, 4 -> 8 M triangles on High; auto drops a
+  tier when frames slow down). High already renders at 2x pixels (smooth edges).
+- Next ideas for High: reflections on the Maas, softer shadows.
+
+## 2026-11-07: the city has sound
+
+- Everything synthesised with Web Audio, no files: traffic near cars and buses plus a hum by the
+  hour, crowd by nearby walkers, birds (dawn chorus, parks, none at night or in rain), Vrijthof
+  bells on the game clock's hours and half hours, footsteps by stride and surface, jump and land
+  thuds, bus engine, ridden-bus doors, rain from `ctx.weather.rain` or `#rain=`.
+- Starts on the first gesture. Volume 60% by default; slider and mute in the settings panel, V
+  mutes, saved in localStorage. Suspended when muted or hidden. About 23 nodes, gain and pan only,
+  10 Hz updates. Guide 14.
+- Open: towers and parks are placed by hand; real surfaces need a ground-colour query.
+
+## 2026-11-07: exploration: plaques, golden studs, journal, photo mode
+
+- `viewer/src/explore/`: 24 plaques at real landmarks show one or two lines of history within 8 m
+  and count as discovered; 42 golden studs to collect in squares, courtyards, parks, on bridges and
+  the Sint-Pietersberg. The journal (J) lists places and studs, with a dark map that lights up where
+  you walked. Photo mode (P) makes framed postcards, shared or downloaded. Saved in localStorage.
+- Positions picked from the built city (feature centroids, then the nearest open street spot).
+- Open: the character creator should offer the gold-colour unlocks. Guide 15.
+
+## 2026-11-07: quiet activities on foot
+
+- G (gamepad X, or the pill above the walk bar): sit on a free terrace chair (relaxed camera, the
+  clock at 10x); take a parked bike (cycling pose, faster, same collision; G leaves it where you
+  are); board a passing river boat from the bank (off at the next open quay); feed the ducks (seven
+  brick ducks on water near you swim to the bread). Terraces thin out in rain, cold and cloud when
+  `__bloxLife.weather` exists. Guide 16.
+
+## 2026-11-07: light goals, navigation cues, the first minute
+
+- `viewer/src/goals/`: optional one-at-a-time goals from real data: a tourist asks for a nearby
+  landmark or café; catch bus N to a stop a few calls on (checked against the ride); golden hour at a
+  viewpoint before sunset. Hints: a faint golden beam over the rooftops, an edge glint and "320 m
+  north-east"; the green ground line only on "Show route". Tiny far labels on Sint-Jan and
+  Sint-Servaas. First visit: one "double-tap the Markt" prompt; first offer ~20 s into the first
+  walk. One top-right card, O folds it. Guide 17.
+
+## 2026-11-07: interiors: walk into real places
+
+- Places are data: one JSON per place in `viewer/src/interiors/data/`, validated and copied into the
+  site by `build.mjs`; adding one needs only the site build and publish, no world rebuild.
+- Walk into a door: a fade, then a brick-built room 40 m below the door with seated people, staff
+  and a closer camera; walk into the doorway to leave. Collision through a city-query wrapper.
+- Café De Steen and Lounge 22 are made-up examples on the Markt, to replace with permitted places
+  (guide 19: what to photograph and measure).
+
+## 2026-11-07: the toy look on every quality tier
+
+- Owner: Low looked better: bolder studs. Two causes: ambient occlusion darkens the gap round every
+  stud and seam, and High built smoother bricks (two bevel steps, 20-sided studs). Now every tier
+  uses the chunkier bricks (one bevel step, 12-sided studs; cheaper too), and ambient occlusion is
+  drawn only from 40 m above the street (it still gives buildings depth from the map view).
+
+## 2026-11-07: multiplayer capture the flag (first playable)
+
+- 2 to 8 players in a room with a 4-letter code; blue defends the Markt, yellow the Vrijthof. First
+  to 3 captures or most in 8 minutes; running into a carrier knocks them down and drops the flag
+  (home after 20 s or when a teammate touches it). Leaving the old town sends you back to your
+  base after 5 s.
+- Each room is a Cloudflare Durable Object (`relay/src/room.js`, rules `ctf.js`) that decides flags
+  and score; clients send positions about 10 times a second, as RD metres. A dropped connection
+  keeps its place for 30 s.
+- The site shows "Multiplayer coming soon" until the relay is deployed with the `ROOMS` binding
+  (`cd relay && npx wrangler deploy`). Guide 18.
+- Open: no speed checks (fine among friends), players pass through each other, one arena.
+
+## 2026-11-07: living city 2.0
+
+- Maastricht lives through its day (`life/routines.js`): people are drawn by hour and weekday to 13
+  places: students to the university in the morning, shoppers on Grote Staat, Kleine Staat and
+  Maastrichter Brugstraat by day, commuters at the station at 8 and 17, nightlife on the Markt,
+  Platielstraat and Vrijthof Thursday to Saturday, almost nobody out at 3 am. Up to 45 % of groups
+  head somewhere rather than wander.
+- Events by date (`life/calendar.js`): carnaval, 11-11, Preuvenemint, Magisch Maastricht,
+  Koningsdag, with outfits; `#date=` tests them.
+- Real weather (`life/weather.js`, Open-Meteo, near real time only): rain thins the crowd and sends
+  people to the walls to shelter, cold empties terraces and brings out coats. `#rain=`/`#temp=`.
+- People react to the player (`life/reactions.js`): look at jumps, step aside from a runner,
+  scatter after a knock-down. Audit unchanged or better.
+- Merge note: terraces read `state.weather` themselves, so index.js passes them plain rain.
+
+## 2026-11-08: fewer sounds
+
+- Owner: didn't like the sounds. Kept the Vrijthof bells, rain, footsteps and jumps; took out the
+  synthetic traffic rumble, crowd murmur, birds, bus engines and doors (code and tests removed,
+  not just muted). If they come back it should be with real recordings.
+
+## 2026-11-09: Maastricht University interiors
+
+- Eight faculty and library buildings are enterable (`viewer/src/interiors/data/um-*.json`): SBE,
+  Law, FASoS, UCM, FSE, UNS40 (FHML + FPN), the Inner City Library and the Randwyck Library.
+  Generic ground floors: a hall with reception, study tables, coffee bar or sofa corner; a lecture,
+  seminar or tutorial room behind a glass or brick wall; book stacks in the libraries.
+- Doors from OSM entrance nodes where mapped (UCM), otherwise the BAG address point on the
+  footprint's street side, each ~1 m out from the 3D BAG facade on level street ground.
+- New campus furniture kit (`kit-campus.js`), screen slides, bigger wrapped name signs (no logos),
+  stone-slab floors, up to 72 people per room.
+- Open: not surveyed (photos per building make them accurate); doors still to be walked up to in a
+  full-city build.
+
+## 2026-11-09: stadium stands
+
+- De Geusselt's pitch side was a brick wall with windows; now it is a seating rake
+  (`voxelise/stands.py`): rows 1 m deep rising one brick from 1 m above the pitch, seats in MVV red
+  and white with patterns per block, aisles every 20 m, the roof kept from 3D BAG and open toward
+  the pitch, outer facades unchanged.
+- Detection from data: a 3D BAG ring with a hole of at least 2,500 m² plus an OSM `leisure=stadium`
+  area or `building=stadium` (no id list; an `osm_tags` correction is the override). Works on
+  islands (De Geusselt is 27 degrees off the grid). Brick count 57.6k -> 50.0k.
+- Open: the north stand's lower front roof crosses in front of its upper rows (3D BAG has two roof
+  levels there). Needs a world rebuild to show.
+
+## 2026-11-09: street life follows the walking player
+
+- Review find: life was centred on the map's orbit point, which stays where you entered walk mode.
+  With the per-tier radius (85 m on Low) the streets emptied as you walked away, and the camera's
+  near plane grew with the distance (up to 8 m: walls near the camera cut open). Life now centres on
+  the walking player, and the orbit point walks along with the player.
+- Checked headless on Low: Markt -> 400 m to the Vrijthof without touching the map: 49 people
+  within 60 m (before: the crowd stayed at the Markt).
+
+## 2026-11-12: movement feel and crowd behaviour
+
+- Player: faster acceleration and braking (running pace in ~0.45 s), walk/run 1.5/5.0 m/s,
+  sharper sprint turning; a jump with a real arc (stronger fall gravity), short hops when the key
+  is released early, coyote time (0.12 s) and jump buffering (0.14 s); kerbs and stairs step at
+  once but the drawn height eases.
+- Camera: looks past thin posts (lamp posts, trunks) instead of punching in; eased pull-in, a
+  short hold before easing back out; height follows quickly on the ground, slowly in the air.
+- Touch: 14 % stick dead zone, run past 82 %, smoothed look drags, gentler vertical look.
+- Animation: no foot sliding (stride measured from the posed legs), short steps at slow pace,
+  turn-on-the-spot shuffles, a jump pose that follows the arc, faster recovery from a running
+  landing, breathing and weight shifts when standing, idle activities (phone, talk, look round,
+  hands on hips), a walking style per person.
+- Crowd: anticipatory steering (`steer()`: groups read each other's lines 6 m ahead, pass on
+  their side, walk round people standing, overtake or follow), never shifting into a wall,
+  eased starts and stops, heads turning to friends, to what the group looks at and to the player.
+  Guide 09.
+
+## 2026-11-12: calm sound
+
+- Owner: "just noise". Reworked so nothing is a raw noise burst: a very quiet pad of slow chords
+  (one voice moves every 15 s), mellow distant bells (low partials, soft attack, long tail, a dull
+  echo; hours only), soft low footsteps and landings, rain as a low patter. Default volume 35 %,
+  a gentle limiter, a 2 s fade-in, smooth mute fades.
+- Measured (30 s offline render): peak -14.3 -> -24.6 dBFS, energy above 4 kHz 44 % -> < 0.001 %,
+  largest sample jump 0.055 -> 0.002 (`audio.render.test.mjs`). Guide 14.
+
+## 2026-11-13: a slim ride bar on phones
+
+- Owner: the blue ride box covered the screen on a phone. On narrow or short screens it is now a
+  slim bar (line, next stop, small buttons; the stop strip and hint hidden): 19 % of a landscape
+  phone screen. The multiplayer, journal and report buttons hide while riding.
+
+## 2026-11-13: pause menu, map and fast travel
+
+- New `viewer/src/menu/` (guide 20): a small pause button top-right on phones and PC, Esc and
+  gamepad Start open it, and on PC a pointer lock lost to the browser's Esc pauses the game too
+  (Resume catches the mouse again). While open the game stands still: keys and pointers go to the
+  menu, the player's tick returns early, the life clock runs at 0.001x.
+- Entries: Resume, Map & fast travel, Character, Journal, Photo mode, Plan a trip, Goals on/off,
+  Settings (the `#hud` panel moved into the menu; hidden on phones otherwise), Controls & help,
+  Multiplayer.
+- Full-screen canvas map: built-city mask, the Maas, walkways (tiled, only what is in view), bus
+  stops (platforms merged), landmarks, you with heading; drag/wheel/pinch. Tap a stop, landmark
+  or street to travel: fade, `enterNearUnity`, or (not loaded) move the map there, `city.focus`,
+  retry, give up after 45 s.
+- Small API additions: `__bloxPlayer.openCreator/closeCreator/creatorOpen/toggleHelp/busy` (Esc
+  and Start go through the menu when there is one), `__bloxExplore.landmarks()/journalOpen`,
+  `__bloxGoals.setOff`. Layout: the Map button and `#info` sit left of the menu button; the
+  empty `#info` panel no longer shows (its `display: grid` beat `hidden`); on short landscape
+  phones the goals card moves left of the button column (it covered the multiplayer button).
+- Checked in headless Chromium on the full city at 915x412, 412x915 (touch) and 1280x720: no
+  overlapping buttons, menu, settings, map, near and far fast travel, Esc and lock-loss paths.
+- Open: arriving at a landmark can put the camera close against a wall (follow camera); the map
+  has no street names yet.
+
+## 2026-11-13: traffic lights and crossings you can see, and everyone keeps to them
+
+- Owner: lights and crossings should be visible and match the real ones. Poles and zebras stand at
+  the real OSM signal (335) and crossing (304) nodes; one city-wide cycle drives the lamps and the
+  rules. New `life/signals.js` (pure, tested) and `life/signalsdraw.js` (instanced, capped by tier).
+- Walkers wait at the kerb for the pedestrian green, give way at zebras, and prefer routes over
+  crossings; cyclists stop at red; buses and trains stop for red and for people on a zebra; cars
+  stop for people waiting at a zebra. Walkers and riders now see every car near them, not the
+  first 40 (most bikes inside cars came from that). Details: guide 05.
+- Audit (`tools/life-audit.mjs`, high tier, markt/vrijthof/station, 40 s, average per snapshot,
+  before -> after): people in vehicles 7.52 -> 0.10, bikes in vehicles 7.76 -> 0.60, car overlaps
+  0.39 -> 0.06, bike overlaps 0.34 -> 0.25, people overlaps 5.66 -> 6.55 (people now bunch at kerbs
+  waiting for green), people on roofs 12.9 -> 16.2 (all at the station; that is a known open problem,
+  not caused by this work, and it varies from run to run).
+- Open: a degree-2 signal node just behind a junction also shows a light for traffic leaving it; no
+  stop-line paint; zebras at junction nodes are not drawn; the station "people on roofs".
+
+## 2026-11-13: the look by time of day (golden hour, blue hour, night), haze, grade
+
+- New `viewer/src/render/`: `look.js` (every light, sky and grade value from the sun state; pure,
+  tested), `haze.js` (the distance fog glows toward the sun), `grade.js` (final pass: tone mapping,
+  grade, vignette, and edge smoothing on High; replaces OutputPass, so no extra pass on any tier).
+- Twilight is longer and has a blue hour; the switch from sun to moon no longer pops (direct light,
+  its colour and the haze glow all fade out before the direction changes; the test caught a colour
+  jump there). Stars and a moon at night. Bloom threshold drops at night so windows glow.
+- Cost: the same number of passes as before; High adds up to 7 texture taps per edge pixel.
+- Open: no measured frame times on a real GPU yet (headless is software rendering); check on the
+  workstation and phones.
+
+## 2026-11-13: capture the flag gets weapons, pickups, a knife and moving bases
+
+- Owner: a good shooting mode (aiming, scopes, zoom), weapon variety and locations, a knife that
+  knocks out in one hit, bases in different parts of town, a heat map. Guide 18 has the details.
+- New `viewer/src/mp/weapons.js` (pure) and `combat.js`; `relay/src/ctf.js` `shoot`, `pickBases`,
+  `PLACES`. The relay must be redeployed (`npx wrangler deploy` in `relay/`): old clients still work
+  with the new room, new clients need the new room to shoot.
+- Found while testing: shots aimed from the camera before the player's own update went into the
+  ground (the map controls had moved it); they now use the camera as drawn. A straight click
+  between two slow frames was lost; it is latched now.
+- Open decisions: weapon balance after real play; whether pickups should be shared room state.
+
+## 2026-11-13: capture the flag: shared pickups, guns on other players, gamepad
+
+- Pickups are decided by the room now (first player there gets it, gone 20 s for everyone);
+  other players' figures carry a gun at their side; a gamepad can fire, aim, reload, swap, stab.
+- Checked in a browser match against a scripted player: the pickup through the room, the gun
+  on the other figure. The relay must be redeployed for pickups to work.
+
+## 2026-11-13: the pause menu looks like the title screen
+
+- Owner: the pause menu was plain. The main page is now a left column in the title screen's style
+  with the paused city beside it (guide 20). CSS and two lines of markup; no behaviour changed.
+
+## 2026-11-13: traffic lights and zebras you can actually see
+
+- Owner: no lights or zebras to be seen on the live site (Wilhelminasingel). The data was right
+  (335 signals, 304 crossings, all but 3 crossings drawn); the drawing was the problem: thin dark
+  poles, shown only within 120-160 m of the camera itself (nothing from the map view), and a pole
+  placed before its ground had streamed in got an invalid height (the ground lookup answers
+  Infinity there) and stayed invisible until the next re-pick.
+- Now: bigger heads and lamps on light grey posts, 4 m zebra stripes, twice the range, measured
+  from the player or the map's focus, and unloaded spots are skipped and retried quickly.
+  Checked in the full city at Stationsstraat / Wilhelminasingel (guide 05).
+- Note: a roundabout has no lights in OSM; its zebras are drawn where OSM has crossing nodes.
+
+## 2026-11-13: people off the station roofs; queues at kerbs
+
+- Owner: roof-walkers and people through each other got worse with the traffic lights.
+- Roofs fixed: walkers go under canopies (`ground.walk`), 16.2 -> 1.3 per snapshot. Queueing
+  behind people waiting at a kerb added. Strangers through each other is not fixed (6.55 -> 6.2,
+  noise); guide 05 says what was measured, what was tried and what to try next.
+
+## 2026-11-14: the Maas and the air, live (relay `/city`)
+
+- Owner: move toward a digital twin, through the relay (the website never used the Python proxy).
+  New `relay/src/city.js` and `GET /city`; `viewer/src/life/cityfeed.js` shows it in the status
+  line and on the pause page. Both sources checked against real answers today (Maas 44.07 m NAP,
+  47.6 m³/s, 10.3 °C; both air stations "moderate"). Guide 08.
+- Fixed: after creating a room a gun filled the screen in the lobby (the first-person gun was
+  never hidden before the first match).
+- The relay must be redeployed. Open decisions: let the drawn river follow the level; traffic and
+  roadworks need a different source or a scheduled job.
+
+## 2026-11-14: a slice for the whole of Maastricht
+
+- Owner: build the west (and so the whole city); buses glitch where they leave the built area.
+- New slice `maastricht` (8.7 x 7.7 km, guide 02). The viewer already took origin and size from
+  the manifest; the one thing tied to the city slice's origin, interior doors, now shifts
+  (`shiftDoor`). Not built: 6 to 9 h on the workstation, and the site may come near GitHub
+  Pages' 1 GB limit, so the size has to be checked before publishing.
+- Open decisions: Itteren (left out); if the site is too big, drop the outer far-bake level or
+  host the world files elsewhere.
+
+## 2026-11-14: leaves sway in the real wind
+
+- Owner: the city should feel alive. First touch: tree foliage near the camera drifts with the
+  live wind speed (guide 06). One shader patch and a per-instance flag; no new draw passes.
+
+## 2026-11-14: more car types with lights at night; rush jobs and sightseeing tours
+
+- Owner: a city that feels alive, more varied challenges. Cars: estate, suv, taxi, body details,
+  head and tail lights with light pools from dusk (guide 05). Goals: a timed delivery between real
+  shops that needs a run, and a three-sights tour in any order (guide 17).
+- Open: the car lights and the tour have not been seen on screen yet; bike riding feel and a
+  wider code review are next.
+
+## 2026-11-14: the shooting mode says how to play
+
+- Nothing told a new player how to fire, aim, swap, stab or find weapons. A controls line now shows
+  for 14 s when their first match in a room starts (guide 18).
+
+## 2026-11-14: a hit says where it came from
+
+- Being shot only flashed the screen red. A red arc now points toward the shooter for a moment
+  (guide 18): the cue a player needs to react instead of dying without knowing why.
+
+## 2026-11-14: haptics in the shooting mode
+
+- Owner asked for haptic feedback. Shots, hits, knock-outs and pickups buzz the phone or rumble
+  the gamepad (guide 18). Not felt on a real device yet; iPhones cannot vibrate from a web page.
+
+## 2026-11-14: an objective marker in matches
+
+- Nothing on screen said where the flag or your base was. A strip at the top now points to the
+  enemy flag, and to your own base while you carry it, with the distance (guide 18).
+
+## 2026-11-14: ammo cue at the crosshair
+
+- The ammo count sat in a corner. Low, reloading (with progress) and empty now show under the
+  crosshair, and only then (guide 18).
+
+## 2026-11-14: a spawn shield
+
+- A player back at the base could be shot the moment they appeared. Three seconds of shield
+  after the start and after a respawn, given up by shooting (guide 18). The relay must be
+  redeployed for it.
+
+## 2026-11-14: the whole-Maastricht site would not stream (fixed)
+
+- After publishing the `maastricht` slice: the loading screen never ended on PC; on phones only
+  the coarse far look showed when zooming in. Cause: the silhouette's region cap (600) was below
+  the region count (1,020), so it never settled and chunk streaming never started (guide 06).
+  The world data was fine; only the site needs rebuilding (no world rebuild).
+- Also seen while checking: two chunks near the hospital (Randwyck) hold a flat grey roof about
+  45 m up with no walls; a building lost its walls in the build. Open.
+
+## 2026-11-14: the figure holds its gun; windows by the hour; match HUD; controller rumble
+
+- Owner: the gun floated beside the character; windows looked like placeholder lights; no
+  haptics on a PS5 controller; (from the screenshot) the brick info, Play button and ammo
+  overlapped the fire buttons. All four addressed (guides 06 and 18).
+- PS5 rumble: the code now tries every API browsers offer and says on connect whether rumble is
+  available. Whether a DualSense rumbles depends on the browser and platform (Chrome or Edge on a
+  PC is the likeliest to work; phones often give gamepads no rumble). Not tested on the hardware.
+
+## 2026-11-14: running into people, and the body when running with a gun
+
+- Owner: hips and arms should move like running with a gun; running into people should push
+  them aside or over. Both done (guide 09). Not seen on screen yet: the sprint carry and a
+  knock-down in the live city (both covered by tests against the real code paths).
+
+## 2026-11-14: low ready, quick draw, strafing and backpedalling
+
+- Owner: proper movement in general, the gun at the hip pointing down when running, ready for a
+  quick draw. Three blended holds, a chest that keeps the aim while the legs go where you walk,
+  and real backwards steps (guide 09). Animation assets were considered: the figure has its own
+  rig and a captured gait already, so retargeting a pack would cost more than it gives.
+
+## 2026-11-15: bike riding feels like a bike
+
+- Riding was a fast walk (instant speed, spins on the spot, no lean). Now: pedal up to speed,
+  roll on, brake, turn no tighter than a bicycle, lean into turns, stand up to push off, coast
+  with level cranks, and a bell (guide 16). Sets up the bike race.
+
+## 2026-11-15: lamp light at night; the stylised look, honestly
+
+- Owner wants a Spider-Verse-like look (a switchable mode, but only once it is right). Screen
+  filters alone could not get there: the reference is mostly lighting (lamp pools, neon, deep
+  shade) plus depth-driven comic effects and animation on twos. First step in the normal game:
+  street lamps cast warm pools and glow (guide 06). Next: depth-based comic focus and animation
+  on twos behind a test flag, then style-aware lighting; the menu switch waits until it is right.
+
+## 2026-11-15: a bright, colourful night; street lights on every road
+
+- Owner: night too dark; it should look good at every hour. New night look (blue-violet fill,
+  city glow, brighter moon, more colour), street lights along every road, colourful windows, and
+  a test that keeps the night from going dark again (guide 06).
+
+## 2026-11-15: the city's own colours, comic handling
+
+- Owner: Maastricht's colours in that style, not a purple filter. Neutral night fill; the comic
+  test pass now groups values and keeps each colour's hue (guide 06). Still in progress.
+
+
+## 2026-11-15: comic look crisp and modelled; brighter night
+
+- Owner: the crisp, detailed comic-film look (a detailed model, coloured and drawn). The test pass
+  (`#look=verse`) gains sharpening, edge and crease lines in the surface's own darker colour, a rim,
+  a clean sky and print texture only in out-of-focus shade; tinted greys stay grey. Night fill and
+  exposure raised for all looks (guide 06). Still behind the test flag; open: shopfronts, neon, lighting.
+
+## 2026-11-15: comic look, painted surfaces
+
+- Owner: closer but "something" missing. Diagnosis: surfaces, lighting, palette and detail, not
+  the filter. Added world-space weathering on opaque materials, a stronger key and depth haze, a
+  restrained palette and shadow hatching, all behind `#look=verse` (guide 06). Next: facade detail
+  and night light pools.
+
+## 2026-11-15: comic look, material textures; depth bug
+
+- Owner: "it's the textures". World-space textures per material (brick bond, marl blocks, plaster,
+  setts, asphalt, roof rows) in the comic test look, matched from the palette. Found why outlines,
+  focus and the clean sky never worked at street level: the AO pass (their depth source) was off
+  there. Fixed (guide 06).
+
+## 2026-11-15: comic look, figures and night pools
+
+- Owner: crisper, detailed figures; different stuff should look different (concrete vs trees);
+  pools and details. Figure parts by material, foliage/bark/grass/soil/copper textures, glazing
+  bars in windows, lamps and shop windows as real point lights at night (guide 06). Ray tracing:
+  not for the browser game (see the reply); the look comes from materials and motivated light.
+
+## 2026-11-15: comic look, characters and vehicles
+
+- Owner: textures for people, bikes and cars, especially the player. Figure parts and vehicle parts
+  get their own materials and sewn/painted detail (guide 06). Checked at 720p only: the finest
+  detail (stitching, laces) needs a look on a real screen.
+
+## 2026-11-15: lessons carried to every look; manga look
+
+- Owner: rebuild-only items to the backlog (facade detail, the Randwyck roof, Itteren; PLAN.md);
+  carry the comic look's lessons to the toy and manga looks. Every look: window bars, real night
+  pools, printed figure detail, tyre and rim detail. Manga built as `#look=manga` on the comic
+  pass (ink lines from depth, screentone, hatching). Toy look keeps smooth bricks on purpose.
+
+## 2026-11-15: the comic look ships
+
+- Owner: put it on the live site as a pause-menu choice; fix the lag; tone it like the film.
+  "Look: Classic / Comic" in the pause menu (saved, reloads); depth from the scene render instead of
+  a second scene render (draw calls no longer double); the film's grade (muted, split-toned, hazier).
+  Manga stays a test flag (#look=manga); next: fewer dots and hatching there.
+- Fixes from the owner's first look: no amber cast on people (gentle split tone, low sheen); street
+  lamps with tight halos and pools that fall off like real street lights.
+
+## 2026-11-15: grounded figures, inked hatching
+
+- Owner: outside advice on integrating characters; hatching as close to the film as possible.
+  Contact shadows under every figure (all looks), figure colours pulled into the painted palette,
+  form-following inked hatching (comic and manga), manga lighter (more paper, finer screentone).
+
+## 2026-11-15 (evening): play-test fixes
+
+- Owner on phone and laptop: gun drifting from the hand in the comic look (twos vs live hand: player
+  figures now animate every frame); phone on Low read like a filter (fine detail fades under 600 px;
+  laptop on Low untouched); no way to close the room panel on a phone (close button, auto-close at
+  match start); guns should feel like guns (recoil recovery, shake, flash, kick-back, sounds).
+  check.sh bundles the game now.
+
+## 2026-11-15 (night): solo play, bots and the night raid
+
+- Owner: bots in capture the flag and a night raid, "protecting Maastricht" as the frame. Both run
+  in the browser on the relay's own rules (`mp/localroom.js`), so no server is needed: CTF 4 v 4
+  with bots, and "Defend Maastricht", waves of raiders from the caves going for the banner on the
+  Markt, 8 waves to dawn (guide 18). Bugs found on the way: the client sends JSON text (the local
+  room parses it), raiders knocked out by me never crumbled (fixed), my position went stale on slow
+  frames (the local room keeps it fresh).
+
+## 2026-11-15 (late): your Spotify; the comic look reacts
+
+- Owner: connect Spotify while playing; the look should react to the action like the film. Music
+  dock with Spotify's own player (any link; whole songs when signed in; the city ducks while it
+  plays; guide 21). Beat-reactive visuals from Spotify are not possible (protected audio, closed
+  analysis API), so the comic look reacts to game events instead: action lines, dot bursts, plate
+  splits, two-colour flashes, tilts, held frames and Dutch sound words (guide 06).
+
+## 2026-11-15 (late): Spotify login and a proper music panel
+
+- Owner: the paste box looked ugly; a real button, log in, control it from the pause menu, reuse the
+  Melody Search Spotify app. Music panel (pause menu > Music) with Connect Spotify (PKCE, no secret:
+  shares the Melody Search app's Client ID), the Web Playback SDK for Premium (playlists, skip,
+  volume), the embedded player otherwise, links tucked behind a small text link, a now-playing chip
+  at the bottom left. Needs the owner's Client ID and redirect URI (guide 21).
+- Look picker: pause menu > Look opens cards for Classic, "Jump into the Spider-Verse" (described,
+  Switch reloads) and Manga (coming soon) (guide 20).
+- Owner on mobile: parasols open at night (terrace parasols now fold from 21:30 to 10:00,
+  `terraces.js` `parasolsOpen`); running into people showed no reaction (now a visible dot burst,
+  jolt and small word); raiders should be monsters, not smiling people (backlog, PLAN.md); High
+  quality on the phone looks like the desktop.
+- Weather you can see and hear: rain streaks with the real wind, wet streets with puddles, snow
+  that settles, an overcast sky, thunderstorms with lightning and thunder; the rain sound now
+  follows the live weather (it only read #rain= before) (guide 06).
+- The sky follows the real cloud cover (was fixed at half), greyer in rain; night clouds hide stars.
+- Bike easier (owner: too wobbly): tighter turns (min radius 1.3 m), quicker steering, a calmer eased lean (max 0.28 rad), less rocking.
+
+## 2026-11-21: seasons, festive lights, Christmas market
+
+- Owner's photo batches: autumn trees and fallen leaves from the date, light crowns in the old town,
+  the Vrijthof Christmas market (wheel, chalets, carousel, banner fence while building) (guide 06).
+- Queued from the owner (same day): a JoJo-style manga look; one great game mode instead of several;
+  haptics on laptop pads; the gun really held; more guns, pickups and loadouts; Call of Duty-style
+  shooting camera; a first-time walkthrough (look switch, how to enter walk mode); fewer people
+  and vehicles away from where people really are (no walkers on roofs, no cars driving nowhere).
+- Crowds scale with how busy the place really is (old town busy, outskirts nearly empty); no walkers on roofs (guide 05).
+- First-time walkthrough: four steps (drop in, what to do, the looks, the games), skippable, replay from the pause menu (guide 20).
+- Arsenal: SMG, pistol, LMG; loadouts; reserve ammo; ammo boxes and medkits; health regen; the gun held in both hands; over-the-shoulder hip camera (guide 18). Relay redeploy needed for online rooms.
+- Raiders are marl golems with glowing eyes (no more smiling people); bots keep apart.
+- Haptics: trigger rumble where the pad has it; Settings > Test controller rumble says what the browser reports (owner: no rumble on the laptop).
+- Manga look rebuilt JoJo-style and added to the Look menu (guide 06).
+- Performance: dynamic resolution (follows the frame time, before dropping a tier), pool lights capped by tier, dry-weather shader skip (guide 06).
+- Manga crisper: cel shading, flat surfaces, no phantom hatch lines; dynamic resolution no longer halves pixels on a capped display (remote desktop).
+- Manga look: ink outlines on characters (inverted hull), menacing ゴ lettering, palette swings, speed lines, katakana sound words (guide 06).
+- Manga colours deep, not pastel (owner: washed out): the lit tone at full colour strength (+50 % saturation), greys tinted by the scene, deep saturated shadows over a larger share of the frame, solid ink below 8 % luma, distance fading into the sky colour (guide 06).
+- Manga: illustrated anime-background style (painted gradients, warm light / cool shade, brush grain, coloured lines, textures back, strong sun) (guide 06).
+
+## 2026-11-22: Manga environment refinement
+
+- Refined the Manga colour pass to preserve local material hues and values, with restrained warm
+  highlights, blue-violet material shadows and warm neutral stone.
+- Added subtle pigment variation and softened the brush treatment; distant architecture now eases
+  toward the Manga sky with lower contrast and chroma.
+- Kept the existing Manga surface textures and trace weathering. Classic and Spider-Verse paths
+  remain unchanged.
+- Validation: source and documentation reviewed; `scripts/check.sh` still needs to be run in a
+  project environment with the repository dependencies installed.
+- Manga, combined: the look-anime shading (local colour, cream stone) with the shadow lifted toward its lit colour and colour +32 %, so the shade reads at dusk; the brush grain no longer scales the colour by the sky mask (guide 06).
+- Manga: the shadow lift undone (owner: dark shadows are true to the anime; the problem was dullness); instead colour +60 %, contrast +8 %, split toning (golden light, blue-violet shade) (guide 06).
+- Manga: painted anime sky with cel-shaded cumulus lit from the sun's side (guide 06).
+- Manga characters, step 1: heroic proportions for every figure; the player strikes original stand-your-ground poses (guide 06). Next: fashion and faces, then the Stand.
+- Manga characters, step 2: bold printed fashion, gold chains and pins, heavy brows (guide 06).
+- Manga characters, step 3: the player's own Stand (original design) beside them when posing or aiming; E throws a rush that hits up close (guide 06).
+- Manga characters less stiff: shaped limbs and V torso in the geometry, relaxed contrapposto stance for everyone, looser walk, fuller hair (guide 06).
+- The manga look's own figure: an original anime build on the same joints (head, hair, anatomy, tailored clothes, hands), face drawn by shader; fixed a shader comment bug that broke manga faces and trouser prints (guide 06).
+- Manga: bolder figure colour, five extreme poses (crowd too), a bigger spiky Stand that poses with you (guide 06).
+
+## 2026-11-23
+- Manga figures: layered, sculpted hair with a cel underside and highlight band; more face detail (lashes, under-eye lines, cheekbone hatching, nose bridge, chin); muscles in the geometry (pecs, deltoids) and inked through the clothes (guide 06).
+- Manga shade no longer navy: a neutral sky fill in the manga look, a lighter, less blue shadow tint, saturation pushed only where a surface has colour (guide 06). Shadows stay dark.
+- Manga poses rebuilt around the legs: leg spread/cross and twist joints, the pelvis sinks so feet stay planted; five new stances (guide 06).
+- The Spider-Verse look gets its own figure (`figure/verseparts.js`, streetwear builds from the owner-approved mockup) and a bouncing street swagger walk (guide 06).
+- Rule (owner): each look adopts its own figures (build, face, proportions, motion) for immersion; added to CLAUDE.md.
+- Manga stance: new bend points (hip shift, waist side bend, shoulder raise, head tilt, wrists, flat feet on spread legs); the default stance is a dramatic S-curve (guide 06). Next (owner): finish the Spider-Verse and manga figures, then per-look vehicles (buses, boats, cyclists).
+- Manga: the torso in two with a bending spine, pelvis tip and thrust, pointed toes, forearm twist; new reach and backbend stances (guide 06).
+- Character creator: Manga print and chain choices. Fixed the look and the saved figure overwriting each other's storage (guide 06).
+- Spider-Verse figure: own face, bending spine, street stance, arm twist joint; coat tails and skirts swing in both painted looks; the manga posing camera (guide 06).
+- Each look's own vehicles: retro cars, a road bike, a two-tone coach and a yacht in Manga; street cars, a BMX, a tagged bus and a neon ferry in Spider-Verse; Classic unchanged (guide 06).
+- Manga default stance: nonchalant, hands in pockets; the hand to the brow only now and then (guide 06).
+- Code health pass (owner: improve and maintain, no features): look styles out of the rig into `figure/lookstyle.js`, one joint table, shared torso cuts and vehicle colours, Spider-Verse wheels 3.7k -> 232 triangles, unused code removed, the game bundle built as `iife` (it was ESM loaded as a classic script). Refactors verified pixel-identical (guide 06).
+- UX (owner: the UI confuses people; the Esc, Esc cycle): the mouse is free while exploring (drag to look), held only in matches or by a setting; the tour gains "Make it yours" and "More in the menu" (character, trips, Spotify), its buttons work (they could not be clicked under the held mouse) and Enter presses them; the menu puts Character, Look, trips, Music and Play first with one-line descriptions (guides 09, 20).
+- Full screen (owner: going full screen and the held mouse): on desktops full screen locks the Escape key for the game (Keyboard Lock), so Esc opens the menu instead of leaving full screen; hold Esc to leave. Needs checking on the owner's PC (headless can't go full screen) (guide 09).
+- Spider-Verse walk/run (owner: the run looked goofy): the swagger fades out with speed; a run leans forward with pumping arms. Vrijthof market re-placed from the owner's 23 November photos (wheel in the north half facing east, gift box by the east fence). Each manga pose has its own posing shot (camera yaw, pitch, distance, fov) with a slow drift (guides 06, 09).
+- Three original Stands in the game (Iron Hymn, Velvet Encore, Live Wire), built on the figure rig, picked in the creator; Spider-Verse caption boxes, pink/cyan rim light on figures, lettered hard landings (guide 06).
+- Backlog (owner): the next world from an artist friend's designs; a stop-motion world (working title "Fantastic Mr Blox"), noted in PLAN.md, not started.
+- Stand designer (parts, colours, name, ability; the three Stands are presets), Stand abilities on X (Guard via the relay, Encore, Short Circuit), the Spider-Verse comic panel border (guide 06). Relay redeploy needed for Guard online.
+- Controller: Share takes photos and postcards, Y/RB the Stand's rush and ability, R3 a pose, L3 the character, d-pad journal, trip planner and songs; Start pauses (guide 09).
+- Spider-Verse panel: thin by default, the full frame only on comic beats (owner: too big) (guide 06).
+- Posing: the camera can be orbited during the posing shot; people nearby pose with you (guide 06).
+- Controller in matches: R2/L2 now read every usable gamepad, not just the first one listed (guide 18).
+- scripts/update-viewer.ps1|sh: publish only the game's code without a world rebuild (guide 06).
+- Manga: lighter shade, softer hatching, a less orange sun (owner: too dark, people orange) (guide 06).
+- The white flash: resolution and tier changes now happen at the start of a frame, not after the draw (guide 06).
+- Fixed: zoomed out on the map the painted looks drew the whole city as sky (guide 06).
+- Map zoom-out, second fix: anything short of the fog's far end is never painted as sky (guide 06).
+- Manga cooled (owner: too yellow): neutral sunlight tint, grey stone, no warm sky schemes (guide 06).
+- 2026-11-24 Film shots are data (`contract/shots.json`, additive, contractVersion stays 4) with a per-shot look and `--look`; two
+  look shots (Manga, Spider-Verse market). The recorder itself already existed (frame-perfect, `tools/film.mjs`), so it was not rebuilt.
+- 2026-11-24 Hit weight: `mp/impact.js` (shake and synthesised thuds for hit, kill, hurt, down), wired into combat. Hit-stop left out
+  (would need a no-desync design). Concept sheets come from an outside AI (owner), see `docs/concepts/README.md`.
+- 2026-11-24 Plan: the Unity track (two products, modular rules) added to PLAN.md and CLAUDE.md. Unity not run yet (workstation busy, credits).
+- 2026-11-24 The two-engine design rules are in docs/ARCHITECTURE.md (committed). Unity attach: the owner's desktop folder is listed but not offered to cloud sessions (the desktop app needs an update); Unity not run.
+- 2026-11-25 Unity first run on the workstation (6000.6.7f1): compile, 14 EditMode tests and the player build pass. The hero shot was
+  blank for two reasons, both fixed: `unity.ps1 setup` baked the scene before `build/testscene` existed (camera framed on the
+  fallback target, so no chunk was in view; the world is now generated first), and `ScreenCapture.CaptureScreenshot` returns an
+  empty frame in the URP/D3D12 player (ShotRunner now renders the camera to a texture). Still only the 2-chunk test diorama: the
+  real-world Unity build is next.
+- 2026-11-25 `unity.ps1 setup|shot -World <dir>` frames and shoots any world. First real-city run (`build/world`, 4096 chunks, 2448
+  islands): streams, meshes, lights and shadows correctly in the player, no errors; the camera starts closer than a city overview.
+- 2026-11-25 Unity overview fixed: at 2500 m the street-level fog (exp², 0.0006) turned the city flat grey, so `MapCameraRig` now thins the
+  fog with distance (about 25 % haze on the scene at any zoom); the skybox ground colour (seen looking down past the map edge) is a cool
+  haze, not brown. Shot args: `unity.ps1 shot -Out x.png -ShotArgs '-bloxCam','x,z,dist','-bloxHour','13','-bloxShotDelay','20'`.
+- 2026-11-27 Title screen print layer (`titlefx.js`): halftone patches, light leak and grain in each look's inks. shaders.com's package was tried and dropped (WebGPU-only, 2.6 MB, telemetry on by default, no output in the headless check); its effect stack was ported as one WebGL shader (guide 06).
+- 2026-11-27 `learn/`: the AI dilemma and its plan, a ten-track curriculum taught from this repo, real bug case studies, a no-credits checklist with a spec template, a tutor prompt, and two tools (`map.mjs`, `quiz.mjs`; tested in viewer/test/learn.test.mjs).
+- 2026-11-27 Open issue: the pipeline is not deterministic across platforms. Building the town fixture on Windows (the
+  workstation) puts one street's centroid at (1128, 2087); Linux (CI and the cloud) gives (1083, 2104). The workstation
+  regenerated `tests/fixtures/town_world/features.json` to its own output (e889c90), which broke CI; restored to the Linux
+  output. Until the cause is found (likely a geometry library or ordering difference), regenerate fixtures on Linux only.

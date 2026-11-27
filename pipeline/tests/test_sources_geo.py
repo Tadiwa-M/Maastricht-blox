@@ -85,3 +85,25 @@ def test_boxes_and_blocks():
         RDBox.parse("1,2,3")
     w, s, e, n = geo.slice_box().to_wgs84()
     assert w < e and s < n and 5.6 < w < 5.8
+
+
+def test_maastricht_slice_shares_the_city_slices_chunk_grid() -> None:
+    """The whole-municipality slice: the city slice moved a whole number of chunks, and it contains it."""
+    from blox_pipeline import geo
+
+    cx0, cy0, cnx, cny = geo.SLICES["city"]
+    mx0, my0, mnx, mny = geo.SLICES["maastricht"]
+    chunk_m = geo.CHUNK_STUDS * geo.STUD_M
+    assert (cx0 - mx0) % chunk_m == 0 and (cy0 - my0) % chunk_m == 0
+    assert mx0 <= cx0 and my0 <= cy0
+    assert mx0 + mnx * chunk_m >= cx0 + cnx * chunk_m and my0 + mny * chunk_m >= cy0 + cny * chunk_m
+    # the western districts (Daalhof ~173300), the east (Amby ~180000) and Borgharen (~321300) are inside
+    assert mx0 < 172500 and mx0 + mnx * chunk_m > 180500 and my0 + mny * chunk_m > 321500
+    before = (geo.X0, geo.Y0, geo.CHUNKS_X, geo.CHUNKS_Y, geo.SLICE_NAME)
+    try:
+        geo.configure("maastricht")
+        assert geo.rd_to_grid(mx0, my0) == (0, 0)
+        assert geo.SLICE_M == 8704.0
+    finally:
+        geo.configure(before[4])
+        assert (geo.X0, geo.Y0, geo.CHUNKS_X, geo.CHUNKS_Y) == before[:4]

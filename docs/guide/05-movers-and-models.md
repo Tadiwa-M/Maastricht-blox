@@ -149,7 +149,7 @@ these scripted movers are the fallback when a world has no `life/` export.
 
 All path endpoints come from the world data, with no hard-coded coordinates.
 
-## City life (web game): buses, pedestrians, boats with zero servers
+## City life (web game): buses, people, bikes, cars, terraces, the market, boats with zero servers
 
 Everything is pre-baked by the pipeline and animated in the browser from a clock, so a static
 site is enough. Live GPS buses (above) stay a later, optional layer.
@@ -158,9 +158,11 @@ site is enough. Live GPS buses (above) stay a later, optional layer.
 OVapi gtfs-nl.zip ──┐ blox fetch --only gtfs      data/raw/gtfs/gtfs-nl.zip (refetched after 7 days)
 OSM slice clip ─────┤ blox life --out build/world
                     ▼
-build/world/life/index.json      {version, files: {transit, walkways, river}, bytes, week, boxUnity}
-                 transit.json    routes, shapes, patterns, trips (one reference week)
+build/world/life/index.json      {version, files: {transit, walkways, streets, river}, bytes, week, boxUnity}
+                 transit.json    routes (+ operator, GTFS id), shapes, patterns (+ stop list), trips (one
+                                 reference week); v2 adds stops (name, Unity m) and tripIds per trips row
                  walkways.json   walk graph: nodes, edges, spawn weights
+                 streets.json    cycle graph, directed road graph, terraces, bike spots, the market
                  river.json      Maas centreline + width
                     ▼  (viewer/src/life/data.js: fetched next to the page, or <site>/world/life/)
 viewer/src/life/index.js  initLife(ctx) -> { update(dt) } per frame (main.js initHooks)
@@ -182,9 +184,12 @@ blox life --out build/world [--date 2026-10-26] [--bbox ...] [--margin 500] [--m
 | `fetch.py` | downloads `sources/config.py: GTFS_URL` to `data/raw/gtfs/` (zip checked, older than 7 days refetched) |
 | `csvzip.py` | streams CSV rows from the zip (stop_times.txt is ~1 GB unzipped; never extracted) |
 | `calendar.py` | `calendar.txt` + `calendar_dates.txt`; the **reference week** = 7 days from `--date` (moved inside the feed's validity), one per weekday |
-| `transit.py` | bus routes whose shape comes within `--margin` (500 m) of the bbox; shapes densified <= 10 m and clipped to the box (one point beyond each edge) with the **full shape's** cumulative distance; stops projected onto the shape in calling order (earliest segment within 5 m of the best, so out-and-back streets work; > 60 m off = ignored); only the stops bracketing the clipped part kept |
+| `transit.py` | bus routes whose shape comes within `--margin` (500 m) of the bbox; shapes densified <= 10 m and clipped to the box (one point beyond each edge) with the **full shape's** cumulative distance; stops projected onto the shape in calling order (earliest segment within 5 m of the best, so out-and-back streets work; > 60 m off = ignored); only the stops bracketing the clipped part kept; bus shapes snapped onto the OSM road centrelines (`snap.py`) |
+| `snap.py` | GTFS bus shapes run 3-7 m off the centrelines, which put buses (after the lane offset) on the pavement, through trees and people. Each point moves to the nearest drivable road (car roads, `busway`, pedestrian streets with bus access) within 12 m that runs the same way (cos >= 0.6, so junctions don't pull it onto the cross street), sticking to the previous road unless another is 2 m closer; a 5-point running median of the moves removes single-point jumps. Distances (timing) are unchanged. On the city: 95 % of bus points within 2.2 m of a centreline (was a median of 3.3 m) |
 | `walkways.py` | walk graph from OSM (below) |
 | `river.py` | `waterway=river` named Maas/Meuse, merged and clipped, densified 20 m; width from the water polygon; a hand-set approximate line if OSM has none |
+| `streets.py` | `streets.json` (below): cycle + road graphs, cafe terraces, bike spots, market |
+| `sample.py` | synthetic export for `samples/markt_v3` (no OSM/GTFS needed): `python -m blox_pipeline.life.sample samples/markt_v3 <out world>` |
 | `export.py` | writes the files (compact JSON) and `index.json` with their sizes |
 
 **transit.json**
@@ -192,7 +197,7 @@ blox life --out build/world [--date 2026-10-26] [--bbox ...] [--margin 500] [--m
 ```jsonc
 { "version": 1, "kind": "transit",
   "meta": { "tz": "Europe/Amsterdam", "week": ["2026-10-26", ... 7 dates, Monday first] },
-  "routes": [ { "short": "4", "long": "...", "colour": "#00A0E0", "mode": "bus" } ],
+  "routes": [ { "short": "4", "long": "...", "colour": "#00A0E0", "mode": "bus", "agency": "ARR" } ],
   "shapes": [ { "id": "sh4", "pts": [x, z, dist, x, z, dist, ...] } ],   // dist = metres along the full shape
   "patterns": [ { "shape": 0, "route": 0, "head": "Station",
                   "st": [arr, dep, dist, ...] } ],   // seconds since the trip's first kept stop
@@ -218,12 +223,42 @@ through the slice and 55 000 trips a week gives **0.85 MB** (180 patterns, 9 180
   get a 6 m lattice of nodes linked 8-ways inside the polygon, tied to the ways crossing them.
 - dead ends within 5 m of another way are joined to it (the edge is split); components with
   fewer than 3 nodes are dropped.
+- nobody walks on water (accuracy A2, `life/water.py`): edges with an end, midpoint or quarter
+  point on water that is not under a bridge are dropped (`meta.wet` counts them). Water: OSM
+  areas + buffered waterways + BGT `waterdeel` when cached; bridges: OSM `bridge=*` ways
+  (half width + 1 m) + BGT `overbruggingsdeel`. Test area 2026-11-02: 10 of 11,133 edges.
 - spawn weight = way kind (square 4, pedestrian 3, living street 2, footway/sidewalk 1.5,
   crossing 1, steps 0.8, path 0.7) x (1 + 0.4 per shop/cafe/restaurant within 30 m, max 8),
   stored x 2 as integers.
 
 Tests: `pipeline/tests/test_life_transit.py`, `test_life_walkways.py`, `test_life_cli.py` with the
 synthetic GTFS zip and OSM file in `tests/life_fixture.py`.
+
+**streets.json** (`streets.py`; ~5-50 KB for the slice):
+
+```jsonc
+{ "version": 1, "kind": "streets",
+  "cycle": { nodes, weights, edges },            // like walkways; centrelines, riders keep right
+  "roads": { "nodes": [x, z, ...], "edges": [a, b, ...], "flags": [f, ...], "classes": [...] },
+                                                 // f bit 0 = one-way a -> b; f >> 1 = class index
+  "pois":  [ { "kind": "cafe", "name": "...", "x", "z", "f": [fx, fz], "d": 12.0 } ],
+                                                 // f = unit vector to the nearest street, d metres
+  "bikes": [ [x, z, dx, dz, len?], ... ],        // parked-bike rows, direction of the row
+  "market": { "name": "Markt", "poly": [x, z, ...], "days": [2, 4], "open": 28800, "close": 46800 } }
+```
+
+- cycle: `highway=cycleway`, paths with `bicycle=yes|designated`, roads with cycle lanes/tracks
+  (weight 2.5), main roads (1.5), residential/living/service streets (1); pedestrian streets
+  only with `bicycle=yes`.
+- roads: primary..residential, unclassified, service (not parking aisles/driveways), living
+  streets; never pedestrian, footway, cycleway, path, steps, track, private or `motor_vehicle=no`.
+  `oneway=yes|-1`, roundabouts one-way. Nodes every <= 20 m.
+- pois: `amenity=cafe|bar|pub|restaurant|fast_food|ice_cream|biergarten` within 40 m of a street.
+- bikes: stations, `amenity=bicycle_parking`, squares, 60 m blocks with >= 3 shops (moved 4 m
+  off the nearest street), and **rows between the trees** of tree lines within 40 m of squares
+  (Maastricht parks its bikes there; `len` = gap between the trees - 2 m).
+- market: `amenity=marketplace`, or the square named Markt; Maastricht's market is Wednesday and
+  Friday 08:00-13:00 (`MARKET` in `streets.py`).
 
 ### Viewer (`viewer/src/life/`)
 
@@ -233,9 +268,21 @@ synthetic GTFS zip and OSM file in `tests/life_fixture.py`.
 | `clock.js` | `LifeClock`: weekday + seconds, speed 1x / 10x / 60x, wraps Sunday -> Monday; starts at real Maastricht time (`Intl`, Europe/Amsterdam) or the URL `#t=8.25&day=sat&speed=60` |
 | `ui.js` | HUD row: clock, 1x/10x/60x, "now". Dragging the sun slider sets the clock's time; the running clock moves the slider (and the sun) in quarter-hour steps |
 | `schedule.js` | `Timetable.activeAt(day, sec)`, `tripDistAt` (pure) |
-| `buses.js` | `TimetableBuses`: poses, LOD, colours, signs |
+| `buses.js` | `TimetableBuses`: poses (with speed, footprint, sweep), LOD, livery colours, signs, `hold` |
+| `busflow.js` | bus/train sweep from the timetable, `aheadGap`, hold-back lag `nextLag` (pure) |
+| `livery.js` | `liveryFor(route)`: bus body colour by operator (Arriva blue) |
+| `density.js` | counts by tier, day curves (people, traffic, terraces), weekend, market schedule, `liveWeights` (pure) |
 | `walkgraph.js` | `WalkGraph`, `Walker`, `avoid`, `rng` (pure) |
-| `walkers.js` | `Pedestrians`: the crowd, `crowdFactor`, `clearVehicles` |
+| `walkers.js` | `Pedestrians`: groups, pauses, umbrellas, `clearVehicles` |
+| `cyclists.js` | `Cyclists` on the cycle graph; `parkedBikes` rows |
+| `traffic.js` | `RoadGraph`, car following (IDM), traffic rules, `carPose` (pure) |
+| `junctions.js` | junction boxes: movements, conflicts, lane corners, bus sweeps (pure) |
+| `signals.js` | lights and crossings for people, bikes, buses: pole and zebra positions, ped lights, kerb waits (pure) |
+| `signalsdraw.js` | instanced light poles (lamps showing the cycle) and zebra plates near the camera |
+| `police.js` | the police car easter egg: when, lights, who pulls over (pure) |
+| `cars.js` | `Cars`: spawn/recycle near the camera, the police car, drawn as toy cars |
+| `terraces.js` | `terraceLayout` (pure), `Terraces`: tables, chairs, parasols, seated people |
+| `market.js` | `stallLayout`, `vanSpots` (pure), `Market`: stalls, vendors, shoppers, parked vans |
 | `boats.js` | `Boats`: river loop |
 | `instancer.js` | `InstancedModel`: many copies of a brick model in a few draw calls |
 | `lodpick.js` | `assignLod` (pure) |
@@ -253,24 +300,96 @@ the right so the two directions use their own lane; `y` = ground. Buses follow t
 at 60x they drive 60x as fast; pedestrians and boats stay real-time.
 
 **LOD and pools.** `assignLod`: the nearest 24 buses within 180 m are full instanced brick
-models (body recoloured to the nearest palette colour of the route colour, wheels turned by
+models (body in the operator's livery, see below, wheels turned by
 distance / radius, a route-number sign on the nose and the roof for the nearest 8); the next
 300 within 900 m are coloured boxes; the rest are hidden. Every mover kind is one
 `InstancedModel`: the model is split once into bricks and studs, grouped by (geometry,
-material), and each copy is a slot with its own pose, part angles and colours: the whole crowd is 5 draw
-calls (13 instances per figure), all full-model buses 22 (232 instances per bus). Measured: ~0.8 ms of JavaScript per frame for 4 buses + 90 walkers.
+material), and each copy is a slot with its own pose, part angles and colours: all full-model buses
+are 22 draw calls (232 instances per bus). People, bikes, cars and props use the toy figure's own
+instancing (below). Measured on samples/markt_v3 with the synthetic export (headless, software GL,
+so only the JS figure is meaningful): ~850 people + 58 cyclists + 47 cars + 6 buses, one life step
+5-14 ms of JavaScript; life adds ~160-280 draw calls and 7-11 M triangles per frame over all
+render passes (shadow, AO, main).
 
-**Pedestrians.** Count by quality tier (high 360, medium 200, low 90) x `crowdFactor(hour)`
-(1.0 in the afternoon, 0.35 at 22:00, 0.06 at 05:00). They spawn on graph nodes near the
-camera target (weighted by spawn weight) within a radius that grows with camera distance
-(50-220 m) and are recycled to a node 0.5-1 radius away when they drift beyond 1.25 radii.
-Random walk: at each node a weighted pick of the neighbours (weight^0.5 x preference for going
-straight on), back only at dead ends. Corners are a quadratic curve through the node (radius
-1.2 m), the displayed heading also turns at most 540 deg/s. Each walker has a speed of
-0.9-1.7 m/s, a lateral place on the way (+-0.8 m), and palette colours by role from
-`character.json` (shirt 44, trousers 21, skin 18, hair 7). `avoid`: slow down behind someone
-going the same way, step to the right for oncoming people; `clearVehicles`: anyone inside a
-bus's footprint (+0.8 m) is moved out to the nearer side. The walk cycle is `WalkCycle`.
+**People: the toy figure** (`viewer/src/figure/`, replaces the brick-built walker of
+`character.json` in the web game). An original, smooth toy figure built in code from rounded
+boxes, capsules and lathed shapes in the city's glossy plastic: rounded-rectangle head on a neck
+with two dot eyes, a smile, nose, ears and cheeks; separate hair or hat; oval torso; two-segment
+arms with mitten hands and legs with knees and shoes. Adults 1.70-1.90 m, shoulders ~0.45 m,
+kids ~1.2 m (bigger heads), older people slower and stooped. Deliberately not a toy minifigure:
+no cylinder head or stud, no trapezoid torso, no C-hands, no hip/leg block.
+
+| File | Does |
+|---|---|
+| `parts.js` | part geometries (+ far LOD), `BODY` skeleton, `figureMaterial` |
+| `variants.js` | `makeVariant(seed)`: kind, size, hair (10 styles: short, bob, long, bun, ponytail, curly, cap, beanie, hat, fringe), top (shirt, jacket, coat, dress), accessory (backpack, bag, umbrella), colours, pace; deterministic |
+| `rig.js` | `jointAngles` (walk, idle, sit, cycle, browse; `legIK` for the pedals) and `poseFigure` (part matrices; cheap in-place affine maths) |
+| `crowd.js` | `FigureCrowd`: one InstancedMesh per part geometry, two LODs |
+| `vehicles.js` | `VehicleFleet`: Dutch step-through bike, hatchback, saloon, van |
+| `props.js` | `PropSet`: cafe table, chair, parasol, striped market stall (4 awnings), bike rack |
+| `sheet.js` | design sheets for `tools/figure-sheet.mjs` (not in the game bundle) |
+
+Every frame: `crowd.begin(eye)`, `add(variant, pose)` per person, `end()`. Instances are packed
+per mesh, so a mesh draws only what is used. Figures within 32 m of the camera (at most 160)
+use the detailed parts (~4.5k triangles), the rest the far parts (~1.5k: forearm+hand and
+shin+shoe merged, 3 hair shapes, 2 top lengths). Draw calls: 1000 figures far away 12-15,
+at street level up to ~37 (24 detailed + 13 far meshes); bikes + cars 9, props 9. Posing 1000
+figures costs ~4 ms of JavaScript (node, warmed up). A dress or coat is drawn as a shirt when
+sitting or cycling. The player (`src/player/character.js`) is a one-figure `FigureCrowd`
+(`#figure=<seed>` picks another look).
+
+**Pedestrians.** People wanted = `FIGURES_BY_TIER` (high 900, medium 500, low 200) x
+`crowdFactor(hour, day)` (1.0 in the afternoon, 0.4 at 22:00, 0.05 at 05:00; Saturday x1.25,
+Sunday morning x0.55, Thursday evening x1.1), living within 50-220 m of the camera target.
+They come in **groups** of 1-4 (50/34/12/4 %; families of two adults and kids) walking side by
+side at the slowest member's pace, each with a lateral place on the way; every 25-95 s a
+group **stops** for 2-12 s (groups turn to each other to chat). Spawn weights: walkways.json,
+then `liveWeights`: the busiest nodes x1.6 by day, the market square x3 while it is on. Random
+walk as before (weighted neighbours, going straight on, rounded corners, `avoid`,
+`clearVehicles` for buses, trains and the nearest 30 cars; people step 0.9 m clear of a
+vehicle's footprint, groups 1.9 m since their members walk side by side). In the rain (`ctx.weather.rain` 0..1 when a
+weather source exists, else `#rain=1`) up to 75 % of the grown-ups carry an umbrella and
+terraces empty.
+
+**Cyclists.** `CYCLISTS_BY_TIER` (140/80/30) x `trafficFactor` on the cycle graph, 3.5-6 m/s,
+1-1.8 m right of the centreline, corners of 4 m; pedals by distance (5.2 m per turn, legs by
+IK), wheels roll. **Parked bikes**: rows at the export's bike spots, 0.7 m apart, a few turned
+round, gaps; tree rows fill the gap between the trees; racks every 6 bikes.
+
+**Cars.** `CARS_BY_TIER` (110/65/25) x `trafficFactor(hour, day)` (peaks 08:00 and 17:30,
+weekends x0.55-0.75) on the directed road graph, spawned within 150-220 m weighted by class x
+length, recycled beyond 1.3 radii or at a dead end. Right-hand traffic: 1.5-1.9 m right of
+the centreline on two-way roads, 0.4 m on one-way ones. Speed by class (primary 50 km/h,
+residential 30, living street 15) x a personal factor; car following by the Intelligent
+Driver Model (time gap 1.2 s, min gap 2.2 m, brake 2.5 m/s²) including the first car on the
+next edge; into a junction (node of degree > 2) the desired speed eases to 4.5 m/s over 18 m.
+Heading from points 1.3 m behind and ahead (rounds corners). Toy bodies: hatchback 45 %,
+saloon 35 %, van 20 %, in everyday car colours.
+
+**Terraces.** For every cafe/bar/restaurant within 260 m: 2-4 tables (two rows when the street
+is > 12 m away) 2.2-6 m in front of the facade along `f`, 2 or 4 chairs each facing the table,
+parasols at 70 % of them; tables on a step or inside a building are dropped (ground check).
+Seats taken: `terraceFactor` (lunch and evening peaks) x (1 - 0.85 rain); seated people sit,
+look around and sip every ~11 s.
+
+**Market.** `marketState`: 'setup' an hour before, 'open', 'packing' an hour after (bare stall
+frames and counters), else off. `stallLayout`: back-to-back rows along the square's long side,
+4.5 m aisles, gaps, a delivery van at the head of each pair of rows; `vanSpots` adds vans along
+the edge (white vans and one yellow parcel van; all of them on market days, two otherwise). A
+vendor behind each counter, up to 4 shoppers per stall browsing (in and out on a ~40 s cycle).
+
+**Colours of movers.** Clothing, bikes and props use palette colours; skin and hair tones
+(`variants.js`), car colours (`cars.js`) and **bus liveries** (`livery.js`) do not have to:
+movers have to look like the real thing. Liveries by GTFS `agency_id`: Arriva (`ARR`, all
+Maastricht city and regional lines) blue `#0B5FA5`, unknown operators also Arriva blue; the
+route colour stays on the number signs. Values are close to the liveries, not brand colours.
+
+**Tools.** `node tools/figure-sheet.mjs [outDir] [figures|poses|vehicles|back|closeup]` renders
+the design sheets to `build/shots/figures/` (sheet.png: 12 variants, front and three-quarter,
+on a tile floor next to a door piece). `node tools/life-shots.mjs <dist> <outDir> "<hash>"
+name:cx,cy,cz,tx,ty,tz | name:bus ...` captures life views of an embed build and prints people,
+cyclists, cars, seated, market state, the JS cost of one life step and the frame's draw calls
+and triangles with and without life.
 
 **Boats.** Two boats loop up one side of the Maas and down the other (lane = 22 % of the river
 width, max 18 m), 3-3.4 m/s, turn radius 14 m; `y` = the water tops of the world along the
@@ -287,11 +406,101 @@ paved top cells (cobbles, pavement; 2 m lattice; not under rotated-building isla
 export, the demo bus/boat/walkers are hidden when their life counterpart exists. The world box
 clips the movers (clipping planes), like the demo.
 
-Tests: `viewer/test/life.schedule.test.mjs` (interpolation, dwell, before/after, day masks, day
+Tests: `viewer/test/figure.test.mjs` (variant determinism, human scale, poses, IK, draw-call and
+triangle budget for 1000 instanced figures + vehicles + props), `life.traffic.test.mjs` (road
+graph, car following, junctions, dead ends, lanes, density curves, market schedule and layout,
+spawn weighting, groups, terraces, bike rows, liveries), `viewer/test/life.schedule.test.mjs` (interpolation, dwell, before/after, day masks, day
 rollover, clipped shapes), `life.clock.test.mjs`, `life.walkers.test.mjs` (graph, walk stays on
 the edges and turns smoothly, spawn, avoidance, crowd curve, vehicle clearance, fallback graph),
 `life.pool.test.mjs` (LOD caps, instanced counts and placement, bus pose/lane/heading, colours,
 river loop).
+
+### People and bikes keep their space (2026-11-06)
+- **Personal space** (`walkgraph.js` `separate`): every walker group is a disc as wide as the group
+  (`w.hw`); overlapping groups step apart through their lateral offset (it eases back afterwards)
+  and whoever has someone right in front slows to a near stop. `avoid()` counts group widths and
+  treats people standing still (a chat, waiting at the kerb: `w.stopped`) as an obstacle to walk
+  round.
+- **Narrow pavements** (`walkers.js` `fitRoom`): a group whose members would stand in a wall falls
+  into single file (`g.file` 0..1, 0.75 m apart) and spreads out again where there is room; a leader
+  against a wall drifts to the path's middle. `room(x, z, y)` (life/index.js) asks the city whether
+  1 m and 1.6 m above the feet are clear. Nobody is drawn more than 1.2 m above the leader.
+- **Vehicles**: people wait at the kerb when a moving bus or car is about to cross their path
+  (`inVehiclePath`: its footprint plus the road it covers in ~2.5 s), at most 8 s; anyone inside a
+  footprint still steps out (`clearVehicles`). Bikes queue behind the bike in front (`queue`), brake
+  for vehicles in the way and step aside for good (lateral offset).
+- **Audit** (`life/audit.js`, `tools/life-audit.mjs --url <site> | --site <dir> [--quality high]`):
+  counts people through people, people in vehicles, people on roofs, bikes in vehicles, bikes
+  through bikes, cars in buses and cars through cars in the running game. Run it before and after
+  any change to street life.
+
+### The city's day: routines, events, weather, reactions (2026-11-07)
+
+| File | Does |
+|---|---|
+| `routines.js` | named places (RD metres from OSM: Markt, Vrijthof, Platielstraat, Onze Lieve Vrouweplein, Grote Staat, Kleine Staat, Maastrichter Brugstraat, Tongersestraat, Minderbroedersberg, Grote Gracht, Randwyck, station, Wycker Brugstraat); `pull(kind, hour, day)`, `nightFactor`, `spotPulls`, `spotWeights`, `goalPlan`, `pickGoal` (pure) |
+| `calendar.js` | day numbers, Easter, `eventsAt(date, hour)`, `clockDate` (pure) |
+| `weather.js` | Open-Meteo parsing, `WeatherFeed`, `weatherState`, crowd and terrace factors (pure but the fetch) |
+| `outfits.js` | `dress(variant, { outfit, tempC })`: carnaval, orange, coats and beanies in the cold (pure) |
+| `reactions.js` | `PlayerWatch` (jumps, landings, running, knock-downs), `dodgeSide`, `hitByVehicle` (pure) |
+
+**Routines.** Each kind of place has a pull (x spawn weight) by hour and weekday: *study*
+(university buildings, weekdays, peak 8:30 and lunch), *shop* (shopping streets 10:30-17:30;
+Monday from 11-13, Thursday until 21, Sunday 12-17), *commute* (station and the Wycker Brugstraat,
+Randwyck: 8:00 and 17:15), *night* (Markt, Platielstraat, Vrijthof, OLV-plein: evening into the
+small hours on Thursday, Friday and Saturday; weeknights home by 2). `spotWeights` multiplies the
+walk graph's weights within a place's radius (fading over half a radius beyond); it is
+recomputed every game quarter-hour (`reweigh` in index.js), on top of `liveWeights`. `goalPlan`
+turns the pulls into goals: a share of new groups (0.08 per unit of pull above 1, at most 45 %)
+gets a goal, picked by pull; `pickNext` then favours neighbours towards it (x 0.3..2.3, still a
+random walk, so streams look natural) until the group is within the place's radius or 300 s
+have passed. Far places (Randwyck) work as directions: students stream that way.
+`nightFactor` empties the city at night (3 am on a weeknight: ~3 % of the daytime crowd) and keeps
+the nights out busy (x1.25 until 2:30). Walkers wanted = tier count x `crowdFactor` x
+`nightFactor` x events x weather, at most x1.6; `LIFE_RADIUS_BY_TIER` and the tier counts are
+unchanged.
+
+**Events** (`calendar.js`, hours may run past 24 = the night after): carnaval (Friday 11:00 -
+Tuesday midnight before Ash Wednesday, crowd x1.6, Markt and Vrijthof x3, 85 % dressed up in
+red, yellow and green with hats), 11 November (Markt x3.5 from 10:00), Preuvenemint
+(Thursday-Sunday ending on the last Sunday of August, 12-24, Vrijthof x4), Magisch Maastricht
+(last Friday of November - 4 January, 11-22/23, Vrijthof x2.5, Markt x1.5; Christmas Eve and New
+Year's Eve until 17), Koningsdag (27 April, 26th when a Sunday, orange). Strength ramps over the
+first and last hour. The weekly market stays data (`streets.json`, `market.js`). The date: the
+clock only has a weekday, so `clockDate` takes the date within half a week of an anchor, today
+(real time) or `#date=2027-02-06` (which also sets the weekday). Example:
+`#date=2027-02-06&t=15` is carnaval Saturday.
+
+**Weather** (`weather.js`). `WeatherFeed` polls Open-Meteo (`current=precipitation,rain,
+cloud_cover,wind_speed_10m,temperature_2m` for 50.85 N 5.69 E, no key) every 15 min; the
+reading is used only while the clock is within 5 min of real time at 1x (the same rule as live
+bus delays, `clockOffset`), else a dry, mild day (15 °C). `#rain=0..1` and `#temp=<°C>` win
+over everything (and stop the feed). Offline or a bad answer: the last reading is kept for 3 h,
+then forgotten; nothing is logged. Rain (mm/h -> 0..1: drizzle 0.3, 1 mm/h 0.6, 4 mm/h 1) gives
+umbrellas, x(1 - 0.4 rain) people out, and above 0.25 people **keep to the walls**: about once a
+second a group feels 0.7-3.1 m to each side of its path (`room`) and moves its lateral place to
+just clear of the nearer wall, never onto a different street level (a stoop, an awning). Above
+0.5 a group stopping by a wall shelters there 6-20 s longer, facing the street. Cold: below
+3 °C fewer people out, below 8 °C more coats and beanies. Terraces: `state.weather.terrace`
+(1 at >= 14 °C, 0.2 at <= 2 °C, x0.75 above 40 km/h wind) is folded into the rain value handed to
+`Terraces.draw` (`terraceRain`: 1 - 0.85 x = (1 - 0.85 rain) x terrace).
+`window.__bloxLife.weather = { rain, tempC, cloud, wind, live, terrace, crowd }`.
+
+**Reactions** (walk mode; `PlayerWatch.sample` once a frame from `window.__bloxPlayer`): a jump
+(take-off at > 2 m/s up) or a landing (after > 0.3 s in the air) within 7 m: three in four groups
+stop 1.2-2.6 s and turn to look. A player running (> 2.6 m/s) at a group within ~3 m: it steps off
+the runner's line sideways at 2.2 m/s (its lateral offset, easing back afterwards). A knock-down
+within 10 m: groups startle (0.6 s, looking), turn round if they were walking towards it and
+hurry away at x1.7 for 2.8 s. The knock-down is seen by life itself (a vehicle moving > 1.5 m/s
+whose footprint covers the player, the test of `player/bump.js`) or announced with a
+`blox:knockdown` window event. Costs: a few squared distances per group per event.
+
+**Audit** (`tools/life-audit.mjs` method on samples/markt_v3 + the synthetic life export, high
+tier, 60 snapshots each), averaged over 11 moments (Saturday 11-17, weekday rush hours, Friday
+market, Saturday rain): people through people 4.5 -> 3.6, people in vehicles 6.7 -> 6.5, people on
+roofs 1.5 -> 1.1 per snapshot (single moments vary +-30 % either way: different random paths).
+Tests: `life.calendar.test.mjs`, `life.routines.test.mjs`, `life.weather.test.mjs`,
+`life.reactions.test.mjs`.
 
 ## Walk mode (Unity)
 
@@ -310,3 +519,176 @@ Press **C** in Play mode to take control of the figure (`Gameplay/Locomotion/Cha
 
 Walk 1.4 m/s, run (Shift) 3.2 m/s. The maths is tested in
 `unity/Assets/Blox/Editor/PureTests~/LocomotionTests.cs`. Nothing has run in a Unity editor yet.
+
+
+## Traffic rules (game phase G1b, 2026-11-05)
+
+`life/traffic.js` turns every rule into a **stop line**: a standing obstacle the car-following
+model (IDM) brakes for, so one law drives everything. Data from `blox life` (`streets.json`
+`roads`): `signals` and `crossings` (OSM `highway=traffic_signals` / `highway=crossing` nodes,
+snapped to road-graph nodes) and `roundabout` (edges of `junction=roundabout` ways, now one-way
+as OSM defines them; they were two-way before). Older viewers ignore the new keys.
+
+- **Traffic lights:** one city-wide 60 s cycle (`SIGNAL`): approaches running north-south
+  (bearing within 45° of the axis) have 25 s green, 3 s amber, then red, while east-west approaches
+  have the opposite half, with a 2 s all-red gap: crossing directions are never green together. A
+  car stops at red, and at amber if it can brake comfortably (3 m/s²).
+- **Junctions without lights** (3+ roads): within 25 m a car checks the cars approaching the same
+  node; it gives way to cars on a bigger road (`CLASS_RANK`), to cars from its right on an equal
+  road (the Dutch rule), and when entering a roundabout to cars on it. After 6 s of waiting it goes
+  (`YIELD_MAX_S`): no four-way standoffs.
+- **Crossings:** stop when a walker group or the player is within 4 m of the crossing node.
+- **Lane obstacles:** buses (three circles along their length), cyclists and the player in the
+  lane up to 30 m ahead are queued behind. Braking is capped at 7 m/s², so a car can still hit
+  someone who steps out right in front of it (the player then pops apart: player/bump.js).
+- ~~Not yet: buses run on the timetable and don't yield~~: see the next section.
+- Checked on the real test-area roads (12 lights, 19 crossings, 42 roundabout edges): 80 cars for
+  4 minutes, no car through a red light, no standoff (longest wait 32.7 s = one red phase).
+
+## Junction boxes, buses in traffic, the police car (2026-11-06)
+
+Owner's videos: no traffic laws visible, buses through bikes, a car through the bus being ridden,
+vehicles phasing through each other at junctions. Causes found and what replaced them:
+
+- **Junction boxes** (`junctions.js`). Every node with 3+ roads has a box (radius = widest lane
+  offset + 2.4 m, at least 3.5 m). A car's path through it is a *movement*: in-lane, the corner
+  where the two lanes meet, out-lane. Two movements conflict when their centre lines come closer
+  than both half widths (0.95 m straight, 1.5 m turning) + 0.1 m; cars from the same lane to the
+  same exit just follow. Before the box a car **commits**; it may not while a committed car on a
+  conflicting movement is still in the box, while a bus/train sweep crosses its path before it is
+  across, or while the exit has no room for the whole car (keep the box clear). A committed car
+  never stops for a light or right of way: it drives out. Before, only cars still *approaching*
+  were checked, so a car already in the box was invisible to cross traffic.
+- **Two junctions ahead.** Rules are checked for the next two nodes on the route (`next2` is
+  picked early). Before, a short OSM edge before a light hid the red until braking (7 m/s²) could
+  no longer stop the car. The front now stops ~1 m before the box, not 1.5 m from the node centre
+  (which was inside the crossing lane).
+- **Right of way** additionally needs a conflicting movement; on green a left turn gives way to
+  oncoming traffic going straight on or right; a ring of cars all waiting for each other lets one
+  go at once (before: everyone waited 6 s). All-red gap now 2 s (green 25 s).
+- **Lane corners** (`routePoint`). Lane lines meet at a corner, not at the node: a right turn's
+  in-lane ends before the node, a left turn's after it. `carPose` jumped between them (a right
+  turn showed yaw 304° for a moment and swung across the oncoming lane); it now bends through the
+  corner from 3 m before to 3 m after the node.
+- **Buses and trains** (`buses.js`, `busflow.js`). Each pose carries speed, footprint and a
+  **sweep**: its body now and its front every 0.25 s for 8 s, *from the timetable* (so a bus about
+  to pull out of a stop counts). Cars treat the first 1.2 s of it as standing in their lane, wait
+  at junctions for it, ignore a bus behind them in their own lane (stopping would not help) and
+  ignore its future when they are already in its way (they drive on out of it). Trains were not
+  obstacles at all before (only `buses` went into the env).
+- **Bus hold-back.** A trip may run up to 120 s (and at most 20 % of the time left to its last
+  stop) behind its timetable: `hold` looks 3.5 m + 1.5 s ahead of the front for cars, bikes and
+  the player and slows or stops; afterwards it runs 25 % faster (shorter stops) until on time.
+  Only at clock speed 1x, only within 250 m of the camera. The ride, panel and trip planner read
+  the lagged pose and `tRel`, so the cabin stays with the bus.
+- **The police car** (`police.js`): one at a time, every 75-225 s, spawned near the camera; an
+  original toy design (white saloon, blue side band, light bar with two lenses, `CAR_TYPES.police`,
+  3 extra draw calls only while one is in view). 40 % arrive with lights on, else they switch on
+  at random (mean 90 s) for 25-45 s. Lights on: lenses flash left/right at 2.5 Hz, 30 % faster,
+  no stopping at red, priority at junctions (cars within 40 m on conflicting movements wait), cars
+  ahead in its lane pull 1.2 m right and slow to 35 %, and it passes them 0.9 m left of its lane.
+  It still never enters a box that is not clear.
+- **Measured** (a 6x6 grid of 60 m blocks with a signalled main road, 70 cars, 3 buses, 240 s, old
+  rules vs new): car-car overlap frames 870 -> 0, car-bus 550 -> 0, distance driven -5 %. With 110
+  cars the grid jams, buses reach the 120 s lag cap and then go on, so some car-bus overlap
+  remains there. Tests: `life.junctions.test.mjs` (fails on the old rules), `life.busflow.test.mjs`.
+- ~~Open: buses do not stop for red lights; people and bikes giving way~~: see the next section.
+
+## Traffic lights you can see, crossings, everyone obeying them (2026-11-13)
+
+The lights and crossings were rules without anything on screen, and only cars kept to them.
+Positions are the real OSM nodes (`streets.json` `roads.signals`, 335, and `roads.crossings`,
+304, snapped to the road graph); one city-wide cycle (`traffic.js` `signalAt`/`signalPhase`,
+unchanged timing) drives every lamp and every rule.
+
+- **`signals.js`** (pure, `test/life.signals.test.mjs`): `CrossingMap` over the cars' `RoadGraph`
+  (a node grid and the road "arms" at each node). `heads()`: one light pole per approach on its
+  right-hand kerb (carriageway half width + 0.7 m out, just before the junction box), lamps facing
+  the traffic; `ped` when a walk-graph node lies within 2.5 m of the signal node (a footway crosses
+  there: `footwayAt`). `zebras()`: white stripes at crossings without lights that are not
+  junctions, 0.5 x 2.6 m, running along the road, spread across the carriageway.
+- **Pedestrian lights:** `pedSignal(walking bearing, t)` is green 1-19 s into the walking
+  direction's half of the cycle, so always while the traffic being crossed has red (it turns green
+  again at 30 s). A pedestrian head (red over green, no figure) hangs lower on the same pole,
+  facing across the road.
+- **People** (`walkers.js`, a few lines): `crossingHold` sees a walker about to step onto the
+  carriageway within 9 m of a crossing or signal node (`kerbStep`: the point 2.5 m ahead is on an
+  arm of the road, they are not, and they walk across it, not along). At lights they wait for
+  green (at most 45 s); at a zebra they wait only for a vehicle that cannot stop gently any more
+  (3 m/s²) and then step on. While at a zebra's kerb the group carries `zebra` = the node, and
+  cars (`traffic.js` crossing rule) and buses stop for that as well as for anyone within 4 m.
+  Walk routes prefer crossings: `walkBias` makes `WalkGraph.pickNext` weigh a walk edge over a
+  road x3 when it crosses within 6 m of a crossing node and x0.2 when it crosses 6-30 m from one.
+- **Bikes** (`cyclists.js`): `riderSlow` stops a rider before the box of a signal node ahead
+  (within 14 m, at most 5 m off its line) on red, and on amber unless too close to stop. Riders
+  also report where they will be in 0.8 s, so cars (lane obstacles) and buses (hold blockers)
+  wait for a bike crossing their path.
+- **Buses and trains** (`buses.js` `hold(..., rules)`, `transitGap`): a red light (amber as for
+  cars) or a zebra with someone on it or waiting is a stop line ahead; the existing lag mechanism
+  holds them there (same caps: 120 s, 20 % of the time left). While held for a stop line the bus
+  remembers where it stops (`stopAt`): its sweep and its reported speed end there (`v` 0), so
+  cars with green no longer wait for a bus that is standing at red, and people see it is waiting;
+  `vt` keeps the timetable speed for the hold logic. Trains use the same rules (they only meet
+  road lights at level crossings).
+- **People and bikes see every car.** The footprints walkers and riders keep clear of were the
+  first 40 cars within 80 m of the camera; now every car within the living radius (cap 200).
+  That was most of `bikesInVehicles`: bikes riding into the back of cars they could not see.
+- **Drawing** (`signalsdraw.js`): five instanced meshes (posts, stud caps, heads, lamps, zebra
+  plates); only the nearest poles and stripes by tier (`SIGNAL_CAPS`: high 120 poles / 1200 stripes
+  within 320 m, lite 12 / 120 within 60 m), measured from the player, or from where the map camera
+  looks, and re-picked on a 12 m move and every ~90 frames. Where the ground is not streamed in yet
+  (the lookup answers Infinity) a pole or stripe is left out and looked for again after 20 frames.
+  Sizes are a little over life (3.7 m posts, 0.28 m lamps, light grey posts) so a light reads
+  from across a square; zebra stripes are 0.5 x 4 m. Lamps are an unlit material: the lit one shows its full
+  colour (glows at night), the others 2.5 % (dark).
+- `audit.js` also counts `bikesInBuses` (of `bikesInVehicles`).
+- Measured (`tools/life-audit.mjs`, markt/vrijthof/station, 40 s): see DEVLOG 2026-11-13.
+- Open: signal heads follow the rule's per-node logic, so a degree-2 signal node just behind a
+  junction also shows (and enforces) a light for traffic leaving it; no stop-line paint; zebras at
+  junction nodes are not drawn (stripes would lie in the middle).
+
+## People off the roofs, queues at the kerb (2026-11-13)
+
+- **Roofs.** People stood on the station's platform canopies: the ground lookup answers the top
+  surface, and a canopy is the top. Walkers now use `ground.walk` (`life/ground.js`): where the top
+  is more than 2.5 m above the street 6 to 12 m around and there is standing room at street level
+  underneath (not solid, not water), they walk under it. A wall walk or a building keeps its top
+  (solid underneath). Only people use it: cars and buses keep the plain lookup (viaducts).
+  A footbridge over land is treated like a canopy (people cross underneath); none is in the
+  walk data today.
+- **Queues.** `separate()` (`walkgraph.js`): behind someone standing still and facing the same way
+  (waiting for green, for a gap), a walker eases to a stop 0.35 m short (`QUEUE_M`) instead of
+  creeping into their back. People going the other way are not held.
+- Audit (high tier, markt/vrijthof/station, 40 s, average per snapshot): people on roofs
+  16.2 -> 1.3 (station 46 -> 1.5); strangers through each other 6.55 -> 6.2, which is within the
+  noise between runs: not fixed.
+- Open: who overlaps (probe at the Vrijthof): mostly groups passing groups (members of a row or
+  a file reach out of the group's disc) and people standing at a kerb. A person-by-person
+  sideways push was tried and did not move the number, so it was not kept; the next thing to try
+  is spacing along the heading (the one behind stops), not only sideways.
+
+## More cars, and lights at night (2026-11-14)
+
+- `figure/vehicles.js` `CAR_TYPES`: estate, suv and taxi join hatch, saloon and van (`cars.js`
+  `TYPES`: 34 / 20 / 14 / 14 / 14 / 4 %; the taxi is black with a lit yellow roof sign).
+  Every body now has wing mirrors, a dark grille, sills, door seams and handles, dark arches over
+  the wheels, and roof rails on the estate and the suv. Still one body + one glass mesh per type.
+- **Lights**: `VehicleFleet.setNight(n)` (life/index.js passes the scene's night factor). Above
+  `LIGHTS_FROM` (0.2) every car adds one instance of `carLights`: a unit set of head lamps, tail
+  lamps and two pools of light on the road ahead, scaled to the car's width, lamp height and
+  length, drawn additively (unlit, no depth write, no shadow), fading in over dusk. One more draw
+  call for all cars together. `test/vehicles.test.mjs`.
+- Seen on screen: the new body details by day. The lights are covered by tests only (no car was
+  in frame in the night check).
+
+
+## Crowds where people really are (2026-11-21)
+
+Owner: full crowds in the middle of nowhere, people on roofs, cars driving nowhere broke the spell
+(Maastricht: ~120,000 people, ~2,250 per km²). `life/density.js` `busyness(weightHere,
+weightCentre, dTown)`: the walk graph's weights round the camera target against the same sum round
+the old town's middle, times a falloff with distance from the old town (full within ~350 m, ~30 %
+at 1.5 km, a few % at the edge of town). Walkers scale with it fully, bikes 15-100 %, cars 25-100 %
+(recomputed every 2 s; `window.__bloxLife.busy`). Roofs: `life/ground.js` `isRoof` (a top more than
+2.5 m above the street round it with no room under it); nobody spawns there, and a group that walks
+onto one is sent elsewhere.

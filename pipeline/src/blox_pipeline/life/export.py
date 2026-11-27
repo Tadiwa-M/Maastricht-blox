@@ -1,4 +1,4 @@
-"""``blox life``: write ``<out>/life/`` (index + transit + walkways + river JSON).
+"""``blox life``: write ``<out>/life/`` (index + transit + walkways + streets + river JSON).
 
 ``life/index.json`` is the only entry point the viewer reads; the world manifest
 (CONTRACT 5) is not touched. Each part is optional: a missing input is an error unless that
@@ -12,6 +12,8 @@ import json
 import logging
 from pathlib import Path
 from typing import Any
+
+import shapely
 
 from .. import geo
 from ..geo import RDBox
@@ -30,10 +32,12 @@ def dump(doc: Any, path: Path) -> int:
 
 
 def export_life(out_dir: Path, *, box: RDBox, gtfs_zip: Path | None, osm: Any | None, start: dt.date,
-                margin_m: float, modes: tuple[str, ...] = ("bus",)) -> dict:
+                margin_m: float, modes: tuple[str, ...] = ("bus",), bgt: Any | None = None) -> dict:
     """Write the life files for RD ``box``. ``gtfs_zip`` None skips transit; ``osm`` None skips
     walkways and uses the fallback river line. Returns the index document."""
     from .river import build_river
+    from .streets import build_streets
+    from .snap import road_lines
     from .transit import build_transit
     from .walkways import build_walkways
 
@@ -46,15 +50,21 @@ def export_life(out_dir: Path, *, box: RDBox, gtfs_zip: Path | None, osm: Any | 
         "files": {}, "bytes": {}, "sources": [],
     }
     if gtfs_zip is not None:
-        doc = build_transit(gtfs_zip, box.buffer(margin_m), start, modes)
+        tbox = box.buffer(margin_m)
+        roads = road_lines(osm, shapely.box(*box.as_tuple())) if osm is not None else None
+        doc = build_transit(gtfs_zip, tbox, start, modes, roads)
         index["files"]["transit"] = "transit.json"
         index["bytes"]["transit"] = dump(doc, life / "transit.json")
         index["week"] = doc["meta"]["week"]
         index["sources"].append({"name": "OVapi GTFS", "licence": "open data (OVapi)", "attribution": "OVapi"})
     if osm is not None:
-        doc = build_walkways(osm, box)
+        from .water import wet_area
+
+        doc = build_walkways(osm, box, wet=wet_area(osm, bgt))  # nobody walks on water (A2)
         index["files"]["walkways"] = "walkways.json"
         index["bytes"]["walkways"] = dump(doc, life / "walkways.json")
+        index["files"]["streets"] = "streets.json"
+        index["bytes"]["streets"] = dump(build_streets(osm, box), life / "streets.json")
         index["sources"].append({"name": "OpenStreetMap", "licence": "ODbL", "attribution": "OpenStreetMap contributors"})
     river = build_river(osm, box)
     index["files"]["river"] = "river.json"

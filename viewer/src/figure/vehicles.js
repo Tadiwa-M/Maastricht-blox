@@ -1,0 +1,267 @@
+// Smooth toy vehicles for city life: a Dutch step-through bicycle and three car bodies
+// (hatchback, saloon, van), each drawn through a few InstancedMeshes (frame, wheels; body,
+// glass + lights, wheels): 9 draw calls for every bike and car in view. Plus the police car (an
+// original toy design: white saloon, blue side stripes, a light bar whose two lenses flash
+// blue in turn; life/police.js): 3 more draw calls while one is in view.
+// Origins: ground. Bike: under the saddle (the rider's root, see rig.js SADDLE); car: centre.
+// Front = -z. Wheels spin about their axle (local x).
+import * as THREE from 'three';
+import { rbox, sphere, cyl, torus, tube as tubeN, place, merge, tint } from './geom.js';
+import { figureMaterial } from './parts.js';
+import { VEHICLE_LOOK, vehicleKindOf, vehicleMaterialFor } from '../render/vehiclesurface.js';
+import { OUTLINE_ON, outlineFor } from '../render/outline.js';
+import { LOOK } from '../render/verse.js';
+import { lookRides } from './lookrides.js';
+
+export const BIKE = { wheelR: 0.34, rear: 0.25, front: -0.84, bb: -0.17 };
+const HUB_Y = BIKE.wheelR;
+
+function bikeFrame() {
+  const tube = (a, b, r, c = 1) => tubeN(a, b, r, c, 4); // thin: 4 sides are enough
+  const BB = [0, 0.3, BIKE.bb], seatTop = [0, 0.86, 0.02], head0 = [0, 0.6, -0.71], head1 = [0, 0.9, -0.66];
+  const rearAx = [0, HUB_Y, BIKE.rear], frontAx = [0, HUB_Y, BIKE.front], r = 0.02;
+  const D = 0.08;
+  const parts = [
+    tube(BB, seatTop, r), tube(BB, [0, 0.4, -0.5], r), tube([0, 0.4, -0.5], head0, r), // step-through
+    tube(head0, head1, r * 1.3), tube([0.05, head0[1], head0[2]], [0.05, HUB_Y, BIKE.front], 0.013), tube([-0.05, head0[1], head0[2]], [-0.05, HUB_Y, BIKE.front], 0.013),
+    tube([0.05, 0.3, BIKE.bb], [0.05, HUB_Y, BIKE.rear], 0.012), tube([-0.05, 0.3, BIKE.bb], [-0.05, HUB_Y, BIKE.rear], 0.012),
+    tube([0.04, 0.82, 0.02], [0.05, HUB_Y, BIKE.rear], 0.011), tube([-0.04, 0.82, 0.02], [-0.05, HUB_Y, BIKE.rear], 0.011),
+    tube(head1, [0, 1.0, -0.6], 0.016, 0.7), tube([-0.27, 1.02, -0.58], [0.27, 1.02, -0.58], 0.013, 0.7), // stem, bar
+    place(cyl(0.022, 0.022, 0.1, D, 8), { at: [-0.26, 1.02, -0.58], rot: [0, 0, Math.PI / 2] }),
+    place(cyl(0.022, 0.022, 0.1, D, 8), { at: [0.26, 1.02, -0.58], rot: [0, 0, Math.PI / 2] }), // grips
+    tube([0, 0.86, 0.02], [0, 0.92, 0.03], 0.012, 0.7), place(rbox(0.15, 0.06, 0.25, 0.03, D), { at: [0, 0.94, 0.02] }), // saddle
+    place(rbox(0.17, 0.02, 0.38, 0.008, 0.55), { at: [0, 0.76, 0.32] }), tube([0.07, 0.75, 0.48], [0.05, HUB_Y, BIKE.rear], 0.007, 0.55),
+    tube([-0.07, 0.75, 0.48], [-0.05, HUB_Y, BIKE.rear], 0.007, 0.55), // rear rack
+    place(torus(BIKE.wheelR + 0.04, 0.018, 1, Math.PI * 0.75, 4, 14), { at: rearAx, rot: [0, Math.PI / 2, Math.PI * 0.15] }), // mudguards
+    place(torus(BIKE.wheelR + 0.04, 0.018, 1, Math.PI * 0.6, 4, 12), { at: frontAx, rot: [0, Math.PI / 2, Math.PI * 0.2] }),
+    place(rbox(0.02, 0.13, 0.5, 0.01, 0.3), { at: [0.075, 0.33, 0.04] }), // chain guard
+    place(cyl(0.05, 0.05, 0.03, 0.55, 12), { at: [0.06, 0.3, BIKE.bb], rot: [0, 0, Math.PI / 2] }), // chainring
+    place(sphere(0.035, [1.6, 1.5, 1.2], 8, 6), { at: [0, 0.8, -0.74] }), // lamp
+  ];
+  return merge(parts);
+}
+
+function bikeWheel() {
+  const R = BIKE.wheelR;
+  const parts = [
+    place(torus(R - 0.025, 0.026, 0.13, Math.PI * 2, 4, 16), { rot: [0, Math.PI / 2, 0] }),
+    place(torus(R - 0.055, 0.009, 0.85, Math.PI * 2, 3, 14), { rot: [0, Math.PI / 2, 0] }),
+    place(cyl(0.03, 0.03, 0.08, 0.7, 10), { rot: [0, 0, Math.PI / 2] }),
+  ];
+  for (let q = 0; q < 6; q++) {
+    const a = (q / 6) * Math.PI * 2;
+    parts.push(tubeN([0, 0, 0], [0, Math.cos(a) * (R - 0.06), Math.sin(a) * (R - 0.06)], 0.004, 0.75, 3));
+  }
+  return merge(parts);
+}
+
+// Car bodies: [L, W, lower body height, cabin [w, h, l, z], glass band, van?]
+export const CAR_TYPES = {
+  hatch: { L: 3.9, W: 1.74, H: 1.48, cabin: [1.58, 0.62, 2.1, 0.35] },
+  saloon: { L: 4.55, W: 1.8, H: 1.44, cabin: [1.62, 0.58, 2.3, 0.2] },
+  van: { L: 5.0, W: 1.96, H: 2.15, cabin: [1.9, 1.15, 3.75, 0.56], van: true },
+  estate: { L: 4.6, W: 1.8, H: 1.5, cabin: [1.62, 0.62, 3.0, 0.62], rails: true }, // the long roof of a family car
+  suv: { L: 4.45, W: 1.9, H: 1.72, cabin: [1.7, 0.72, 2.7, 0.42], rails: true, tall: true },
+  taxi: { L: 4.55, W: 1.8, H: 1.6, cabin: [1.62, 0.58, 2.3, 0.2], sign: true }, // a saloon with a lit roof sign
+  police: { L: 4.55, W: 1.8, H: 1.6, cabin: [1.62, 0.58, 2.3, 0.2], police: true, cap: 4 },
+};
+// the light bar's two lenses (left, right): car-local [x, y, z] and colours lit / dark (linear, lit > 1 glows)
+export const BEACON = { x: 0.27, y: 1.47, z: 0.2, on: [0.2, 0.5, 3.4], off: [0.06, 0.1, 0.32] };
+const STRIPE = [0.06, 0.2, 0.62], STRIPE_LIGHT = [0.4, 0.66, 0.98];
+const WHEEL_R = 0.32;
+
+/** Height of the lower body (bonnet line) of a car type. */
+const lowOf = (t) => (t.van ? 0.85 : t.tall ? 0.74 : 0.6);
+
+function carBody(t) {
+  const { L, W, cabin: [cw, ch, cl, cz] } = t;
+  const low = lowOf(t), y0 = 0.22, dark = 0.16;
+  const parts = [
+    place(rbox(W, low, L, 0.2, 1, 2), { at: [0, y0 + low / 2, 0] }),
+    place(rbox(cw, ch, cl, t.van ? 0.18 : 0.24, 1, 2), { at: [0, y0 + low + ch / 2 - 0.06, cz] }),
+    place(rbox(W + 0.03, 0.12, 0.2, 0.05, 0.25), { at: [0, y0 + 0.12, -L / 2 + 0.06] }), // bumpers
+    place(rbox(W + 0.03, 0.12, 0.2, 0.05, 0.25), { at: [0, y0 + 0.12, L / 2 - 0.06] }),
+  ];
+  if (!t.van) parts.push(place(rbox(W * 0.5, 0.05, 0.28, 0.02, 0.85), { at: [0, y0 + low + 0.01, -L / 2 + 0.55] })); // bonnet line
+  // the small things that make it a car: wing mirrors, a dark grille, sills, door seams, arches over the wheels
+  const cabinFront = cz - cl / 2;
+  for (const sx of [-1, 1]) {
+    parts.push(place(rbox(0.16, 0.1, 0.12, 0.03, 1), { at: [sx * (W / 2 + 0.07), y0 + low + 0.06, cabinFront + 0.35] }),
+      place(rbox(0.03, 0.09, L * 0.62, 0.012, dark), { at: [sx * (W / 2 + 0.002), y0 + 0.08, 0] }), // sill
+      place(rbox(0.012, low * 0.62, 0.02, 0.004, 0.55), { at: [sx * (W / 2 + 0.004), y0 + low * 0.55, cz - 0.05] }), // door seam
+      place(rbox(0.05, 0.04, 0.16, 0.012, dark), { at: [sx * (W / 2 + 0.012), y0 + low * 0.66, cz + 0.22] })); // door handle
+    for (const az of [-1, 1]) parts.push(place(cyl(WHEEL_R + 0.07, WHEEL_R + 0.07, 0.04, dark, 16), { at: [sx * (W / 2 - 0.005), WHEEL_R, az * (L / 2 - 0.85)], rot: [0, 0, Math.PI / 2] }));
+    if (t.rails) parts.push(place(rbox(0.05, 0.05, cl * 0.78, 0.015, dark), { at: [sx * (cw / 2 - 0.16), y0 + low + ch - 0.035, cz] }));
+  }
+  parts.push(place(rbox(W * 0.56, t.van ? 0.2 : 0.13, 0.04, 0.015, dark), { at: [0, y0 + low * 0.42, -L / 2 - 0.005] })); // grille
+  if (t.police) { // a broad blue band along both sides with a thin light-blue line above it, a blue bonnet stripe
+    parts.push(place(rbox(W + 0.05, 0.22, L * 0.86, 0.03, STRIPE), { at: [0, y0 + low * 0.5, 0] }),
+      place(rbox(W + 0.056, 0.05, L * 0.86, 0.015, STRIPE_LIGHT), { at: [0, y0 + low * 0.5 + 0.16, 0] }),
+      place(rbox(0.32, 0.03, L * 0.24, 0.012, STRIPE), { at: [0, y0 + low + 0.02, -L / 2 + 0.62] }));
+  }
+  return merge(parts);
+}
+
+function carGlass(t) {
+  const { L, W, cabin: [cw, ch, cl, cz] } = t;
+  const low = lowOf(t), y0 = 0.22, G = [0.05, 0.07, 0.09];
+  const gh = t.van ? 0.5 : ch * 0.66, gy = t.van ? y0 + low + 0.32 : y0 + low + ch / 2 - 0.06;
+  const glass = t.van
+    ? place(rbox(cw + 0.025, gh, 1.1, 0.12, G), { at: [0, gy, cz - cl / 2 + 0.5] })
+    : place(rbox(cw + 0.025, gh, cl + 0.03, 0.14, G), { at: [0, gy, cz] });
+  const lamp = (x, z, c) => place(rbox(0.32, 0.12, 0.06, 0.03, c), { at: [x, y0 + low - 0.16, z] });
+  const bar = t.police ? [place(rbox(1.12, 0.08, 0.32, 0.03, 0.12), { at: [0, BEACON.y - 0.09, BEACON.z] })] : []; // light bar base
+  if (t.sign) bar.push(place(rbox(0.5, 0.14, 0.2, 0.04, [1.5, 1.15, 0.2]), { at: [0, y0 + low + ch + 0.02, cz - 0.2] })); // TAXI roof sign
+  return merge([glass, ...bar,
+    lamp(-W / 2 + 0.3, -L / 2 - 0.005, [1.4, 1.35, 1.2]), lamp(W / 2 - 0.3, -L / 2 - 0.005, [1.4, 1.35, 1.2]),
+    lamp(-W / 2 + 0.25, L / 2 + 0.005, [0.9, 0.08, 0.06]), lamp(W / 2 - 0.25, L / 2 + 0.005, [0.9, 0.08, 0.06]),
+    place(rbox(0.5, 0.14, 0.03, 0.02, [0.95, 0.85, 0.2]), { at: [0, y0 + 0.28, -L / 2 - 0.02] })]); // number plate (yellow, NL)
+}
+
+function carWheel() {
+  return merge([place(cyl(WHEEL_R, WHEEL_R, 0.21, 0.1, 18), { rot: [0, 0, Math.PI / 2] }),
+    place(cyl(WHEEL_R * 0.55, WHEEL_R * 0.55, 0.215, 0.75, 14), { rot: [0, 0, Math.PI / 2] })]);
+}
+
+// Night lights for every car type in one mesh: a unit car (1 wide, 1 long, lamps at height 1)
+// that addCar scales to the type. Head lamps, tail lamps, and two soft pools of light on the road
+// ahead that fade out with distance. Drawn additively, only when it is dark (VehicleFleet.night).
+function carLights() {
+  const lamp = (x, z, c) => place(tint(new THREE.BoxGeometry(0.2, 0.2, 0.012), c), { at: [x, 1, z] });
+  const parts = [lamp(-0.33, -0.506, [1.0, 0.92, 0.7]), lamp(0.33, -0.506, [1.0, 0.92, 0.7]),
+    lamp(-0.35, 0.506, [0.9, 0.05, 0.03]), lamp(0.35, 0.506, [0.9, 0.05, 0.03])];
+  for (const sx of [-1, 1]) { // a pool per head lamp: bright at the bumper, gone 1.7 car lengths ahead
+    const g = new THREE.PlaneGeometry(1, 1, 1, 4).rotateX(-Math.PI / 2);
+    const pos = g.attributes.position, col = new Float32Array(pos.count * 3);
+    for (let q = 0; q < pos.count; q++) {
+      const u = 0.5 - pos.getZ(q); // 0 at the car, 1 far ahead
+      pos.setXYZ(q, sx * 0.3 + pos.getX(q) * (0.5 + 1.1 * u), 0.05, -0.52 - u * 1.7);
+      const k = 0.22 * (1 - u) ** 1.6;
+      col.set([k, k * 0.92, k * 0.7], q * 3);
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.deleteAttribute('uv');
+    parts.push(g);
+  }
+  return merge(parts);
+}
+
+let geoCache = null;
+export function VEHICLE_GEOS() {
+  if (geoCache) return geoCache;
+  geoCache = { bikeFrame: bikeFrame(), bikeWheel: bikeWheel(), carWheel: carWheel(), beacon: rbox(0.42, 0.11, 0.26, 0.04, 1), carLights: carLights() };
+  for (const [k, t] of Object.entries(CAR_TYPES)) { geoCache[`body:${k}`] = carBody(t); geoCache[`glass:${k}`] = carGlass(t); }
+  Object.assign(geoCache, lookRides(LOOK, CAR_TYPES, BIKE) || {}); // each painted look's own cars and bikes (lookrides.js)
+  return geoCache;
+}
+
+const WHITE = new THREE.Color(1, 1, 1);
+const WHEEL_COL = new THREE.Color('#d8d8d8');
+
+export class VehicleFleet {
+  /** caps: { bikes, cars }. */
+  constructor({ bikes = 400, cars = 200, clippingPlanes = null, shadows = true, material = null } = {}) {
+    this.material = material || figureMaterial({ clippingPlanes });
+    this.group = new THREE.Group();
+    this.group.name = 'vehicles';
+    const G = VEHICLE_GEOS();
+    const caps = { bikeFrame: bikes, bikeWheel: bikes * 2, carWheel: cars * 4, beacon: 2 * CAR_TYPES.police.cap };
+    for (const [k, t] of Object.entries(CAR_TYPES)) { caps[`body:${k}`] = t.cap || cars; caps[`glass:${k}`] = t.cap || cars; }
+    caps.carLights = cars;
+    // lamps and light pools glow on their own (additive, not lit, bloom picks them up)
+    this.lightMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, blending: THREE.AdditiveBlending, transparent: true,
+      depthWrite: false, toneMapped: false, clippingPlanes, side: THREE.DoubleSide });
+    this.night = 0;
+    this.meshes = new Map();
+    for (const [key, cap] of Object.entries(caps)) {
+      const mesh = new THREE.InstancedMesh(G[key], key === 'carLights' ? this.lightMaterial : this.materialFor(key), cap);
+      mesh.name = `vehicle:${key}`;
+      mesh.count = 0; mesh.frustumCulled = false; mesh.castShadow = shadows && key !== 'carLights'; mesh.receiveShadow = key !== 'carLights';
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      mesh.setColorAt(0, WHITE);
+      this.group.add(mesh);
+      const outline = OUTLINE_ON && (key.startsWith('body:') || key === 'bikeFrame' || key === 'carWheel') ? outlineFor(mesh) : null;
+      if (outline) this.group.add(outline);
+      this.meshes.set(key, { mesh, outline, n: 0, cap, m: mesh.instanceMatrix.array, c: mesh.instanceColor.array });
+    }
+    this._root = new THREE.Matrix4(); this._w = new THREE.Matrix4(); this._t = new THREE.Matrix4();
+    this._q = new THREE.Quaternion(); this._v = new THREE.Vector3(); this._one = new THREE.Vector3(1, 1, 1);
+    this._up = new THREE.Vector3(0, 1, 0); this._col = new THREE.Color();
+    this._on = new THREE.Color(...BEACON.on); this._off = new THREE.Color(...BEACON.off);
+    this._s = new THREE.Matrix4(); this._lit = new THREE.Color();
+  }
+
+  /** Night factor 0..1 (scene.js): from dusk the cars drive with their lights on. */
+  setNight(n) { this.night = n; }
+
+  begin() { for (const e of this.meshes.values()) e.n = 0; }
+
+  /** The shared toy material, or in the comic look one per kind of part (render/vehiclesurface.js). */
+  materialFor(key) {
+    const kind = VEHICLE_LOOK ? vehicleKindOf(key) : null;
+    if (!kind) return this.material;
+    this.kindMats ||= new Map();
+    if (!this.kindMats.has(kind)) this.kindMats.set(kind, vehicleMaterialFor(this.material, kind));
+    return this.kindMats.get(kind);
+  }
+
+  put(key, mat, col) {
+    const e = this.meshes.get(key);
+    if (!e || e.n >= e.cap) return;
+    const i = e.n++;
+    e.m.set(mat.elements, i * 16);
+    e.c[i * 3] = col.r; e.c[i * 3 + 1] = col.g; e.c[i * 3 + 2] = col.b;
+  }
+
+  root(x, y, z, rotY) { return this._root.compose(this._v.set(x, y, z), this._q.setFromAxisAngle(this._up, rotY), this._one); }
+
+  /** A bicycle at three.js (x, y, z), heading rotY; opts.colour (hex or Color), opts.spin (wheel angle, rad). */
+  addBike(x, y, z, rotY, { colour = '#22385A', spin = 0, bank = 0 } = {}) {
+    const root = this.root(x, y, z, rotY);
+    if (bank) root.multiply(this._t.makeRotationZ(bank)); // leaning into a turn, about the tyres' contact line
+    this.put('bikeFrame', root, colour instanceof THREE.Color ? colour : this._col.set(colour));
+    for (const az of [BIKE.rear, BIKE.front]) {
+      this._w.multiplyMatrices(root, this._t.makeTranslation(0, HUB_Y, az)).multiply(this._t.makeRotationX(spin));
+      this.put('bikeWheel', this._w, WHEEL_COL);
+    }
+  }
+
+  /**
+   * A car of `type` (CAR_TYPES key) at three.js (x, y, z), heading rotY. opts.beacons: the police
+   * car's light bar, [left lit, right lit] (life/police.js beacons).
+   */
+  addCar(type, x, y, z, rotY, { colour = '#A33A2B', spin = 0, beacons = null } = {}) {
+    const t = CAR_TYPES[type] || CAR_TYPES.hatch;
+    const root = this.root(x, y, z, rotY);
+    if (t.police) {
+      for (const k of [0, 1]) { // left (-x), right (+x)
+        this._w.multiplyMatrices(root, this._t.makeTranslation((k ? 1 : -1) * BEACON.x, BEACON.y, BEACON.z));
+        this.put('beacon', this._w, beacons?.[k] ? this._on : this._off);
+      }
+    }
+    this.put(`body:${type}`, root, colour instanceof THREE.Color ? colour : this._col.set(colour));
+    this.put(`glass:${type}`, root, WHITE);
+    if (this.night > LIGHTS_FROM) { // lights on: the unit lamp set, scaled to this car
+      const k = Math.min(1, (this.night - LIGHTS_FROM) / 0.25);
+      this._w.multiplyMatrices(root, this._s.makeScale(t.W, 0.22 + lowOf(t) - 0.16, t.L));
+      this.put('carLights', this._w, this._lit.setRGB(k, k, k));
+    }
+    for (const sx of [-1, 1]) for (const az of [-1, 1]) {
+      this._w.multiplyMatrices(root, this._t.makeTranslation(sx * (t.W / 2 - 0.04), WHEEL_R, az * (t.L / 2 - 0.85))).multiply(this._t.makeRotationX(spin));
+      this.put('carWheel', this._w, WHITE);
+    }
+  }
+
+  end() {
+    for (const { mesh, n, outline } of this.meshes.values()) {
+      mesh.count = n; mesh.visible = n > 0;
+      if (outline) { outline.count = n; outline.visible = n > 0; }
+      mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
+    }
+  }
+
+  drawCalls() { let k = 0; for (const { mesh } of this.meshes.values()) if (mesh.visible && mesh.count > 0) k++; return k; }
+}
+
+export const CAR_WHEEL_R = WHEEL_R;
+export const LIGHTS_FROM = 0.2; // night factor at which cars switch their lights on

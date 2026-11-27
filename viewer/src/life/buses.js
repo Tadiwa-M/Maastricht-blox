@@ -3,13 +3,20 @@
 // Pose: the shared PathMover rule (src/mover.js: heading = rear -> front axle over
 // turnRadius, yaw clockwise from north), shifted LANE_M to the right of the shape so the two
 // directions of a street use their own lane. LOD (lodpick.js): the nearest `full` buses are
-// instanced brick models (contract/models/bus.json, body recoloured to the route colour,
+// instanced brick models (contract/models/bus.json, body in the operator's livery (livery.js),
 // wheels rolling with distance, route number sign on the nose and roof); farther ones are
 // coloured boxes; beyond farDist they are hidden.
+//
+// Traffic (busflow.js): each pose carries its speed, footprint and sweep (where it will be over
+// the next seconds, from the timetable) for the cars to give way to, and hold() lets a bus hold
+// back for something right in front of it: a small per-trip lag it makes up afterwards.
 import * as THREE from 'three';
 import { PathMover } from '../mover.js';
 import { InstancedModel } from './instancer.js';
 import { assignLod } from './lodpick.js';
+import { liveryFor } from './livery.js';
+import { tripDistAt } from './schedule.js';
+import { sweepSamples, aheadGap, nextLag, wantAhead, lagCap, pathPoint } from './busflow.js';
 
 export const LANE_M = 1.6;
 const SIGNS = 8;
@@ -57,9 +64,12 @@ export class TimetableBuses {
    * timetable: Timetable. model: bus model JSON. opts: { palette, types, mats, studM, plateM }.
    * ground(x, z) -> y. caps: { full, box, fullDist, farDist }.
    */
-  constructor({ timetable, model, opts, ground, caps = {} }) {
+  constructor({ timetable, model, opts, ground, deck = null, caps = {}, modes = null, laneM = LANE_M }) {
     this.tt = timetable;
+    this.modes = modes; // e.g. ['bus'] or ['rail']: one fleet per vehicle model; null = all
+    this.laneM = laneM; // buses keep right of the shape's centre line; trains run on it
     this.ground = ground;
+    this.deck = deck; // (x, z, yaw) -> bridge deck beside a route line that runs over the water, or null
     this.caps = { full: 24, box: 300, fullDist: 180, farDist: 900, ...caps };
     this.palette = opts.palette;
     this.clip = opts.mats.clippingPlanes || null;
@@ -68,6 +78,10 @@ export class TimetableBuses {
     this.full = new InstancedModel(model, opts, this.caps.full);
     this.group.add(this.full.group);
     const L = model.size[1] * opts.studM, W = model.size[0] * opts.studM, H = model.size[2] * opts.plateM;
+    this.halfL = L / 2; this.halfW = W / 2; // footprint (traffic)
+    this.lag = new Map(); // trip id -> seconds behind its timetable (hold)
+    this.stopAt = new Map(); // trip id -> path distance its centre stops at (a red light, a zebra: hold rules)
+    this.current = [];
     const boxGeo = new THREE.BoxGeometry(W, H, L).translate(0, H / 2, 0);
     this.boxes = new THREE.InstancedMesh(boxGeo, new THREE.MeshStandardMaterial({ roughness: 0.5, clippingPlanes: this.clip }), this.caps.box);
     this.boxes.count = 0; this.boxes.frustumCulled = false; this.boxes.castShadow = true;
@@ -113,24 +127,75 @@ export class TimetableBuses {
     return this.movers.get(shape);
   }
 
-  /** Poses of the trips active at the clock: [{ x, y, z (Unity metres), yaw, dist, route, id }]. */
+  /**
+   * Poses of the trips active at the clock: [{ x, y, z (Unity metres), yaw, dist, route, id, trip,
+   * pattern, tRel, mode, v (m/s: timetable speed, 0 when it waits at a stop line), vt (timetable
+   * speed), lag (s), halfW, halfL, sweep(), ahead(m) }].
+   * sweep() -> [{ x, z, t }] where it is and will be (busflow.js); ahead(m) -> [{ x, z, a }] its
+   * path the next m metres ahead of its front. A held-back trip runs `lag` seconds late.
+   */
   poses(clock) {
-    return this.tt.activeAt(clock.day, clock.sec).map((a) => {
-      const pose = this.mover(a.shape).poseAt(a.dist - a.shape.d0);
-      const r = (pose.yaw * Math.PI) / 180;
-      const x = pose.position[0] + Math.cos(r) * LANE_M, z = pose.position[2] - Math.sin(r) * LANE_M;
-      return { x, y: this.ground(x, z), z, yaw: pose.yaw, dist: a.dist, route: a.route, id: a.id };
+    const list = this.tt.activeAt(clock.day, clock.sec).filter((a) => !this.modes || this.modes.includes(a.route?.mode || 'bus'));
+    return list.map((a) => {
+      const shape = a.shape, st = a.pattern.st, mover = this.mover(shape);
+      const lag = this.lag.get(a.id) || 0, tRel = a.tRel - lag;
+      const clampD = (d) => Math.max(shape.d0, Math.min(shape.d1, d));
+      const stopD = this.stopAt.get(a.id) ?? Infinity; // it will wait there: its sweep and speed end there
+      const rawAt = (t) => (!lag && !t ? a.dist : clampD(tripDistAt(st, tRel + t) ?? (tRel + t < st[0] ? st[2] : st[st.length - 1])));
+      const distAt = (t) => (t > 0 ? Math.max(Math.min(rawAt(t), stopD), rawAt(0)) : rawAt(0));
+      const point = (d) => pathPoint(mover, clampD(d) - shape.d0, this.laneM); // sweeps (fast, corners not rounded)
+      const dist = distAt(0);
+      const pose = mover.poseAt(dist - shape.d0), yaw = pose.yaw, r = (yaw * Math.PI) / 180;
+      let x = pose.position[0] + Math.cos(r) * this.laneM, z = pose.position[2] - Math.sin(r) * this.laneM;
+      const deck = this.deck?.(x, z, yaw); // never drive on the river: onto the bridge beside the line
+      if (deck) ({ x, z } = deck);
+      const front = dist + this.halfL;
+      return { x, y: this.ground(x, z), z, yaw, dist, route: a.route, id: a.id,
+        trip: a.trip, pattern: a.pattern, tRel, mode: a.route?.mode || 'bus',
+        v: Math.max(0, distAt(1) - dist), vt: Math.max(0, rawAt(1) - dist), lag, halfW: this.halfW, halfL: this.halfL,
+        sweep: () => sweepSamples(point, distAt, this.halfL),
+        ahead: (m) => { const out = []; for (let s = 0; s <= m; s += 1.5) out.push({ ...point(front + s), a: s }); return out; } };
     });
   }
 
+  /**
+   * Hold back for what is in front: blockers = footprints { x, z, yaw, halfW, halfL } or circles
+   * { x, z, r } (cars, bikes, the player). rules(b, ahead) -> metres from its front to a stop
+   * line (a red light, a zebra: signals.js transitGap), Infinity if none. Only trips within
+   * `radius` of `near` look; the rest make up their lag. dt: game seconds.
+   */
+  hold(dt, blockers = [], near = null, radius = 250, rules = null) {
+    const seen = new Set();
+    this.stopAt.clear();
+    for (const b of this.current) {
+      seen.add(b.id);
+      let gap = Infinity, rule = Infinity;
+      if ((blockers.length || rules) && dt > 0 && (!near || Math.hypot(b.x - near[0], b.z - near[1]) < radius)) {
+        const look = wantAhead(b.vt ?? b.v) + 1, m = look + b.halfL + 6;
+        const close = blockers.filter((o) => Math.abs(o.x - b.x) < m && Math.abs(o.z - b.z) < m);
+        const ahead = close.length || rules ? b.ahead(look) : null;
+        if (close.length) gap = aheadGap(ahead, this.halfW, close);
+        if (rules) rule = rules(b, ahead);
+      }
+      const st = b.pattern.st, left = st[st.length - 3] - (b.tRel + b.lag); // timetable s to its last stop
+      const cap = lagCap(left), lag = nextLag(this.lag.get(b.id) || 0, Math.min(gap, rule), b.vt ?? b.v, dt, cap);
+      if (lag > 1e-3) this.lag.set(b.id, lag); else this.lag.delete(b.id);
+      if (rule < Infinity && lag < cap) this.stopAt.set(b.id, b.dist + rule);
+    }
+    for (const id of [...this.lag.keys()]) if (!seen.has(id)) this.lag.delete(id);
+  }
+
+  /** Body colour of a route's buses: the operator's livery (livery.js; Arriva blue in Maastricht). */
   routeColour(route) {
-    if (route._body === undefined) route._body = nearestPalette(this.palette, route.colour || '#C8102E', this.bodyIdx);
+    if (route._body === undefined) route._body = new THREE.Color(liveryFor(route));
     return route._body;
   }
 
   /** camera: THREE.Camera (three.js space). Returns the poses. */
   update(clock, camera) {
-    const list = this.poses(clock);
+    const all = this.poses(clock);
+    // the vehicle being ridden is not drawn (the passenger sees ride/cabin.js instead)
+    const list = this.hideId ? all.filter((b) => b.id !== this.hideId) : all;
     const cp = camera.position;
     const dist = list.map((b) => Math.hypot(b.x - cp.x, b.y - cp.y, -b.z - cp.z));
     const lod = assignLod(dist, { fullDist: this.caps.fullDist, farDist: this.caps.farDist,
@@ -139,7 +204,7 @@ export class TimetableBuses {
       const b = list[q];
       if (this.slotRoute[slot] !== b.route) {
         this.slotRoute[slot] = b.route;
-        this.full.setColors(slot, b.route ? { 38: this.routeColour(b.route) } : null);
+        this.full.setColors(slot, { 38: b.route ? this.routeColour(b.route) : new THREE.Color(liveryFor(null)) });
       }
       const angles = {};
       for (const [n, r] of Object.entries(this.wheelR)) angles[n] = -b.dist / r;
@@ -153,7 +218,7 @@ export class TimetableBuses {
       const b = list[q];
       m.compose(at.set(b.x, b.y, -b.z), qt.setFromAxisAngle(up, (-b.yaw * Math.PI) / 180), one);
       this.boxes.setMatrixAt(n, m);
-      this.boxes.setColorAt(n, this.color.set(b.route?.colour || '#C8102E'));
+      this.boxes.setColorAt(n, b.route ? this.routeColour(b.route) : this.color.set(liveryFor(null)));
     });
     this.boxes.count = lod.box.length;
     this.boxes.instanceMatrix.needsUpdate = true;
@@ -168,7 +233,8 @@ export class TimetableBuses {
       const mat = this.signMaterial(b.route || { short: '', colour: '#C8102E' });
       for (const c of g.children) c.material = mat;
     });
-    this.stats = { active: list.length, full: lod.full.length, box: lod.box.length, hidden: lod.hidden };
-    return list;
+    this.stats = { active: all.length, full: lod.full.length, box: lod.box.length, hidden: lod.hidden };
+    this.current = all;
+    return all;
   }
 }

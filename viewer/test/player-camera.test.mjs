@@ -35,7 +35,7 @@ test('pull-in: looking up from low, the floor stops the camera; unknown space do
   assert.equal(pullIn(city, focus, backDir(-Math.PI / 2, 0), 8), 8); // toward +x into unknown
 });
 
-test('FollowCamera: snaps in at once, eases back out, clamps zoom and pitch', () => {
+test('FollowCamera: pulls in within a few frames, eases back out, clamps zoom and pitch', () => {
   const city = synthCity();
   const cam = new FollowCamera();
   const feet = [5, city.floorY, -5];
@@ -43,13 +43,58 @@ test('FollowCamera: snaps in at once, eases back out, clamps zoom and pitch', ()
   assert.ok(Math.abs(cam.dist - 5) < 1e-9);
   city.fill(0, 4, 5, 39, 5, 30);
   r = cam.update(city, feet, 0.016);
-  assert.ok(r.position[2] < -3, `pulled in at once: ${r.position[2]}`);
+  assert.ok(cam.dist < 4.2 && cam.dist > 1.5, `first frame: on its way, not a jump cut: ${cam.dist}`);
+  for (let q = 0; q < 9; q++) r = cam.update(city, feet, 1 / 60);
+  assert.ok(r.position[2] < -3, `pulled in within 0.17 s: ${r.position[2]}`);
   cam.input([0, 5], 100);
-  assert.equal(cam.pitch, cam.o.maxPitch);
-  assert.equal(cam.want, cam.o.maxDist);
+  assert.equal(cam.aimPitch, cam.o.maxPitch);
+  assert.equal(cam.aimDist, cam.o.maxDist);
+  assert.ok(cam.pitch < cam.o.maxPitch, 'shown pitch eases, it does not jump');
+  for (let q = 0; q < 60; q++) cam.update(city, feet, 1 / 60);
+  assert.ok(Math.abs(cam.pitch - cam.o.maxPitch) < 1e-3 && Math.abs(cam.want - cam.o.maxDist) < 0.05);
   cam.input([0, -10], -100);
-  assert.equal(cam.pitch, cam.o.minPitch);
-  assert.equal(cam.want, cam.o.minDist);
+  assert.equal(cam.aimPitch, cam.o.minPitch);
+  assert.equal(cam.aimDist, cam.o.minDist);
+  cam.pitch = 0.3; // direct assignment (URL hash) snaps aim and shown value
+  assert.equal(cam.aimPitch, 0.3);
+});
+
+test('FollowCamera: damped turn is smooth at 60 fps and 10 fps, never overshoots, wraps yaw', () => {
+  const city = synthCity();
+  const feet = [5, city.floorY, -5];
+  for (const dt of [1 / 60, 1 / 10]) {
+    const cam = new FollowCamera();
+    cam.input([1, 0], 0);
+    let last = cam.yaw, steps = 0;
+    for (let t = 0; t < 1; t += dt) {
+      cam.update(city, feet, dt);
+      assert.ok(cam.yaw >= last - 1e-12 && cam.yaw <= 1 + 1e-12, `monotonic, no overshoot at dt ${dt}: ${cam.yaw}`);
+      last = cam.yaw; steps++;
+    }
+    assert.ok(Math.abs(cam.yaw - 1) < 1e-3, `settled at dt ${dt}`);
+  }
+  const cam = new FollowCamera();
+  cam.yaw = 3.1;
+  cam.input([0.2, 0], 0); // across +PI: the aim wraps, the shown yaw takes the short way
+  assert.ok(cam.aimYaw < 0);
+  cam.update(city, feet, 1 / 60);
+  assert.ok(Math.abs(cam.yaw) > 3, `short way round: ${cam.yaw}`);
+});
+
+test('FollowCamera: collision pull-in still works on the damped values', () => {
+  const city = synthCity();
+  const feet = [5, city.floorY, -5];
+  const cam = new FollowCamera();
+  cam.yaw = Math.PI; // looking south: the camera sits north (-z) of the player
+  cam.update(city, feet, 1 / 60);
+  assert.ok(Math.abs(cam.dist - 5) < 1e-9);
+  cam.input([Math.PI, 0], 0); // turn round to look north: the camera swings south, free
+  for (let q = 0; q < 60; q++) cam.update(city, feet, 1 / 60);
+  assert.ok(Math.abs(cam.dist - 5) < 0.05);
+  city.fill(0, 4, 5, 39, 5, 30); // wall between player and camera (south)
+  let r;
+  for (let q = 0; q < 10; q++) r = cam.update(city, feet, 1 / 60);
+  assert.ok(r.position[2] < -3, `pulled in: ${r.position[2]}`);
 });
 
 test('raycast finds the first solid point and the spawn point is backed off toward the viewer', () => {
@@ -81,4 +126,96 @@ test('walk hash: #mode=walk&at=x,z with optional yaw/camyaw/pitch/dist', () => {
   assert.equal(parseWalkHash('#mode=walk'), null);
   assert.equal(parseWalkHash('#view=hero'), null);
   assert.equal(parseWalkHash('#mode=walk&at=a,b'), null);
+});
+
+test('over the right shoulder, pulled in by a wall on that side; trails the body; sprint pulls back and widens', () => {
+  const city = synthCity();
+  const feet = [10, city.floorY, -10];
+  const cam = new FollowCamera();
+  cam.yaw = 0; // looking north: right is +x
+  let r = cam.update(city, feet, 1);
+  assert.ok(Math.abs(r.focus[0] - (feet[0] + cam.o.shoulder)) < 1e-6, `focus x ${r.focus[0]}`);
+  assert.equal(r.fov, cam.o.fov);
+  // a wall 0.4 m to the right: the shoulder offset shrinks so the camera doesn't sit inside it
+  const walled = synthCity();
+  walled.fill(21, 0, 5, 21, 39, 12); // x 10.5-11 m
+  const c2 = new FollowCamera(); c2.yaw = 0;
+  r = c2.update(walled, feet, 1);
+  assert.ok(r.focus[0] < feet[0] + 0.3, `walled focus x ${r.focus[0]}`);
+  // trailing: a sudden 1 m step forward is not followed at once
+  const c3 = new FollowCamera(); c3.yaw = 0;
+  c3.update(city, feet, 1);
+  r = c3.update(city, [feet[0], feet[1], feet[2] - 1], 1 / 60);
+  assert.ok(r.focus[2] > feet[2] - 0.9, 'the camera lags behind');
+  for (let q = 0; q < 60; q++) r = c3.update(city, [feet[0], feet[1], feet[2] - 1], 1 / 60);
+  assert.ok(Math.abs(r.focus[2] - (feet[2] - 1)) < 0.01, 'and catches up');
+  // sprinting
+  let s;
+  for (let q = 0; q < 120; q++) s = c3.update(city, [feet[0], feet[1], feet[2] - 1], 1 / 60, 5.2);
+  assert.ok(s.fov > cam.o.fov + 5);
+});
+
+test('phones: portrait screens get a wider view and a smaller shoulder offset; landscape is unchanged', async () => {
+  const { fitFov, shoulderScale } = await import('../src/player/camera.js');
+  assert.equal(fitFov(55, 16 / 9), 55);
+  const p = fitFov(55, 390 / 844);
+  assert.ok(p > 70 && p <= 78, `portrait fov ${p}`);
+  assert.equal(shoulderScale(16 / 9), 1);
+  assert.ok(shoulderScale(390 / 844) < 0.4);
+});
+
+test('FollowCamera: a lamp post between player and camera is looked past; a wall is not; easing out waits', () => {
+  const city = synthCity();
+  const feet = [5, city.floorY, -5];
+  const cam = new FollowCamera({ shoulder: 0 });
+  cam.update(city, feet, 1 / 60);
+  // a post one cell (0.5 m... thin) wide, 2.5 m behind the player, right on the view line
+  const S = city.S, i = Math.floor(5 / S), j = Math.floor((5 - 2.5) / S); // Unity north = -z
+  city.fill(i - 0, j, 5, i, j, 30);
+  const thin = pullIn(city, [5.25, city.floorY + 1.6, -5], [0, 0, 1], 5, { thin: 0.55 });
+  const solid = pullIn(city, [5.25, city.floorY + 1.6, -5], [0, 0, 1], 5);
+  assert.ok(solid < 2.6, `without the option the post blocks: ${solid}`);
+  assert.equal(thin, 5);
+  city.fill(0, j, 5, 39, j, 30); // the same thickness as a wall right across: blocks
+  assert.ok(pullIn(city, [5.25, city.floorY + 1.6, -5], [0, 0, 1], 5, { thin: 0.55 }) < 2.6);
+  // a wall (thicker than a post) still blocks, and after it goes the camera holds, then eases out
+  const c2 = synthCity(), cam2 = new FollowCamera();
+  cam2.update(c2, feet, 1 / 60);
+  c2.fill(0, 4, 5, 39, 5, 30);
+  for (let q = 0; q < 20; q++) cam2.update(c2, feet, 1 / 60);
+  const inD = cam2.dist;
+  assert.ok(inD < 3);
+  const open = synthCity(); // (the wall is no longer in the way)
+  cam2.update(open, feet, 1 / 60);
+  assert.ok(Math.abs(cam2.dist - inD) < 1e-9, 'holds for a moment');
+  let prev = cam2.dist, maxStep = 0;
+  for (let q = 0; q < 120; q++) { cam2.update(open, feet, 1 / 60); maxStep = Math.max(maxStep, cam2.dist - prev); prev = cam2.dist; }
+  assert.ok(Math.abs(cam2.dist - 5) < 0.05, `back out: ${cam2.dist}`);
+  assert.ok(maxStep < 0.12, `eased, no pop: ${maxStep}`);
+});
+
+test('the manga posing shot: drama swings the camera to the front three-quarter, low, looking up', () => {
+  const city = { isSolid: () => false, floorY: 0 };
+  const cam = new FollowCamera();
+  const feet = [0, 0, 0];
+  cam.aimYaw = 0; cam.snap();
+  let r = cam.update(city, feet, 1);
+  assert.ok(r.position[2] > 1, 'behind: south of a player looking north');
+  cam.drama = 1; cam.dramaYaw = Math.PI + 0.55; // the player faces north (yaw 0): its front is to the north
+  r = cam.update(city, feet, 1);
+  assert.ok(r.position[2] < -1, `in front: ${r.position[2]}`);
+  assert.ok(r.position[1] < r.focus[1], 'below the focus, looking up');
+  assert.ok(r.fov > 55, 'a little wider');
+});
+
+test('the posing shot can be orbited: look input moves round it, and is forgotten when the pose ends', () => {
+  const city = { isSolid: () => false, floorY: 0 };
+  const cam = new FollowCamera(); cam.aimYaw = 0; cam.snap();
+  cam.drama = 1; cam.dramaYaw = Math.PI;
+  const a = cam.update(city, [0, 0, 0], 1).position;
+  cam.input([0.8, 0], 0);
+  const b = cam.update(city, [0, 0, 0], 1).position;
+  assert.ok(Math.hypot(a[0] - b[0], a[2] - b[2]) > 1, 'the camera moved round the figure');
+  cam.drama = 0; cam.update(city, [0, 0, 0], 1);
+  assert.equal(cam.dramaOff, null);
 });
