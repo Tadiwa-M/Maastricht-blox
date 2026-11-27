@@ -1,0 +1,219 @@
+{
+  "film/maastricht-blox.mp4": {
+    "title": "Web trailer",
+    "note": "The web game's trailer, rendered by scripts/film (contract/shots.json).",
+    "engine": "web",
+    "look": "classic",
+    "kind": "ok"
+  },
+  "film/stills/bosscherweg.png": {
+    "title": "Trailer still: Bosscherweg",
+    "note": "Still from the web trailer.",
+    "engine": "web",
+    "look": "classic",
+    "kind": "ok"
+  },
+  "film/stills/city.png": {
+    "title": "Trailer still: city",
+    "note": "Still from the web trailer.",
+    "engine": "web",
+    "look": "classic",
+    "kind": "ok"
+  },
+  "film/stills/dive.png": {
+    "title": "Trailer still: dive",
+    "note": "Still from the web trailer.",
+    "engine": "web",
+    "look": "classic",
+    "kind": "ok"
+  },
+  "film/stills/enci.png": {
+    "title": "Trailer still: ENCI",
+    "note": "Still from the web trailer.",
+    "engine": "web",
+    "look": "classic",
+    "kind": "ok"
+  },
+  "film/stills/markt.png": {
+    "title": "Trailer still: Markt",
+    "note": "Still from the web trailer.",
+    "engine": "web",
+    "look": "classic",
+    "kind": "ok"
+  },
+  "film/stills/night.png": {
+    "title": "Trailer still: night",
+    "note": "Still from the web trailer.",
+    "engine": "web",
+    "look": "classic",
+    "kind": "ok"
+  },
+  "film/stills/station.png": {
+    "title": "Trailer still: station",
+    "note": "Still from the web trailer.",
+    "engine": "web",
+    "look": "classic",
+    "kind": "ok"
+  },
+  "film/stills/street.png": {
+    "title": "Trailer still: street",
+    "note": "Still from the web trailer.",
+    "engine": "web",
+    "look": "classic",
+    "kind": "ok"
+  },
+  "shots/u_default.png": {
+    "title": "Unity: city, default camera",
+    "note": "build/world in the player, framed by -bloxCam.",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "test"
+  },
+  "shots/u_dusk.png": {
+    "title": "Unity: dusk (16:20)",
+    "note": "Time of day via -bloxHour.",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "test"
+  },
+  "shots/u_night.png": {
+    "title": "Unity: night (21:00)",
+    "note": "Very dark: night lighting still needs work.",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "test"
+  },
+  "shots/u_overview.png": {
+    "title": "Unity: city overview",
+    "note": "2.5 km overview after the distance-scaled fog and haze-coloured sky ground fix.",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "ok"
+  },
+  "shots/unity_editor_world_before_fix.jpg": {
+    "title": "unity editor world before fix",
+    "note": "",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "test"
+  },
+  "shots/unity_editor_world_play.jpg": {
+    "title": "unity editor world play",
+    "note": "",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "test"
+  },
+  "shots/unity_hero.png": {
+    "title": "Unity: test diorama",
+    "note": "First working Unity player shot, build/testscene, after the capture fix.",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "ok"
+  },
+  "shots/unity_hero_cam.png": {
+    "title": "unity hero cam",
+    "note": "",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "test"
+  },
+  "shots/unity_hero_d25.png": {
+    "title": "Unity: blank grey frame",
+    "note": "First player shot: flat grey. Two causes: scene baked before the test world existed, and ScreenCapture returned an empty frame under URP/D3D12. Both fixed.",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "bug"
+  },
+  "shots/unity_maastricht_final.png": {
+    "title": "Unity: whole Maastricht (65k chunks)",
+    "note": "build/world_maastricht in a fresh player build at 13:00.",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "ok"
+  },
+  "shots/unity_maastricht_h13_centre_60s.png": {
+    "title": "unity maastricht h13 centre 60s",
+    "note": "",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "test"
+  },
+  "shots/unity_maastricht_h13_samecam.png": {
+    "title": "unity maastricht h13 samecam",
+    "note": "",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "test"
+  },
+  "shots/unity_maastricht_h13_samecam_60s.png": {
+    "title": "unity maastricht h13 samecam 60s",
+    "note": "",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "test"
+  },
+  "shots/unity_maastricht_newbuild.png": {
+    "title": "unity maastricht newbuild",
+    "note": "",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "test"
+  },
+  "shots/unity_maastricht_newbuild_oldcam.png": {
+    "title": "unity maastricht newbuild oldcam",
+    "note": "",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "test"
+  },
+  "shots/unity_world_maastricht.png": {
+    "title": "Unity: 65k world near-black",
+    "note": "Shot at 19:38 real time, so night; plus a stale player. Shots now default to 13:00.",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "bug"
+  },
+  "shots/verse_test_classic.png": {
+    "title": "Unity: classic, 350 m",
+    "note": "Same view as the verse overview, for comparison.",
+    "engine": "unity",
+    "look": "classic",
+    "kind": "test"
+  },
+  "shots/verse_test_close.png": {
+    "title": "Unity: verse look, 70 m",
+    "note": "Street-level verse: bold colour, but ink lines and halftone too faint; no painted surfaces yet (web has them).",
+    "engine": "unity",
+    "look": "verse",
+    "kind": "test"
+  },
+  "shots/verse_test_verse.png": {
+    "title": "Unity: verse look, 350 m",
+    "note": "First Unity port of the comic look (full-screen pass only): flat bold colour, cool shade; lines already faded at this distance.",
+    "engine": "unity",
+    "look": "verse",
+    "kind": "test"
+  },
+  "testscene/preview.png": {
+    "title": "preview",
+    "note": "Pipeline preview render of build/testscene (python, not a game engine).",
+    "engine": "pipeline",
+    "look": "classic",
+    "kind": "test"
+  },
+  "testscene/preview_iso.png": {
+    "title": "preview iso",
+    "note": "Pipeline preview render of build/testscene (python, not a game engine).",
+    "engine": "pipeline",
+    "look": "classic",
+    "kind": "test"
+  },
+  "testscene/preview_iso_row.png": {
+    "title": "preview iso row",
+    "note": "Pipeline preview render of build/testscene (python, not a game engine).",
+    "engine": "pipeline",
+    "look": "classic",
+    "kind": "test"
+  }
+}

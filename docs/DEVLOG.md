@@ -2056,3 +2056,6 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   test checks every link lands and every #L line still holds its name (re-run the tool when code moves).
 - 2026-11-27 Shooting view: the figure fades when it covers the crosshair, the hip camera sits 1 m over the shoulder, and aimed guns drop below the crosshair (`mp/aimview.js`, guide 18). Parked (owner): the floating gun, the JoJo poses' dexterity, a pose button on keyboard and controller, Stand abilities checked on a real controller.
 - 2026-11-27 Matches are first person while alive (owner: no character in front when aiming); the knocked-out view stays over the shoulder (guide 18).
+- 2026-11-27 Gallery: `scripts/gallery.py` puts every screenshot, still and video under `build/` on one page
+  (`build/gallery/index.html`, `--open` to view), newest first, with captions and Unity/web/bug filters. Media stay in
+  `build/` (not in git: the trailer alone is 74 MB); captions are tracked in `docs/gallery.json`.
