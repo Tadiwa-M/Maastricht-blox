@@ -266,3 +266,9 @@ rule being that nothing of yours ever hides the target:
   camera in, sprinting, and any pose where an arm crosses the line.
 - Aiming down the sights, every gun sits `ADS_DROP` (3 cm lower, 10 cm further) below its own aim point, so the sights
   sit just under the crosshair instead of over it. The crosshair stays on screen while aiming (except scopes).
+
+**First person (later the same day).** Owner, with Call of Duty screenshots: "I just don't want my character in front of
+me when I'm trying to aim/zoom with a gun". A match is now first person while you're alive, as Call of Duty is: the
+camera sits at the eyes, the gun low and to the right from the hip, its sights centred when aiming (`ADS_DROP` reduced
+to 1.2 cm lower and 8 cm further). Knocked out, the camera steps back over the shoulder (`COMBAT_SHOULDER`) so you see
+yourself down. Other players still see your figure.

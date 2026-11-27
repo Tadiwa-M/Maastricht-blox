@@ -1,9 +1,10 @@
 // Keeping the aim clear (owner, 2026-11-27: "the shooting view is still obstructed, this makes it very hard to aim").
 // Pure maths, no three.js: how much the player's own figure covers the crosshair (the shooting camera fades it by
-// this), and how far the gun drops when aiming so its sights don't fill the middle of the view.
+// this whenever the camera is behind it), and how far the gun drops when aiming so its sights don't fill the middle of the view.
+// A match is first person since 2026-11-27, so the fade now matters only in the knocked-out view.
 
 /** Aiming down the sights: the gun sits this much lower and further than its own aim point (camera space, m). */
-export const ADS_DROP = [0, -0.03, -0.1];
+export const ADS_DROP = [0, -0.012, -0.08]; // (the sights sit centred, the bulky brick receiver a touch lower and further)
 /** The figure counts as in the way inside CLEAR_IN of the aim ray, and as clear past CLEAR_OUT (m). */
 export const CLEAR_IN = 0.32, CLEAR_OUT = 0.6;
 const HEIGHTS = [0.35, 0.8, 1.2, 1.55]; // sample points up the figure, from the feet (m)

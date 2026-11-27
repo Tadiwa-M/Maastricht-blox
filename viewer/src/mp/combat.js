@@ -13,7 +13,7 @@ import { standSpot } from '../player/spot.js';
 import { usablePads } from '../player/input.js';
 
 const HIP_DIST = 2.6, EYE_DIST = 0.05, TRACER_S = 0.09, DARK = '#4b4f5c';
-export const COMBAT_SHOULDER = 1.0; // m: the hip-fire camera over the right shoulder (0.85 left the figure too near the crosshair)
+export const COMBAT_SHOULDER = 1.0; // m: the knocked-out camera over the right shoulder (alive, a match is first person)
 const _A = new THREE.Vector3(), _F = new THREE.Vector3(), _L = new THREE.Vector3(), _R = new THREE.Vector3(), _D = new THREE.Vector3(), _T = new THREE.Vector3(), _UP = new THREE.Vector3(0, 1, 0), _M = new THREE.Matrix4(), _Q = new THREE.Quaternion();
 const CSS = `
 #cb { position: fixed; inset: 0; pointer-events: none; z-index: 4; font-family: system-ui, sans-serif; }
@@ -567,10 +567,10 @@ export class Combat {
     this.want.rush = false;
     // health comes back after a while without a hit (as the room counts it: weapons.js REGEN)
     if (alive && this.hp < this.maxHp && performance.now() - (this.hurtAt || 0) > REGEN.delay * 1000) this.hp = Math.min(this.maxHp, this.hp + REGEN.rate * dt);
-    // the shooting camera (Call of Duty: your aim is never blocked): from the hip the camera sits
-    // over the right shoulder (the figure to the left of the crosshair); aiming goes to the eyes
-    // (the gun in the hands); the figure fades when the camera is close to it
-    const hipShoulder = Math.max(this.saved.o.shoulder || 0, COMBAT_SHOULDER);
+    // the shooting camera, first person like Call of Duty (owner: "I just don't want my character in front
+    // of me when I'm trying to aim"): alive, the camera is at the eyes, the gun low and right from the hip and
+    // its sights centred when aiming; knocked out, it steps back over the shoulder so you see yourself down
+    const eyesK = alive ? 1 : 0;
     // aim: ease in and out; the follow camera moves to the eyes and narrows its view
     const wantAim = alive && this.aiming && !this.gun.reloading && !def.melee ? 1 : 0;
     this.aim += (wantAim - this.aim) * Math.min(1, dt * 14);
@@ -582,8 +582,8 @@ export class Combat {
       f.aimYaw = wrap(f.aimYaw - wrap(f.aimYaw - this.prevAim[0]) * (1 - sens));
       f.aimPitch -= (f.aimPitch - this.prevAim[1]) * (1 - sens);
     }
-    f.o.minDist = EYE_DIST; f.o.shoulder = lerp(hipShoulder, 0, a); f.o.fov = lerp(this.saved.o.fov, fov, a);
-    f.aimDist = lerp(HIP_DIST, EYE_DIST, a);
+    f.o.minDist = EYE_DIST; f.o.shoulder = eyesK ? 0 : COMBAT_SHOULDER; f.o.fov = lerp(this.saved.o.fov, fov, a);
+    f.aimDist = eyesK ? EYE_DIST : HIP_DIST;
     // see-through while the camera passes through it, and whenever the figure covers the crosshair
     // (owner: "the shooting view is still obstructed"): the aim is never hidden behind your own back
     const cp = this.camera.position, cd = this.camera.getWorldDirection(_F);
