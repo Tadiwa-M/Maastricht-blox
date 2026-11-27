@@ -5,6 +5,8 @@
 // (a console game's title screen: rotating in-game key art while loading, then the live city behind the logo, button prompts that answer
 // "how do I get back to the map?"). Skipped for screenshots and automation (?shot=1 or
 // navigator.webdriver).
+import { startTitleFx } from './titlefx.js';
+import { LOOK } from './render/verse.js';
 
 const MSG = {
   index: 'Laying the baseplate…',
@@ -86,7 +88,7 @@ export class LoadingScreen {
     this.frac = 0;
     const auto = typeof navigator !== 'undefined' && navigator.webdriver;
     if (el && (auto || /[?&]shot=1/.test(location.search))) { this.hide(true); return; }
-    if (el) { el.ownerDocument?.body.classList.add('title'); this.rotateTips(); this.rotateSlides(); }
+    if (el) { el.ownerDocument?.body.classList.add('title'); this.rotateTips(); this.rotateSlides(); this.fx = startTitleFx(el.querySelector?.('.fx'), LOOK || 'classic'); }
   }
 
   /** Key art slideshow (GTA-style): one slide at a time, crossfading, with its place name. */
@@ -174,6 +176,7 @@ export class LoadingScreen {
     if (!this.el || this.done) return;
     this.done = true;
     clearInterval(this.tipTimer); clearInterval(this.slideTimer);
+    this.fx?.stop();
     for (const fn of this.after || []) fn();
     this.after = null;
     this.el.ownerDocument?.body.classList.remove('title');

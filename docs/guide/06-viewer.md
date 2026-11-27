@@ -207,6 +207,13 @@ triangles, 17.5 / 5.4 / 1.5 MB.
   length, not brick count (`picking.js`, tested in `test/picking.test.mjs`).
 
 ### Title screen (`src/loading.js`, `#loading` in `index.html`)
+**Print layer (`src/titlefx.js`, 2026-11-27).** A moving halftone layer over the key art: a flowing colour field in the look's
+inks (`TITLE_FX`: Classic the logo's blue, red and yellow; Spider-Verse magenta, cyan and yellow; Manga violet, lilac and teal),
+printed as dot patches only where the field is strong, a light leak breathing in from the top right, and film grain;
+screen-blended at 42% and faded out once the live city plays. One small WebGL shader (falls back to nothing without WebGL,
+one still frame with reduced motion). It ports the idea of shaders.com's FlowingGradient + Halftone + LightLeak + FilmGrain
+stack rather than the package: that is WebGPU-only (no iPhone Safari or Firefox), 2.6 MB minified, sends telemetry to its
+server unless switched off, and did not draw in the headless check.
 Modelled on console-game title screens (Spider-Man PS4, FIFA: the live game world behind the logo;
 GTA V: minimal UI, tips in one corner, a small spinner in the other).
 - **Key art while loading:** a dark backdrop with the logo: MAASTRICHT in Anton (Google Fonts,
