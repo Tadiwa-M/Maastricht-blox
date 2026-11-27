@@ -2009,5 +2009,15 @@ Tests: `gpu.test.mjs`, tier/governor tests extended (153 pass).
   (would need a no-desync design). Concept sheets come from an outside AI (owner), see `docs/concepts/README.md`.
 - 2026-11-24 Plan: the Unity track (two products, modular rules) added to PLAN.md and CLAUDE.md. Unity not run yet (workstation busy, credits).
 - 2026-11-24 The two-engine design rules are in docs/ARCHITECTURE.md (committed). Unity attach: the owner's desktop folder is listed but not offered to cloud sessions (the desktop app needs an update); Unity not run.
+- 2026-11-25 Unity first run on the workstation (6000.6.7f1): compile, 14 EditMode tests and the player build pass. The hero shot was
+  blank for two reasons, both fixed: `unity.ps1 setup` baked the scene before `build/testscene` existed (camera framed on the
+  fallback target, so no chunk was in view; the world is now generated first), and `ScreenCapture.CaptureScreenshot` returns an
+  empty frame in the URP/D3D12 player (ShotRunner now renders the camera to a texture). Still only the 2-chunk test diorama: the
+  real-world Unity build is next.
+- 2026-11-25 `unity.ps1 setup|shot -World <dir>` frames and shoots any world. First real-city run (`build/world`, 4096 chunks, 2448
+  islands): streams, meshes, lights and shadows correctly in the player, no errors; the camera starts closer than a city overview.
+- 2026-11-25 Unity overview fixed: at 2500 m the street-level fog (exp², 0.0006) turned the city flat grey, so `MapCameraRig` now thins the
+  fog with distance (about 25 % haze on the scene at any zoom); the skybox ground colour (seen looking down past the map edge) is a cool
+  haze, not brown. Shot args: `unity.ps1 shot -Out x.png -ShotArgs '-bloxCam','x,z,dist','-bloxHour','13','-bloxShotDelay','20'`.
 - 2026-11-27 Title screen print layer (`titlefx.js`): halftone patches, light leak and grain in each look's inks. shaders.com's package was tried and dropped (WebGPU-only, 2.6 MB, telemetry on by default, no output in the headless check); its effect stack was ported as one WebGL shader (guide 06).
 - 2026-11-27 `learn/`: the AI dilemma and its plan, a ten-track curriculum taught from this repo, real bug case studies, a no-credits checklist with a spec template, a tutor prompt, and two tools (`map.mjs`, `quiz.mjs`; tested in viewer/test/learn.test.mjs).

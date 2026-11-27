@@ -62,6 +62,11 @@ namespace Blox.Gameplay
         [SerializeField, Range(10f, 300f)] private float focalLengthAt100m = 190f;
         [SerializeField, Range(1f, 32f)] private float aperture = 2.2f;
 
+        [Header("Haze")]
+        [SerializeField] private bool scaleFogWithDistance = true;
+        [Tooltip("Exponential-squared fog density at street level; the rig lowers it as the camera zooms out.")]
+        [SerializeField, Min(0f)] private float streetFogDensity = 0.0006f;
+
         private Camera _camera;
         private DepthOfField _dof;
         private Vector3 _desiredTarget;
@@ -158,6 +163,10 @@ namespace Blox.Gameplay
             if (_camera == null) _camera = GetComponent<Camera>();
             _camera.nearClipPlane = Mathf.Clamp(distance * 0.01f, 0.05f, 5f);
             _camera.farClipPlane = Mathf.Max(4000f, distance * 6f);
+            // Street-level haze would turn a city overview into flat grey: thin the fog as the camera rises
+            // so the scene itself stays about 25 % hazed whatever the zoom.
+            if (scaleFogWithDistance && RenderSettings.fog)
+                RenderSettings.fogDensity = Mathf.Min(streetFogDensity, 0.3f / (distance * 1.3f));
         }
 
         private void HandleMouse()

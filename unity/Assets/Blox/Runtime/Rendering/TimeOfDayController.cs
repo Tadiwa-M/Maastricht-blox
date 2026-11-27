@@ -95,6 +95,18 @@ namespace Blox.Rendering
                 RenderSettings.skybox = _skyInstance;
             }
             if (driveAmbient) RenderSettings.ambientMode = AmbientMode.Trilight;
+            ApplyCommandLineHour();
+        }
+
+        /// <summary>A player started with <c>-bloxHour 14.5</c> shows that local Maastricht hour today (reproducible shots).</summary>
+        private void ApplyCommandLineHour()
+        {
+            var args = System.Environment.GetCommandLineArgs();
+            int a = System.Array.IndexOf(args, "-bloxHour");
+            if (a < 0 || a + 1 >= args.Length) return;
+            if (!float.TryParse(args[a + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float hour)) return;
+            var now = DateTime.Now;
+            SetManualTime(now.Year, now.DayOfYear, hour);
         }
 
         private void OnDisable()
